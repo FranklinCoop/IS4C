@@ -588,3 +588,4 @@ function createViews($dstr,$db){
 }
 
 ?>
+

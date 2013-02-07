@@ -7,6 +7,8 @@ $ts_db = FannieDB::get($FANNIE_PLUGIN_SETTINGS['TimesheetDatabase']);
 
 class TimesheetPage extends FanniePage {
 
+	protected $auth_classes = array('timesheet_access');
+
 	private $display_func;
 	private $errors;
 
@@ -22,7 +24,10 @@ class TimesheetPage extends FanniePage {
 
 		$max = ($_GET['max']) ? 10 : 10;  // Max number of entries.
 
-		if ($_GET['login'] == 1 || $_SESSION['logged_in'] == True) include("/pos/fannie/src/passwd.php");
+		if (!$this->current_user && $_GET['login'] == 1 ){
+			$this->login_redirect();
+			return False;
+		}
 
 		if (isset($_POST['submitted'])) { // If the form has been submitted.
 			// Validate the data.
@@ -154,12 +159,14 @@ class TimesheetPage extends FanniePage {
 	}
 
 	function success_content(){
+		include ('./includes/header.html');
 		echo "<div id='alert'><h1>Success!</h1>";
 		echo '<p>If you like, you may <a href="'.$_SERVER['PHP_SELF'].'">add more hours</a> 
-			or you can <a href="./viewsheet.php">edit hours</a>.</p></div>';
+			or you can <a href="./ViewsheetPage.php">edit hours</a>.</p></div>';
 	}
 
 	function error_content(){
+		include ('./includes/header.html');
 		echo '<div id="alert"><p><font color="red">The following error(s) occurred:</font></p>';
 		foreach ($this->errors AS $message) {
 			echo "<p> - $message</p>";
@@ -168,7 +175,7 @@ class TimesheetPage extends FanniePage {
 	}
 
 	function body_content(){
-		global $ts_db;
+		global $ts_db, $FANNIE_OP_DB, $FANNIE_URL, $FANNIE_PLUGIN_SETTINGS;
 		include ('./includes/header.html');
 		/**
 		  if preprocess() changed the setting for display_func 
@@ -183,11 +190,14 @@ class TimesheetPage extends FanniePage {
 		echo "<body onLoad='putFocus(0,0);'>";
 		echo '<form action="'.$_SERVER['PHP_SELF'].'" method="POST" name="timesheet" id="timesheet">';
 		echo '<table border=0 cellpadding=4><tr>';
-		if ($_SESSION['logged_in'] == True) {
+		if ($this->current_user){
 			echo '<td><p>Name: <select name="emp_no">
 				<option value="error">Select staff member</option>' . "\n";
 		
-			$query = "SELECT FirstName, IF(LastName='','',CONCAT(SUBSTR(LastName,1,1),\".\")), emp_no FROM ".$FANNIE_OP_DB.".employees where EmpActive=1 ORDER BY FirstName ASC";
+			$query = "SELECT FirstName, 
+				CASE WHEN LastName='' OR LastName IS NULL THEN ''
+				ELSE ".$ts_db->concat('LEFT(LastName,1)',"'.'")." END,
+				emp_no FROM ".$FANNIE_OP_DB.".employees where EmpActive=1 ORDER BY FirstName ASC";
 			$result = $ts_db->query($query);
 			while ($row = $ts_db->fetch_array($result)) {
 				echo "<option value=\"$row[2]\">$row[0] $row[1]</option>\n";
@@ -216,8 +226,8 @@ class TimesheetPage extends FanniePage {
 			<button name="submit" type="submit">Submit</button>
 			<input type="hidden" name="submitted" value="TRUE" /></td></tr>
 			</table></form>';	
-		if ($_SESSION['logged_in'] == True) {
-			echo "<div class='log_btn'><a href='" . $_SERVER["PHP_SELF"] . "?logout=1'>logout</a></div>";
+		if ($this->current_user){
+			echo "<div class='log_btn'><a href='" . $FANNIE_URL . "auth/ui/loginform.php?logout=1'>logout</a></div>";
 		} else {
 			echo "<div class='log_btn'><a href='" . $_SERVER["PHP_SELF"] . "?login=1'>login</a></div>";  //   class='loginbox'
 		}

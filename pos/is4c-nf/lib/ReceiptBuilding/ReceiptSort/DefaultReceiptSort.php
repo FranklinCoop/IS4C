@@ -138,4 +138,39 @@ class DefaultReceiptSort {
 		else
 			return $r1['trans_id'] - $r2['trans_id'];
 	}
+
+	/**
+	  Combine item records when appropriate
+	  @param $cur an array of records some of which
+		are keyed by UPC
+	  @param $new a new record
+	  @return $cur with the new record added
+	*/
+	protected function upc_merge($cur, $new){
+		if ($new['trans_status'] != '' || $row['trans_type'] != ''
+		   || $new['scale'] != 0 || $new['matched'] != 0){
+			/**
+			  By-weight, refund, void, or group discount
+			  items shouldn't be combined. They
+			  get added with a simple numerical key
+			*/
+			$cur[] = $new;
+		}
+		else if (isset($cur[$new['upc']])){
+			/**
+			  Valid item to merge; add to the existing record
+			*/
+			$cur[$new['upc']]['ItemQty'] += $new['ItemQty'];
+			$cur[$new['upc']]['quantity'] += $new['quantity'];
+			$cur[$new['upc']]['total'] += $new['total'];
+		}
+		else {
+			/**
+			  Valid item to merge; add record with
+			  UPC key.
+			*/
+			$cur[$new['upc']] = $new;
+		}
+		return $cur;
+	}
 }	

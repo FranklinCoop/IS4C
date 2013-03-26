@@ -82,11 +82,76 @@ static public function center($text, $linewidth) {
 	$newline = substr($blank, 0, $lead).$text;
 	return $newline;
 }
+
 // -------------------------------------------------------------
 static public function drawerKick() {
-
+	$pin = self::currentDrawer();
+	if ($pin == 1)
 		self::writeLine(chr(27).chr(112).chr(0).chr(48)."0");
-		//self::writeLine(chr(27).chr(112).chr(48).chr(55).chr(121));
+	elseif ($pin == 2)
+		self::writeLine(chr(27).chr(112).chr(1).chr(48)."0");
+	//self::writeLine(chr(27).chr(112).chr(48).chr(55).chr(121));
+}
+
+/**
+  Which drawer is currently in use
+  @return
+    1 - Use the first drawer
+    2 - Use the second drawer
+    0 - Current cashier has no drawer
+
+  This always returns 1 when dual drawer mode
+  is enabled. Assignments in the table aren't
+  relevant.
+*/
+static public function currentDrawer(){
+	global $CORE_LOCAL;
+	if ($CORE_LOCAL->get('dualDrawerMode') !== 1) return 1;
+	$db = Database::pDataConnect();
+	$chkQ = 'SELECT drawer_no FROM drawerowner WHERE emp_no='.$CORE_LOCAL->get('CashierNo');
+	$chkR = $db->query($chkQ);
+	if ($db->num_rows($chkR) == 0) return 0;
+	else return array_pop($db->fetch_row($chkR));
+}
+
+/**
+  Assign drawer to cashier
+  @param $emp the employee number
+  @param $num the drawer number
+  @return success True/False
+*/
+static public function assignDrawer($emp,$num){
+	$db = Database::pDataConnect();
+	$upQ = sprintf('UPDATE drawerowner SET emp_no=%d WHERE drawer_no=%d',$emp,$num);
+	$upR = $db->query($upQ);
+	return ($upR !== False) ? True : False;
+}
+
+/**
+  Unassign drawer
+  @param $num the drawer number
+  @return success True/False
+*/
+static public function freeDrawer($num){
+	$db = Database::pDataConnect();
+	$upQ = sprintf('UPDATE drawerowner SET emp_no=NULL WHERE drawer_no=%d',$num);
+	$upR = $db->query($upQ);
+	return ($upR !== False) ? True : False;
+}
+
+/**
+  Get list of available drawers
+  @return array of drawer numbers
+*/
+static public function availableDrawers(){
+	global $CORE_LOCAL;
+	$db = Database::pDataConnect();
+	$q = 'SELECT drawer_no FROM drawerowner WHERE emp_no IS NULL ORDER BY drawer_no';
+	$r = $db->query($q);
+	$ret = array();
+	while($w = $db->fetch_row($r))
+		$ret[] = $w['drawer_no'];
+	return $ret;
 }
 
 // -------------------------------------------------------------
@@ -110,7 +175,7 @@ static public function printReceiptHeader($dateTimeStamp, $ref) {
 			$receipt .= "\n\n";
 		}
 	}
-	else if ($CORE_LOCAL->get("newReceipt")==1 && $CORE_LOCAL->get("store") == "wfc"){
+	else if ($CORE_LOCAL->get("newReceipt")>=1 && $CORE_LOCAL->get("store") == "wfc"){
 		$img = self::$PRINT_OBJ->RenderBitmapFromFile(MiscLib::base_url()."graphics/WFC_Logo.bmp");
 		$receipt .= $img."\n";
 		$i=4;
@@ -1077,7 +1142,7 @@ static public function printReceipt($arg1,$second=False) {
 			$receipt .= "\n";
 	
 			if (trim($CORE_LOCAL->get("memberID")) != $CORE_LOCAL->get("defaultNonMem")) {
-				if ($CORE_LOCAL->get("newReceipt")==1){
+				if ($CORE_LOCAL->get("newReceipt")>=1){
 					$receipt .= self::$PRINT_OBJ->TextStyle(True,False,True);
 					$receipt .= self::$PRINT_OBJ->centerString("thank you - owner ".$member,True);
 					$receipt .= self::$PRINT_OBJ->TextStyle(True);
@@ -1089,7 +1154,7 @@ static public function printReceipt($arg1,$second=False) {
 				}
 			}
 			else {
-				if ($CORE_LOCAL->get("newReceipt")==1){
+				if ($CORE_LOCAL->get("newReceipt")>=1){
 					$receipt .= self::$PRINT_OBJ->TextStyle(True,False,True);
 					$receipt .= self::$PRINT_OBJ->centerString("thank you",True);
 					$receipt .= self::$PRINT_OBJ->TextStyle(True);

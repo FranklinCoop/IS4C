@@ -123,6 +123,22 @@ class AutoLoader extends LibraryClass {
 			$path = realpath(dirname(__FILE__).'/ReceiptBuilding/TenderReports');
 			$map = Plugin::PluginMap($path,$map);
 			break;
+		case 'DefaultReceiptDataFetch':
+			$path = realpath(dirname(__FILE__).'/ReceiptBuilding/ReceiptDataFetch');
+			$map = Plugin::PluginMap($path,$map);
+			break;
+		case 'DefaultReceiptFilter':
+			$path = realpath(dirname(__FILE__).'/ReceiptBuilding/ReceiptFilter');
+			$map = Plugin::PluginMap($path,$map);
+			break;
+		case 'DefaultReceiptSort':
+			$path = realpath(dirname(__FILE__).'/ReceiptBuilding/ReceiptSort');
+			$map = Plugin::PluginMap($path,$map);
+			break;
+		case 'DefaultReceiptTag':
+			$path = realpath(dirname(__FILE__).'/ReceiptBuilding/ReceiptTag');
+			$map = Plugin::PluginMap($path,$map);
+			break;
 		case 'ProductSearch':
 			$path = realpath(dirname(__FILE__).'/Search/Products');
 			$map = Plugin::PluginMap($path,$map);
@@ -132,7 +148,7 @@ class AutoLoader extends LibraryClass {
 		foreach($map as $name => $file){
 
 			// matched base class
-			if ($name == $base_class){
+			if ($name === $base_class){
 				if ($include_base) $ret[] = $name;
 				continue;
 			}
@@ -173,7 +189,7 @@ class AutoLoader extends LibraryClass {
 		while($dh && ($file=readdir($dh)) !== False){
 			if ($file[0] == ".") continue;
 			$fullname = realpath($path."/".$file);
-			if (is_dir($fullname)){
+			if (is_dir($fullname) && $file != "gui-modules"){
 				self::RecursiveLoader($fullname, $map);
 			}
 			else if (substr($file,-4) == '.php'){

@@ -4167,3 +4167,88 @@
 			group by year(d.tdate),month(d.tdate),day(d.tdate),
 			d.upc,p.description
 			order by d.upc,year(d.tdate),month(d.tdate),day(d.tdate)
+/fannie/install/update.php: Tue, 26 Mar 2013 14:30:20 -0400: CREATE TABLE ar_history_sum (
+			card_no INT,
+			charges DECIMAL(10,2),
+			payments DECIMAL(10,2),
+			balance descimal(10,2),
+			PRIMARY KEY (card_no)	
+			)
+/fannie/install/update.php: Tue, 26 Mar 2013 14:30:36 -0400: INSERT INTO AR_EOM_Summary SELECT * FROM AR_EOM_Summary_cache
+/fannie/install/update.php: Tue, 26 Mar 2013 14:30:36 -0400: DROP TABLE AR_EOM_Summary_cache
+/fannie/install/mem.php: Tue, 26 Mar 2013 14:34:00 -0400: 
+	CREATE VIEW ar_live_balance AS
+	SELECT   
+	c.CardNo as card_no,
+	(CASE WHEN a.charges IS NULL THEN 0 ELSE a.charges END)
+	+ (CASE WHEN t.charges IS NULL THEN 0 ELSE t.charges END)
+	as totcharges,
+	(CASE WHEN a.payments IS NULL THEN 0 ELSE a.payments END)
+	+ (CASE WHEN t.payments IS NULL THEN 0 ELSE t.payments END)
+	as totpayments,
+	(CASE WHEN a.balance IS NULL THEN 0 ELSE a.balance END)
+	+ (CASE WHEN t.balance IS NULL THEN 0 ELSE t.balance END)
+	as balance,
+	(CASE WHEN t.card_no IS NULL THEN 0 ELSE 1 END) as mark
+	FROM 
+	core_op.custdata as c left join
+	ar_history_sum as a on c.CardNo=a.card_no and c.personNum=1
+	left join ar_history_today_sum as t ON c.CardNo = t.card_no and c.personNum=1
+	where c.personNum=1
+
+/fannie/install/index.php: Tue, 26 Mar 2013 14:34:08 -0400: 
+	CREATE VIEW ar_live_balance AS
+	SELECT   
+	c.CardNo as card_no,
+	(CASE WHEN a.charges IS NULL THEN 0 ELSE a.charges END)
+	+ (CASE WHEN t.charges IS NULL THEN 0 ELSE t.charges END)
+	as totcharges,
+	(CASE WHEN a.payments IS NULL THEN 0 ELSE a.payments END)
+	+ (CASE WHEN t.payments IS NULL THEN 0 ELSE t.payments END)
+	as totpayments,
+	(CASE WHEN a.balance IS NULL THEN 0 ELSE a.balance END)
+	+ (CASE WHEN t.balance IS NULL THEN 0 ELSE t.balance END)
+	as balance,
+	(CASE WHEN t.card_no IS NULL THEN 0 ELSE 1 END) as mark
+	FROM 
+	core_op.custdata as c left join
+	ar_history_sum as a on c.CardNo=a.card_no and c.personNum=1
+	left join ar_history_today_sum as t ON c.CardNo = t.card_no and c.personNum=1
+	where c.personNum=1
+
+/fannie/install/index.php: Tue, 26 Mar 2013 14:36:21 -0400: 
+	CREATE VIEW memChargeBalance as
+	SELECT   c.CardNo, 
+	(CASE when a.balance is NULL then c.memDiscountLimit
+		ELSE c.memDiscountLimit - a.balance END) as availBal,
+	(CASE when a.balance is NULL then 0 ELSE a.balance END) as balance,
+	CASE WHEN a.mark IS NULL THEN 0 ELSE a.mark END AS mark   
+	FROM core_op.custdata as c left join ar_live_balance as a ON c.CardNo = a.card_no
+	where c.personNum = 1
+
+/fannie/install/index.php: Thu, 28 Mar 2013 10:17:19 -0400: 
+	CREATE VIEW memChargeBalance as
+	SELECT   c.CardNo, 
+	(CASE when a.balance is NULL then c.memDiscountLimit
+		ELSE c.memDiscountLimit - a.balance END) as availBal,
+	(CASE when a.balance is NULL then 0 ELSE a.balance END) as balance,
+	CASE WHEN a.mark IS NULL THEN 0 ELSE a.mark END AS mark   
+	FROM core_op.custdata as c left join ar_live_balance as a ON c.CardNo = a.card_no
+	where c.personNum = 1
+
+/fannie/sync/TableSyncPage.php: Mon, 29 Apr 2013 13:18:21 -0400: INSERT INTO employees VALUES ('56','56','56','Kate','Kipling','STAFF','1','20','20','1900-01-01 00:00')
+/fannie/sync/TableSyncPage.php: Mon, 29 Apr 2013 13:18:21 -0400: INSERT INTO employees VALUES ('57','57','57','Rowan','Oberski','','1','30','30','1900-01-01 00:00')
+/fannie/sync/TableSyncPage.php: Mon, 29 Apr 2013 13:18:21 -0400: INSERT INTO employees VALUES ('902','902','902','John','Eichholz','Finance/I.S. Manager','1','30','30','1959-08-14 00:00:00')
+/fannie/sync/TableSyncPage.php: Mon, 29 Apr 2013 13:18:21 -0400: INSERT INTO employees VALUES ('7000','7000','7000','John','Norton','SUB','1','15','15','1900-01-01 00:00')
+/fannie/sync/TableSyncPage.php: Mon, 29 Apr 2013 13:18:31 -0400: INSERT INTO employees VALUES ('56','56','56','Kate','Kipling','STAFF','1','20','20','1900-01-01 00:00')
+/fannie/sync/TableSyncPage.php: Mon, 29 Apr 2013 13:18:31 -0400: INSERT INTO employees VALUES ('57','57','57','Rowan','Oberski','','1','30','30','1900-01-01 00:00')
+/fannie/sync/TableSyncPage.php: Mon, 29 Apr 2013 13:18:31 -0400: INSERT INTO employees VALUES ('902','902','902','John','Eichholz','Finance/I.S. Manager','1','30','30','1959-08-14 00:00:00')
+/fannie/sync/TableSyncPage.php: Mon, 29 Apr 2013 13:18:31 -0400: INSERT INTO employees VALUES ('7000','7000','7000','John','Norton','SUB','1','15','15','1900-01-01 00:00')
+/fannie/sync/TableSyncPage.php: Thu, 02 May 2013 09:13:21 -0400: INSERT INTO employees VALUES ('56','56','56','Kate','Kipling','STAFF','1','20','20','1900-01-01 00:00')
+/fannie/sync/TableSyncPage.php: Thu, 02 May 2013 09:13:21 -0400: INSERT INTO employees VALUES ('57','57','57','Rowan','Oberski','','1','30','30','1900-01-01 00:00')
+/fannie/sync/TableSyncPage.php: Thu, 02 May 2013 09:13:21 -0400: INSERT INTO employees VALUES ('902','902','902','John','Eichholz','Finance/I.S. Manager','1','30','30','1959-08-14 00:00:00')
+/fannie/sync/TableSyncPage.php: Thu, 02 May 2013 09:13:21 -0400: INSERT INTO employees VALUES ('7000','7000','7000','John','Norton','SUB','1','15','15','1900-01-01 00:00')
+/fannie/sync/TableSyncPage.php: Thu, 02 May 2013 09:13:36 -0400: INSERT INTO employees VALUES ('56','56','56','Kate','Kipling','STAFF','1','20','20','1900-01-01 00:00')
+/fannie/sync/TableSyncPage.php: Thu, 02 May 2013 09:13:36 -0400: INSERT INTO employees VALUES ('57','57','57','Rowan','Oberski','','1','30','30','1900-01-01 00:00')
+/fannie/sync/TableSyncPage.php: Thu, 02 May 2013 09:13:36 -0400: INSERT INTO employees VALUES ('902','902','902','John','Eichholz','Finance/I.S. Manager','1','30','30','1959-08-14 00:00:00')
+/fannie/sync/TableSyncPage.php: Thu, 02 May 2013 09:13:36 -0400: INSERT INTO employees VALUES ('7000','7000','7000','John','Norton','SUB','1','15','15','1900-01-01 00:00')

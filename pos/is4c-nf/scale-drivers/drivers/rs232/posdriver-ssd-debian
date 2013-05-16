@@ -75,7 +75,8 @@ start(){
 		makelogdir
 
 		# Start the driver in the background as user nobody.
-		/usr/bin/sudo -u nobody /var/www/IS4C/pos/is4c-nf/scale-drivers/drivers/rs232/ssd &> ${DHOME}/ssd.log &
+		chmod 777 /dev/ttyS0
+		/usr/bin/sudo -u nobody /pos/pos/is4c-nf/scale-drivers/drivers/rs232/ssd &> ${DHOME}/ssd.log &
 		# Store the PID of the startup process.
 		MYPID=$!
 		echo $MYPID > ${DHOME}/ssd.pid
@@ -86,7 +87,7 @@ start(){
 			# It is not the same pid as the startup returned,
 			# and the startup process is no longer alive.
 			# Apparently takes a bit of time for the daemon to start, or be known to ps.
-			sleep 2
+			sleep 5
 			MYPIDP=`/bin/ps --no-headers -C ssd -o pid=`
 			if [ "$MYPIDP" ] ; then
 				echo "Running: $NAME as PIDP: ${MYPIDP}"

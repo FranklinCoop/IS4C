@@ -26,7 +26,7 @@ fi
 
 #POSD=posdriver2-ssd
 POSD=posdriver-ssd-debian
-SSD=/var/www/IS4C/pos/is4c-nf/scale-drivers/drivers/rs232
+SSD=/pos/pos/is4c-nf/scale-drivers/drivers/rs232
 
 # --VARIABLES- - - - - - - - - - - - - - - - - - - -
 

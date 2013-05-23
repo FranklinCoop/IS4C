@@ -81,7 +81,7 @@ static public function memberID($member_number) {
 	$num_rows = $db->num_rows($result);
 
 	if ($num_rows == 1 && 
-		$member_number == $CORE_LOCAL->get("defaultNonMem")){
+		$member_number !== $CORE_LOCAL->get("defaultNonMem")){
            	$row = $db->fetch_array($result);
 	     	self::setMember($row["CardNo"], $row["personNum"],$row);
 		$ret['redraw_footer'] = True;

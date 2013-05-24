@@ -714,7 +714,7 @@ function create_op_dbs($db,$type){
 		primary key (card_no,modifier_module)
 		)";
 	if(!$db->table_exists('custReceiptMessage',$name)){
-		db_structure_modify($db,'custReceiptMessage',$custRpt,$errors);
+		db_structure_modify($db,'custReceiptMessage',$memRpt,$errors);
 	}
 
 	$dCoup = "CREATE TABLE disableCoupon (

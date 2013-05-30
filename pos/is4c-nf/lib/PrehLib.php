@@ -847,8 +847,9 @@ static public function deptkey($price, $dept,$ret=array()) {
 			$CORE_LOCAL->set("togglefoodstamp",0);
 		}
 
-		// Hard coding starts
-		if ($dept == 606) {
+		// Hard coding starts for making depratmetns negative
+		// bottle dep = 399, paid out == 994
+		if ($dept == 399 || $dept == 994) {
 			$price = -1 * $price;
 			$total = -1 * $total;
 		}

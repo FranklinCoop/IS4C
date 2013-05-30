@@ -331,7 +331,7 @@ static public function getCustomerPref($key){
 	global $CORE_LOCAL;
 	if ($CORE_LOCAL->get('memberID') == 0) return '';
 	$db = Database::pDataConnect();
-	$q = 'SELECT pref_value FROM custPreferences WHERE card_no='.$CORE_LOCAL->get('memberID').' AND '.$key;
+	$q = 'SELECT pref_value FROM custPreferences WHERE card_no='.$CORE_LOCAL->get('memberID').' AND pref_key='.$key;
 	$r = $db->query($q);
 	if ($r === False) return '';
 	if ($db->num_rows($r) == 0) return '';

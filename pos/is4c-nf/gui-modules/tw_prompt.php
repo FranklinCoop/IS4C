@@ -88,6 +88,6 @@ class tw_prompt extends BasicPage {
 	} // END true_body() FUNCTION
 }
 
-new qtty2();
+new tw_prompt();
 
 ?>

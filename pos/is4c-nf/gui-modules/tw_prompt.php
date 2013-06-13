@@ -42,8 +42,6 @@ class tw_prompt extends BasicPage {
 			$this->change_page($this->page_url."gui-modules/pos2.php");
 			return False;
 		}
-		elseif (strlen($tw) > 4)
-			$ret['output'] = DisplayLib::boxMsg(MiscLib::truncate2($tw/100)." "._("tare not supported"));
 		else {
 			if ($tw == "") $tw = 1;
 			$input_string = $CORE_LOCAL->get("item");

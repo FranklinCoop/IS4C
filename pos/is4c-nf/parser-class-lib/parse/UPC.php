@@ -249,8 +249,9 @@ class UPC extends Parser {
 			if (strstr($peek,"** Tare Weight") === False)
 				TransRecord::addTare($row['tareweight']*100);
 		}
+		$scale = ($row["scale"] == 0) ? 0 : 1;
 		//Prompt for tare weight for scale items with 0 tw in db
-		if ($scale != 0 && substr($upc,0,3) != "002" && $row['tareweight'] = 0) {
+		if ($scale != 0 && substr($upc,0,3) != "002" && $row['tareweight'] == 0 ) {
 			$peek = PrehLib::peekItem();
 			if (strstr($peek,"** Tare Weight") === False){
 				$ret['main_frame'] = $my_url."gui-modules/tw_prompt.php";
@@ -265,7 +266,7 @@ class UPC extends Parser {
 			return $ret;
 		}
 
-		$scale = ($row["scale"] == 0) ? 0 : 1;
+		
 
 		/* need a weight with this item
 		   retry the UPC in a few milliseconds and see

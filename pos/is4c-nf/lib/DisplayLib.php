@@ -61,6 +61,7 @@ static public function printfooter($readOnly=False) {
 		'TransPercentDiscount',
 		'MemSales',
 		'EveryoneSales',
+		'FSTotal'
 		'MultiTotal'
 		);
 	}
@@ -128,6 +129,8 @@ static public function printfooter($readOnly=False) {
 	$ret .= sprintf('<td class="reg" style="%s">%s</td>',$modchain[3]->header_css,$label);
 	$label = $modchain[4]->header_content();
 	$ret .= sprintf('<td class="total" style="%s">%s</td>',$modchain[4]->header_css,$label);
+	$label = $modchain[5]->header_content();
+	$ret .= sprintf('<td class="total" style="%s">%s</td>',$modchain[5]->header_css,$label);
 	/* 5/11/12
 	$ret .= "<td class=\"first\">$labelyousaved</td>";
 	$ret .= "<td class=\"reg\">$strpercentdisclabel</td>";

@@ -268,11 +268,12 @@ elseif(!is_array($current_mods) || count($current_mods) != 5){
 	'TransPercentDiscount',
 	'MemSales',
 	'EveryoneSales',
+	'FSToral'
 	'MultiTotal'
 	);
 }
 $footer_mods = AutoLoader::ListModules('FooterBox');
-for($i=0;$i<5;$i++){
+for($i=0;$i<6;$i++){
 	echo '<select name="FOOTER_MODS[]">';
 	foreach($footer_mods as $fm){
 		printf('<option %s>%s</option>',

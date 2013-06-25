@@ -61,7 +61,7 @@ static public function printfooter($readOnly=False) {
 		'TransPercentDiscount',
 		'MemSales',
 		'EveryoneSales',
-		'FSTotal'
+		'FSTotal',
 		'MultiTotal'
 		);
 	}

@@ -344,6 +344,18 @@ static public function addcomment($comment) {
 	self::addItem("",$comment, "C", "CM", "D", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
+/**
+  Add a comment with the correct percentDiscount so that discdounts work if a member number is the first item entered
+  @param $comment is the comment text. Max length allowed 
+  is 30 characters.
+*/
+static public function addMemberComment($comment, $disc) {
+	if (strlen($comment) > 30)
+		$comment = substr($comment,0,30);
+	$comment = str_replace("\\",'',$comment);
+	self::addItem("",$comment, "C", "CM", "D", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+}
+
 
 //--------------------------------- insert change line item ------------------------------------
 

@@ -216,6 +216,8 @@ static public function setMember($member, $personNumber, $row) {
 		self::tender("MI", $CORE_LOCAL->get("runningTotal") * 100);
 	}
 
+	$comment = "Fix to make lttsummeray update if member number is first line";
+	TransRecord::addMemberComment($comment, $CORE_LOCAL->get("percentDiscount"));
 }
 
 /**

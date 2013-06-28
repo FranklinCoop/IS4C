@@ -191,7 +191,7 @@ static public function setMember($member, $personNumber, $row) {
 	}
 	
 	$comment = "Member Added #$member";
-	TransRecord::addMemberComment($comment);
+	TransRecord::addComment($comment);
 
 	$opts = array('upc'=>'MEMENTRY','description'=>'CARDNO IN NUMFLAG','numflag'=>$member);
 	TransRecord::add_log_record($opts);

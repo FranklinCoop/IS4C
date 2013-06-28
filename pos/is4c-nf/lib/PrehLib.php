@@ -189,6 +189,10 @@ static public function setMember($member, $personNumber, $row) {
 	else if ($CORE_LOCAL->get("discountEnforced") == 0 && $CORE_LOCAL->get("tenderTotal") == 0) {
 		$memquery .= " , percentDiscount = 0 ";
 	}
+	
+	$comment = "Member Added #$member";
+	TransRecord::addMemberComment($comment);
+
 	$opts = array('upc'=>'MEMENTRY','description'=>'CARDNO IN NUMFLAG','numflag'=>$member);
 	TransRecord::add_log_record($opts);
 	$conn2->query($memquery);
@@ -215,9 +219,6 @@ static public function setMember($member, $personNumber, $row) {
 		$CORE_LOCAL->set("runningTotal",$CORE_LOCAL->get("amtdue"));
 		self::tender("MI", $CORE_LOCAL->get("runningTotal") * 100);
 	}
-
-	$comment = "Fix to make lttsummeray update if member number is first line";
-	TransRecord::addMemberComment($comment, $CORE_LOCAL->get("percentDiscount"));
 }
 
 /**

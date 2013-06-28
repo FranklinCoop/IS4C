@@ -483,7 +483,7 @@ static public function biggerFont($str) {
 static public function centerBig($text) {
 	$blank = str_repeat(" ", 30);
 	$text = trim($text);
-	$lead = (int) ((30 - strlen($text)) / 2);
+	$lead = (int) ((28 - strlen($text)) / 2);
 	$newline = substr($blank, 0, $lead).$text;
 	return $newline;
 }

@@ -353,7 +353,7 @@ static public function addMemberComment($comment, $disc) {
 	if (strlen($comment) > 30)
 		$comment = substr($comment,0,30);
 	$comment = str_replace("\\",'',$comment);
-	self::addItem("",$comment, "C", "CM", "D", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+	self::addItem("",$comment, "C", "CM", "D", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, $disc, 0, 0, 0, 0);
 }
 
 

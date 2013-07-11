@@ -1179,7 +1179,7 @@ static public function printReceipt($arg1,$second=False,$email=False) {
 			}
 
 			/***** CvR add charge total to receipt bottom ****/
-			$receipt['any'] = self::chargeBalance($receipt['any']);
+			//$receipt['any'] = self::chargeBalance($receipt['any']);
 			/**** CvR end ****/
 
 			// preemptive-check: avoid extra function calls if there aren't

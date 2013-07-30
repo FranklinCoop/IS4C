@@ -62,6 +62,7 @@ class Input extends BasicPage {
 				submitMainForm('WAKEUP');
 				break;
 			default:
+				betterDate();
 				break;
 			}
 		}

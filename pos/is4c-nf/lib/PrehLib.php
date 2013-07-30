@@ -91,22 +91,22 @@ static public function memberID($member_number) {
 
 	// special hard coding for member 5607 WFC 
 	// needs to go away
-	if ($member_number == "5607"){
-		if ($CORE_LOCAL->get("requestType") == ""){
-			$CORE_LOCAL->set("requestType","member gift");
-			$CORE_LOCAL->set("requestMsg","Card for which member?");
-			$ret['main_frame'] = MiscLib::base_url()."gui-modules/requestInfo.php";
-			$CORE_LOCAL->set("strEntered","5607ID");
-		}
-		else if ($CORE_LOCAL->get("requestType") == "member gift"){
-			TransRecord::addcomment("CARD FOR #".$CORE_LOCAL->get("requestMsg"));
-			$CORE_LOCAL->set("requestType","");
-			$row = $db->fetch_array($result);
-			self::setMember($row["CardNo"], $row["personNum"],$row);
-			$ret['redraw_footer'] = True;
-			$ret['output'] = DisplayLib::lastpage();
-		}
-	}
+	//if ($member_number == "5607"){
+	//	if ($CORE_LOCAL->get("requestType") == ""){
+	//		$CORE_LOCAL->set("requestType","member gift");
+	//		$CORE_LOCAL->set("requestMsg","Card for which member?");
+	//		$ret['main_frame'] = MiscLib::base_url()."gui-modules/requestInfo.php";
+	//		$CORE_LOCAL->set("strEntered","5607ID");
+	//	}
+	//	else if ($CORE_LOCAL->get("requestType") == "member gift"){
+	//		TransRecord::addcomment("CARD FOR #".$CORE_LOCAL->get("requestMsg"));
+	//		$CORE_LOCAL->set("requestType","");
+	//		$row = $db->fetch_array($result);
+	//		self::setMember($row["CardNo"], $row["personNum"],$row);
+	//		$ret['redraw_footer'] = True;
+	//		$ret['output'] = DisplayLib::lastpage();
+	//	}
+	//}
 
 	$CORE_LOCAL->set("idSearch",$member_number);
 	$CORE_LOCAL->set("memberID","0");
@@ -189,11 +189,15 @@ static public function setMember($member, $personNumber, $row) {
 	else if ($CORE_LOCAL->get("discountEnforced") == 0 && $CORE_LOCAL->get("tenderTotal") == 0) {
 		$memquery .= " , percentDiscount = 0 ";
 	}
-
-	$conn2->query($memquery);
+	
+	$comment = "Member Added #$member";
+	TransRecord::addComment($comment);
 
 	$opts = array('upc'=>'MEMENTRY','description'=>'CARDNO IN NUMFLAG','numflag'=>$member);
 	TransRecord::add_log_record($opts);
+	$conn2->query($memquery);
+
+	
 
 	if ($CORE_LOCAL->get("isStaff") == 0) {
 		$CORE_LOCAL->set("staffSpecial",0);
@@ -215,7 +219,6 @@ static public function setMember($member, $personNumber, $row) {
 		$CORE_LOCAL->set("runningTotal",$CORE_LOCAL->get("amtdue"));
 		self::tender("MI", $CORE_LOCAL->get("runningTotal") * 100);
 	}
-
 }
 
 /**
@@ -1327,17 +1330,6 @@ static public function chargeOk() {
 //----------------------------------------------------------
 
 /**
-  Add WFC virtual coupon
-  @deprecated
-*/
-static public function madCoupon(){
-	Database::getsubtotals();
-	TransRecord::addMadCoup();
-	DisplayLib::lastpage();
-
-}
-
-/**
   Add a comment
   @deprecated
   Use addcomment().
@@ -1347,50 +1339,6 @@ static public function comment($comment){
 	DisplayLib::lastpage();
 }
 //----------------------------------------------------------
-
-/**
-  Wedge staff charge related
-  @deprecated
-*/
-static public function staffCharge($arg,$json=array()) {
-	global $CORE_LOCAL;
-
-	$CORE_LOCAL->set("sc",1);
-	$staffID = substr($arg, 0, 4);
-
-	$pQuery = "select staffID,chargecode,blueLine from chargecodeview where chargecode = '".$arg."'";
-	$pConn = Database::pDataConnect();
-	$result = $pConn->query($pQuery);
-	$num_rows = $pConn->num_rows($result);
-	$row = $pConn->fetch_array($result);
-
-	if ($num_rows == 0) {
-		$json['output'] = DisplayLib::xboxMsg("unable to authenticate staff ".$staffID);
-		$CORE_LOCAL->set("isStaff",0);			// apbw 03/05/05 SCR
-		return $json;
-	}
-	else {
-		$CORE_LOCAL->set("isStaff",1);			// apbw 03/05/05 SCR
-		$CORE_LOCAL->set("memMsg",$row["blueLine"]);
-		$tQuery = "update localtemptrans set card_no = '".$staffID."', percentDiscount = 15";
-		$tConn = Database::tDataConnect();
-
-		TransRecord::addscDiscount();		
-		TransRecord::discountnotify(15);
-		$tConn->query($tQuery);
-		Database::getsubtotals();
-
-		$chk = self::ttl();
-		if ($chk !== True){
-			$json['main_frame'] = $chk;
-			return $json;
-		}
-		$CORE_LOCAL->set("runningTotal",$CORE_LOCAL->get("amtdue"));
-		return self::tender("MI", $CORE_LOCAL->get("runningTotal") * 100);
-
-	}
-
-}
 
 /**
   End of Shift functionality isn't in use

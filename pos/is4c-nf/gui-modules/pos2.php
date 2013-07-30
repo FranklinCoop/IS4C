@@ -209,6 +209,16 @@ class pos2 extends BasicPage {
 		function inputRetry(str){
 			parseWrapper(str);
 		}
+		
+		function keyDown(e) {
+			clearTimeout(screenLockVar);
+			enableScreenLock();
+		}
+
+		$(document).ready(function() {
+			$(document).keydown(keyDown);
+		});
+		
 		</script>
 		<?php
 	}

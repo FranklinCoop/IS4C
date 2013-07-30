@@ -55,12 +55,13 @@ static public function printfooter($readOnly=False) {
 	$FOOTER_MODULES = $CORE_LOCAL->get("FooterModules");
 	// use defaults if modules haven't been configured
 	// properly
-	if (!is_array($FOOTER_MODULES) || count($FOOTER_MODULES) != 5){
+	if (!is_array($FOOTER_MODULES) || count($FOOTER_MODULES) != 6){
 		$FOOTER_MODULES = array(
 		'SavedOrCouldHave',
 		'TransPercentDiscount',
 		'MemSales',
 		'EveryoneSales',
+		'FSTotal',
 		'MultiTotal'
 		);
 	}
@@ -127,7 +128,9 @@ static public function printfooter($readOnly=False) {
 	$label = $modchain[3]->header_content();
 	$ret .= sprintf('<td class="reg" style="%s">%s</td>',$modchain[3]->header_css,$label);
 	$label = $modchain[4]->header_content();
-	$ret .= sprintf('<td class="total" style="%s">%s</td>',$modchain[4]->header_css,$label);
+	$ret .= sprintf('<td class="reg" style="%s">%s</td>',$modchain[4]->header_css,$label);
+	$label = $modchain[5]->header_content();
+	$ret .= sprintf('<td class="total" style="%s">%s</td>',$modchain[5]->header_css,$label);
 	/* 5/11/12
 	$ret .= "<td class=\"first\">$labelyousaved</td>";
 	$ret .= "<td class=\"reg\">$strpercentdisclabel</td>";
@@ -213,7 +216,9 @@ static public function printfooter($readOnly=False) {
 	$box = $modchain[3]->display_content();
 	$ret .= sprintf('<td class="reg" style="%s">%s</td>',$modchain[3]->display_css,$box);
 	$box = $modchain[4]->display_content();
-	$ret .= sprintf('<td class="total" style="%s">%s</td>',$modchain[4]->display_css,$box);
+	$ret .= sprintf('<td class="reg" style="%s">%s</td>',$modchain[4]->display_css,$box);
+	$box = $modchain[5]->display_content();
+	$ret .= sprintf('<td class="total" style="%s">%s</td>',$modchain[5]->display_css,$box);
 	/* 5/11/12
 	$ret .= "<td class=\"first\">".number_format($dblyousaved,2)."</td>";
 	$ret .= "<td class=\"reg\">".$strperdiscount."</td>";
@@ -683,8 +688,8 @@ static public function listitems($top_item, $highlight) {
 
 //------------------Boundary Bottom----------------
 
-	return self::drawitems($top_item, 11, $highlight);
 	$CORE_LOCAL->set("currentid",$highlight);
+	return self::drawitems($top_item, 11, $highlight);
 }
 
 

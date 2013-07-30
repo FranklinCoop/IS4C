@@ -212,7 +212,7 @@ static public function printReceiptHeader($dateTimeStamp, $ref) {
 
 	$time = self::build_time($dateTimeStamp);
 	$time = str_replace(" ","     ",$time);
-	$spaces = 55 - strlen($time) - strlen($ref);
+	$spaces = 53 - strlen($time) - strlen($ref);
 	$receipt .= $time.str_repeat(' ',$spaces).$ref."\n";
 			
 	return $receipt;
@@ -483,7 +483,7 @@ static public function biggerFont($str) {
 static public function centerBig($text) {
 	$blank = str_repeat(" ", 30);
 	$text = trim($text);
-	$lead = (int) ((30 - strlen($text)) / 2);
+	$lead = (int) ((28 - strlen($text)) / 2);
 	$newline = substr($blank, 0, $lead).$text;
 	return $newline;
 }
@@ -1179,7 +1179,7 @@ static public function printReceipt($arg1,$second=False,$email=False) {
 			}
 
 			/***** CvR add charge total to receipt bottom ****/
-			$receipt['any'] = self::chargeBalance($receipt['any']);
+			//$receipt['any'] = self::chargeBalance($receipt['any']);
 			/**** CvR end ****/
 
 			// preemptive-check: avoid extra function calls if there aren't

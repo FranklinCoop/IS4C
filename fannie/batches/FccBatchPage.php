@@ -29,8 +29,27 @@ class FccBatchPage extends FanniePage {
 	protected $header = 'Sales Batches';
 
 	function body_content(){
+				ob_start();
+		?>
+		<html>
+		<head><title>Batch Management</title>
+		</head>
+		<body>
+
+		<div id="inputarea">
+		<?php echo $this->newBatchInput(); ?>
+		</div>
+		<div id="displayarea">
+		<?php echo $this->batchListDisplay(); ?>
+		</div>
+		<input type=hidden id=uid value="<?php echo $this->current_user; ?>" />
+		<input type=hidden id=isAudited value="<?php echo $this->audited; ?>" />
+		<?php
+		$ret = ob_get_clean();
+
+
 		$data = get_batches();
-		$ret = "<table border =1>
+		$ret .= "<table border =1>
 				<tr> 
 				<th>Batch Number</th>
 				<th>Batch Name</th>
@@ -44,6 +63,7 @@ class FccBatchPage extends FanniePage {
 			$ret .="</tr>"
 		}
 		$ret "</table>""
+		$ret .= '</body></html>';
 		return $ret;
 	}
 

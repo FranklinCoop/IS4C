@@ -20,9 +20,12 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
-include('../config.php');
+include('../../config.php');
+include('audit.php');
+include('../../auth/login.php');
 include($FANNIE_ROOT.'classlib2.0/FanniePage.php');
 include($FANNIE_ROOT.'classlib2.0/data/FannieDB.php');
+include($FANNIE_ROOT.'classlib2.0/lib/FormLib.php');
 
 class FccBatchPage extends FanniePage {
 	protected $title = 'Fannie - Fcc';
@@ -36,15 +39,6 @@ class FccBatchPage extends FanniePage {
 		</head>
 		<body>
 
-		<div id="inputarea">
-		<?php echo $this->newBatchInput(); ?>
-		</div>
-		<div id="displayarea">
-		<?php echo $this->batchListDisplay(); ?>
-		</div>
-		<input type=hidden id=uid value="<?php echo $this->current_user; ?>" />
-		<input type=hidden id=isAudited value="<?php echo $this->audited; ?>" />
-		<?php
 		$ret = ob_get_clean();
 
 

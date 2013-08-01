@@ -24,36 +24,44 @@ include('../config.php');
 include($FANNIE_ROOT.'classlib2.0/FanniePage.php');
 
 class FccBatchPage extends FanniePage {
-	protected $title = 'Fannie - Batch Module';
+	protected $title = 'Fannie - Fcc';
 	protected $header = 'Sales Batches';
 
 	function body_content(){
-		ob_start();
-		?>
-		<ul>
-			<li><a href="newbatch/">Sales Batches</a> is a tool to create
-				batches manually one item at a time.</li>
-			<li><a href="xlsbatch/">Upload Batch</a> is a tool to create
-				a batch from a spreadsheet.</li>
-			<li><a href="BatchTypeEditor.php">Manage Batch Types</a> adds, removes, or
-				adjusts batch types</li>
-			<li><a href="CAP/">Co+op Deals</a> imports the Co+op Deals pricing
-				spreadsheet, determines where sale items exist in POS,
-				and creates appropriate sales batches.</li>
-			<li><a href="UNFI/">Vendor Pricing</a> imports cost information
-				from vendor spreadsheets, calculates SRPs based on desired
-				margins, and creates price change batches to apply new
-				SRPs.</li>
-			<li><a href="FccBatchPage.php">Activate FCC Batch</a> Activate a batch that was uploaded
-				from the fcc legacy backend.</li>
-		</ul>
-		<?php
-		return ob_get_clean();
+		$data = get_batches();
+		$ret = "<table border =1>
+				<tr> 
+				<th>Batch Number</th>
+				<th>Batch Name</th>
+				<th>Batch Run</th>
+				</tr>";
+		while($fetchW = $dbc->fetch_array($data) {
+			$ret .="<tr>";\
+			$ret .="<td>" . $fetchW[0] . "</td>";
+			$ret .="<td>" . $fetchW[1] . "</td>";
+			$ret .="<td>" . $fetchW[2] . "</td>";
+			$ret .="</tr>"
+		}
+		$ret "</table>""
+		return $ret;
+	}
+
+	function get_batches() {
+		global $FANNIE_OP_DB;
+		$dbc = FannieDB::get($FANNIE_OP_DB);
+
+		$query = "SELECT * FROM fcc_batch_headers";
+		$args = array();
+
+		$prep = $dbc->prepare_statement($query);
+		$result = $dbc->exec_statement($query,$args);
+
+		return $result;
 	}
 }
 
 if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)){
-	$obj = new BatchIndexPage();
+	$obj = new FccBatchPage();
 	$obj->draw_page();
 }
 ?>

@@ -22,6 +22,7 @@
 *********************************************************************************/
 include('../config.php');
 include($FANNIE_ROOT.'classlib2.0/FanniePage.php');
+include($FANNIE_ROOT.'classlib2.0/data/FannieDB.php');
 
 class FccBatchPage extends FanniePage {
 	protected $title = 'Fannie - Fcc';

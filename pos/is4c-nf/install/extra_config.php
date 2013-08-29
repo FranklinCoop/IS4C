@@ -16,8 +16,8 @@ include('util.php');
 <div id="wrapper">	
 <h2>IT CORE Lane Installation: Additional Configuration</h2>
 
-<div class="alert"><?php check_writeable('../ini.php'); ?></div>
-<div class="alert"><?php check_writeable('../ini-local.php'); ?></div>
+<div class="alert"><?php check_writeable('../ini.php', False, 'PHP'); ?></div>
+<div class="alert"><?php check_writeable('../ini-local.php', True, 'PHP'); ?></div>
 
 <form action=extra_config.php method=post>
 <table id="install" border=0 cellspacing=0 cellpadding=4>
@@ -59,6 +59,23 @@ echo " />\n<label for='discounts' onclick=''>Discounts Enabled: </label>\n
 confsave('discountEnforced',$CORE_LOCAL->get('discountEnforced'));
 ?>
 <span class='noteTxt'>If yes, members get a percentage discount as specified in custdata.</span>
+</td></tr><tr><td>
+<label><b>Discount Module</b></label>
+</td><td> 
+<select name="DISCOUNTHANDLER">
+<?php
+if(isset($_REQUEST['DISCOUNTHANDLER'])) $CORE_LOCAL->set('DiscountModule',$_REQUEST['DISCOUNTHANDLER'],True);
+elseif ($CORE_LOCAL->get('DiscountModule') === '') $CORE_LOCAL->set('DiscountModule','DiscountModule');
+$mods = AutoLoader::ListModules('DiscountModule',True);
+foreach($mods as $m){
+	printf('<option %s>%s</option>',
+		($CORE_LOCAL->get('DiscountModule')==$m ? 'selected' : ''),
+		$m);
+}
+confsave('DiscountModule',"'".$CORE_LOCAL->get('DiscountModule')."'");
+?>
+</select>
+<span class='noteTxt'>Calculates actual discount amount</span>
 </td></tr><tr><td></td><td> 
 <?php
 if(isset($_REQUEST['RDISCOUNTS'])) $CORE_LOCAL->set('refundDiscountable',1,True);
@@ -156,6 +173,18 @@ confsave('printerPort',"'".$CORE_LOCAL->get('printerPort')."'");
 <span class='noteTxt' style="top:-120px;"> <?php printf("<p>Current value: <span class='pre'>%s</span></p>",$CORE_LOCAL->get('printerPort')); ?>
 <br />Path to the printer. Select from common values, or enter a custom path.  Some ubuntu distros might put your USB printer at /dev/usblp0</span>
 </td></tr>
+<tr><td></td><td>
+<?php
+if (isset($_REQUEST['FRANK'])) $CORE_LOCAL->set('enableFranking',1,True);
+elseif ($CORE_LOCAL->get('enableFranking')==='') $CORE_LOCAL->set('enableFranking',0,True);
+echo "<fieldset class='toggle'>\n<input type='checkbox' name='FRANK' id='enableFranking'";
+if ($CORE_LOCAL->get("enableFranking") == 1) echo " value='1' checked";
+else echo " value='0'";
+echo " />\n<label for='enableFranking' onclick=''>Enable Check Franking: </label>\n
+	<span class='toggle-button'></span></fieldset>";
+confsave('enableFranking',$CORE_LOCAL->get("enableFranking"));
+?>
+</select></td></tr>
 <tr><td>
 <b>Drawer Behavior Module</b>:</td><td>
 <?php

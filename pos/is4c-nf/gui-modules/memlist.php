@@ -76,7 +76,7 @@ class memlist extends NoInputPage {
 		if (!$entered || strlen($entered) < 1 || $entered == "CL") {
 			$this->change_page($this->page_url."gui-modules/pos2.php");
 			return False;
-		}
+		} else {
 			// find the member
 			$lookups = AutoLoader::ListModules('MemberLookup', True);
 			foreach($lookups as $class){
@@ -107,7 +107,6 @@ class memlist extends NoInputPage {
 			}
 			$this->submitted = True;
 		}
-
 		// if theres only 1 match don't show the memlist
 		// when it's the default non-member account OR
 		// when name verification is disabled

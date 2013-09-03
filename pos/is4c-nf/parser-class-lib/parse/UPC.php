@@ -243,14 +243,6 @@ class UPC extends Parser {
 		/* got a scale weight, make sure the tare
 		   is valid */
 		if ($scale != 0 and substr($upc,0,3) != "002"){
-			//Prompt for tare weight for scale items with 0 tw in db and no tw set
-			if ($row['tareweight'] == 0 ) {
-				$peek = PrehLib::peekItem();
-				if (strstr($peek,"** Tare Weight") === False){
-					$ret['main_frame'] = $my_url."gui-modules/tw_prompt.php";
-					return $ret;
-				}
-			}
 			$quantity = $CORE_LOCAL->get("weight") - $CORE_LOCAL->get("tare");
 			if ($CORE_LOCAL->get("quantity") != 0) 
 				$quantity = $CORE_LOCAL->get("quantity") - $CORE_LOCAL->get("tare");

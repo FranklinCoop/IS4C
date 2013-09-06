@@ -291,18 +291,17 @@ $current_mods = $CORE_LOCAL->get("FooterModules");
 // replace w/ form post if needed
 // fill in defaults if missing
 if (isset($_REQUEST['FOOTER_MODS'])) $current_mods = $_REQUEST['FOOTER_MODS'];
-elseif(!is_array($current_mods) || count($current_mods) != 6){
+elseif(!is_array($current_mods) || count($current_mods) != 5){
 	$current_mods = array(
 	'SavedOrCouldHave',
 	'TransPercentDiscount',
 	'MemSales',
 	'EveryoneSales',
-	'FSToral'
 	'MultiTotal'
 	);
 }
 $footer_mods = AutoLoader::ListModules('FooterBox');
-for($i=0;$i<6;$i++){
+for($i=0;$i<5;$i++){
 	echo '<select name="FOOTER_MODS[]">';
 	foreach($footer_mods as $fm){
 		printf('<option %s>%s</option>',

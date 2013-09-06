@@ -61,7 +61,7 @@ class CheckTender extends TenderModule {
 				$chkR = $db->query($chkQ);
 				if ($db->num_rows($chkR) > 0){
 					return DisplayLib::xboxMsg(_('already used check over benefit today'));
-				}			}
+				}
 			}
 		}
 		else if( $CORE_LOCAL->get("isMember") == 0  && ($this->amount - $CORE_LOCAL->get("amtdue") - 0.005) > 0){ 

@@ -291,7 +291,7 @@ $current_mods = $CORE_LOCAL->get("FooterModules");
 // replace w/ form post if needed
 // fill in defaults if missing
 if (isset($_REQUEST['FOOTER_MODS'])) $current_mods = $_REQUEST['FOOTER_MODS'];
-elseif(!is_array($current_mods) || count($current_mods) != 5){
+elseif(!is_array($current_mods) || count($current_mods) != 6){
 	$current_mods = array(
 	'SavedOrCouldHave',
 	'TransPercentDiscount',

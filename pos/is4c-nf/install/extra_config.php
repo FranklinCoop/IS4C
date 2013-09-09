@@ -146,7 +146,6 @@ confsave('BottleReturnDept',"'".$CORE_LOCAL->get('BottleReturnDept')."'");
 <span class='noteTxt'>Add a BOTTLE RETURN item to your products table with a normal_price of 0, IS4C will prompt for Bottle Return amt. and then make it a negative value.</span>
 </td></tr>
 
-
 <tr><td colspan=2 class="tblHeader">
 <h3>Hardware Settings</h3></td></tr>
 <tr><td>

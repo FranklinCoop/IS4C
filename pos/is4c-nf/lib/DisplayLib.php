@@ -41,13 +41,12 @@ static public function printfooter($readOnly=False) {
 	$FOOTER_MODULES = $CORE_LOCAL->get("FooterModules");
 	// use defaults if modules haven't been configured
 	// properly
-	if (!is_array($FOOTER_MODULES) || count($FOOTER_MODULES) != 6){
+	if (!is_array($FOOTER_MODULES) || count($FOOTER_MODULES) != 5){
 		$FOOTER_MODULES = array(
 		'SavedOrCouldHave',
 		'TransPercentDiscount',
 		'MemSales',
 		'EveryoneSales',
-		'FSTotal',
 		'MultiTotal'
 		);
 	}

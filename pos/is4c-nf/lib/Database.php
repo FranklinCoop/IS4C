@@ -161,7 +161,16 @@ static public function getsubtotals() {
 		if ($CORE_LOCAL->get("SSI") != 0 && ($CORE_LOCAL->get("isStaff") == 3 || $CORE_LOCAL->get("isStaff") == 6)) PrehLib::wmdiscount();
 	}
 
+	$handler_class = $CORE_LOCAL->get('DiscountModule');
+	if ($handler_class === '') $handler_class = 'DiscountModule';
+	elseif (!class_exists($handler_class)) $handler_class = 'DiscountModule';
+	if (class_exists($handler_class)){
+		$module = new $handler_class();
+		$CORE_LOCAL->set('transDiscount', $module->calculate() );
+	}
+
 	/* BETA 10Jun2013
+	   ENABLED LIVE 15Aug2013
 	   Calculate taxes & exemptions separately from
 	   the subtotals view.
 
@@ -170,6 +179,7 @@ static public function getsubtotals() {
 	   this function behaving the same. Once the subtotals
 	   view is deprecated we can revisit how these two
 	   session variables should behave.
+	*/
 	$taxes = Database::LineItemTaxes();
 	$taxTTL = 0.00;
 	$exemptTTL = 0.00;
@@ -179,7 +189,6 @@ static public function getsubtotals() {
 	}
 	$CORE_LOCAL->set('taxTotal', number_format($taxTTL,2));
 	$CORE_LOCAL->set('fsTaxExempt', number_format(-1*$exemptTTL,2));
-	*/
 
 	if ( $CORE_LOCAL->get("TaxExempt") == 1 ) {
 		$CORE_LOCAL->set("taxable",0);

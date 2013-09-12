@@ -26,7 +26,8 @@ ini_set('display_errors','1');
 
 include(realpath(dirname(__FILE__).'/../lib/AutoLoader.php'));
 AutoLoader::LoadMap();
-include(realpath(dirname(__FILE__).'/../ini.php'));
+if(file_exists((dirname(__FILE__).'/../ini.php')))
+	include(realpath(dirname(__FILE__).'/../ini.php'));
 include('util.php');
 ?>
 <html>
@@ -46,17 +47,11 @@ body {
 
 <form action=index.php method=post>
 
-<div class="alert"><?php check_writeable('../ini.php'); ?></div>
-<div class="alert"><?php check_writeable('../ini-local.php'); ?></div>
+<div class="alert"><?php check_writeable('../ini.php', False, 'PHP'); ?></div>
+<div class="alert"><?php check_writeable('../ini-local.php', True, 'PHP'); ?></div>
 
+PHP is running as: <?php echo whoami(); ?><br />
 <?php
-if (function_exists('posix_getpwuid')){
-	$chk = posix_getpwuid(posix_getuid());
-	echo "PHP is running as: ".$chk['name']."<br />";
-}
-else
-	echo "PHP is (probably) running as: ".get_current_user()."<br />";
-
 if (!function_exists("socket_create")){
 	echo '<b>Warning</b>: PHP socket extension is not enabled. NewMagellan will not work quite right';
 }
@@ -323,17 +318,17 @@ $sql = db_test_connect($CORE_LOCAL->get('mServer'),
 		$CORE_LOCAL->get('mPass'));
 if ($sql === False){
 	echo "<span class='fail'>Failed</span>";
-	echo '<div class="db_hints" style="margin-left:25px;">';
+	echo '<div class="db_hints" style="margin-left:25px;width:350px;">';
 	if (!function_exists('socket_create')){
 		echo '<i>Try enabling PHP\'s socket extension in php.ini for better diagnostics</i>';
 	}
-	elseif (@MiscLib::pingport($CORE_LOCAL->get('localhost'),$CORE_LOCAL->get('DBMS'))){
-		echo '<i>Database found at '.$CORE_LOCAL->get('localhost').'. Verify username and password
+	elseif (@MiscLib::pingport($CORE_LOCAL->get('mServer'),$CORE_LOCAL->get('DBMS'))){
+		echo '<i>Database found at '.$CORE_LOCAL->get('mServer').'. Verify username and password
 			and/or database account permissions.</i>';
 	}
 	else {
 		echo '<i>Database does not appear to be listening for connections on '
-			.$CORE_LOCAL->get('localhost').'. Verify host is correct, database is running and
+			.$CORE_LOCAL->get('mServer').'. Verify host is correct, database is running and
 			firewall is allowing connections.</i>';
 	}
 	echo '</div>';
@@ -383,7 +378,7 @@ if($gotDBs == 2){
 	while($row=$sql->fetch_row($ratesR))
 		$rates[] = array($row[0],$row[1],$row[2]);
 }
-echo "<table><tr><th>ID</th><th>Rate (%)</th><th>Description</th></tr>";
+echo "<table><tr><th>ID</th><th>Rate</th><th>Description</th></tr>";
 foreach($rates as $rate){
 	printf("<tr><td>%d</td><td><input type=text name=TAX_RATE[] value=\"%f\" /></td>
 		<td><input type=text name=TAX_DESC[] value=\"%s\" /></td></tr>",
@@ -415,8 +410,10 @@ function create_op_dbs($db,$type){
 
 	create_if_needed($db, $type, $name, 'memberCards', 'op', $errors);
 
+	create_if_needed($db, $type, $name, 'custPreferences', 'op', $errors);
+
 	$cardsViewQ = "CREATE VIEW memberCardsView AS 
-		SELECT CONCAT(" . $CORE_LOCAL->get('memberUpcPrefix') . ",c.CardNo) as upc, c.CardNo as card_no FROM custdata c";
+		SELECT CONCAT('" . $CORE_LOCAL->get('memberUpcPrefix') . "',c.CardNo) as upc, c.CardNo as card_no FROM custdata c";
 	if (!$db->table_exists('memberCardsView',$name)){
 		db_structure_modify($db,'memberCardsView',$cardsViewQ,$errors);
 	}
@@ -467,12 +464,14 @@ function create_op_dbs($db,$type){
 
 	create_if_needed($db, $type, $name, 'unpaid_ar_today', 'op', $errors);
 
-	create_if_needed($db, $type, $name, 'lane_config', 'op', $errors);
-	$chk = $db->query('SELECT modified FROM lane_config',$name);
-	if ($db->num_rows($chk) != 1){
-		$db->query('TRUNCATE TABLE lane_config', $name);
-		$db->query("INSERT INTO lane_config VALUES ('1900-01-01 00:00:00')", $name);
+	// Update lane_config structure if needed
+	if ($db->table_exists('lane_config', $name)){
+		$def = $db->table_definition('lane_config', $name);
+		if (!isset($def['keycode']) || !isset($def['value']))
+			$db->query('DROP TABLE lane_config', $name);
 	}
+	create_if_needed($db, $type, $name, 'lane_config', 'op', $errors);
+	
 	return $errors;
 }
 
@@ -519,7 +518,6 @@ function create_trans_dbs($db,$type){
 
 	create_if_needed($db, $type, $name, 'couponApplied', 'trans', $errors);
 
-
 	/* lttsummary, lttsubtotals, and subtotals
 	 * always get rebuilt to account for tax rate
 	 * changes */
@@ -530,7 +528,7 @@ function create_trans_dbs($db,$type){
 
 	$lttR = "CREATE view ltt_receipt as 
 		select
-		description,
+		l.description,
 		case 
 			when voided = 5 
 				then 'Discount'
@@ -559,12 +557,16 @@ function create_trans_dbs($db,$type){
 				then 'VD'
 			when trans_status = 'R'
 				then 'RF'
-			when tax <> 0 and foodstamp <> 0
+			when tax = 1 and foodstamp <> 0
 				then 'TF'
-			when tax <> 0 and foodstamp = 0
+			when tax = 1 and foodstamp = 0
 				then 'T' 
 			when tax = 0 and foodstamp <> 0
 				then 'F'
+			WHEN (tax > 1 and foodstamp <> 0)
+				THEN CONCAT(LEFT(t.description,1),'F')
+			WHEN (tax > 1 and foodstamp = 0)
+				THEN LEFT(t.description,1)
 			when tax = 0 and foodstamp = 0
 				then '' 
 		end
@@ -579,13 +581,15 @@ function create_trans_dbs($db,$type){
 			WHEN trans_type = 'T' THEN trans_id+99999	
 			ELSE trans_id
 		END AS trans_id
-		from localtemptrans
+		from localtemptrans as l
+		left join taxrates as t
+		on l.tax = t.id
 		where voided <> 5 and UPC <> 'TAX'
 		AND trans_type <> 'L'";
 	if($type == 'mssql'){
 		$lttR = "CREATE view ltt_receipt as 
 			select
-			description,
+			l.description,
 			case 
 				when voided = 5 
 					then 'Discount'
@@ -614,10 +618,14 @@ function create_trans_dbs($db,$type){
 					then 'VD'
 				when trans_status = 'R'
 					then 'RF'
-				when tax <> 0 and foodstamp <> 0
+				when tax = 1 and foodstamp <> 0
 					then 'TF'
-				when tax <> 0 and foodstamp = 0
+				when tax = 1 and foodstamp = 0
 					then 'T' 
+				WHEN (tax > 1 and foodstamp <> 0)
+					THEN LEFT(t.description,1)+'F'
+				WHEN (tax > 1 and foodstamp = 0)
+					THEN LEFT(t.description,1)
 				when tax = 0 and foodstamp <> 0
 					then 'F'
 				when tax = 0 and foodstamp = 0
@@ -634,7 +642,9 @@ function create_trans_dbs($db,$type){
 				WHEN trans_type = 'T' THEN trans_id+99999	
 				ELSE trans_id
 			END AS trans_id
-			from localtemptrans
+			from localtemptrans as l
+			left join taxrates as t
+			on l.tax = t.id
 			where voided <> 5 and UPC <> 'TAX'
 			AND trans_type <> 'L'
 			order by trans_id";
@@ -770,7 +780,7 @@ function create_trans_dbs($db,$type){
 		register_no,
 		emp_no,
 		trans_no,
-		description,
+		l.description,
 		case 
 			when voided = 5 
 				then 'Discount'
@@ -799,10 +809,14 @@ function create_trans_dbs($db,$type){
 				then 'VD'
 			when trans_status = 'R'
 				then 'RF'
-			when tax <> 0 and foodstamp <> 0
-				then 'TF'
-			when tax <> 0 and foodstamp = 0
-				then 'T' 
+			WHEN (tax = 1 and foodstamp <> 0)
+				THEN 'TF'
+			WHEN (tax = 1 and foodstamp = 0)
+				THEN 'T' 
+			WHEN (tax > 1 and foodstamp <> 0)
+				THEN CONCAT(LEFT(t.description,1),'F')
+			WHEN (tax > 1 and foodstamp = 0)
+				THEN LEFT(t.description,1)
 			when tax = 0 and foodstamp <> 0
 				then 'F'
 			when tax = 0 and foodstamp = 0
@@ -813,7 +827,9 @@ function create_trans_dbs($db,$type){
 		unitPrice,
 		voided,
 		trans_id
-		from localtranstoday
+		from localtranstoday as l
+		left join taxrates as t
+		on l.tax = t.id
 		where voided <> 5 and UPC <> 'TAX' and UPC <> 'DISCOUNT'
 		AND trans_type <> 'L'
 		order by emp_no, trans_no, trans_id";
@@ -852,10 +868,14 @@ function create_trans_dbs($db,$type){
 					then 'VD'
 				when trans_status = 'R'
 					then 'RF'
-				when tax <> 0 and foodstamp <> 0
-					then 'TF'
-				when tax <> 0 and foodstamp = 0
-					then 'T' 
+				WHEN (tax = 1 and foodstamp <> 0)
+					THEN 'TF'
+				WHEN (tax = 1 and foodstamp = 0)
+					THEN 'T' 
+				WHEN (tax > 1 and foodstamp <> 0)
+					THEN LEFT(t.description,1)+'F'
+				WHEN (tax > 1 and foodstamp = 0)
+					THEN LEFT(t.description,1)
 				when tax = 0 and foodstamp <> 0
 					then 'F'
 				when tax = 0 and foodstamp = 0
@@ -866,7 +886,9 @@ function create_trans_dbs($db,$type){
 			unitPrice,
 			voided,
 			trans_id
-			from localtranstoday
+			from localtranstoday as l
+			left join taxrates as t
+			on l.tax = t.id
 			where voided <> 5 and UPC <> 'TAX' and UPC <> 'DISCOUNT'
 			AND trans_type <> 'L'
 			order by emp_no, trans_no, trans_id";
@@ -1251,7 +1273,7 @@ function create_trans_dbs($db,$type){
 
 	$lttreorderG = "CREATE   view ltt_receipt_reorder_g as
 	select 
-	description,
+	l.description,
 	case 
 		when voided = 5 
 			then 'Discount'
@@ -1286,10 +1308,10 @@ function create_trans_dbs($db,$type){
 			then 'TF'
 		when tax = 1 and foodstamp = 0
 			then 'T' 
-		when tax = 2 and foodstamp <> 0
-			then 'DF'
-		when tax = 2 and foodstamp = 0
-			then 'D' 
+		WHEN (tax > 1 and foodstamp <> 0)
+			THEN CONCAT(LEFT(t.description,1),'F')
+		WHEN (tax > 1 and foodstamp = 0)
+			THEN LEFT(t.description,1)
 		when tax = 0 and foodstamp <> 0
 			then 'F'
 		when tax = 0 and foodstamp = 0
@@ -1306,7 +1328,9 @@ function create_trans_dbs($db,$type){
 	department,
 	upc,
 	trans_subtype
-	from ltt_grouped
+	from ltt_grouped as l
+	left join taxrates as t
+	on l.tax = t.id
 	where voided <> 5 and UPC <> 'TAX' and UPC <> 'DISCOUNT'
 	AND trans_type <> 'L'
 	and not (trans_status='M' and total=convert('0.00',decimal(10,2)))
@@ -1329,7 +1353,7 @@ function create_trans_dbs($db,$type){
 	if($type == 'mssql'){
 		$lttreorderG = "CREATE view ltt_receipt_reorder_g as
 		select top 100 percent
-		description,
+		l.description,
 		case 
 			when voided = 5 
 				then 'Discount'
@@ -1358,10 +1382,14 @@ function create_trans_dbs($db,$type){
 				then 'VD'
 			when trans_status = 'R'
 				then 'RF'
-			when tax <> 0 and foodstamp <> 0
-				then 'TF'
-			when tax <> 0 and foodstamp = 0
-				then 'T' 
+			WHEN (tax = 1 and foodstamp <> 0)
+				THEN 'TF'
+			WHEN (tax = 1 and foodstamp = 0)
+				THEN 'T' 
+			WHEN (tax > 1 and foodstamp <> 0)
+				THEN LEFT(t.description,1)+'F'
+			WHEN (tax > 1 and foodstamp = 0)
+				THEN LEFT(t.description,1)
 			when tax = 0 and foodstamp <> 0
 				then 'F'
 			when tax = 0 and foodstamp = 0
@@ -1378,7 +1406,9 @@ function create_trans_dbs($db,$type){
 		department,
 		upc,
 		trans_subtype
-		from ltt_grouped
+		from ltt_grouped as l
+		left join taxrates as t
+		on l.tax = t.id
 		where voided <> 5 and UPC <> 'TAX' and UPC <> 'DISCOUNT'
 		AND trans_type <> 'L'
 		and not (trans_status='M' and total=convert(money,'0.00'))
@@ -1817,7 +1847,7 @@ function create_trans_dbs($db,$type){
 	$rpreorderG = "CREATE    view rp_ltt_receipt_reorder_g as
 		select 
 		register_no,emp_no,trans_no,card_no,
-		description,
+		l.description,
 		case 
 			when voided = 5 
 				then 'Discount'
@@ -1846,10 +1876,14 @@ function create_trans_dbs($db,$type){
 				then 'VD'
 			when trans_status = 'R'
 				then 'RF'
-			when tax <> 0 and foodstamp <> 0
-				then 'TF'
-			when tax <> 0 and foodstamp = 0
-				then 'T' 
+			WHEN (tax = 1 and foodstamp <> 0)
+				THEN 'TF'
+			WHEN (tax = 1 and foodstamp = 0)
+				THEN 'T' 
+			WHEN (tax > 1 and foodstamp <> 0)
+				THEN CONCAT(LEFT(t.description,1),'F')
+			WHEN (tax > 1 and foodstamp = 0)
+				THEN LEFT(t.description,1)
 			when tax = 0 and foodstamp <> 0
 				then 'F'
 			when tax = 0 and foodstamp = 0
@@ -1863,7 +1897,9 @@ function create_trans_dbs($db,$type){
 		department,
 		upc,
 		trans_subtype
-		from rp_ltt_grouped
+		from rp_ltt_grouped as l
+		left join taxrates as t
+		on l.tax=t.id
 		where voided <> 5 and UPC <> 'TAX' and UPC <> 'DISCOUNT'
 		AND trans_type <> 'L'
 		and not (trans_status='M' and total=convert('0.00',decimal))
@@ -1887,7 +1923,7 @@ function create_trans_dbs($db,$type){
 		$rpreorderG = "CREATE     view rp_ltt_receipt_reorder_g as
 		select top 100 percent
 		register_no,emp_no,trans_no,card_no,
-		description,
+		l.description,
 		case 
 			when voided = 5 
 				then 'Discount'
@@ -1916,10 +1952,14 @@ function create_trans_dbs($db,$type){
 				then 'VD'
 			when trans_status = 'R'
 				then 'RF'
-			when tax <> 0 and foodstamp <> 0
-				then 'TF'
-			when tax <> 0 and foodstamp = 0
-				then 'T' 
+			WHEN (tax = 1 and foodstamp <> 0)
+				THEN 'TF'
+			WHEN (tax = 1 and foodstamp = 0)
+				THEN 'T' 
+			WHEN (tax > 1 and foodstamp <> 0)
+				THEN LEFT(t.description,1)+'F'
+			WHEN (tax > 1 and foodstamp = 0)
+				THEN LEFT(t.description,1)
 			when tax = 0 and foodstamp <> 0
 				then 'F'
 			when tax = 0 and foodstamp = 0
@@ -1933,7 +1973,9 @@ function create_trans_dbs($db,$type){
 		department,
 		upc,
 		trans_subtype
-		from rp_ltt_grouped
+		from rp_ltt_grouped as l
+		left join taxrates as t
+		on l.tax=t.id
 		where voided <> 5 and UPC <> 'TAX' and UPC <> 'DISCOUNT'
 		AND trans_type <> 'L'
 		and not (trans_status='M' and total=convert(money,'0.00'))
@@ -2520,6 +2562,9 @@ function create_min_server($db,$type){
 	if (!$db->table_exists("TenderTapeGeneric",$name)){
 		db_structure_modify($db,'TenderTapeGeneric',$ttG,$errors);
 	}
+
+	// re-use definition to create lane_config on server
+	create_if_needed($db, $type, $name, 'lane_config', 'op', $errors);
 
 	return $errors;
 }

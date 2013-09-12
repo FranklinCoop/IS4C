@@ -50,6 +50,23 @@ class AutoLoader extends LibraryClass {
 		$map = $CORE_LOCAL->get("ClassLookup");
 		if (!is_array($map)) return;
 
+		if (isset($map[$name]) && !file_exists($map[$name])){
+			// file is missing. 
+			// rebuild map to see if the class is
+			// gone or the file just moved
+			self::LoadMap();
+			$map = $CORE_LOCAL->get("ClassLookup");
+			if (!is_array($map)) return;
+		}
+		else if (!isset($map[$name])){
+			// class is unknown
+			// rebuild map to see if the definition
+			// file has been added
+			self::LoadMap();
+			$map = $CORE_LOCAL->get("ClassLookup");
+			if (!is_array($map)) return;
+		}
+
 		if (isset($map[$name]) && !class_exists($name,False)
 		   && file_exists($map[$name])){
 
@@ -142,6 +159,12 @@ class AutoLoader extends LibraryClass {
 		case 'ProductSearch':
 			$path = realpath(dirname(__FILE__).'/Search/Products');
 			$map = Plugin::PluginMap($path,$map);
+			break;
+		case 'DiscountModule':
+			$map['DiscountModule'] = realpath(dirname(__FILE__).'/DiscountModule.php');
+			break;
+		case 'MemberLookup':
+			$map['MemberLookup'] = realpath(dirname(__FILE__).'/MemberLookup.php');
 			break;
 		}
 

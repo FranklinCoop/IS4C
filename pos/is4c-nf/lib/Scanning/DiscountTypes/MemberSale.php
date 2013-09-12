@@ -34,7 +34,7 @@ class MemberSale extends DiscountType {
 		$ret["unitPrice"] = $row['normal_price'];
 
 		$ret['discount'] = 0;
-		$ret['memDiscount'] = ($ret['regPrice'] - $row['special_price']) * $quantity;
+		$ret['memDiscount'] = MiscLib::truncate2(($ret['regPrice'] - $row['special_price']) * $quantity);
 
 		if ($CORE_LOCAL->get("isMember") == 1 || $CORE_LOCAL->get("memberID") == $CORE_LOCAL->get("visitingMem"))
 			$ret["unitPrice"] = $row['special_price'];
@@ -53,12 +53,10 @@ class MemberSale extends DiscountType {
 	function addDiscountLine(){
 		global $CORE_LOCAL;	
 		if ($CORE_LOCAL->get("isMember") == 1 || $CORE_LOCAL->get("memberID") == $CORE_LOCAL->get("visitingMem")){
-			$CORE_LOCAL->set("voided",2);
 			TransRecord::adddiscount($this->savedInfo['memDiscount'],
 				$this->savedRow['department']);
 		}
 		if ($this->savedInfo['discount'] != 0){
-			$CORE_LOCAL->set("voided",2);
 			TransRecord::adddiscount($this->savedInfo['discount'],
 					$this->savedRow['department']);
 		}

@@ -20,6 +20,8 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
+header('Location: InstallIndexPage.php');
+return False;
 
 ini_set('display_errors','1');
 require(dirname(__FILE__).'/../config.php'); 
@@ -845,6 +847,9 @@ function create_op_dbs($con){
 
 	$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_OP_DB,
 			'vendorItems','op');
+
+	$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_OP_DB,
+			'vendorContact','op');
 
 	$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_OP_DB,
 			'vendorSKUtoPLU','op');

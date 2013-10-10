@@ -87,10 +87,12 @@ static public function center($text, $linewidth) {
 static public function drawerKick() {
 	$pin = self::currentDrawer();
 	if ($pin == 1)
-		self::writeLine(chr(27).chr(112).chr(0).chr(48)."0");
+		self::writeLine(chr(27).chr(112).chr(48).chr(55).chr(121));
+		//self::writeLine(chr(27).chr(112).chr(0).chr(48)."0");
 	elseif ($pin == 2)
-		self::writeLine(chr(27).chr(112).chr(1).chr(48)."0");
-	//self::writeLine(chr(27).chr(112).chr(48).chr(55).chr(121));
+		self::writeLine(chr(27).chr(112).chr(48).chr(55).chr(121));
+		//self::writeLine(chr(27).chr(112).chr(1).chr(48)."0");
+	
 }
 
 /**

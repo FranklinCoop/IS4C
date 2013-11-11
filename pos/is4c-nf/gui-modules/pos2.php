@@ -183,7 +183,21 @@ class pos2 extends BasicPage {
 			screenLockVar = setTimeout('lockScreen()', <?php echo $CORE_LOCAL->get("timeout") ?>);
 		}
 		function lockScreen(){
-			location = '<?php echo $this->page_url; ?>gui-modules/login3.php';
+			if ('<?php echo $CORE_LOCAL->get("End")?>' != 0) 
+				location = '<?php echo $this->page_url; ?>gui-modules/login3.php';
+			else {
+				<?php
+				Database::setglobalvalue("LoggedIn", 0);
+				$CORE_LOCAL->set("LoggedIn",0);
+				$CORE_LOCAL->set("training",0);
+				$CORE_LOCAL->set("gui-scale","no");
+					if (session_id() != '')
+						session_write_close();
+				?>
+				location = '<?php echo $this->page_url; ?>/login.php';
+			}
+
+			
 		}
 		function receiptFetch(r_type){
 			$.ajax({

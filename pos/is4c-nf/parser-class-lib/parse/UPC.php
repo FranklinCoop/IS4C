@@ -270,13 +270,16 @@ class UPC extends Parser {
 		else
 			$CORE_LOCAL->set("qttyvalid",1); // this may be unnecessary
 
+		/*
+		I had to comment out this section because we use plu 8010 and 8011
+
 		/* wedge I assume
 		   I don't like this being hard-coded, but since these UPCs
 		   are entries in products they can't go in a SpecialUPC
 		   object (unless SpecialUPC checks take place on every
 		   scan, but that's more overhead than I want on such a common
 		   operation
-		*/
+		
 		if ($upc == "0000000008010" && $CORE_LOCAL->get("msgrepeat") == 0) {
 			$CORE_LOCAL->set("boxMsg","<b>".$total." gift certificate</b><br />
 				"._("insert document")."<br />"._("press enter to endorse")."
@@ -287,7 +290,7 @@ class UPC extends Parser {
 
 		/* wedge I assume
 		   see 0000000008010 above
-		*/
+		
 		if ($upc == "0000000008011" && $CORE_LOCAL->get("msgrepeat") == 0) {
 			$CORE_LOCAL->set("boxMsg","<b>".$total." class registration</b><br />
 				"._("insert form")."<br />"._("press enter to endorse")."
@@ -298,6 +301,8 @@ class UPC extends Parser {
 
 		/*
 		   END error checking round #1
+		
+
 		*/	
 
 		// wfc uses deposit field to link another upc

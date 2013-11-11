@@ -36,7 +36,7 @@ class login2 extends BasicPage {
 	function preprocess(){
 		global $CORE_LOCAL;
 		$this->box_css_class = 'coloredArea';
-		$this->msg = _('please enter your password');
+		$this->msg = gettext('please enter your password');
 
 		if (isset($_REQUEST['reginput'])){
 			if (Authenticate::check_password($_REQUEST['reginput'])){

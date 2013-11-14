@@ -147,7 +147,7 @@ class Steering extends Parser {
 					$kicker_class = ($CORE_LOCAL->get("kickerModule")=="") ? 'Kicker' : $CORE_LOCAL->get('kickerModule');
 					$kicker_object = new $kicker_class();
 					if ($kicker_object->kickOnSignOut())
-					ReceiptLib::drawerKick();
+						ReceiptLib::drawerKick();
 					ReceiptLib::freeDrawer(ReceiptLib::currentDrawer());
 				}
 				$this->ret['main_frame'] = $my_url."login.php";
@@ -171,6 +171,10 @@ class Steering extends Parser {
 			return True;
 		*/
 		case "CN":
+			/* always prompt for a login. this older behavior can
+			   be brought back as an optional feature, but I'm not
+			   going to add yet-another-setting unless someone actually
+			   needs this. Andy 24Sep13
 			if ($CORE_LOCAL->get("runningTotal") == 0) {
 				$this->ret['receipt'] = 'cancelled';
 				$this->ret['output'] = DisplayLib::printheaderb();
@@ -179,6 +183,8 @@ class Steering extends Parser {
 			else {
 				$this->ret['main_frame'] = $my_url."gui-modules/mgrlogin.php";
 			}
+			*/
+			$this->ret['main_frame'] = $my_url."gui-modules/mgrlogin.php";
 			return True;
 		case "CC":
 			if ($CORE_LOCAL->get("ttlflag") != 1){

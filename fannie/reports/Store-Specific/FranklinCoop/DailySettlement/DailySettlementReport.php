@@ -154,7 +154,9 @@ echo "<tr>
 		</tr>";
 
 $echo_str = "";
+$echo_str = "<tr><th>".$result."</th></tr>"."<tr><th>".$result_l1."</th></tr>"."<tr><th>".$result_l2."</th></tr>";
 
+/*
 $row = mysql_fetch_array($result, MYSQL_BOTH);
 $row1 = mysql_fetch_array($result_l1, MYSQL_BOTH);
 $row2 = mysql_fetch_array($result_l2, MYSQL_BOTH);
@@ -171,7 +173,7 @@ $echo_str .= "<tr><th>Mfg Coupon Total</th><th>".$row["mfg_coupon_total"]."</th>
 $echo_str .= "<tr><th>Str Coupon Total</th><th>".$row["store_coupon_total"]."</th><th>".$row1["store_coupon_total"]."</th><th>".$row2["store_coupon_total"]."</th></tr>";
 $echo_str .= "<tr><th>Gift Card Total</th><th>".$row["gift_card_total"]."</th><th>".$row1["gift_card_total"]."</th><th>".$row2["sales_total"]."</th></tr>";
 $echo_str .= "<tr><th>Gift Sold Total</th><th>".$row["gift_sold_number"]."</th><th>".$row1["gift_sold_number"]."</th><th>".$row2["sales_total"]."</th></tr>";
-
+*/
 echo $echo_str;
 
 echo "</table>";

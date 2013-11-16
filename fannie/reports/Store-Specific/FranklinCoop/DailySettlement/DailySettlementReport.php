@@ -34,22 +34,8 @@ $buyer = $_REQUEST['buyer'];
 $dDiffStart = $startDate.' 00:00:00';
 $dDiffEnd = $endDate.' 23:59:59';
 
-echo "<span style='font-weight:bold;'>Hourly Sales Report</span><br>";
+echo "<span style='font-weight:bold;'>Daily Settlement Report</span><br>";
 echo "From $startDate to $endDate";
-echo "<br />Super Department: ";
-if($buyer == -1){
-	echo "All";
-} else {
-	$sdQ = "SELECT super_name FROM superDeptNames WHERE superID = ?";
-	$sdP = $dbc->prepare_statement($sdQ);
-	$sdR = $dbc->exec_statement($sdP,array($buyer));
-	$superDept = "";
-	while($row = $dbc->fetch_row($sdR)){
-		$superDept = $row['super_name'];
-		echo $superDept;
-		break;
-	}
-}
 
 $dlog = select_dlog($startDate,$endDate);
 
@@ -59,91 +45,87 @@ $total_sales = '';
 $lane1_sales = '';
 $lane2_sales = '';
 
-$total_sales = "SELECT sum(total) as sales_total,
-sum(case when description='MassSalesTax' then regPrice else 0 end) as sales_tax_total,
-sum(case when description='StateAndLocalMealsTax' then regPrice else null end) as meals_tax_total,
-sum(case when department='992' then total else null end) as member_payment_total,
-sum(case when trans_subtype='CA' then total else null end) as cash_total,
-sum(case when trans_subtype='CK' then total else null end) as check_total,
-sum(case when trans_subtype='DC' then total else null end) as debit_total,
-sum(case when trans_subtype='EF' then total else null end) as snap_total,
-sum(case when trans_subtype='CC' then total else null end) as credit_total,
-sum(case when trans_subtype='CP' then total else null end) as mfg_coupon_total,
-sum(case when trans_subtype='IC' then total else null end) as store_coupon_total,
-sum(case when trans_subtype='TC' then total else null end) as gift_card_total,
-sum(case when upc='1930' then quantity else null end) as gift_sold_number
+$total_sales = "SELECT sum(case when trans_type='T' then total else 0 end) as sales_total,
+sum(case when description='MassSalesTax' AND trans_type='C' then regPrice else 0 end) as sales_tax_total,
+sum(case when description='StateAndLocalMealsTax' AND trans_type='C' then regPrice else 0 end) as meals_tax_total,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when trans_subtype='CA' AND trans_type ='T' then total else 0 end) as cash_total,
+sum(case when trans_subtype='CK' AND trans_type ='T' then total else 0 end) as check_total,
+sum(case when trans_subtype='DC' AND trans_type ='T' then total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then total else 0 end) as snap_total,
+sum(case when trans_subtype='CC' AND trans_type ='T' then total else 0 end) as credit_total,
+sum(case when trans_subtype='CP' AND trans_type ='T' then total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='IC' AND trans_type ='T' then total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='TC' AND trans_type ='T' then total else 0 end) as gift_card_total,
+sum(case when upc='1930' then total else 0 end) as gift_sold_number,
+sum(case when department='994' then total else 0 end) as paid_out_total,
+sum(case when department='995' then total else 0 end) as paid_in_total
 FROM core_trans.transarchive
-WHERE (trans_type ='T' OR trans_type='C' OR department='992') and datetime BETWEEN ? AND ?;";
+WHERE datetime BETWEEN ? AND ?;";
 
-$lane1_sales = "SELECT sum(total) as sales_total,
-sum(case when description='MassSalesTax' then regPrice else 0 end) as sales_tax_total,
-sum(case when description='StateAndLocalMealsTax' then regPrice else null end) as meals_tax_total,
-sum(case when department='992' then total else null end) as member_payment_total,
-sum(case when trans_subtype='CA' then total else null end) as cash_total,
-sum(case when trans_subtype='CK' then total else null end) as check_total,
-sum(case when trans_subtype='DC' then total else null end) as debit_total,
-sum(case when trans_subtype='EF' then total else null end) as snap_total,
-sum(case when trans_subtype='CC' then total else null end) as credit_total,
-sum(case when trans_subtype='CP' then total else null end) as mfg_coupon_total,
-sum(case when trans_subtype='IC' then total else null end) as store_coupon_total,
-sum(case when trans_subtype='TC' then total else null end) as gift_card_total,
-sum(case when upc='1930' then quantity else null end) as gift_sold_number
+$lane1_sales = "SELECT sum(case when trans_type='T' then total else 0 end) as sales_total,
+sum(case when description='MassSalesTax' AND trans_type='C' then regPrice else 0 end) as sales_tax_total,
+sum(case when description='StateAndLocalMealsTax' AND trans_type='C' then regPrice else 0 end) as meals_tax_total,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when trans_subtype='CA' AND trans_type ='T' then total else 0 end) as cash_total,
+sum(case when trans_subtype='CK' AND trans_type ='T' then total else 0 end) as check_total,
+sum(case when trans_subtype='DC' AND trans_type ='T' then total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then total else 0 end) as snap_total,
+sum(case when trans_subtype='CC' AND trans_type ='T' then total else 0 end) as credit_total,
+sum(case when trans_subtype='CP' AND trans_type ='T' then total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='IC' AND trans_type ='T' then total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='TC' AND trans_type ='T' then total else 0 end) as gift_card_total,
+sum(case when upc='1930' then total else 0 end) as gift_sold_number,
+sum(case when department='994' then total else 0 end) as paid_out_total,
+sum(case when department='995' then total else 0 end) as paid_in_total
 FROM core_trans.transarchive
-WHERE (trans_type ='T' OR trans_type='C' OR department='992') and register_no='1' and datetime BETWEEN ? AND ?;";
+WHERE register_no='1' and datetime BETWEEN ? AND ?;";
 
-$lane2_sales = "SELECT sum(total) as sales_total,
-sum(case when description='MassSalesTax' then regPrice else 0 end) as sales_tax_total,
-sum(case when description='StateAndLocalMealsTax' then regPrice else null end) as meals_tax_total,
-sum(case when department='992' then total else null end) as member_payment_total,
-sum(case when trans_subtype='CA' then total else null end) as cash_total,
-sum(case when trans_subtype='CK' then total else null end) as check_total,
-sum(case when trans_subtype='DC' then total else null end) as debit_total,
-sum(case when trans_subtype='EF' then total else null end) as snap_total,
-sum(case when trans_subtype='CC' then total else null end) as credit_total,
-sum(case when trans_subtype='CP' then total else null end) as mfg_coupon_total,
-sum(case when trans_subtype='IC' then total else null end) as store_coupon_total,
-sum(case when trans_subtype='TC' then total else null end) as gift_card_total,
-sum(case when upc='1930' then quantity else null end) as gift_sold_number
+$lane2_sales = "SELECT sum(case when trans_type='T' then total else 0 end) as sales_total,
+sum(case when description='MassSalesTax' AND trans_type='C' then regPrice else 0 end) as sales_tax_total,
+sum(case when description='StateAndLocalMealsTax' AND trans_type='C' then regPrice else 0 end) as meals_tax_total,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when trans_subtype='CA' AND trans_type ='T' then total else 0 end) as cash_total,
+sum(case when trans_subtype='CK' AND trans_type ='T' then total else 0 end) as check_total,
+sum(case when trans_subtype='DC' AND trans_type ='T' then total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then total else 0 end) as snap_total,
+sum(case when trans_subtype='CC' AND trans_type ='T' then total else 0 end) as credit_total,
+sum(case when trans_subtype='CP' AND trans_type ='T' then total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='IC' AND trans_type ='T' then total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='TC' AND trans_type ='T' then total else 0 end) as gift_card_total,
+sum(case when upc='1930' then total else 0 end) as gift_sold_number,
+sum(case when department='994' then total else 0 end) as paid_out_total,
+sum(case when department='995' then total else 0 end) as paid_in_total
 FROM core_trans.transarchive
-WHERE (trans_type ='T' OR trans_type='C' OR department='992') and register_no='2' and datetime BETWEEN ? AND ?;";
+WHERE register_no='2' and datetime BETWEEN ? AND ?;";
 
 $args = array($dDiffStart,$dDiffEnd);
 
 $prep = $dbc->prepare_statement($total_sales);
 $result = $dbc->exec_statement($prep,$args);
+$row = $dbc->fetchArray($result);
 
 $prep = $dbc->prepare_statement($lane1_sales);
 $result_l1 = $dbc->exec_statement($prep,$args);
+$row1 = $dbc->fetchArray($result_l1);
+
 $prep = $dbc->prepare_statement($lane2_sales);
 $result_l2 = $dbc->exec_statement($prep,$args);
+$row2 = $dbc->fetchArray($result_l2);
 
 
 echo "<table cellspacing=0 cellpadding=4 border=1>";
 
 if (isset($_REQUEST['excel'])){
 	  header('Content-Type: application/ms-excel');
-	  header('Content-Disposition: attachment; filename="hourlySales.xls"');
+	  header('Content-Disposition: attachment; filename="DailySettlement.xls"');
 }
 else {
 	if(isset($_REQUEST['weekday'])){
 		 $weekday = $_REQUEST['weekday'];
-	   echo "<br><a href=hourlySalesAuth.php?endDate=$endDate&startDate=$startDate&buyer=$buyer&weekday=$weekday&excel=yes>Click here to dump to Excel File</a>";
+	   echo "<br><a href=DailySettlementReport.php?endDate=$endDate&startDate=$startDate&buyer=$buyer&weekday=$weekday&excel=yes>Click here to dump to Excel File</a>";
 	}else{
-	   echo "<br><a href=hourlySalesAuth.php?endDate=$endDate&startDate=$startDate&buyer=$buyer&excel=yes>Click here to dump to Excel File</a>";
-	}
-	echo " <a href='javascript:history.back();'>Back</a>";
-}
-
-if (isset($_REQUEST['excel'])){
-	  header('Content-Type: application/ms-excel');
-	  header('Content-Disposition: attachment; filename="hourlySales.xls"');
-}
-else {
-	if(isset($_REQUEST['weekday'])){
-		 $weekday = $_REQUEST['weekday'];
-	   echo "<br><a href=hourlySalesAuth.php?endDate=$endDate&startDate=$startDate&buyer=$buyer&weekday=$weekday&excel=yes>Click here to dump to Excel File</a>";
-	}else{
-	   echo "<br><a href=hourlySalesAuth.php?endDate=$endDate&startDate=$startDate&buyer=$buyer&excel=yes>Click here to dump to Excel File</a>";
+	   echo "<br><a href=DailySettlementReport.php?endDate=$endDate&startDate=$startDate&buyer=$buyer&excel=yes>Click here to dump to Excel File</a>";
 	}
 	echo " <a href='javascript:history.back();'>Back</a>";
 }
@@ -154,13 +136,11 @@ echo "<tr>
 		</tr>";
 
 $echo_str = "";
-$echo_str = "<tr><th>".$result."</th></tr>"."<tr><th>".$result_l1."</th></tr>"."<tr><th>".$result_l2."</th></tr>";
+//$echo_str = "<tr><th>".$result."</th></tr>"."<tr><th>".$result_l1."</th></tr>"."<tr><th>".$result_l2."</th></tr>";
 
-/*
-$row = mysql_fetch_array($result, MYSQL_BOTH);
-$row1 = mysql_fetch_array($result_l1, MYSQL_BOTH);
-$row2 = mysql_fetch_array($result_l2, MYSQL_BOTH);
-$echo_str .= "<tr><th>Net Sales</th><th>".$row["sales_total"]."</th><th>".$row1["sales_total"]."</th><th>".$row2["sales_total"]."</th></tr>";
+
+
+$echo_str .= "<tr><th>Net Sales</th><th>".$row[0]."</th><th>".$row1[0]."</th><th>".$row2[0]."</th></tr>";
 $echo_str .= "<tr><th>Sales Tax</th><th>".$row["sales_tax_total"]."</th><th>".$row1["sales_tax_total"]."</th><th>".$row2["sales_tax_total"]."</th></tr>";
 $echo_str .= "<tr><th>Meals Tax</th><th>".$row["meals_tax_total"]."</th><th>".$row1["meals_tax_total"]."</th><th>".$row2["meals_tax_total"]."</th></tr>";
 $echo_str .= "<tr><th>Equity Payments</th><th>".$row["member_payment_total"]."</th><th>".$row1["member_payment_total"]."</th><th>".$row2["member_payment_total"]."</th></tr>";
@@ -171,9 +151,9 @@ $echo_str .= "<tr><th>SNAP Total</th><th>".$row["snap_total"]."</th><th>".$row1[
 $echo_str .= "<tr><th>Credit Total</th><th>".$row["credit_total"]."</th><th>".$row1["credit_total"]."</th><th>".$row2["credit_total"]."</th></tr>";
 $echo_str .= "<tr><th>Mfg Coupon Total</th><th>".$row["mfg_coupon_total"]."</th><th>".$row1["mfg_coupon_total"]."</th><th>".$row2["mfg_coupon_total"]."</th></tr>";
 $echo_str .= "<tr><th>Str Coupon Total</th><th>".$row["store_coupon_total"]."</th><th>".$row1["store_coupon_total"]."</th><th>".$row2["store_coupon_total"]."</th></tr>";
-$echo_str .= "<tr><th>Gift Card Total</th><th>".$row["gift_card_total"]."</th><th>".$row1["gift_card_total"]."</th><th>".$row2["sales_total"]."</th></tr>";
-$echo_str .= "<tr><th>Gift Sold Total</th><th>".$row["gift_sold_number"]."</th><th>".$row1["gift_sold_number"]."</th><th>".$row2["sales_total"]."</th></tr>";
-*/
+$echo_str .= "<tr><th>Gift Card Total</th><th>".$row["gift_card_total"]."</th><th>".$row1["gift_card_total"]."</th><th>".$row2["gift_card_total"]."</th></tr>";
+$echo_str .= "<tr><th>Gift Sold Total</th><th>".$row["gift_sold_number"]."</th><th>".$row1["gift_sold_number"]."</th><th>".$row2["gift_sold_number"]."</th></tr>";
+
 echo $echo_str;
 
 echo "</table>";

@@ -98,11 +98,11 @@ echo "<tr>
 $echo_str = "";
 //$echo_str = "<tr><th>".$result."</th></tr>"."<tr><th>".$result_l1."</th></tr>"."<tr><th>".$result_l2."</th></tr>";
 
-$row_names = ["Department Sales Totals", "Sales Tax", "Meals Tax", "Member Payments", "Charge Payments",
+$row_names = array("Department Sales Totals", "Sales Tax", "Meals Tax", "Member Payments", "Charge Payments",
 				"Gift Cards Sold", "Paid In", "Member 2%", "Member 10%", "Member 15%", "Staff 15",
 				"Staff 17%", "Staff 23%", "Credit Card Total", "Debit Card Total", "SNAP Total",
 				"SNAP Cash Total", "Gift Card Total", "Paper Gift Total", "In Store Charge Total",
-				"Paid Out Total", "Store Coupon Total", "Manufactures Coupon Total"];
+				"Paid Out Total", "Store Coupon Total", "Manufactures Coupon Total");
 
 if($result) {
 	for($i = 0; $i <count($row_names); $i++) {

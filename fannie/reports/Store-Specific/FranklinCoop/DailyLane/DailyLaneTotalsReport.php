@@ -45,21 +45,22 @@ $total_sales = '';
 $lane1_sales = '';
 $lane2_sales = '';
 
-$total_sales = "SELECT sum(case when trans_type='T' then total else 0 end) as sales_total,
-sum(case when description='MassSalesTax' AND trans_type='C' then regPrice else 0 end) as sales_tax_total,
-sum(case when description='StateAndLocalMealsTax' AND trans_type='C' then regPrice else 0 end) as meals_tax_total,
+$total_sales = "SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
+sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
+sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
 sum(case when department='992' then total else 0 end) as member_payment_total,
-sum(case when trans_subtype='CA' AND trans_type ='T' then total else 0 end) as cash_total,
-sum(case when trans_subtype='CK' AND trans_type ='T' then total else 0 end) as check_total,
-sum(case when trans_subtype='DC' AND trans_type ='T' then total else 0 end) as debit_total,
-sum(case when trans_subtype='EF' AND trans_type ='T' then total else 0 end) as snap_total,
-sum(case when trans_subtype='CC' AND trans_type ='T' then total else 0 end) as credit_total,
-sum(case when trans_subtype='CP' AND trans_type ='T' then total else 0 end) as mfg_coupon_total,
-sum(case when trans_subtype='IC' AND trans_type ='T' then total else 0 end) as store_coupon_total,
-sum(case when trans_subtype='TC' AND trans_type ='T' then total else 0 end) as gift_card_total,
-sum(case when upc='1930' then total else 0 end) as gift_sold_number,
-sum(case when department='994' then total else 0 end) as paid_out_total,
-sum(case when department='995' then total else 0 end) as paid_in_total
+sum(case when department='995' then -total else 0 end) as paid_in_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
+sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
 FROM core_trans.transarchive
 WHERE datetime BETWEEN ? AND ?;";
 
@@ -84,7 +85,7 @@ WHERE register_no='1' and datetime BETWEEN ? AND ?;";
 
 $lane2_sales = "SELECT
 sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
-sum(case when trans_subtype='CK' then quantity else 0 end) as check_number,
+sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
 sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
 sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
 sum(case when department='992' then total else 0 end) as member_payment_total,
@@ -134,7 +135,7 @@ else {
 
 //echo "<table cellspacing=0 cellpadding=4 border=1>";
 echo "<tr>
-		<th> <th>Lane 1 Totals</th> <th>Lane 2 Totals</th>
+		<th> <th>Lane 1 Totals</th> <th>Lane 2 Totals</th><th>Store Totals</th>
 		</tr>";
 
 $echo_str = "";
@@ -146,7 +147,7 @@ $row_names = array("Cash Total", "Checks (# of)", "Checks (amount)", "GIFT CARD 
 
 if($result) {
 	for($i = 0; $i < count($row_names); $i++) {
-		$echo_str .= "<tr><th>".$row_names[$i]."</th><th>".$row1[$i]."</th><th>".$row2[$i]."</th></tr>";
+		$echo_str .= "<tr><th>".$row_names[$i]."</th><th>".$row1[$i]."</th><th>".$row2[$i]."</th><th>".$row[$i]."</th></tr>";
 	}
 }
 

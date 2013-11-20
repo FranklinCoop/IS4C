@@ -66,7 +66,7 @@ sum(case when department='994' then -total else 0 end) as paid_out_total,
 sum(case when trans_subtype='IC' AND trans_type ='T' then -total else 0 end) as store_coupon_total,
 sum(case when trans_subtype='CP' AND trans_type ='T' then -total else 0 end) as mfg_coupon_total
 FROM core_trans.transarchive
-WHERE datetime BETWEEN ? AND ?;";
+WHERE trans_status!='X' AND datetime BETWEEN ? AND ?;";
 
 $args = array($dDiffStart,$dDiffEnd);
 

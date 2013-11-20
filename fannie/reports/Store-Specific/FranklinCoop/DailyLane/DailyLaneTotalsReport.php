@@ -62,7 +62,7 @@ sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as 
 sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
 sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
 FROM core_trans.transarchive
-WHERE datetime BETWEEN ? AND ?;";
+WHERE trans_status!='X' AND datetime BETWEEN ? AND ?;";
 
 $lane1_sales = "SELECT
 sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
@@ -81,7 +81,7 @@ sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as 
 sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
 sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
 FROM core_trans.transarchive
-WHERE register_no='1' and datetime BETWEEN ? AND ?;";
+WHERE trans_status!='X' AND register_no='1' and datetime BETWEEN ? AND ?;";
 
 $lane2_sales = "SELECT
 sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
@@ -100,7 +100,7 @@ sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as 
 sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
 sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
 FROM core_trans.transarchive
-WHERE register_no='2' and datetime BETWEEN ? AND ?;";
+WHERE trans_status!='X' AND register_no='2' and datetime BETWEEN ? AND ?;";
 
 $args = array($dDiffStart,$dDiffEnd);
 

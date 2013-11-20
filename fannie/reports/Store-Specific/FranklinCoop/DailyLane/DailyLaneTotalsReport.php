@@ -46,7 +46,7 @@ $lane1_sales = '';
 $lane2_sales = '';
 
 $total_sales = "SELECT
-sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
+sum(case when trans_subtype='CA' then -total else 0 end) + 500 as cash_total,
 sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
 sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
 sum(case when upc='1930' then -total else 0 end) as gift_sold_number,

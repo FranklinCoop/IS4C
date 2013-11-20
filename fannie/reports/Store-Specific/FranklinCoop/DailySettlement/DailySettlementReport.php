@@ -42,7 +42,7 @@ $dbconn = ($FANNIE_SERVER_DBMS=='MSSQL')?'.dbo.':'.';
 $total_sales = '';
 
 $total_sales = "SELECT 
-sum(case when department!=0 then total else 0 end) as dept_sales_total,
+sum(case when department!=0 AND trans_status!='X' then total else 0 end) as dept_sales_total,
 sum(case when description='MassSalesTax' AND trans_type='C' then regPrice else 0 end) as sales_tax_total,
 sum(case when description='StateAndLocalMealsTax' AND trans_type='C' then regPrice else 0 end) as meals_tax_total,
 sum(case when department='992' then total else 0 end) as member_payment_total,

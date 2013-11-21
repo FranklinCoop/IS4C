@@ -4252,3 +4252,572 @@
 /fannie/sync/TableSyncPage.php: Thu, 02 May 2013 09:13:36 -0400: INSERT INTO employees VALUES ('57','57','57','Rowan','Oberski','','1','30','30','1900-01-01 00:00')
 /fannie/sync/TableSyncPage.php: Thu, 02 May 2013 09:13:36 -0400: INSERT INTO employees VALUES ('902','902','902','John','Eichholz','Finance/I.S. Manager','1','30','30','1959-08-14 00:00:00')
 /fannie/sync/TableSyncPage.php: Thu, 02 May 2013 09:13:36 -0400: INSERT INTO employees VALUES ('7000','7000','7000','John','Norton','SUB','1','15','15','1900-01-01 00:00')
+/is4c/fannie/reports/DepartmentMovement/DepartmentMovementReport.php: Mon, 18 Nov 2013 16:45:45 -0500: SELECT t.upc,p.description, 
+				  SUM(CASE WHEN unitPrice=0.01 THEN 1 ELSE t.quantity END) as qty,
+				  SUM(t.total) AS total,
+				  d.dept_no,d.dept_name,s.superID,x.distributor
+				  FROM trans_archive.dlogBig as t LEFT JOIN products as p on t.upc = p.upc
+				  LEFT JOIN departments as d on d.dept_no = t.department
+				  LEFT JOIN MasterSuperDepts AS s ON t.department = s.dept_ID
+				  LEFT JOIN prodExtra as x on t.upc = x.upc
+				  WHERE d.dept_no BETWEEN ? AND ?
+				  AND tdate BETWEEN ? AND ?
+				  GROUP BY t.upc,p.description,
+				  d.dept_no,d.dept_name,s.superID,x.distributor ORDER BY SUM(t.total) DESC
+Table 'trans_archive.products' doesn't exist
+
+/is4c/fannie/reports/DepartmentMovement/DepartmentMovementReport.php: Mon, 18 Nov 2013 16:46:08 -0500: SELECT t.upc,p.description, 
+				  SUM(CASE WHEN unitPrice=0.01 THEN 1 ELSE t.quantity END) as qty,
+				  SUM(t.total) AS total,
+				  d.dept_no,d.dept_name,s.superID,x.distributor
+				  FROM trans_archive.dlogBig as t LEFT JOIN products as p on t.upc = p.upc
+				  LEFT JOIN departments as d on d.dept_no = t.department
+				  LEFT JOIN MasterSuperDepts AS s ON t.department = s.dept_ID
+				  LEFT JOIN prodExtra as x on t.upc = x.upc
+				  WHERE d.dept_no BETWEEN ? AND ?
+				  AND tdate BETWEEN ? AND ?
+				  GROUP BY t.upc,p.description,
+				  d.dept_no,d.dept_name,s.superID,x.distributor ORDER BY SUM(t.total) DESC
+Table 'trans_archive.products' doesn't exist
+
+/IS4C/fannie/reports/DepartmentMovement/DepartmentMovementReport.php: Mon, 18 Nov 2013 16:53:10 -0500: SELECT t.upc,p.description, 
+				  SUM(CASE WHEN unitPrice=0.01 THEN 1 ELSE t.quantity END) as qty,
+				  SUM(t.total) AS total,
+				  d.dept_no,d.dept_name,s.superID,x.distributor
+				  FROM trans_archive.dlogBig as t LEFT JOIN products as p on t.upc = p.upc
+				  LEFT JOIN departments as d on d.dept_no = t.department
+				  LEFT JOIN MasterSuperDepts AS s ON t.department = s.dept_ID
+				  LEFT JOIN prodExtra as x on t.upc = x.upc
+				  WHERE 1=1
+				  AND tdate BETWEEN ? AND ?
+				  GROUP BY t.upc,p.description,
+				  d.dept_no,d.dept_name,s.superID,x.distributor ORDER BY SUM(t.total) DESC
+Table 'trans_archive.products' doesn't exist
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Tue, 19 Nov 2013 09:41:37 -0500: SELECT
+sum(case when trans_subtype='CA' then total else null end) + 250 as cash_total,
+sum(case when trans_subtype='CK' then quantity else null end) as check_number,
+sum(case when trans_subtype='CK' then total else null end) as check_total,
+sum(case when upc='1930' then quantity else null end) as gift_sold_number
+sum(case when department='992' then total else null end) as member_payment_total,
+sum(case when department='995' then total else 0 end) as paid_in_total,
+sum(case when department='994' then total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then total else null end) as store_coupon_total,
+sum(case when trans_subtype='CP' then total else null end) as mfg_coupon_total,
+sum(case when trans_subtype='DC' then total else null end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then total else null end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then total else null end) as card_media_total
+FROM core_trans.transarchive
+WHERE register_no='1' and datetime BETWEEN ? AND ?;
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'sum(case when department='992' then total else null end) as member_payment_total' at line 6
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Tue, 19 Nov 2013 09:41:37 -0500: SELECT
+sum(case when trans_subtype='CA' then total else null end) + 250 as cash_total,
+sum(case when trans_subtype='CK' then quantity else null end) as check_number,
+sum(case when trans_subtype='CK' then total else null end) as check_total,
+sum(case when upc='1930' then quantity else null end) as gift_sold_number
+sum(case when department='992' then total else null end) as member_payment_total,
+sum(case when department='995' then total else 0 end) as paid_in_total,
+sum(case when department='994' then total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then total else null end) as store_coupon_total,
+sum(case when trans_subtype='CP' then total else null end) as mfg_coupon_total,
+sum(case when trans_subtype='DC' then total else null end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then total else null end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then total else null end) as card_media_total
+FROM core_trans.transarchive
+WHERE register_no='2' and datetime BETWEEN ? AND ?;
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'sum(case when department='992' then total else null end) as member_payment_total' at line 6
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Tue, 19 Nov 2013 09:51:38 -0500: SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
+count(case when trans_subtype='CK' else 0 end) as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
+sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='995' then -total else 0 end) as paid_in_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+FROM core_trans.transarchive
+WHERE register_no='1' and datetime BETWEEN ? AND ?;
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'else 0 end) as check_number,
+sum(case when trans_subtype='CK' then -total else 0' at line 3
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Tue, 19 Nov 2013 09:51:56 -0500: SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
+count(case when trans_subtype='CK') as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
+sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='995' then -total else 0 end) as paid_in_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+FROM core_trans.transarchive
+WHERE register_no='1' and datetime BETWEEN ? AND ?;
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ') as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as c' at line 3
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Tue, 19 Nov 2013 10:05:30 -0500: SELECT sum(SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 500 as cash_total,
+sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
+sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='995' then -total else 0 end) as paid_in_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+FROM core_trans.transarchive
+WHERE datetime BETWEEN ? AND ?;
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 500 as cash_to' at line 1
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Tue, 19 Nov 2013 10:06:09 -0500: 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''2013-11-14 00:00:00''2013-11-14 23:59:59'' at line 1
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailySettlement/DailySettlementReport.php: Tue, 19 Nov 2013 10:23:47 -0500: SELECT sum(SELECT 
+sum(case when department!=0 then total else 0 end) as dept_sales_total,
+sum(case when description='MassSalesTax' AND trans_type='C' then regPrice else 0 end) as sales_tax_total,
+sum(case when description='StateAndLocalMealsTax' AND trans_type='C' then regPrice else 0 end) as meals_tax_total,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='990' then total else 0 end) as charge_payment_total,
+sum(case when upc='1930' then total else 0 end) as gift_total,
+sum(case when department='995' then total else 0 end) as paid_in_total,
+sum(case when description='2% Discount' then unitPrice else 0 end) as member_disc2,
+sum(case when description='10% Discount' then unitPrice else 0 end) as member_disc10,
+sum(case when (description='15% Discount' and staff=0) then unitPrice else 0 end) as member_disc15,
+sum(case when (description='15% Discount' and staff=1) then unitPrice else 0 end) as staff_disc15,
+sum(case when (description='17% Discount' and staff=1) then unitPrice else 0 end) as staff_disc17,
+sum(case when (description='23% Discount' and staff=1) then unitPrice else 0 end) as staff_disc23,
+sum(case when trans_subtype='CC' AND trans_type ='T' then total else 0 end) as credit_total,
+sum(case when trans_subtype='DC' AND trans_type ='T' then total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='GC' AND trans_type ='T' then total else 0 end) as gift_card_total,
+sum(case when trans_subtype='TC' AND trans_type ='T' then total else 0 end) as paper_gift_total,
+sum(case when trans_subtype='MI' AND trans_type ='T' then total else 0 end) as instore_charge_total,
+sum(case when department='994' then total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' AND trans_type ='T' then total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' AND trans_type ='T' then total else 0 end) as mfg_coupon_total
+FROM core_trans.transarchive
+WHERE datetime BETWEEN ? AND ?;
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SELECT 
+sum(case when department!=0 then total else 0 end) as dept_sales_total,
+' at line 1
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailySettlement/DailySettlementReport.php: Tue, 19 Nov 2013 10:26:39 -0500: SELECT sum(SELECT 
+sum(case when department!=0 then total else 0 end) as dept_sales_total,
+sum(case when description='MassSalesTax' AND trans_type='C' then regPrice else 0 end) as sales_tax_total,
+sum(case when description='StateAndLocalMealsTax' AND trans_type='C' then regPrice else 0 end) as meals_tax_total,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='990' then total else 0 end) as charge_payment_total,
+sum(case when upc='1930' then total else 0 end) as gift_total,
+sum(case when department='995' then total else 0 end) as paid_in_total,
+sum(case when description='2% Discount' then unitPrice else 0 end) as member_disc2,
+sum(case when description='10% Discount' then unitPrice else 0 end) as member_disc10,
+sum(case when (description='15% Discount' and staff=0) then unitPrice else 0 end) as member_disc15,
+sum(case when (description='15% Discount' and staff=1) then unitPrice else 0 end) as staff_disc15,
+sum(case when (description='17% Discount' and staff=1) then unitPrice else 0 end) as staff_disc17,
+sum(case when (description='23% Discount' and staff=1) then unitPrice else 0 end) as staff_disc23,
+sum(case when trans_subtype='CC' AND trans_type ='T' then total else 0 end) as credit_total,
+sum(case when trans_subtype='DC' AND trans_type ='T' then total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='GC' AND trans_type ='T' then total else 0 end) as gift_card_total,
+sum(case when trans_subtype='TC' AND trans_type ='T' then total else 0 end) as paper_gift_total,
+sum(case when trans_subtype='MI' AND trans_type ='T' then total else 0 end) as instore_charge_total,
+sum(case when department='994' then total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' AND trans_type ='T' then total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' AND trans_type ='T' then total else 0 end) as mfg_coupon_total
+FROM core_trans.transarchive
+WHERE datetime BETWEEN ? AND ?;
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SELECT 
+sum(case when department!=0 then total else 0 end) as dept_sales_total,
+' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:24 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:24 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:24 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:24 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:24 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:24 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:24 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:24 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:24 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:24 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:30 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:30 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:30 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:30 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:30 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:30 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:30 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:30 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:30 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 11:56:30 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortDayPage.php: Tue, 19 Nov 2013 11:56:50 -0500: SELECT note FROM dailyNotes WHERE emp_no=? AND date=?
+Table 'core_overshort.dailynotes' doesn't exist
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortDayPage.php: Tue, 19 Nov 2013 11:56:50 -0500: SELECT `date`,`username`,`resolved` FROM overshortsLog WHERE 1=1 AND `date` = ?
+Table 'core_overshort.overshortslog' doesn't exist
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortDayPage.php: Tue, 19 Nov 2013 12:02:28 -0500: SELECT note FROM dailyNotes WHERE emp_no=? AND date=?
+Table 'core_overshort.dailynotes' doesn't exist
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortDayPage.php: Tue, 19 Nov 2013 12:02:28 -0500: SELECT `date`,`username`,`resolved` FROM overshortsLog WHERE 1=1 AND `date` = ?
+Table 'core_overshort.overshortslog' doesn't exist
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortDayPage.php: Tue, 19 Nov 2013 12:10:32 -0500: SELECT note FROM dailyNotes WHERE emp_no=? AND date=?
+Table 'core_overshort.dailynotes' doesn't exist
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortDayPage.php: Tue, 19 Nov 2013 12:10:32 -0500: SELECT `date`,`username`,`resolved` FROM overshortsLog WHERE 1=1 AND `date` = ?
+Table 'core_overshort.overshortslog' doesn't exist
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortDayPage.php: Tue, 19 Nov 2013 12:11:12 -0500: SELECT note FROM dailyNotes WHERE emp_no=? AND date=?
+Table 'core_overshort.dailynotes' doesn't exist
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortDayPage.php: Tue, 19 Nov 2013 12:11:12 -0500: SELECT `date`,`username`,`resolved` FROM overshortsLog WHERE 1=1 AND `date` = ?
+Table 'core_overshort.overshortslog' doesn't exist
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortDayPage.php: Tue, 19 Nov 2013 12:14:08 -0500: SELECT note FROM dailyNotes WHERE emp_no=? AND date=?
+Table 'core_overshort.dailynotes' doesn't exist
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortDayPage.php: Tue, 19 Nov 2013 12:14:08 -0500: SELECT `date`,`username`,`resolved` FROM overshortsLog WHERE 1=1 AND `date` = ?
+Table 'core_overshort.overshortslog' doesn't exist
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortCashierPage.php: Tue, 19 Nov 2013 12:18:14 -0500: SELECT `date`,`emp_no`,`tender_type`,`amt` FROM dailyCounts WHERE 1=1 AND `date` = ? AND `emp_no` = ?
+Table 'core_overshort.dailycounts' doesn't exist
+
+/is4c/fannie/modules/plugins2.0/OverShortTools/OverShortCashierPage.php: Tue, 19 Nov 2013 12:18:14 -0500: SELECT `date`,`emp_no`,`checks`,`id` FROM dailyChecks WHERE 1=1 AND `date` = ? AND `emp_no` = ?
+Table 'core_overshort.dailychecks' doesn't exist
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:20:55 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:20:55 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:20:55 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:20:55 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:20:55 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:20:55 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:20:55 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:20:55 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:20:55 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:20:55 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:21:01 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:21:01 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:21:01 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:21:01 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:21:01 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:21:01 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:21:01 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:21:01 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:21:01 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:21:01 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:17 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:17 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:17 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:17 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:17 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:17 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:17 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:17 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:17 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:17 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:20 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:20 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:20 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:20 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:20 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:20 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:20 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:20 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:20 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 12:37:20 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 15:10:53 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 15:10:53 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 15:10:53 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 15:10:53 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 15:10:53 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 15:10:53 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 15:10:53 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 15:10:53 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 15:10:53 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/install/InstallPluginsPage.php: Tue, 19 Nov 2013 15:10:53 -0500: use 
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Wed, 20 Nov 2013 16:25:03 -0500: SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 500 as cash_total,
+sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
+sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='995' then -total else 0 end) as paid_in_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
+sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+FROM core_trans.dlog
+WHERE trans_status!='X' AND datetime BETWEEN ? AND ?;
+Unknown column 'datetime' in 'where clause'
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Wed, 20 Nov 2013 16:25:03 -0500: SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
+sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
+sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='995' then -total else 0 end) as paid_in_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
+sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+FROM core_trans.dlog
+WHERE trans_status!='X' AND register_no='1' and datetime BETWEEN ? AND ?;
+Unknown column 'datetime' in 'where clause'
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Wed, 20 Nov 2013 16:25:03 -0500: SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
+sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
+sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='995' then -total else 0 end) as paid_in_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
+sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+FROM core_trans.dlog
+WHERE trans_status!='X' AND register_no='2' and datetime BETWEEN ? AND ?;
+Unknown column 'datetime' in 'where clause'
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Wed, 20 Nov 2013 16:25:11 -0500: SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 500 as cash_total,
+sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
+sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='995' then -total else 0 end) as paid_in_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
+sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+FROM core_trans.dlog
+WHERE trans_status!='X' AND datetime BETWEEN ? AND ?;
+Unknown column 'datetime' in 'where clause'
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Wed, 20 Nov 2013 16:25:11 -0500: SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
+sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
+sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='995' then -total else 0 end) as paid_in_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
+sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+FROM core_trans.dlog
+WHERE trans_status!='X' AND register_no='1' and datetime BETWEEN ? AND ?;
+Unknown column 'datetime' in 'where clause'
+
+/IS4C/fannie/reports/Store-Specific/FranklinCoop/DailyLane/DailyLaneTotalsReport.php: Wed, 20 Nov 2013 16:25:11 -0500: SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
+sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
+sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='995' then -total else 0 end) as paid_in_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
+sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+FROM core_trans.dlog
+WHERE trans_status!='X' AND register_no='2' and datetime BETWEEN ? AND ?;
+Unknown column 'datetime' in 'where clause'
+

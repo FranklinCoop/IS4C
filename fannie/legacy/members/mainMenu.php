@@ -3,7 +3,10 @@ include('../../config.php');
 
 include($FANNIE_ROOT.'src/SQLManager.php');
 include('../db.php');
+<<<<<<< HEAD
 include 'functMem.php';
+=======
+>>>>>>> 1ad6218ec85a7208e5b7f12427af955dba79b5c3
 
 include($FANNIE_ROOT.'auth/login.php');
 if (!validateUserQuiet('editmembers') && !validateUserQuiet('editmembers_csc') && !validateUserQuiet('viewmembers')){

@@ -21,8 +21,8 @@
 
 *********************************************************************************/
 header('Location: InstallIndexPage.php');
-return False;
 
+<<<<<<< HEAD
 ini_set('display_errors','1');
 require(dirname(__FILE__).'/../config.php'); 
 include(dirname(__FILE__).'/util.php');
@@ -1571,3 +1571,5 @@ function create_archive_dbs($con) {
 }
 
 ?>
+=======
+>>>>>>> 1ad6218ec85a7208e5b7f12427af955dba79b5c3

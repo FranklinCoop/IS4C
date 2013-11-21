@@ -68,10 +68,14 @@ include($FANNIE_ROOT.'src/header.html');
 	<li><a href="SalesToday/">Today's Sales</a> shows current day totals by hour.</li>
 	<li><a href="SalesAndTaxToday/">Today's Sales and Tax</a> shows current day totals by hour
 		and tax totals for the day.</li>
+<<<<<<< HEAD
 	<li><a href="HourlySales/">Store Hourly Sales</a> lists store-wide sales per hour
+=======
+	<li><a href="HourlySales/HourlySalesReport.php">Hourly Sales</a> lists sales per hour
 		over a given date range.</li>
-	<li><a href="HourlySales/hourlySalesDept.php">Department Hourly Sales</a> lists
-		sales per hour over a given date range for a subset of departments.</li>
+	<li><a href="HourlyTrans/HourlyTransReport.php">Hourly Transactions</a> lists transactions per hour
+>>>>>>> 1ad6218ec85a7208e5b7f12427af955dba79b5c3
+		over a given date range.</li>
 	</ul>
 <li><a href="../item/productList.php">Product List</a> is a cross between a report and 
 	a tool. It lists current item prices and status flags for a department or set

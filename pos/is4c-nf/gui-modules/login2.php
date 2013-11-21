@@ -40,6 +40,11 @@ class login2 extends BasicPage
 
 		if (isset($_REQUEST['reginput']) || isset($_REQUEST['userPassword'])){
 
+<<<<<<< HEAD
+=======
+		if (isset($_REQUEST['reginput']) || isset($_REQUEST['userPassword'])){
+
+>>>>>>> 1ad6218ec85a7208e5b7f12427af955dba79b5c3
 			$passwd = '';
 			if (isset($_REQUEST['reginput']) && !empty($_REQUEST['reginput'])){
 				$passwd = $_REQUEST['reginput'];

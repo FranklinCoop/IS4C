@@ -36,6 +36,12 @@ class GCReceiptMessage extends ReceiptMessage {
 
 	protected function varied_message($ref, $reprint=False, $sigSlip=False){
 		global $CORE_LOCAL;
+<<<<<<< HEAD
+=======
+        if ($CORE_LOCAL->get('autoReprint') == 1) {
+            $sigSlip = true;
+        }
+>>>>>>> 1ad6218ec85a7208e5b7f12427af955dba79b5c3
 		$date = ReceiptLib::build_time(time());
 		list($emp, $reg, $trans) = explode('-',$ref);
 		$slip = '';

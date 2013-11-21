@@ -463,6 +463,10 @@ class InstallUtilities extends LibraryClass
 
     /* query to create another table with the same
         columns
+<<<<<<< HEAD
+=======
+       @retrun string query or boolean false
+>>>>>>> 1ad6218ec85a7208e5b7f12427af955dba79b5c3
     */
     static public function duplicateStructure($dbms,$table1,$table2)
     {
@@ -479,11 +483,19 @@ class InstallUtilities extends LibraryClass
                 include($path.'/trans/'.$table1.'.php');
                 return str_replace($table1, $table2, $CREATE['trans.'.$table1]);
             } else {
+<<<<<<< HEAD
                 return 'No table found';
             }
         }
 
         return '';
+=======
+                return false;
+            }
+        }
+
+        return false;
+>>>>>>> 1ad6218ec85a7208e5b7f12427af955dba79b5c3
     }
 
     static public function createIfNeeded($con, $dbms, $db_name, $table_name, $stddb, &$errors=array())
@@ -516,6 +528,7 @@ class InstallUtilities extends LibraryClass
         return self::dbStructureModify($con, $table_name, $CREATE["$stddb.$table_name"], $errors);
     }
 
+<<<<<<< HEAD
     public static function dbStructureModify($sql, $struct_name, $query, &$errors=array())
     {
         ob_start();
@@ -537,6 +550,35 @@ class InstallUtilities extends LibraryClass
                 'details'=>$sql->error(),
                 'important'=>True
                 );
+=======
+    public static function dbStructureModify($sql, $struct_name, $queries, &$errors=array())
+    {
+        if (!is_array($queries)) {
+            $queries = array($queries);
+        }
+
+        foreach($queries as $query) {
+            ob_start();
+            $try = @$sql->query($query);
+            ob_end_clean();
+            if ($try === false){
+                if (stristr($query, "DROP ") && stristr($query,"VIEW ")) {
+                    /* suppress unimportant errors
+                    $errors[] = array(
+                    'struct' => $struct_name,
+                    'query' => $query,
+                    'important' => False
+                    );
+                    */
+                } else {
+                    $errors[] = array(
+                    'struct'=>$struct_name,
+                    'query'=>$query,
+                    'details'=>$sql->error(),
+                    'important'=>True
+                    );
+                }
+>>>>>>> 1ad6218ec85a7208e5b7f12427af955dba79b5c3
             }
         }
 

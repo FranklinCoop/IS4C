@@ -33,6 +33,7 @@ class StoreCreditIssuedReceiptMessage extends ReceiptMessage{
 	public function message($val, $ref, $reprint=False){
 		global $CORE_LOCAL;
 		if ($val <= 0) return '';
+<<<<<<< HEAD
 
 		$slip = ReceiptLib::centerString("................................................")."\n\n";
 		$slip .= ReceiptLib::centerString("( C U S T O M E R   C O P Y )")."\n";
@@ -50,9 +51,36 @@ class StoreCreditIssuedReceiptMessage extends ReceiptMessage{
 		$slip .= " * no cash back on store credit refunds\n";
 		$slip .= " * change amount is not transferable to\n   another store credit\n";
 		$slip .= ReceiptLib::centerString("................................................")."\n";
+=======
+        
+        $slip = '';
+        if ($reprint || $CORE_LOCAL->get('autoReprint') == 0) {
+
+            $slip .= ReceiptLib::centerString("................................................")."\n\n";
+            $slip .= ReceiptLib::centerString("( C U S T O M E R   C O P Y )")."\n";
+            $slip .= ReceiptLib::biggerFont("Store credit issued")."\n\n";
+            $slip .= ReceiptLib::biggerFont(sprintf("Amount \$%.2f",$val))."\n\n";
+
+            if ( $CORE_LOCAL->get("fname") != "" && $CORE_LOCAL->get("lname") != ""){
+                $slip .= "Name: ".$CORE_LOCAL->get("fname")." ".$CORE_LOCAL->get("lname")."\n\n";
+            } else {
+                $slip .= "Name: ____________________________________________\n\n";
+            }
+            $slip .= "Ph #: ____________________________________________\n\n";
+
+            $slip .= " * no cash back on store credit refunds\n";
+            $slip .= " * change amount is not transferable to\n   another store credit\n";
+            $slip .= ReceiptLib::centerString("................................................")."\n";
+        }
+
+>>>>>>> 1ad6218ec85a7208e5b7f12427af955dba79b5c3
 		return $slip;
 	}
 
 	public $paper_only = True;
 }
+<<<<<<< HEAD
 ?>
+=======
+
+>>>>>>> 1ad6218ec85a7208e5b7f12427af955dba79b5c3

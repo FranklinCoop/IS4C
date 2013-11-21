@@ -52,5 +52,16 @@ that reference the current day's info - for example,
 reprinting receipts.
 */
 $CREATE['trans.localtrans_today'] = InstallUtilities::duplicateStructure($dbms,'dtransactions','localtrans_today');
+<<<<<<< HEAD
+=======
+
+if ($CREATE['trans.localtrans_today'] !== false) {
+    $CREATE['trans.localtrans_today'] = array(
+                                            $CREATE['trans.localtrans_today'],
+                                            'ALTER TABLE localtrans_today ADD INDEX (trans_no)',
+                                            'ALTER TABLE localtrans_today ADD INDEX (datetime)',
+                                            );
+}
+>>>>>>> 1ad6218ec85a7208e5b7f12427af955dba79b5c3
 
 ?>

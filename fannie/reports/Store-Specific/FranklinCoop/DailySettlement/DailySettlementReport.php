@@ -43,18 +43,18 @@ $total_sales = '';
 
 $total_sales = "SELECT 
 sum(case when department!=0 then total else 0 end) as dept_sales_total,
-sum(case when description='MassSalesTax' AND trans_type='C' then regPrice else 0 end) as sales_tax_total,
-sum(case when description='StateAndLocalMealsTax' AND trans_type='C' then regPrice else 0 end) as meals_tax_total,
+truncate(sum(case when tax='1' then total*0.0625 else 0 end),2) as sales_tax_total,
+truncate(sum(case when tax='2' then total*0.0625 else 0 end),2) as meals_tax_total,
 sum(case when department='992' then total else 0 end) as member_payment_total,
 sum(case when department='990' then total else 0 end) as charge_payment_total,
 sum(case when upc='1930' then -total else 0 end) as gift_total,
 sum(case when department='995' then total else 0 end) as paid_in_total,
-sum(case when description='2% Discount' then -unitPrice else 0 end) as member_disc2,
-sum(case when description='10% Discount' then -unitPrice else 0 end) as member_disc10,
-sum(case when (description='15% Discount' and staff=0) then -unitPrice else 0 end) as member_disc15,
-sum(case when (description='15% Discount' and staff=1) then -unitPrice else 0 end) as staff_disc15,
-sum(case when (description='17% Discount' and staff=1) then -unitPrice else 0 end) as staff_disc17,
-sum(case when (description='23% Discount' and staff=1) then -unitPrice else 0 end) as staff_disc23,
+sum(case when upc='DISCOUNT' and memType=1 then -unitPrice else 0 end) as member_disc2,
+sum(case when upc='DISCOUNT' and memType=3 then -unitPrice else 0 end) as member_disc10,
+sum(case when upc='DISCOUNT' and memType=5 then -unitPrice else 0 end) as member_disc15,
+sum(case when upc='DISCOUNT' and memType=7 then -unitPrice else 0 end) as staff_disc15,
+sum(case when upc='DISCOUNT' and memType=8 then -unitPrice else 0 end) as staff_disc17,
+sum(case when upc='DISCOUNT' and memType=9 then -unitPrice else 0 end) as staff_disc23,
 sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
 sum(case when trans_subtype='DC' AND trans_type ='T' then -total else 0 end) as debit_total,
 sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
@@ -64,9 +64,9 @@ sum(case when trans_subtype='TC' AND trans_type ='T' then -total else 0 end) as 
 sum(case when trans_subtype='MI' AND trans_type ='T' then -total else 0 end) as instore_charge_total,
 sum(case when department='994' then total else 0 end) as paid_out_total,
 sum(case when trans_subtype='IC' AND trans_type ='T' then -total else 0 end) as store_coupon_total,
-sum(case when trans_subtype='CP' AND trans_type ='T' then -total else 0 end) as mfg_coupon_total
-FROM core_trans.transarchive
-WHERE datetime BETWEEN ? AND ?;";
+sum(case when trans_subtype='CP' OR trans_subtype='MC' AND trans_type ='T' then -total else 0 end) as mfg_coupon_total
+FROM core_trans.dlog_90_view
+WHERE tdate BETWEEN ? AND ?;";
 
 $args = array($dDiffStart,$dDiffEnd);
 

@@ -73,11 +73,15 @@ how the discount is calculated
   quantity for the cheapest qualifying item
 * 'AD' discount equals discountValue times
   sum(quantity) for ALL qualifying items
+* '%D' percent off all itmes in given department.
 
 (other discounts)
 * 'F' discount equals discountValue
 * '%' discountValue is a percent discount for
   all discountable items
+* '%O' percent discount at end of sale, gives the highist applicalbe
+   discount but does not stack discounts.
+* 'PD' percent discount added to member discounts.
 
 Qualifying items are stored in houseCouponItems. Not
 all coupons require entries here. Records can be

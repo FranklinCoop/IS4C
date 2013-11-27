@@ -49,7 +49,7 @@ $total_sales = "SELECT
 sum(case when trans_subtype='CA' then -total else 0 end) + 500 as cash_total,
 sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
 sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
-sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
 sum(case when department='992' then total else 0 end) as member_payment_total,
 sum(case when department='995' then -total else 0 end) as paid_in_total,
 sum(case when department='994' then -total else 0 end) as paid_out_total,
@@ -64,10 +64,10 @@ FROM core_trans.dlog_90_view
 WHERE tdate BETWEEN ? AND ?;";
 
 $lane1_sales = "SELECT
-sum(case when trans_subtype='CA' then -total else 0 end) + 500 as cash_total,
+sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
 sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
 sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
-sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
 sum(case when department='992' then total else 0 end) as member_payment_total,
 sum(case when department='995' then -total else 0 end) as paid_in_total,
 sum(case when department='994' then -total else 0 end) as paid_out_total,
@@ -82,10 +82,10 @@ FROM core_trans.dlog_90_view
 WHERE register_no='1' and tdate BETWEEN ? AND ?;";
 
 $lane2_sales = "SELECT
-sum(case when trans_subtype='CA' then -total else 0 end) + 500 as cash_total,
+sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
 sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
 sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
-sum(case when upc='1930' then -total else 0 end) as gift_sold_number,
+sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
 sum(case when department='992' then total else 0 end) as member_payment_total,
 sum(case when department='995' then -total else 0 end) as paid_in_total,
 sum(case when department='994' then -total else 0 end) as paid_out_total,
@@ -132,7 +132,7 @@ else {
 
 //echo "<table cellspacing=0 cellpadding=4 border=1>";
 echo "<tr>
-		<th> <th>Lane 1 Totals</th> <th>Lane 2 Totals</th>
+		<th> <th>Lane 1 Totals</th> <th>Lane 2 Totals</th><th>Store Totals</th>
 		</tr>";
 
 $echo_str = "";

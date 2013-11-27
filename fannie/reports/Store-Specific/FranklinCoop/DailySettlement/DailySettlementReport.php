@@ -47,7 +47,7 @@ truncate(sum(case when tax='1' then total*0.0625 else 0 end),2) as sales_tax_tot
 truncate(sum(case when tax='2' then total*0.0625 else 0 end),2) as meals_tax_total,
 sum(case when department='992' then total else 0 end) as member_payment_total,
 sum(case when department='990' then total else 0 end) as charge_payment_total,
-sum(case when upc='1930' then -total else 0 end) as gift_total,
+sum(case when upc='0000000001930' then total else 0 end) as gift_total,
 sum(case when department='995' then total else 0 end) as paid_in_total,
 sum(case when upc='DISCOUNT' and memType=1 then -unitPrice else 0 end) as member_disc2,
 sum(case when upc='DISCOUNT' and memType=3 then -unitPrice else 0 end) as member_disc10,

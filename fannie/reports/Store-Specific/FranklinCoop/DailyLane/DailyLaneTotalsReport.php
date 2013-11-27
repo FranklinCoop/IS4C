@@ -28,7 +28,6 @@ include($FANNIE_ROOT.'src/select_dlog.php');
 
 $startDate = $_REQUEST['startDate'];
 $endDate = $_REQUEST['endDate'];
-$buyer = $_REQUEST['buyer'];
 
 
 $dDiffStart = $startDate.' 00:00:00';
@@ -55,6 +54,7 @@ sum(case when department='995' then -total else 0 end) as paid_in_total,
 sum(case when department='994' then -total else 0 end) as paid_out_total,
 sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
 sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='CC' then -total else 0 end) as credit_total,
 sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
 sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
 sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
@@ -73,6 +73,7 @@ sum(case when department='995' then -total else 0 end) as paid_in_total,
 sum(case when department='994' then -total else 0 end) as paid_out_total,
 sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
 sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='CC' then -total else 0 end) as credit_total,
 sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
 sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
 sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
@@ -91,6 +92,7 @@ sum(case when department='995' then -total else 0 end) as paid_in_total,
 sum(case when department='994' then -total else 0 end) as paid_out_total,
 sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
 sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='CC' then -total else 0 end) as credit_total,
 sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
 sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
 sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
@@ -139,7 +141,7 @@ $echo_str = "";
 //$echo_str = "<tr><th>".$result."</th></tr>"."<tr><th>".$result_l1."</th></tr>"."<tr><th>".$result_l2."</th></tr>";
 
 $row_names = array("Cash Total", "Checks (# of)", "Checks (amount)", "GIFT CARD Sold", "MEMBER PAYMENT",
-				"R/A: Other", "PAIDOUT", "STORE COUPON", "VENDOR COUPONS", "DEBIT", "SNAP: Food",
+				"R/A: Other", "PAIDOUT", "STORE COUPON", "VENDOR COUPONS", "CREDIT", "DEBIT", "SNAP: Food",
 				"SNAP: Cash", "GIFT CARD/CERTIFICATE Redeemed", "Total CARD MEDIA");
 
 if($result) {

@@ -26,7 +26,7 @@
   Base class for opening cash drawer
 
 */
-class Kicker 
+class class MCC_Kicker extends Kicker
 {
 
     /**

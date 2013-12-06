@@ -61,7 +61,7 @@ class MCC_Kicker extends Kicker
             return false;
         }
 
-        return true;
+        return false;
     }
 
     /**
@@ -76,7 +76,7 @@ class MCC_Kicker extends Kicker
             return false;
         }
 
-        return true;
+        return false;
     }
 }
 

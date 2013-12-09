@@ -58,8 +58,8 @@ sum(case when trans_subtype='CC' then -total else 0 end) as credit_total,
 sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
 sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
 sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
-sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
-sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+sum(case when trans_subtype='TC' OR trans_subtype='GD' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GD','TC') then -total else 0 end) as card_media_total
 FROM core_trans.dlog_90_view
 WHERE tdate BETWEEN ? AND ?;";
 
@@ -77,8 +77,8 @@ sum(case when trans_subtype='CC' then -total else 0 end) as credit_total,
 sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
 sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
 sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
-sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
-sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+sum(case when trans_subtype='TC' OR trans_subtype='GD' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GD','TC') then -total else 0 end) as card_media_total
 FROM core_trans.dlog_90_view
 WHERE register_no='1' and tdate BETWEEN ? AND ?;";
 
@@ -96,8 +96,8 @@ sum(case when trans_subtype='CC' then -total else 0 end) as credit_total,
 sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
 sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
 sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
-sum(case when trans_subtype='TC' OR trans_subtype='GC' then -total else 0 end) as gift_total,
-sum(case when trans_subtype in ('CC','EF','EC','DC','GC','TC') then -total else 0 end) as card_media_total
+sum(case when trans_subtype='TC' OR trans_subtype='GD' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GD','TC') then -total else 0 end) as card_media_total
 FROM core_trans.dlog_90_view
 WHERE register_no='2' and tdate BETWEEN ? AND ?;";
 

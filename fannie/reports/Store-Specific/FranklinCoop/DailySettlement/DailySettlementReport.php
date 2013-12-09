@@ -59,7 +59,7 @@ sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as 
 sum(case when trans_subtype='DC' AND trans_type ='T' then -total else 0 end) as debit_total,
 sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
 sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
-sum(case when trans_subtype='GC' AND trans_type ='T' then -total else 0 end) as gift_card_total,
+sum(case when trans_subtype='GD' AND trans_type ='T' then -total else 0 end) as gift_card_total,
 sum(case when trans_subtype='TC' AND trans_type ='T' then -total else 0 end) as paper_gift_total,
 sum(case when trans_subtype='MI' AND trans_type ='T' then -total else 0 end) as instore_charge_total,
 sum(case when department='994' then total else 0 end) as paid_out_total,

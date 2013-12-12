@@ -39,12 +39,19 @@ $dlog = select_dlog($startDate,$endDate);
 
 $dbconn = ($FANNIE_SERVER_DBMS=='MSSQL')?'.dbo.':'.';
 
+$total_tax = "SELECT
+sum(case when upc='TAXLINEITEM' and description IN ('MaStateMealsTax','StateAndLocalMealsTax') then regPrice else 0 end) as sales_tax_total,
+sum(case when upc='TAXLINEITEM' and description IN ('MASalesTax','MassSalesTax') then regPrice else 0 end) as sales_tax_total
+FROM core_trans.transarchive
+WHERE datetime BETWEEN ? AND ?;
+";
+
 $total_sales = '';
 
 $total_sales = "SELECT 
-sum(case when department!=0 then total else 0 end) as dept_sales_total,
-truncate(sum(case when tax='1' then total*0.0625 else 0 end),2) as sales_tax_total,
-truncate(sum(case when tax='2' then total*0.0625 else 0 end),2) as meals_tax_total,
+sum(case when department!=0 and trans_subtype!='CP' and department NOT IN (992,990,994,995) then total else 0 end) as dept_sales_total,
+'ERR' as sales_tax_total,
+'ERR' as meals_tax_total,
 sum(case when department='992' then total else 0 end) as member_payment_total,
 sum(case when department='990' then total else 0 end) as charge_payment_total,
 sum(case when upc='0000000001930' then total else 0 end) as gift_total,
@@ -55,6 +62,7 @@ sum(case when upc='DISCOUNT' and memType=5 then -unitPrice else 0 end) as member
 sum(case when upc='DISCOUNT' and memType=7 then -unitPrice else 0 end) as staff_disc15,
 sum(case when upc='DISCOUNT' and memType=8 then -unitPrice else 0 end) as staff_disc17,
 sum(case when upc='DISCOUNT' and memType=9 then -unitPrice else 0 end) as staff_disc23,
+sum(case when upc='DISCOUNT' and memType=0 then -unitPrice else 0 end) as senior_disc,
 sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
 sum(case when trans_subtype='DC' AND trans_type ='T' then -total else 0 end) as debit_total,
 sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
@@ -73,6 +81,10 @@ $args = array($dDiffStart,$dDiffEnd);
 $prep = $dbc->prepare_statement($total_sales);
 $result = $dbc->exec_statement($prep,$args);
 $row = $dbc->fetchArray($result);
+
+$prep_tax = $dbc->prepare_statement($total_tax);
+$result_tax = $dbc->exec_statement($prep_tax,$args);
+$row_tax = $dbc->fetchArray($result_tax);
 
 echo "<table cellspacing=0 cellpadding=4 border=1>";
 
@@ -99,10 +111,12 @@ $echo_str = "";
 //$echo_str = "<tr><th>".$result."</th></tr>"."<tr><th>".$result_l1."</th></tr>"."<tr><th>".$result_l2."</th></tr>";
 
 $row_names = array("Department Sales Totals", "Sales Tax", "Meals Tax", "Member Payments", "Charge Payments",
-				"Gift Cards Sold", "Paid In", "Member 2%", "Member 10%", "Member 15%", "Staff 15",
-				"Staff 17%", "Staff 23%", "Credit Card Total", "Debit Card Total", "SNAP Total",
+				"Gift Cards Sold", "Paid In", "Member 2%", "Member 10%", "Member 15%", "Staff 15%",
+				"Staff 17%", "Staff 23%", "Senior Discout", "Credit Card Total", "Debit Card Total", "SNAP Total",
 				"SNAP Cash Total", "Gift Card Total", "Paper Gift Total", "In Store Charge Total",
 				"Paid Out Total", "Store Coupon Total", "Manufactures Coupon Total");
+$row[1] = $row_tax[1];
+$row[2] = $row_tax[0];
 
 if($result) {
 	for($i = 0; $i <count($row_names); $i++) {

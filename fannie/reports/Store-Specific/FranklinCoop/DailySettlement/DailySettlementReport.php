@@ -56,7 +56,7 @@ sum(case when department='992' then total else 0 end) as member_payment_total,
 sum(case when department='990' then total else 0 end) as charge_payment_total,
 sum(case when upc='0000000001930' then total else 0 end) as gift_total,
 sum(case when department='995' then total else 0 end) as paid_in_total,
-sum(case when upc='DISCOUNT' and memType=1 then -unitPrice else 0 end) as member_disc2,
+sum(case when upc='DISCOUNT' and memType in (1,2) then -unitPrice else 0 end) as member_disc2,
 sum(case when upc='DISCOUNT' and memType=3 then -unitPrice else 0 end) as member_disc10,
 sum(case when upc='DISCOUNT' and memType=5 then -unitPrice else 0 end) as member_disc15,
 sum(case when upc='DISCOUNT' and memType=7 then -unitPrice else 0 end) as staff_disc15,
@@ -70,7 +70,7 @@ sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as 
 sum(case when trans_subtype='GD' AND trans_type ='T' then -total else 0 end) as gift_card_total,
 sum(case when trans_subtype='TC' AND trans_type ='T' then -total else 0 end) as paper_gift_total,
 sum(case when trans_subtype='MI' AND trans_type ='T' then -total else 0 end) as instore_charge_total,
-sum(case when department='994' then total else 0 end) as paid_out_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
 sum(case when trans_subtype='IC' AND trans_type ='T' then -total else 0 end) as store_coupon_total,
 sum(case when trans_subtype='CP' OR trans_subtype='MC' AND trans_type ='T' then -total else 0 end) as mfg_coupon_total
 FROM core_trans.dlog_90_view

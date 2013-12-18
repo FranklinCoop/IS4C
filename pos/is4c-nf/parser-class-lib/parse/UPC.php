@@ -225,7 +225,7 @@ class UPC extends Parser {
 			if (strstr($peek,"** Tare Weight") === False)
 				TransRecord::addTare($row['tareweight']*100);
 		}
-		
+
 		/* sanity check - ridiculous price 
 		   (can break db column if it doesn't fit
 		*/
@@ -241,9 +241,9 @@ class UPC extends Parser {
 		/* need a weight with this item
 		   retry the UPC in a few milliseconds and see
 		*/
-		$scale = ($row["scale"] == 0) ? 0 : 1;
 		if ($scale != 0 && $CORE_LOCAL->get("weight") == 0 && 
 			$CORE_LOCAL->get("quantity") == 0 && substr($upc,0,3) != "002") {
+
 			$CORE_LOCAL->set("SNR",$CORE_LOCAL->get('strEntered'));
 			$ret['output'] = DisplayLib::boxMsg(_("please put item on scale"),'',True);
 			//$ret['retry'] = $CORE_LOCAL->get("strEntered");
@@ -377,7 +377,7 @@ class UPC extends Parser {
            assigned cannot calculate a proper quantity.
 		*/
 		if (substr($upc,0,3) == "002") {
-			if ($DiscountObject->isSale() && $scale == 1) {
+			if ($DiscountObject->isSale() && $scale == 1 && $row['normal_price'] != 0) {
 				$quantity = MiscLib::truncate2($scaleprice / $row["normal_price"]);
             } else if ($scale == 1 && $row['normal_price'] != 0) {
 				$quantity = MiscLib::truncate2($scaleprice / $row["normal_price"]);

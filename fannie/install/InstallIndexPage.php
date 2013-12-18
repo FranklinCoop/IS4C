@@ -953,6 +953,9 @@ class InstallIndexPage extends InstallPage {
 				'PurchaseOrderItems','op');
 
 		$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_OP_DB,
+				'PurchaseOrderSummary','op');
+
+		$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_OP_DB,
 				'emailLog','op');
 
 		$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_OP_DB,
@@ -1198,6 +1201,12 @@ class InstallIndexPage extends InstallPage {
 				'newBalanceStockToday_test','trans');
 
 		$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_TRANS_DB,
+				'equity_history_sum','trans');
+
+		$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_TRANS_DB,
+				'equity_live_balance','trans');
+
+		$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_TRANS_DB,
 				'memChargeBalance','trans');
 
 		$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_TRANS_DB,
@@ -1221,6 +1230,9 @@ class InstallIndexPage extends InstallPage {
 		$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_TRANS_DB,
 				'houseCouponThisMonth','trans');
 
+		$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_TRANS_DB,
+				'skuMovementSummary','trans');
+
 		return $ret;
 
 	// create_dlogs()
@@ -1235,11 +1247,9 @@ class InstallIndexPage extends InstallPage {
 			$FANNIE_OP_DB,$FANNIE_SERVER_USER,
 			$FANNIE_SERVER_PW);
 
-		$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_OP_DB,
-				'expingMems','op');
+        $ret[] = dropDeprecatedStructure($con, $FANNIE_OP_DB, 'expingMems', true);
 
-		$ret[] = create_if_needed($con,$FANNIE_SERVER_DBMS,$FANNIE_OP_DB,
-				'expingMems_thisMonth','op');
+        $ret[] = dropDeprecatedStructure($con, $FANNIE_OP_DB, 'expingMems_thisMonth', true);
 
 		$con = db_test_connect($FANNIE_SERVER,$FANNIE_SERVER_DBMS,
 			$FANNIE_TRANS_DB,$FANNIE_SERVER_USER,

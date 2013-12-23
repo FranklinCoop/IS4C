@@ -69,7 +69,7 @@ class PriceOverride extends NoInputPage {
 				}
 				$ttl = ((int)$dollars) + ((int)$cents / 100.0);
 				$ttl = number_format($ttl,2);
-				if ($w['department'] == $CORE_LOCAL->get("BottleReturnDept"))
+				if ($w['department'] == $CORE_LOCAL->get("BottleReturnDept") || $w['department'] == $CORE_LOCAL->get("PaidOutDept"))
 					$ttl = $ttl * -1;
 					
 				$q = sprintf("UPDATE localtemptrans SET unitPrice=%.2f, regPrice=%.2f,

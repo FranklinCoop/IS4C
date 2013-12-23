@@ -144,6 +144,14 @@ printf("<input type=text name=BOTTLE_RET value=\"%s\" />",$CORE_LOCAL->get('Bott
 InstallUtilities::paramSave('BottleReturnDept',$CORE_LOCAL->get('BottleReturnDept'));
 ?>
 <span class='noteTxt'>Add a BOTTLE RETURN item to your products table with a normal_price of 0, IS4C will prompt for Bottle Return amt. and then make it a negative value.</span>
+</td></tr><tr><td>
+<b>Paid Out Department number</b>: </td><td>
+<?php
+if(isset($_REQUEST['PAIDOUT_RET'])) $CORE_LOCAL->set('PaidOutDept',$_REQUEST['PAIDOUT_RET']);
+printf("<input type=text name=PAIDOUT_RET value=\"%s\" />",$CORE_LOCAL->get('PaidOutDept'));
+InstallUtilities::paramSave('PaidOutDept',$CORE_LOCAL->get('PaidOutDept'));
+?>
+<span class='noteTxt'>Add a Paid Oout item to your products table with a normal_price of 0, IS4C will prompt for Paid Out amt. and then make it a negative value.</span>
 </td></tr>
 
 

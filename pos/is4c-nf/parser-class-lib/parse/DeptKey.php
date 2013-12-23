@@ -73,9 +73,13 @@ class DeptKey extends Parser {
 				$ret = $obj->handle($dept,$split[1]/100,$ret);
 			}
 		}
+
+		if ($dept/10 == $CORE_LOCAL->get('BottleReturnDept') || $dept/10 == $CORE_LOCAL->get('PaidOutDept'))
+			$amt = $amt * -1;
+
 		
 		if (!$ret['main_frame'])
-			$ret = PrehLib::deptkey($split[0],$split[1],$ret);
+			$ret = PrehLib::deptkey($amt,$dept,$ret);
 		return $ret;
 	}
 

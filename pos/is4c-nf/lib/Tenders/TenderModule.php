@@ -89,6 +89,8 @@ class TenderModule
         } else if ($this->name_string === "") {
             return DisplayLib::inputUnknown();
         }
+        if ($CORE_LOCAL->get("amtdue") <0 && $this->amount >= 0)
+            $this->amount = -1 * $this->amount;
 
         return true;
     }

@@ -21,8 +21,6 @@
 
 *********************************************************************************/
 
-ini_set('display_errors','1');
- 
 session_cache_limiter('nocache');
 
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
@@ -183,7 +181,10 @@ class pos2 extends BasicPage {
 			screenLockVar = setTimeout('lockScreen()', <?php echo $CORE_LOCAL->get("timeout") ?>);
 		}
 		function lockScreen(){
-			location = '<?php echo $this->page_url; ?>gui-modules/login3.php';
+			if (parseInt('<?php echo $CORE_LOCAL->get("LastID")?>') != 0) 
+				location = '<?php echo $this->page_url; ?>gui-modules/login3.php';
+			else
+				location = '<?php echo $this->page_url; ?>?reginput=SO';
 		}
 		function receiptFetch(r_type){
 			$.ajax({
@@ -304,6 +305,7 @@ class pos2 extends BasicPage {
 	} // END body_content() FUNCTION
 }
 
-new pos2();
+if (basename(__FILE__) == basename($_SERVER['PHP_SELF']))
+	new pos2();
 
 ?>

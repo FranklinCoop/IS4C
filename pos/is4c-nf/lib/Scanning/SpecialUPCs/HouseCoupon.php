@@ -378,6 +378,36 @@ class HouseCoupon extends SpecialUPC
                 // transaction to track usage
                 $value = 0;
                 break;
+            case '%O': //overides the customer percent discount
+                $couponPD = $infoW['discountValue'] * 100;
+                $normalPD = 0;
+                                Database::getsubtotals();
+                $opDB = Database::pDataConnect();
+                $custQ = 'SELECT Discount FROM custdata WHERE CardNo='.$CORE_LOCAL->get('memberID');    
+                $custR = $opDB->query($custQ);
+                // get member's normal discount
+                $cust_discount = 0;
+                if ($opDB->num_rows($custR) > 0) {
+                    $custW = $opDB->fetch_row($custR);
+                    $cust_discount = $custW['Discount'];
+                }
+                // apply discount module
+                $handler_class = $CORE_LOCAL->get('DiscountModule');
+                if ($handler_class === '') $handler_class = 'DiscountModule';
+                elseif (!class_exists($handler_class)) $handler_class = 'DiscountModule';
+                if (class_exists($handler_class)) {
+                    $module = new $handler_class();
+                    $normalPD = $module->percentage($cust_discount);
+                }
+                //check the normal discount vs the coupon and apply the highest discount.
+                if ($normalPD > $couponPD) {
+                    $CORE_LOCAL->set('percentDiscount', $normalPD);
+                    $transDB->query(sprintf('UPDATE localtemptrans SET percentDiscount=%f',$normalPD));
+                } else {
+                    $CORE_LOCAL->set('percentDiscount', $couponPD);
+                    $transDB->query(sprintf('UPDATE localtemptrans SET percentDiscount=%f',$couponPD));
+                }
+                break;
         }
 
         $dept = $infoW["department"];
@@ -391,5 +421,3 @@ class HouseCoupon extends SpecialUPC
     }
 
 }
-
-

@@ -96,7 +96,7 @@ class TarePropmtInputPage extends NoInputPage {
 				$result = $class::requestTareCallback($reginput, $item);
 				if ($result === True){
 					// accepted. go home
-					$this->change_page($pos_home.'?reginput=\''.$item.'\'');
+					$this->change_page($pos_home.'?reginput='.$item);
 					return False;
 				}
 				elseif ($result === False){

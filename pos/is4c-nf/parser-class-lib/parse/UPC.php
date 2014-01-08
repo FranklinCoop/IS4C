@@ -224,9 +224,11 @@ class UPC extends Parser {
 			$peek = PrehLib::peekItem();
 			if (strstr($peek,"** Tare Weight") === False)
 				TransRecord::addTare($row['tareweight']*100);
-		} elseif ($row['scale'] != 0 && !$CORE_LOCAL->get("tare") && Plugin::isEnabled('PromptForTare')) {
+		} elseif ($row['scale'] != 0 && !$CORE_LOCAL->get("tare") && Plugin::isEnabled('PromptForTare') && !$CORE_LOCAL->get("tarezero")) {
             $ret['main_frame'] = $my_url.'plugins/PropmtForTare/TarePropmtInputPage.php?class=UPC&item='.$entered;
 			return $ret;
+        } else {
+        	$CORE_LOCAL->set('tarezero', False);
         }
 
 		/* sanity check - ridiculous price 
@@ -249,6 +251,7 @@ class UPC extends Parser {
 
 			$CORE_LOCAL->set("SNR",$CORE_LOCAL->get('strEntered'));
 			$ret['output'] = DisplayLib::boxMsg(_("please put item on scale"),'',True);
+			$CORE_LOCAL->set('tarezero', False);
 			//$ret['retry'] = $CORE_LOCAL->get("strEntered");
 			
 			return $ret;

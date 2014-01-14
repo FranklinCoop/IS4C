@@ -81,14 +81,14 @@ class TarePropmtInputPage extends NoInputPage {
 				$this->change_page($pos_home);
 				return False;
 			} else {
-				if ($reginput === ''){
+				if ($reginput === '' || $reginput === '0'){
 				    // blank. enter default tare.
 				    global $CORE_LOCAL;
 				    if ($CORE_LOCAL->get('DefaultTare') > 0) {
 				    	$reginput = $CORE_LOCAL->get('DefaultTare')*100;
 				    } else {
 				    	$CORE_LOCAL->set('tarezero', Ture);
-				    	$this->change_page($pos_home.'?reginput=\''.$item.'\'');
+				    	$this->change_page($pos_home.'?reginput='.$item);
 				    	return False;
 				    }
 				}

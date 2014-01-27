@@ -38,7 +38,13 @@ class HouseCoupon extends SpecialUPC
 
     public function isSpecial($upc)
     {
-        if (substr($upc, 0, 8) == "00499999") {
+        global $CORE_LOCAL;
+        $prefix = $CORE_LOCAL->get('houseCouponPrefix');
+        if ($prefix == '') {
+            $prefix = '00499999';
+        }
+
+		if (substr($upc,0,strlen($prefix)) == $prefix) {
             return true;
         }
 
@@ -401,7 +407,6 @@ class HouseCoupon extends SpecialUPC
                     $CORE_LOCAL->set('percentDiscount', $couponPD);
                     $transDB->query(sprintf('UPDATE localtemptrans SET percentDiscount=%f',$couponPD));
                 }
-
                 break;
         }
 
@@ -416,4 +421,3 @@ class HouseCoupon extends SpecialUPC
     }
 
 }
-

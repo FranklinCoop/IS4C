@@ -101,6 +101,25 @@ sum(case when trans_subtype in ('CC','EF','EC','DC','GD','TC') then -total else 
 FROM core_trans.dlog_90_view
 WHERE register_no='2' and tdate BETWEEN ? AND ?;";
 
+$lane3_sales = "SELECT
+sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
+sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
+sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
+sum(case when department='992' then total else 0 end) as member_payment_total,
+sum(case when department='995' then -total else 0 end) as paid_in_total,
+sum(case when department='994' then -total else 0 end) as paid_out_total,
+sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
+sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total,
+sum(case when trans_subtype='CC' then -total else 0 end) as credit_total,
+sum(case when trans_subtype='DC' then -total else 0 end) as debit_total,
+sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+sum(case when trans_subtype='TC' OR trans_subtype='GD' then -total else 0 end) as gift_total,
+sum(case when trans_subtype in ('CC','EF','EC','DC','GD','TC') then -total else 0 end) as card_media_total
+FROM core_trans.dlog_90_view
+WHERE register_no='3' and tdate BETWEEN ? AND ?;";
+
 $args = array($dDiffStart,$dDiffEnd);
 
 $prep = $dbc->prepare_statement($total_sales);
@@ -115,6 +134,9 @@ $prep = $dbc->prepare_statement($lane2_sales);
 $result_l2 = $dbc->exec_statement($prep,$args);
 $row2 = $dbc->fetchArray($result_l2);
 
+$prep = $dbc->prepare_statement($lane3_sales);
+$result_l3 = $dbc->exec_statement($prep,$args);
+$row3 = $dbc->fetchArray($result_l3);
 
 echo "<table cellspacing=0 cellpadding=4 border=1>";
 
@@ -134,7 +156,7 @@ else {
 
 //echo "<table cellspacing=0 cellpadding=4 border=1>";
 echo "<tr>
-		<th> <th>Lane 1 Totals</th> <th>Lane 2 Totals</th><th>Store Totals</th>
+		<th> <th>Lane 1 Totals</th> <th>Lane 2 Totals</th><th>Lane 3 Totals</th><th>Store Totals</th>
 		</tr>";
 
 $echo_str = "";
@@ -146,7 +168,7 @@ $row_names = array("Cash Total", "Checks (# of)", "Checks (amount)", "GIFT CARD 
 
 if($result) {
 	for($i = 0; $i < count($row_names); $i++) {
-		$echo_str .= "<tr><th>".$row_names[$i]."</th><th>".$row1[$i]."</th><th>".$row2[$i]."</th><th>".$row[$i]."</th></tr>";
+		$echo_str .= "<tr><th>".$row_names[$i]."</th><th>".$row1[$i]."</th><th>".$row2[$i]."</th><th>".$row3[$i]."</th><th>".$row[$i]."</th></tr>";
 	}
 }
 

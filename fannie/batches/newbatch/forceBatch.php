@@ -133,6 +133,65 @@ function forceBatch($batchID){
 		}
 	}
 	else{
+		
+		if ($batchInfoW['batchType'] == 2) {
+            //sale batch set the sale price.
+            $forceQ = "UPDATE products AS p
+		      INNER JOIN batchList AS l ON l.upc=p.upc
+		      INNER JOIN batches AS b ON l.batchID=b.batchID
+		 
+		      		SET p.special_price = l.salePrice,
+		p.end_date = b.endDate,p.start_date=b.startDate,
+		p.specialgroupprice=CASE WHEN l.salePrice < 0 THEN -1*l.salePrice ELSE l.salePrice END,
+		p.specialquantity=l.quantity,
+		p.specialpricemethod=l.pricemethod,
+		p.discounttype = b.discounttype,
+		p.mixmatchcode = CASE 
+			WHEN l.pricemethod IN (3,4) AND l.salePrice >= 0 THEN convert(l.batchID,char)
+			WHEN l.pricemethod IN (3,4) AND l.salePrice < 0 THEN convert(-1*l.batchID,char)
+			ELSE p.mixmatchcode 
+		END	
+				WHERE l.upc not like 'LC%'
+		      AND l.batchID = ?";
+
+		$forceLCQ = "UPDATE products AS p
+			INNER JOIN upcLike AS v ON v.upc=p.upc
+			INNER JOIN batchList as l on l.upc=concat('LC',convert(v.likecode,char))
+			INNER JOIN batches AS b ON l.batchID=b.batchID
+					SET p.special_price = l.salePrice,
+		p.end_date = b.endDate,p.start_date=b.startDate,
+		p.specialgroupprice=CASE WHEN l.salePrice < 0 THEN -1*l.salePrice ELSE l.salePrice END,
+		p.specialquantity=l.quantity,
+		p.specialpricemethod=l.pricemethod,
+		p.discounttype = b.discounttype,
+		p.mixmatchcode = CASE 
+			WHEN l.pricemethod IN (3,4) AND l.salePrice >= 0 THEN convert(l.batchID,char)
+			WHEN l.pricemethod IN (3,4) AND l.salePrice < 0 THEN convert(-1*l.batchID,char)
+			ELSE p.mixmatchcode 
+		END			
+			WHERE b.batchID=?";
+
+		if ($FANNIE_SERVER_DBMS == 'MSSQL'){
+			$forceQ = "UPDATE products
+			      SET special_price = l.salePrice,
+			      modified = getdate()
+			      FROM products as p,
+			      batches as b,
+			      batchList as l
+			      WHERE l.upc = p.upc
+			      AND l.upc not like 'LC%'
+			      AND b.batchID = l.batchID
+			      AND b.batchID = ?";
+
+			$forceLCQ = "update products set normal_price = b.salePrice,
+				modified=getdate()
+				from products as p left join
+				upcLike as v on v.upc=p.upc left join
+				batchList as b on b.upc='LC'+convert(varchar,v.likecode)
+				where b.batchID=?";
+		}
+		
+		} else {
 		$forceQ = "UPDATE products AS p
 		      INNER JOIN batchList AS l
 		      ON l.upc=p.upc
@@ -167,6 +226,8 @@ function forceBatch($batchID){
 				upcLike as v on v.upc=p.upc left join
 				batchList as b on b.upc='LC'+convert(varchar,v.likecode)
 				where b.batchID=?";
+		}
+
 		}
 	}
 

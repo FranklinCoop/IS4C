@@ -90,7 +90,9 @@ class FannieAPI
     */
     static private function findClass($name, $path)
     {
-        if (!is_dir($path)){
+        if (!is_dir($path)) {
+            return false;
+        } else if ($name == 'index') {
             return false;
         }
 
@@ -173,15 +175,6 @@ class FannieAPI
                 continue;
             }
 
-            // verify class exists
-            ob_start();
-            include_once($file);
-            ob_end_clean();
-
-            if (!class_exists($class)) {
-                continue;
-            }
-
             // if the file is part of a plugin, make sure
             // the plugin is enabled. The exception is when requesting
             // a list of plugin classes
@@ -190,6 +183,15 @@ class FannieAPI
                 if ($parent === false || !FanniePlugin::isEnabled($parent)) {
                     continue;
                 }
+            }
+
+            // verify class exists
+            ob_start();
+            include_once($file);
+            ob_end_clean();
+
+            if (!class_exists($class)) {
+                continue;
             }
 
             if (is_subclass_of($class, $base_class)) {

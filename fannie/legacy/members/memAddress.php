@@ -44,7 +44,7 @@ function addressList($memNum)
 	$dateW = $sql->fetch_row($dateR);
 
 	//updated to new stock view based on stockpurchases table....CvR 02/27/06
-	$query2 = $sql->prepare("SELECT payments FROM is4c_trans.newBalanceStockToday_test WHERE memnum = ?");
+	$query2 = $sql->prepare("SELECT payments FROM is4c_trans.equity_live_balance WHERE memnum = ?");
 	$stockResult = $sql->execute($query2, array($memNum));
 	$row2 = $sql->fetch_row($stockResult);
 		
@@ -230,7 +230,7 @@ function addressForm($memNum)
     $row1 = $sql->fetch_row($result1);
 	$memIDQ = "SELECT * FROM memTypeID";
 
-	$query2 = $sql->prepare("SELECT payments FROM is4c_trans.newBalanceStockToday_test WHERE memnum = ?");
+	$query2 = $sql->prepare("SELECT payments FROM is4c_trans.equity_live_balance WHERE memnum = ?");
 	$stockResult = $sql->execute($query2, array($memNum));
     $row2 = $sql->fetch_row($stockResult);
 
@@ -513,10 +513,10 @@ function deactivate($memNum,$type,$reason,$reasonCode){
     $result = $sql->execute($query, array($username, $now, $reason, $memNum, $reasonCode));
 
     $mQ = $sql->prepare("update meminfo set ads_OK=0 where card_no = ?");
-    $cQ = $sql->prepare("update custdata set memType=0, Type='TERM',ChargeOk=0,Discount=0,MemDiscountLimit=0,ChargeLimit=0 
+    $cQ = $sql->prepare("update custdata set memType=0, Type=?,ChargeOk=0,Discount=0,MemDiscountLimit=0,ChargeLimit=0 
             where CardNo=?");
     $mR = $sql->execute($mQ, array($memNum));
-    $cR = $sql->execute($cQ, array($memNum));
+    $cR = $sql->execute($cQ, array($type, $memNum));
   }
 }
 

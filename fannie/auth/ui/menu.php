@@ -21,6 +21,8 @@
 
 *********************************************************************************/
 
+header("Location: AuthIndexPage.php");
+
 require('../login.php');
 include("../../config.php");
 $page_title = 'Fannie : Auth : Menu';
@@ -32,10 +34,10 @@ if (!$name){
   echo "You must be <a href=loginform.php>logged in</a> to use this</a>";
 }
 else {
-  $priv = checkAuth($name,'admin');
+  $priv = validateUserQuiet('admin');
   $options = 'all';
   if (!$priv){
-    $options = 'limited';
+		$options = 'limited';
   }
 
   /* password change only allowed if not using

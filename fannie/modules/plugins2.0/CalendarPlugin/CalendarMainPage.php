@@ -23,11 +23,9 @@
 
 include_once(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FanniePage'))
-	include($FANNIE_ROOT.'classlib2.0/FanniePage.php');
+	include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 if (!class_exists('CalendarPlugin'))
 	include(dirname(__FILE__).'/CalendarPlugin.php');
-if (!class_exists('FormLib'))
-	include($FANNIE_ROOT.'classlib2.0/lib/FormLib.php');
 if (!function_exists('getUID'))
 	include($FANNIE_ROOT.'auth/login.php');
 include_once(dirname(__FILE__).'/CalendarPluginDisplayLib.php');
@@ -44,6 +42,7 @@ class CalendarMainPage extends FanniePage {
 		$this->header = "Calendars";
 		
 		$plugin = new CalendarPlugin(); 
+        $this->add_script($FANNIE_URL . 'src/jquery/jquery.js');
 		$this->add_script($plugin->plugin_url().'/javascript/calendar.js');
 		$this->add_script($plugin->plugin_url().'/javascript/ajax.js');
 
@@ -93,9 +92,6 @@ class CalendarMainPage extends FanniePage {
 
 }
 
-if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)){
-	$obj = new CalendarMainPage();
-	$obj->draw_page();
-}
+FannieDispatch::conditionalExec(false);
 
 ?>

@@ -75,6 +75,7 @@ class paycardSuccess extends BasicPage {
 
 				PaycardLib::paycard_reset();
 				UdpComm::udpSend('termReset');
+                $CORE_LOCAL->set('ccTermState','swipe');
 				$CORE_LOCAL->set("CacheCardType","");
 				$CORE_LOCAL->set("strRemembered","TO");
 				$CORE_LOCAL->set("msgrepeat",1);
@@ -226,3 +227,4 @@ class paycardSuccess extends BasicPage {
 
 if (basename($_SERVER['PHP_SELF']) == basename(__FILE__))
 	new paycardSuccess();
+

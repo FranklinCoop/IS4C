@@ -95,7 +95,11 @@ class TenderModule
             return DisplayLib::xboxMsg(_("return tender must be exact")); //handles the case when there is a card
         } elseif (($this->amount > ($CORE_LOCAL->get("amtdue") + 0.005)) && $CORE_LOCAL->get("amtdue") < 0) {
             return DisplayLib::xboxMsg(_("return tender must be exact"));
+        } elseif($CORE_LOCAL->get("amtdue")>0 && $this->amount <= 0) {
+            return DisplayLib::xboxMsg(_("Why are you useing a negative number plese ask Jeremy or Rowan about this."));
         }
+
+
         if ($CORE_LOCAL->get("amtdue") <0 && $this->amount >= 0)
             $this->amount = -1 * $this->amount;
 

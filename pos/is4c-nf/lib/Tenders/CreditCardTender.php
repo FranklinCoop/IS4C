@@ -44,7 +44,7 @@ class CreditCardTender extends TenderModule
             return DisplayLib::xboxMsg(_("tender cannot exceed purchase amount"));
         } elseif (($this->amount < ($CORE_LOCAL->get("amtdue") - 0.005)) && $CORE_LOCAL->get("amtdue") < 0){ 
             return DisplayLib::xboxMsg(_("return tender must be exact")); //handles the case when there is a card
-        } elseif($CORE_LOCAL->get("amtdue")>0 && $this->amount <= 0) {
+        } elseif($CORE_LOCAL->get("amtdue")>0 && $this->amount < 0) {
             return DisplayLib::xboxMsg(_("Why are you useing a negative number plese ask Jeremy or Rowan about this."));
         }
         return true;
@@ -65,11 +65,7 @@ class CreditCardTender extends TenderModule
 
     public function allowDefault()
     {
-        if ($this->tender_code == 'CC' && $CORE_LOCAL->get('store') == 'wfc') {
-            return True;
-        } else {
-            return False;
-        }
+        return true;
     }
 }
 

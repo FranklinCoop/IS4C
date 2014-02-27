@@ -179,10 +179,10 @@ class pos2 extends BasicPage {
 			screenLockVar = setTimeout('lockScreen()', <?php echo $CORE_LOCAL->get("timeout") ?>);
 		}
 		function lockScreen(){
-			if (parseInt('<?php echo $CORE_LOCAL->get("LastID")?>') != 0) 
+			//if (parseInt('<?php echo $CORE_LOCAL->get("LastID")?>') != 0) 
 				location = '<?php echo $this->page_url; ?>gui-modules/login3.php';
-			else
-				location = '<?php echo $this->page_url; ?>?reginput=SO';
+			//else
+			//	location = '<?php echo $this->page_url; ?>?reginput=SO';
 		}
 		function receiptFetch(r_type){
 			$.ajax({

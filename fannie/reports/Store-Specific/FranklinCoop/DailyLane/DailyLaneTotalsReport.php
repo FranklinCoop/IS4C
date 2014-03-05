@@ -46,7 +46,7 @@ $lane2_sales = '';
 
 $total_sales = "SELECT 
 sum(case when trans_subtype='CA' then -total else 0 end) + 500 as cash_total,
-sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' and total<0 then 1 else 0 end) as check_number,
 sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
 sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
 sum(case when department='992' then total else 0 end) as member_payment_total,
@@ -65,7 +65,7 @@ WHERE tdate BETWEEN ? AND ?;";
 
 $lane1_sales = "SELECT
 sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
-sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' and total<0 then 1 else 0 end) as check_number,
 sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
 sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
 sum(case when department='992' then total else 0 end) as member_payment_total,
@@ -84,7 +84,7 @@ WHERE register_no='1' and tdate BETWEEN ? AND ?;";
 
 $lane2_sales = "SELECT
 sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
-sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' and total<0 then 1 else 0 end) as check_number,
 sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
 sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
 sum(case when department='992' then total else 0 end) as member_payment_total,
@@ -103,7 +103,7 @@ WHERE register_no='2' and tdate BETWEEN ? AND ?;";
 
 $lane3_sales = "SELECT
 sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
-sum(case when trans_subtype='CK' then 1 else 0 end) as check_number,
+sum(case when trans_subtype='CK' and total<0 then 1 else 0 end) as check_number,
 sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
 sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
 sum(case when department='992' then total else 0 end) as member_payment_total,

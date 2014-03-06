@@ -67,13 +67,6 @@ class CreditCardTender extends TenderModule
     {
         return true;
     }
-          Value to use if no total is provided
-      @return number
-    */
-    public function defaultTotal()
-    {
-        global $CORE_LOCAL;
-        return $CORE_LOCAL->get('amtdue');
-    }
+    
 }
 

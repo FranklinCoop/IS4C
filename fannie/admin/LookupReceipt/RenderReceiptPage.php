@@ -97,7 +97,7 @@ class RenderReceiptPage extends FanniePage {
 					
 			end
 			as comment,
-			total,
+			case when total=0 then unitPrice else total end as total,
 			case 
 				when trans_status = 'V' 
 					then 'VD'

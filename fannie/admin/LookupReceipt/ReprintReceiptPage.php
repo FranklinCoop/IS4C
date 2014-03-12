@@ -63,7 +63,7 @@ class ReprintReceiptPage extends FanniePage
 
 			$dbc = FannieDB::get($FANNIE_OP_DB);
 			$dlog = $FANNIE_TRANS_DB . $dbc->sep() . "dlog_15";
-			$query = "SELECT year(tdate),month(tdate),day(tdate),emp_no,register_no,trans_no FROM $dlog WHERE 1=1 ";
+			$query = "SELECT year(tdate),month(tdate),day(tdate),emp_no,register_no,trans_no, sum(case when trans_type='T' then -total else 0 end) as total FROM $dlog WHERE 1=1 ";
 			$args = array();
 			if ($date != "") {
 				$date2 = ($date2 != "") ? $date2 : $date;
@@ -144,8 +144,9 @@ class ReprintReceiptPage extends FanniePage
 					$month = $row[1];
 					$day = $row[2];
 					$trans_num = $row[3].'-'.$row[4].'-'.$row[5];
+					$total_amt = $row[6];
 					$this->results .= "<a href=RenderReceiptPage.php?year=$year&month=$month&day=$day&receipt=$trans_num>";
-					$this->results .= "$year-$month-$day $trans_num</a><br />";
+					$this->results .= "$year-$month-$day $trans_num  Total: $total_amt</a><br />";
 				}
 			}
 		}

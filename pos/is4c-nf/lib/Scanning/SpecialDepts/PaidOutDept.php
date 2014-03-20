@@ -27,7 +27,9 @@ class PaidOutDept extends SpecialDept
     {
         global $CORE_LOCAL;
         if ($CORE_LOCAL->get('msgrepeat') == 0) { // invert has not happened yet
-            $CORE_LOCAL->set('strEntered', (100*$amount * -1).'DP'.$deptID);
+            if ($amount > 0) {
+                $CORE_LOCAL->set('strEntered', (100*$amount * -1).'DP'.$deptID);
+            }
             $CORE_LOCAL->set('msgrepeat', 1);
            // $json['main_frame'] = MiscLib::base_url().'gui-modules/boxMsg2.php?autoconfirm=1';
             $json['main_frame'] = MiscLib::base_url().'gui-modules/PaidOutComment.php';

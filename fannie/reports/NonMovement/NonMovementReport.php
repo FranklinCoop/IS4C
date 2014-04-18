@@ -22,7 +22,9 @@
 *********************************************************************************/
 
 include('../../config.php');
-include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+if (!class_exists('FannieAPI')) {
+    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
 
 class NonMovementReport extends FannieReportPage {
 
@@ -30,6 +32,9 @@ class NonMovementReport extends FannieReportPage {
     protected $header = "Non-Movement Report";
 
     protected $required_fields = array('date1', 'date2');
+
+    public $description = '[Non-Movement] shows items in a department or group of departments that have no sales over a given date range. This is mostly for finding discontinued or mis-entered products.';
+    public $report_set = 'Movement Reports';
 
 	function preprocess()
     {
@@ -43,20 +48,21 @@ class NonMovementReport extends FannieReportPage {
             }
             $dbc = FannieDB::get($FANNIE_OP_DB);
             $model = new ProductsModel($dbc);
+            $model->upc($upc);
             $model->delete();
 
 			echo 'Deleted';
 			exit;
 		}
 
-        parent::preprocess();
+        $ret = parent::preprocess();
         // custom: needs extra JS for delete option
         if ($this->content_function == 'report_content' && $this->report_format == 'html') {
             $this->add_script("../../src/jquery/jquery.js");
             $this->add_script('delete.js');
         }
 
-		return true;
+		return $ret;
 	}
 
 	function fetch_report_data()

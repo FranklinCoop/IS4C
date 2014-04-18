@@ -151,6 +151,7 @@ class PIMemberPage extends PIKillerPage {
 			$custdata->memType(FormLib::get_form_value('memType'));
 			$custdata->MemDiscountLimit(FormLib::get_form_value('chargelimit'));
 			$custdata->ChargeLimit(FormLib::get_form_value('chargelimit'));
+            $custdata->ChargeOk( FormLib::get('chargelimit') == 0 ? 0 : 1 );
 
 			$default = $this->get_model($dbc, 'MemtypeModel', array('memtype'=>$custdata->memType()));
 			$custdata->Type($default->custdataType());
@@ -258,6 +259,9 @@ class PIMemberPage extends PIKillerPage {
 		}
 		echo '</td>';
 		echo "<td><a href=\"{$FANNIE_URL}ordering/clearinghouse.php?card_no=".$this->card_no."\">Special Orders</a></td>";
+        if (FannieAuth::validateUserQuiet('GiveUsMoney')) {
+            echo "<td><a href=\"{$FANNIE_URL}modules/plugins2.0/GiveUsMoneyPlugin/GumMainPage.php?id=".$this->card_no."\">Owner Loans</a></td>";
+        }
 		echo "</tr>";
 
 		echo "<tr>";

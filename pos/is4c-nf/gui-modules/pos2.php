@@ -49,6 +49,7 @@ class pos2 extends BasicPage {
 
 		if ($CORE_LOCAL->get("msgrepeat") == 1 && $entered != "CL") {
 			$entered = $CORE_LOCAL->get("strRemembered");
+            $CORE_LOCAL->set('strRemembered', '');
 		}
 		$CORE_LOCAL->set("strEntered",$entered);
 
@@ -191,10 +192,20 @@ class pos2 extends BasicPage {
 				data: 'receiptType='+r_type,
 				dataType: 'json',
 				cache: false,
+                error: function() {
+                    var icon = $('#receipticon').attr('src');
+                    var newicon = icon.replace(/(.*graphics)\/.*/, "$1/deadreceipt.gif");
+                    $('#receipticon').attr('src', newicon);
+                },
 				success: function(data){
 					if (data.sync){
 						ajaxTransactionSync('<?php echo $this->page_url; ?>');
 					}
+                    if (data.error) {
+                        var icon = $('#receipticon').attr('src');
+                        var newicon = icon.replace(/(.*graphics)\/.*/, "$1/deadreceipt.gif");
+                        $('#receipticon').attr('src', newicon);
+                    }
 				},
 				error: function(e1){
 				}

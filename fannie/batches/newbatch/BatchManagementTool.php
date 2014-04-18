@@ -40,17 +40,6 @@ class BatchManagementTool extends FanniePage
     private $batchtypes = array();
     private $owners = array();
 
-    // This replaces the __construct() in the parent.
-    public function __construct() {
-        global $FANNIE_WINDOW_DRESSING;
-        // To set authentication.
-        parent::__construct();
-        if ( isset($FANNIE_WINDOW_DRESSING) ) {
-            $this->window_dressing = $FANNIE_WINDOW_DRESSING;
-        }
-    // __construct()
-    }
-
     function preprocess()
     {
         global $FANNIE_OP_DB;
@@ -302,12 +291,6 @@ class BatchManagementTool extends FanniePage
             $id = FormLib::get_form_value('id',0);
             $upc = FormLib::get_form_value('upc','');
             
-            $delQ = $dbc->prepare_statement("delete from batchList where batchID=? and upc=?");
-            $delR = $dbc->exec_statement($delQ,array($id,$upc));
-            
-            $delQ = $dbc->prepare_statement("delete from batchBarcodes where upc=? and batchID=?");
-            $delR = $dbc->exec_statement($delQ,array($upc,$id));
-
             if (substr($upc,0,2) != 'LC'){
                 // take the item off sale if this batch is currently on sale
                 $unsaleQ = "UPDATE products AS p LEFT JOIN batchList as b on p.upc=b.upc
@@ -340,6 +323,13 @@ class BatchManagementTool extends FanniePage
 
                 //syncProductsAllLanes();
             }
+
+            $delQ = $dbc->prepare_statement("delete from batchList where batchID=? and upc=?");
+            $delR = $dbc->exec_statement($delQ,array($id,$upc));
+            
+            $delQ = $dbc->prepare_statement("delete from batchBarcodes where upc=? and batchID=?");
+            $delR = $dbc->exec_statement($delQ,array($upc,$id));
+
             if (FormLib::get_form_value('audited') == '1') {
                 AuditLib::batchNotification($id, $upc, AuditLib::BATCH_DELETE, (substr($upc,0,2)=='LC' ? true : false));
             }

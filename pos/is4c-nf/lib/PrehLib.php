@@ -21,14 +21,6 @@
 
 *********************************************************************************/
 
-/* --COMMENTS - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-	13Feb2013 Andy Theuninck visitingMem support for memdiscountadd
-	13Jan2013 Eric Lee New omtr_ttl() based on ttl() for Ontario Meal Tax Rebate.
-	18Sep2012 Eric Lee In setMember support for not displaying subtotal.
-
-*/
-
 /**
   @class PrehLib
   A horrible, horrible catch-all clutter of functions
@@ -47,6 +39,8 @@ static public function clearMember()
 	$db = Database::tDataConnect();
 	$db->query("UPDATE localtemptrans SET card_no=0,percentDiscount=NULL");
 	$CORE_LOCAL->set("ttlflag",0);	
+	$opts = array('upc'=>'DEL_MEMENTRY');
+	TransRecord::add_log_record($opts);
 }
 
 /**
@@ -98,10 +92,14 @@ static public function memberID($member_number)
 		$ret['main_frame'] = MiscLib::baseURL()."gui-modules/requestInfo.php?class=PrehLib";
 	}
 
+    /** This is a bad idea. If the search is
+        cancelled, these fields won't be refreshed
+        with new data
 	$CORE_LOCAL->set("memberID","0");
 	$CORE_LOCAL->set("memType",0);
 	$CORE_LOCAL->set("percentDiscount",0);
 	$CORE_LOCAL->set("memMsg","");
+    */
 
 	if (empty($ret['output']) && $ret['main_frame'] == false) {
 		$ret['main_frame'] = MiscLib::base_url()."gui-modules/memlist.php?idSearch=".$member_number;
@@ -152,17 +150,32 @@ static public function setMember($member, $personNumber, $row)
     }
 	$CORE_LOCAL->set("memMsg",$memMsg);
 
+	$CORE_LOCAL->set("memberID",$member);
 	$chargeOk = self::chargeOk();
 	if ($CORE_LOCAL->get("balance") != 0 && $member != $CORE_LOCAL->get("defaultNonMem")) {
-	      $CORE_LOCAL->set("memMsg",$CORE_LOCAL->get("memMsg")." AR");
+	      $CORE_LOCAL->set("memMsg",$CORE_LOCAL->get("memMsg") . _(" AR"));
     }
       
-	$CORE_LOCAL->set("memberID",$member);
 	$CORE_LOCAL->set("memType",$row["memType"]);
 	$CORE_LOCAL->set("lname",$row["LastName"]);
 	$CORE_LOCAL->set("fname",$row["FirstName"]);
 	$CORE_LOCAL->set("Type",$row["Type"]);
 	$CORE_LOCAL->set("percentDiscount",$row["Discount"]);
+	$CORE_LOCAL->set("isStaff",$row["staff"]);
+	$CORE_LOCAL->set("SSI",$row["SSI"]);
+
+    if ($CORE_LOCAL->get('useMemtypeTable') == 1 && $conn->table_exists('memtype')) {
+        $prep = $conn->prepare('SELECT discount, staff, ssi 
+                                 FROM memtype
+                                 WHERE memtype=?');
+        $res = $conn->execute($prep, array((int)$CORE_LOCAL->get('memType')));
+        if ($conn->num_rows($res) > 0) {
+            $mt_row = $conn->fetch_row($res);
+            $CORE_LOCAL->set('percentDiscount', $mt_row['discount']);
+            $CORE_LOCAL->set('isStaff', $mt_row['staff']);
+            $CORE_LOCAL->set('SSI', $mt_row['ssi']);
+        }
+    }
 
 	/**
 	  Use discount module to calculate modified percentDiscount
@@ -172,7 +185,7 @@ static public function setMember($member, $personNumber, $row)
 	elseif (!class_exists($handler_class)) $handler_class = 'DiscountModule';
 	if (class_exists($handler_class)){
 		$module = new $handler_class();
-		$CORE_LOCAL->set('percentDiscount', $module->percentage($row['Discount']));
+		$CORE_LOCAL->set('percentDiscount', $module->percentage($CORE_LOCAL->get('percentDiscount')));
 	}
 
 	if ($CORE_LOCAL->get("Type") == "PC") {
@@ -180,9 +193,6 @@ static public function setMember($member, $personNumber, $row)
 	} else {
         $CORE_LOCAL->set("isMember",0);
 	}
-
-	$CORE_LOCAL->set("isStaff",$row["staff"]);
-	$CORE_LOCAL->set("SSI",$row["SSI"]);
 
 	if ($CORE_LOCAL->get("SSI") == 1) {
 		$CORE_LOCAL->set("memMsg",$CORE_LOCAL->get("memMsg")." #");
@@ -215,6 +225,7 @@ static public function setMember($member, $personNumber, $row)
 
 	$conn2->query($memquery);
 
+	$CORE_LOCAL->set("memberID",$member);
 	$opts = array('upc'=>'MEMENTRY','description'=>'CARDNO IN NUMFLAG','numflag'=>$member);
 	TransRecord::add_log_record($opts);
 
@@ -1049,8 +1060,6 @@ static public function percentDiscount($strl,$json=array())
 static public function chargeOk() 
 {
 	global $CORE_LOCAL;
-
-	Database::getsubtotals();
 
 	$conn = Database::pDataConnect();
 	$query = "SELECT c.ChargeLimit - c.Balance AS availBal,

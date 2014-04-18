@@ -63,6 +63,8 @@ class FanniePage
         if (isset($FANNIE_COOP_ID) && $FANNIE_COOP_ID == 'WEFC_Toronto') {
             $this->auth_classes[] = 'admin';
         }
+        /*
+        */
     }
 
     /**
@@ -93,6 +95,10 @@ class FanniePage
 
         return ob_get_clean();
     }
+    public function get_header()
+    {
+        return $this->getHeader();
+    }
 
     /**
       Get the standard footer
@@ -105,6 +111,10 @@ class FanniePage
         include($FANNIE_ROOT.'src/footer.html');
 
         return ob_get_clean();
+    }
+    public function get_footer()
+    {
+        return $this->getFooter();
     }
 
     /**
@@ -216,6 +226,11 @@ class FanniePage
         header('Location: '.$url.'?redirect='.$redirect);
     }
 
+    public function login_redirect()
+    {
+        $this->loginRedirect();
+    }
+
     /**
       Check if the user is logged in
     */
@@ -240,6 +255,11 @@ class FanniePage
         }
 
         return False;
+    }
+
+    public function check_auth()
+    {
+        return $this->checkAuth();
     }
 
     public function draw_page()
@@ -313,11 +333,20 @@ class FanniePage
     */
     public function drawPage()
     {
+        global $FANNIE_WINDOW_DRESSING;
 
         if (!$this->checkAuth() && $this->must_authenticate) {
             $this->loginRedirect();
             exit;
         } elseif ($this->preprocess()) {
+
+            /**
+              Global setting overrides default behavior
+              to force the menu to appear.
+            */
+            if (isset($FANNIE_WINDOW_DRESSING) && $FANNIE_WINDOW_DRESSING) {
+                $this->window_dressing = true;
+            }
             
             if ($this->window_dressing) {
                 echo $this->getHeader();
@@ -359,7 +388,6 @@ class FanniePage
                 echo "\n";
             }
             
-            // 22May13 Eric Lee  Moved after css_files so these take precedence.
             $page_css = $this->css_content();
             if (!empty($page_css)) {
                 echo '<style type="text/css">';

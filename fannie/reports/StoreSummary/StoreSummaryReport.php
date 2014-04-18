@@ -25,9 +25,14 @@
  * 22Jul13 EL Attempt to use dlog views must wait until they include cost.
 */
 include('../../config.php');
-include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+if (!class_exists('FannieAPI')) {
+    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
 
 class StoreSummaryReport extends FannieReportPage2 {
+
+    public $discoverable = false; // I'd like to replace this with StoreSummaryAlt
+                                  // and eliminate FannieReportPage2
 
 	private $grandTTL;
 	private $grandCostsTotal;
@@ -40,11 +45,10 @@ class StoreSummaryReport extends FannieReportPage2 {
 	public function __construct() {
 		// To set authentication.
 		parent::__construct();
-		// Would dialing-direct work? Seems to. No, it doesn't.
-		// FanniePage::__construct();
 	}
 
 	function preprocess(){
+		global $FANNIE_WINDOW_DRESSING;
 		$this->title = "Fannie : Store Summary Report";
 		$this->header = "Store Summary Report";
 		$this->report_cache = 'none';
@@ -58,7 +62,10 @@ class StoreSummaryReport extends FannieReportPage2 {
 
 		if (isset($_REQUEST['date1'])){
 			$this->content_function = "report_content";
-			$this->has_menus(True); // 1Jul13 was False, normal for reports of this kind.
+			if ( isset($FANNIE_WINDOW_DRESSING) )
+				$this->has_menus($FANNIE_WINDOW_DRESSING);
+			else
+				$this->has_menus(False);
 			$this->report_headers = array('','Qty','Costs','% Costs','DeptC%','Sales','% Sales','DeptS %',
 				'Margin %','GST','HST');
 

@@ -22,10 +22,15 @@
 *********************************************************************************/
 
 include('../../config.php');
-include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+if (!class_exists('FannieAPI')) {
+    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
 
 class CustomerPurchasesReport extends FannieReportPage 
 {
+    public $description = '[Member Purchases] lists items purchased by a given member in a given date range.';
+    public $report_set = 'Membership';
+
     protected $title = "Fannie : What Did I Buy?";
     protected $header = "What Did I Buy? Report";
     protected $report_headers = array('Date','UPC','Description','Dept','Cat','Qty','$');
@@ -45,9 +50,9 @@ class CustomerPurchasesReport extends FannieReportPage
 			  t.department,d.dept_name,m.super_name,
 			  sum(t.quantity) as qty,
 			  sum(t.total) as ttl from
-			  $dlog as t left join products as p on t.upc = p.upc 
-			  left join departments AS d ON t.department=d.dept_no
-			  left join MasterSuperDepts AS m ON t.department=m.dept_ID
+			  $dlog as t left join {$FANNIE_OP_DB}.products as p on t.upc = p.upc 
+			  left join {$FANNIE_OP_DB}.departments AS d ON t.department=d.dept_no
+			  left join {$FANNIE_OP_DB}.MasterSuperDepts AS m ON t.department=m.dept_ID
 			  where t.card_no = ? AND
 			  trans_type IN ('I','D') AND
 			  tdate BETWEEN ? AND ?

@@ -175,9 +175,9 @@ $echo_str = "";
 //$echo_str = "<tr><th>".$result."</th></tr>"."<tr><th>".$result_l1."</th></tr>"."<tr><th>".$result_l2."</th></tr>";
 
 $row_names = array("Cash Total", "Checks (# of)", "Checks (amount)", "GIFT CARD Sold", "MEMBER PAYMENT",
-				"CHARGE PAYMENT TOTAL","R/A: Other", "CREDIT", "DEBIT", "SNAP: Food", "SNAP: Cash",
-				"GIFT CARD Redeemed", "Total CARD MEDIA", "Paper Gift Redeemed","STORE CHARGE",
-				"STORE COUPON", "VENDOR COUPONS", "PAIDOUT");
+				"CHARGE PAYMENT TOTAL", "R/A: Other", "CREDIT", "DEBIT", "SNAP: Food", "SNAP: Cash",
+				"GIFT CARD Redeemed", "Total CARD MEDIA", "Paper Gift Redeemed","STORE CHARGE", "PAIDOUT",
+				"STORE COUPON", "VENDOR COUPONS");
 
 if($result) {
 	for($i = 0; $i < count($row_names); $i++) {

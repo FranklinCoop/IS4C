@@ -22,27 +22,40 @@
 *********************************************************************************/
 
 /**
-  @class ProductUserSearch
-  Use the productUser table to
-  supplement searches
+  @class AllItemProductUserSearch
+  Use the productUser table to supplement searches.
+  Does not filter out normal UPC's,
+   i.e. those that start with a manufacturer part.
 */
-class ProductUserSearch extends ProductSearch {
+class AllItemProductUserSearch extends ProductSearch {
 
 	public function search($str){
+        global $CORE_LOCAL;
 		$ret = array();
 		$sql = Database::pDataConnect();
-		if (!$sql->table_exists('productUser')) return array();
-		$query = "SELECT p.upc,
-			   CASE WHEN u.description IS NULL THEN p.description
-				   ELSE u.description END as description,
+        if (!$sql->table_exists('productUser')) {
+            return $ret;
+        }
+//			   CASE WHEN u.description IS NOT NULL THEN u.description
+//				   ELSE p.description END as description,
+//            u.description,
+        $query = "SELECT p.upc,
+			   CASE WHEN u.description IS NOT NULL THEN u.description
+				   ELSE p.description END as description,
 				p.normal_price, p.special_price, p.advertised, p.scale
 			   FROM products AS p
 				LEFT JOIN productUser AS u ON p.upc=u.upc
 			 WHERE (p.description LIKE '%$str%' OR
 				 u.description LIKE '%$str%')
-			 AND p.upc LIKE ('0000000%')
-			 AND p.inUse='1'
-			 ORDER BY description";
+            AND p.inUse='1'
+            ORDER BY description";
+		//	 $query .= " AND p.upc LIKE ('0000000%')";
+        // 'listAllProducts'
+        /*
+         if ($CORE_LOCAL->get("store") != "WEFC_Toronto") {
+			 $query .= " AND p.upc LIKE ('0000000%')";
+         }
+        */
 		$result = $sql->query($query);
 		while($row = $sql->fetch_row($result)){
 			$ret[$row['upc']] = $row;
@@ -52,3 +65,4 @@ class ProductUserSearch extends ProductSearch {
 }
 
 ?>
+

@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2001, 2004 Wedge Community Co-op
+    Copyright 2012 Whole Foods Co-op
 
     This file is part of IT CORE.
 
@@ -20,23 +20,23 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
-$CORE_PATH = isset($CORE_PATH)?$CORE_PATH:"";
-if (empty($CORE_PATH)){ while(!file_exists($CORE_PATH."pos.css")) $CORE_PATH .= "../"; }
- 
-if (!isset($CORE_LOCAL)) include($CORE_PATH."lib/LocalStorage/conf.php");
 
-function boxMsgscreen() {
-	global $CORE_PATH;
-	changeCurrentPageJS("{$CORE_PATH}gui-modules/boxMsg2.php");
+class AllItemProdUserSearch extends Plugin {
+
+	public $plugin_settings = array(
+	);
+
+	public $plugin_description = 'Include all items in product searches instead of
+        just PLU items
+        and use table ProductUser.description when it is available.
+        This plugin has priority over standard modules that do similar things.';
+
+	public function plugin_enable(){
+
+	}
+
+	public function plugin_disable(){
+
+	}
+
 }
-
-
-function receipt($arg) {
-	global $CORE_LOCAL,$CORE_PATH;
-	$CORE_LOCAL->set("receiptType",$arg);
-	echo "<script type=\"text/javascript\">\n";
-	echo "window.top.end.location  = '{$CORE_PATH}end.php';\n";
-	echo "</script>\n";
-}
-
-?>

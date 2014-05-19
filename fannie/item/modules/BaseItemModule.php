@@ -51,7 +51,7 @@ class BaseItemModule extends ItemModule {
                                         p.scale,
                                         p.qttyEnforced,
                                         p.discount,
-                                        x.manufacturer,
+                                        p.brand AS manufacturer,
                                         x.distributor,
                                         u.description as ldesc 
                                       FROM products AS p 
@@ -365,7 +365,7 @@ class BaseItemModule extends ItemModule {
 		$model->size(FormLib::get_form_value('size',''));
 		$model->modified(date('Y-m-d H:i:s'));
 		$model->unitofmeasure(FormLib::get_form_value('unitm',''));
-		$model->subdept(FormLib::get_form_value('subdepartment',0));
+		$model->subdept(FormLib::get_form_value('subdept',0));
 
 		/* turn on volume pricing if specified, but don't
 		   alter pricemethod if it's already non-zero */

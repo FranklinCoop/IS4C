@@ -91,14 +91,6 @@ static public function checkPassword($password,$activity=1)
 				$result = $db_g->exec_statement($prep,$args);
 			}
 
-            /**
-            alog and its variants are never used.
-            @deprecated
-			if ($transno == 1) {
-                TransRecord::addactivity($activity);
-            }
-            */
-			
 		} elseif ($password == 9999) {
 			Database::loadglobalvalues();
 

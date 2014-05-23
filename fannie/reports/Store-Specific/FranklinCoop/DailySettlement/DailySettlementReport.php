@@ -63,6 +63,7 @@ sum(case when upc='DISCOUNT' and memType=7 then -unitPrice else 0 end) as staff_
 sum(case when upc='DISCOUNT' and memType=8 then -unitPrice else 0 end) as staff_disc17,
 sum(case when upc='DISCOUNT' and memType=9 then -unitPrice else 0 end) as staff_disc23,
 sum(case when upc='DISCOUNT' and memType=0 then -unitPrice else 0 end) as senior_disc,
+sum(case when upc='DISCOUNT' and memType=6 then -unitPrice else 0 end) as food_for_all_disc,
 sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
 sum(case when trans_subtype='DC' AND trans_type ='T' then -total else 0 end) as debit_total,
 sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
@@ -112,7 +113,7 @@ $echo_str = "";
 
 $row_names = array("Department Sales Totals", "Sales Tax", "Meals Tax", "Member Payments", "Charge Payments",
 				"Gift Cards Sold", "Paid In", "Member 2%", "Member 10%", "Member 15%", "Staff 15%",
-				"Staff 17%", "Staff 23%", "Senior Discout", "Credit Card Total", "Debit Card Total", "SNAP Total",
+				"Staff 17%", "Staff 23%", "Senior Discout", "Food For All Disc", "Credit Card Total", "Debit Card Total", "SNAP Total",
 				"SNAP Cash Total", "Gift Card Total", "Paper Gift Total", "In Store Charge Total",
 				"Paid Out Total", "Store Coupon Total", "Manufactures Coupon Total");
 $row[1] = $row_tax[1];

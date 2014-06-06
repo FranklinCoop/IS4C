@@ -117,7 +117,7 @@ InstallUtilities::paramSave('SpecialUpcClasses', $CORE_LOCAL->get('SpecialUpcCla
 if(isset($_REQUEST['HCPREFIX'])) $CORE_LOCAL->set('houseCouponPrefix',$_REQUEST['HCPREFIX'],True);
 else if ($CORE_LOCAL->get('houseCouponPrefix') === '') $CORE_LOCAL->set('houseCouponPrefix', '00499999', true);
 printf("<input type=text name=HCPREFIX value=\"%s\" />",$CORE_LOCAL->get('houseCouponPrefix'));
-InstallUtilities::paramSave('houseCouponPrefix',"'".$CORE_LOCAL->get('houseCouponPrefix')."'");
+InstallUtilities::paramSave('houseCouponPrefix',$CORE_LOCAL->get('houseCouponPrefix'));
 ?>
 <span class='noteTxt'>Set the barcode prefix for houseCoupons.  Should be 8 digits starting with 004. Default is 00499999.</span>
 </td></tr>
@@ -158,7 +158,7 @@ else if ($CORE_LOCAL->get('roundUpDept') === '') {
     }
 }
 printf("<input type=text name=DONATIONDEPT value=\"%s\" />",$CORE_LOCAL->get('roundUpDept'));
-InstallUtilities::paramSave('roundUpDept',"'".$CORE_LOCAL->get('roundUpDept')."'");
+InstallUtilities::paramSave('roundUpDept',$CORE_LOCAL->get('roundUpDept'));
 ?>
 <span class='noteTxt'>Set the department number for lines entered via the "round up" donation function.</span>
 </td></tr><tr>
@@ -310,6 +310,41 @@ InstallUtilities::confsave('SpecialDeptMap',$saveStr);
 </td></tr>
 <tr><td colspan=2>
 <hr />
+</td></tr>
+<tr>
+    <td colspan=2>
+    <b>Variable Weight Item Mapping</b> (UPC Prefix "2"):<br />
+    Variable-weight items do not have identical barcodes because the
+    price is encoded in the barcode. A translator is required to map
+    these different barcodes back to one logical product.
+    </td>
+</tr>
+<tr>
+    <td>
+    <b>Translator</b>:
+    </td>
+    <td>
+    <select name="VW_MOD">
+    <?php
+    $mods = AutoLoader::listModules('VariableWeightReWrite');
+    if (isset($_REQUEST['VW_MOD'])) 
+        $CORE_LOCAL->set('VariableWeightReWriter', $_REQUEST['VW_MOD']);
+    else if ($CORE_LOCAL->get('VariableWeightReWriter') === '') 
+        $CORE_LOCAL->set('VariableWeightReWriter', 'ZeroedPriceReWrite');
+    foreach($mods as $m) {
+        printf('<option %s>%s</option>',
+            $CORE_LOCAL->get('VariableWeightReWriter') == $m ? 'selected' : '',
+            $m);
+    }
+    InstallUtilities::paramSave('VariableWeightReWriter',$CORE_LOCAL->get('VariableWeightReWriter'));
+    ?>
+    </select>
+    </td>
+</tr>
+<tr><td colspan=2>
+<hr />
+</td></tr>
+<tr><td>
 <input type=submit name=scansubmit value="Save Changes" />
 </td></tr></table>
 </form>

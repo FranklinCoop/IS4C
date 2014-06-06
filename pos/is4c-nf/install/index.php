@@ -412,6 +412,8 @@ function create_op_dbs($db,$type){
 
     InstallUtilities::createIfNeeded($db, $type, $name, 'custdata', 'op', $errors);
 
+    InstallUtilities::createIfNeeded($db, $type, $name, 'memtype', 'op', $errors);
+
     InstallUtilities::createIfNeeded($db, $type, $name, 'memberCards', 'op', $errors);
 
     InstallUtilities::createIfNeeded($db, $type, $name, 'custPreferences', 'op', $errors);
@@ -453,6 +455,8 @@ function create_op_dbs($db,$type){
 
     InstallUtilities::createIfNeeded($db, $type, $name, 'subdepts', 'op', $errors);
 
+    InstallUtilities::createIfNeeded($db, $type, $name, 'MasterSuperDepts', 'op', $errors);
+
     InstallUtilities::createIfNeeded($db, $type, $name, 'customReceipt', 'op', $errors);
 
     InstallUtilities::createIfNeeded($db, $type, $name, 'custReceiptMessage', 'op', $errors);
@@ -465,7 +469,16 @@ function create_op_dbs($db,$type){
 
     InstallUtilities::createIfNeeded($db, $type, $name, 'houseCouponItems', 'op', $errors);
 
-    InstallUtilities::createIfNeeded($db, $type, $name, 'memchargebalance', 'op', $errors);
+    InstallUtilities::createIfNeeded($db, $type, $name, 'autoCoupons', 'op', $errors);
+
+    InstallUtilities::createIfNeeded($db, $type, $name, 'ShrinkReasons', 'op', $errors);
+
+    /**
+      @deprecated 3Jan14
+      Only used in PrehLib::chargeOk()
+      Not really necessary to have a dedicated view
+    */
+    //InstallUtilities::createIfNeeded($db, $type, $name, 'memchargebalance', 'op', $errors);
 
     InstallUtilities::createIfNeeded($db, $type, $name, 'unpaid_ar_today', 'op', $errors);
 
@@ -486,18 +499,6 @@ function create_trans_dbs($db,$type){
     global $CORE_LOCAL;
     $name = $CORE_LOCAL->get('tDatabase');
     $errors = array();
-
-    /**
-    alog and its variants are never used.
-    @deprecated
-    InstallUtilities::createIfNeeded($db, $type, $name, 'activities', 'trans', $errors);
-
-    InstallUtilities::createIfNeeded($db, $type, $name, 'alog', 'trans', $errors);
-
-    InstallUtilities::createIfNeeded($db, $type, $name, 'activitylog', 'trans', $errors);
-
-    InstallUtilities::createIfNeeded($db, $type, $name, 'activitytemplog', 'trans', $errors);
-    */
 
     InstallUtilities::createIfNeeded($db, $type, $name, 'dtransactions', 'trans', $errors);
 
@@ -529,7 +530,11 @@ function create_trans_dbs($db,$type){
 
     InstallUtilities::createIfNeeded($db, $type, $name, 'staffdiscountremove', 'trans', $errors);
 
+    /**
+     @deprecated 10Mar14 by Andy
+     View layer isn't necessary; can query suspended table directly
     InstallUtilities::createIfNeeded($db, $type, $name, 'suspendedtoday', 'trans', $errors);
+    */
 
     InstallUtilities::createIfNeeded($db, $type, $name, 'couponApplied', 'trans', $errors);
 
@@ -1012,6 +1017,8 @@ function create_trans_dbs($db,$type){
         InstallUtilities::dbStructureModify($db,'rp_receipt',$rprV,$errors);
     }
 
+    InstallUtilities::createIfNeeded($db, $type, $name, 'PaycardTransactions', 'trans', $errors);
+
     InstallUtilities::createIfNeeded($db, $type, $name, 'efsnetRequest', 'trans', $errors);
 
     InstallUtilities::createIfNeeded($db, $type, $name, 'efsnetRequestMod', 'trans', $errors);
@@ -1019,12 +1026,6 @@ function create_trans_dbs($db,$type){
     InstallUtilities::createIfNeeded($db, $type, $name, 'efsnetResponse', 'trans', $errors);
 
     InstallUtilities::createIfNeeded($db, $type, $name, 'efsnetTokens', 'trans', $errors);
-
-    InstallUtilities::createIfNeeded($db, $type, $name, 'valutecRequest', 'trans', $errors);
-
-    InstallUtilities::createIfNeeded($db, $type, $name, 'valutecRequestMod', 'trans', $errors);
-
-    InstallUtilities::createIfNeeded($db, $type, $name, 'valutecResponse', 'trans', $errors);
 
     $ccV = "CREATE view ccReceiptView 
         AS 
@@ -1102,66 +1103,6 @@ function create_trans_dbs($db,$type){
           and m.mode='void'";
     if(!$db->table_exists('ccReceiptView',$name)){
         InstallUtilities::dbStructureModify($db,'ccReceiptView',$ccV,$errors);
-    }
-
-    $gcV = "CREATE VIEW gcReceiptView
-        AS
-        select
-          (case mode
-            when 'tender' then 'Gift Card Purchase'
-            when 'refund' then 'Gift Card Refund'
-            when 'addvalue' then 'Gift Card Add Value'
-            when 'activate' then 'Gift Card Activation'
-            else 'Gift Card Transaction'
-          end) as tranType,
-          (case mode when 'refund' then -1*r.amount else r.amount end) as amount, 
-          terminalID,
-          PAN,
-          (case manual when 1 then 'Manual' else 'Swiped' end) as entryMethod,
-          xAuthorizationCode,
-          xBalance,
-          '' as xVoidCode,
-          r.date, r.cashierNo, r.laneNo, r.transNo, r.transID, r.datetime,
-          0 as sortorder
-        from valutecRequest r
-        join valutecResponse s
-          on s.date=r.date
-          and s.cashierNo=r.cashierNo
-          and s.laneNo=r.laneNo
-          and s.transNo=r.transNo
-          and s.transID=r.transID
-        where s.validResponse=1 and (s.xAuthorized='true' or s.xAuthorized='Appro')
-
-        union all
-
-        select
-          (case r.mode
-            when 'tender' then 'Gift Card Purchase CANCELED'
-            when 'refund' then 'Gift Card Refund CANCELED'
-            when 'addvalue' then 'Gift Card Add Value CANCELED'
-            when 'activate' then 'Gift Card Activation CANCELED'
-            else 'Gift Card Transaction CANCELED'
-          end) as tranType,
-          (case r.mode when 'refund' then r.amount else -1*r.amount end) as amount,  
-          terminalID,
-          PAN,
-          (case manual when 1 then 'Manual' else 'Swiped' end) as entryMethod,
-          origAuthCode as xAuthorizationCode,
-          xBalance,
-          xAuthorizationCode as xVoidCode,
-          r.date, r.cashierNo, r.laneNo, r.transNo, r.transID, m.datetime,
-          1 as sortorder
-        from valutecRequestMod as m
-        join valutecRequest as r
-          on r.date=m.date
-          and r.cashierNo=m.cashierNo
-          and r.laneNo=m.laneNo
-          and r.transNo=m.transNo
-          and r.transID=m.transID
-        where m.validResponse=1 and (m.xAuthorized='true' 
-        or m.xAuthorized='Appro') and m.mode='void'";
-    if(!$db->table_exists('gcReceiptView',$name)){
-        InstallUtilities::dbStructureModify($db,'gcReceiptView',$gcV,$errors);
     }
 
     $sigCaptureTable = "CREATE TABLE CapturedSignature (
@@ -1520,11 +1461,11 @@ function create_trans_dbs($db,$type){
             end as linetoprint,
         sequence,
         department,
-        subdept_name as dept_name,
+        super_name as dept_name,
         trans_type,
         upc
         from ltt_receipt_reorder_g r
-        left outer join ".$CORE_LOCAL->get('pDatabase').".subdepts d on r.department=d.dept_ID
+        left outer join ".$CORE_LOCAL->get('pDatabase').".MasterSuperDepts d on r.department=d.dept_ID
         where r.total<>0 or r.unitPrice=0
         order by sequence";
     
@@ -1576,7 +1517,7 @@ function create_trans_dbs($db,$type){
             trans_type,
             upc
             from ltt_receipt_reorder_g r
-            left outer join ".$CORE_LOCAL->get('pDatabase')."dbo.subdepts
+            left outer join ".$CORE_LOCAL->get('pDatabase')."dbo.MasterSuperDepts
                    d on r.department=d.dept_ID
             where r.total<>0 or r.unitprice=0
             order by sequence";
@@ -2112,7 +2053,7 @@ function create_trans_dbs($db,$type){
         as linetoprint,
         sequence,
         department,
-        subdept_name as dept_name,
+        super_name as dept_name,
         case when trans_subtype='CM' or voided in (10,17)
             then 'CM' else trans_type
         end
@@ -2120,7 +2061,7 @@ function create_trans_dbs($db,$type){
         upc
 
         from rp_ltt_receipt_reorder_g r
-        left outer join ".$CORE_LOCAL->get('pDatabase').".subdepts d 
+        left outer join ".$CORE_LOCAL->get('pDatabase').".MasterSuperDepts d 
         on r.department=d.dept_ID
         where r.total<>0 or r.unitPrice=0
         order by register_no,emp_no,trans_no,card_no,sequence";
@@ -2177,7 +2118,7 @@ function create_trans_dbs($db,$type){
         upc
 
         from rp_ltt_receipt_reorder_g r
-        left outer join ".$CORE_LOCAL->get('pDatabase').".dbo.subdepts d 
+        left outer join ".$CORE_LOCAL->get('pDatabase').".dbo.MasterSuperDepts d 
         on r.department=d.dept_ID
         where r.total<>0 or r.unitprice=0
         order by register_no,emp_no,trans_no,card_no,sequence";
@@ -2516,30 +2457,6 @@ function create_min_server($db,$type){
         AND emp_no <> 9999 and register_no <> 99";
     if(!$db->table_exists("dlog",$name)){
         $errors = InstallUtilities::dbStructureModify($db,'dlog',$dlogQ,$errors);
-    }
-
-    
-
-    $alogQ = "CREATE TABLE alog (
-        `datetime` datetime,
-        LaneNo smallint,
-        CashierNo smallint,
-        TransNo int,
-        Activity tinyint,
-        `Interval` real)";
-    if ($type == 'mssql'){
-        $alogQ = str_replace("`datetime`","[datetime]",$alogQ);
-        $alogQ = str_replace("`","",$alogQ);
-    }
-    if(!$db->table_exists("alog",$name)){
-        InstallUtilities::dbStructureModify($db,'alog',$alogQ,$errors);
-    }
-
-    $susToday = "CREATE VIEW suspendedtoday AS
-        SELECT * FROM suspended 
-        WHERE datetime >= " . $db->curdate();
-    if (!$db->table_exists("suspendedtoday",$name)){
-        InstallUtilities::dbStructureModify($db,'suspendedtoday',$susToday,$errors);
     }
 
     $efsrq = "CREATE TABLE efsnetRequest (

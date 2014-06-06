@@ -63,9 +63,6 @@ class XlsBatchPage extends FannieUploadPage {
 		$upcCol = $this->get_column_index('upc_lc');
 		$priceCol = $this->get_column_index('price');
 
-		for($i=0;$i<count($upcs);$i++)
-			$upcs[$i] = str_replace(" ","",$upcs[$i]);
-
 		$btype = FormLib::get_form_value('btype',0);
 		$date1 = FormLib::get_form_value('date1',date('Y-m-d'));
 		$date2 = FormLib::get_form_value('date2',date('Y-m-d'));
@@ -197,8 +194,7 @@ class XlsBatchPage extends FannieUploadPage {
 		return ob_get_clean();
 	}
 }
-if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)){
-	$obj = new XlsBatchPage();
-	$obj->draw_page();
-}
+
+FannieDispatch::conditionalExec(false);
+
 ?>

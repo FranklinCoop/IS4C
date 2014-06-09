@@ -34,13 +34,12 @@ class PriceOverride extends NoInputPage {
 		$db = Database::tDataConnect();
 		
 		$q = "SELECT description,total,department FROM localtemptrans
-			WHERE trans_type IN ('I','D') AND trans_status IN ('',' ')
+			WHERE trans_type IN ('I','D') AND trans_status IN ('', ' ', '0')
 			AND trans_id=".((int)$line_id);
 		$r = $db->query($q);
 		if ($db->num_rows($r)==0){
 			// current record cannot be repriced
-			//$this->change_page($this->page_url."gui-modules/pos2.php");
-            var_dump($line_id);
+			$this->change_page($this->page_url."gui-modules/pos2.php");
 			return False;
 		}
 		$w = $db->fetch_row($r);
@@ -71,7 +70,7 @@ class PriceOverride extends NoInputPage {
 				}
 				$ttl = ((int)$dollars) + ((int)$cents / 100.0);
 				$ttl = number_format($ttl,2);
-				if ($w['department'] == $CORE_LOCAL->get("BottleReturnDept") || $w['department'] == $CORE_LOCAL->get("PaidOutDept"))
+				if ($w['department'] == $CORE_LOCAL->get("BottleReturnDept"))
 					$ttl = $ttl * -1;
 					
 				$q = sprintf("UPDATE localtemptrans SET unitPrice=%.2f, regPrice=%.2f,

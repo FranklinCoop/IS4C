@@ -387,7 +387,7 @@ function createViews($dstr,$db){
 
 	$dbms = $FANNIE_ARCHIVE_REMOTE?$FANNIE_ARCHIVE_DBMS:$FANNIE_SERVER_DBMS;
 
-    $table_def = $db->table_definition('transArchive' . $str);
+    $table_def = $db->table_definition('transArchive' . $dstr);
 
 	$dlogQ = "CREATE  view dlog$dstr as
 		select 

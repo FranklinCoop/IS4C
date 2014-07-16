@@ -36,7 +36,7 @@ if (!function_exists('updateProductAllLanes'))
 	include($FANNIE_ROOT.'item/laneUpdates.php');
 
 function forceBatch($batchID){
-	global $FANNIE_OP_DB,$FANNIE_SERVER_DBMS,$FANNIE_STORE_ID;
+	global $FANNIE_OP_DB,$FANNIE_SERVER_DBMS;
 	$dbc = FannieDB::get($FANNIE_OP_DB);
 
 	$batchInfoQ = $dbc->prepare_statement("SELECT batchType,discountType FROM batches WHERE batchID = ?");
@@ -70,7 +70,7 @@ function forceBatch($batchID){
 		    and l.batchID = ?";
             
 		$forceLCQ = "UPDATE products AS p
-			INNER JOIN likeCodeView AS v 
+			INNER JOIN upcLike AS v 
 			ON v.upc=p.upc
 			INNER JOIN batchList as l 
 			ON l.upc=concat('LC',convert(v.likecode,char))
@@ -126,72 +126,12 @@ function forceBatch($batchID){
 					ELSE p.mixmatchcode 
 				END	
 				from products as p left join
-				likeCodeView as v on v.upc=p.upc left join
+				upcLike as v on v.upc=p.upc left join
 				batchList as l on l.upc='LC'+convert(varchar,v.likecode)
 				left join batches as b on b.batchID = l.batchID
 				where b.batchID=?";
 		}
-	}
-	else{
-		
-		if ($batchInfoW['batchType'] == 2) {
-            //sale batch set the sale price.
-            $forceQ = "UPDATE products AS p
-		      INNER JOIN batchList AS l ON l.upc=p.upc
-		      INNER JOIN batches AS b ON l.batchID=b.batchID
-		 
-		      		SET p.special_price = l.salePrice,
-		p.end_date = b.endDate,p.start_date=b.startDate,
-		p.specialgroupprice=CASE WHEN l.salePrice < 0 THEN -1*l.salePrice ELSE l.salePrice END,
-		p.specialquantity=l.quantity,
-		p.specialpricemethod=l.pricemethod,
-		p.discounttype = b.discounttype,
-		p.mixmatchcode = CASE 
-			WHEN l.pricemethod IN (3,4) AND l.salePrice >= 0 THEN convert(l.batchID,char)
-			WHEN l.pricemethod IN (3,4) AND l.salePrice < 0 THEN convert(-1*l.batchID,char)
-			ELSE p.mixmatchcode 
-		END	
-				WHERE l.upc not like 'LC%'
-		      AND l.batchID = ?";
-
-		$forceLCQ = "UPDATE products AS p
-			INNER JOIN upcLike AS v ON v.upc=p.upc
-			INNER JOIN batchList as l on l.upc=concat('LC',convert(v.likecode,char))
-			INNER JOIN batches AS b ON l.batchID=b.batchID
-					SET p.special_price = l.salePrice,
-		p.end_date = b.endDate,p.start_date=b.startDate,
-		p.specialgroupprice=CASE WHEN l.salePrice < 0 THEN -1*l.salePrice ELSE l.salePrice END,
-		p.specialquantity=l.quantity,
-		p.specialpricemethod=l.pricemethod,
-		p.discounttype = b.discounttype,
-		p.mixmatchcode = CASE 
-			WHEN l.pricemethod IN (3,4) AND l.salePrice >= 0 THEN convert(l.batchID,char)
-			WHEN l.pricemethod IN (3,4) AND l.salePrice < 0 THEN convert(-1*l.batchID,char)
-			ELSE p.mixmatchcode 
-		END			
-			WHERE b.batchID=?";
-
-		if ($FANNIE_SERVER_DBMS == 'MSSQL'){
-			$forceQ = "UPDATE products
-			      SET special_price = l.salePrice,
-			      modified = getdate()
-			      FROM products as p,
-			      batches as b,
-			      batchList as l
-			      WHERE l.upc = p.upc
-			      AND l.upc not like 'LC%'
-			      AND b.batchID = l.batchID
-			      AND b.batchID = ?";
-
-			$forceLCQ = "update products set normal_price = b.salePrice,
-				modified=getdate()
-				from products as p left join
-				upcLike as v on v.upc=p.upc left join
-				batchList as b on b.upc='LC'+convert(varchar,v.likecode)
-				where b.batchID=?";
-		}
-		
-		} else {
+	} else {
 		$forceQ = "UPDATE products AS p
 		      INNER JOIN batchList AS l
 		      ON l.upc=p.upc
@@ -227,8 +167,6 @@ function forceBatch($batchID){
 				batchList as b on b.upc='LC'+convert(varchar,v.likecode)
 				where b.batchID=?";
 		}
-
-		}
 	}
 
 	$forceP = $dbc->prepare_statement($forceQ);
@@ -239,16 +177,21 @@ function forceBatch($batchID){
 	$q = $dbc->prepare_statement("SELECT upc FROM batchList WHERE batchID=?");
 	$r = $dbc->exec_statement($q,array($batchID));
 	$likeP = $dbc->prepare_statement('SELECT upc FROM upcLike WHERE likeCode=?');
-	while($w = $dbc->fetch_row($r)){
+    $update = new ProdUpdateModel($dbc);
+    $updateType = ($batchInfoW['discountType'] == 0) ? ProdUpdateModel::UPDATE_PC_BATCH : ProdUpdateModel::UPDATE_BATCH;
+	while($w = $dbc->fetch_row($r)) {
 		$upcs = array($w['upc']);
-		if (substr($w['upc'],0,2)=='LC'){
+		if (substr($w['upc'],0,2)=='LC') {
 			$upcs = array();
 			$lc = substr($w['upc'],2);
 			$r2 = $dbc->exec_statement($likeP,array($lc));
 			while($w2 = $dbc->fetch_row($r2))
 				$upcs[] = $w2['upc'];
 		}
-		foreach($upcs as $u){
+		foreach($upcs as $u) {
+            $update->reset();
+            $update->upc($u);
+            $update->logUpdate($updateType);
 			updateProductAllLanes($u);
 		}
 	}

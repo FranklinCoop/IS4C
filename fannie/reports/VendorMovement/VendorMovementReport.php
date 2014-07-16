@@ -21,32 +21,19 @@
 
 *********************************************************************************/
 
-include('../../config.php');
-include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+include(dirname(__FILE__) . '/../../config.php');
+if (!class_exists('FannieAPI')) {
+    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
 
 class VendorMovementReport extends FannieReportPage 
 {
+    public $description = '[Vendor Movement] lists item sales for a particular vendor';
+    public $report_set = 'Movement Reports';
 
-	function preprocess()
-    {
-		$this->report_cache = 'none';
-		$this->title = "Fannie : Vendor Movement";
-		$this->header = "Vendor Movement Report";
-
-		if (isset($_REQUEST['date1'])){
-			$this->content_function = "report_content";
-			$this->has_menus(False);
-		
-			if (isset($_REQUEST['excel']) && $_REQUEST['excel'] == 'xls')
-				$this->report_format = 'xls';
-			elseif (isset($_REQUEST['excel']) && $_REQUEST['excel'] == 'csv')
-				$this->report_format = 'csv';
-		}
-		else 
-			$this->add_script("../../src/CalendarControl.js");
-
-		return True;
-	}
+    protected $title = "Fannie : Vendor Movement";
+    protected $header = "Vendor Movement Report";
+    protected $required_fields = array('date1', 'date2');
 
 	function fetch_report_data()
     {
@@ -66,11 +53,12 @@ class VendorMovementReport extends FannieReportPage
 			$query = "select t.upc,p.description,
 				  sum(t.quantity) as qty,
 				  sum(t.total),d.dept_no,d.dept_name,s.superID
-				  from $dlog as t left join products as p
-				  on t.upc=p.upc left join prodExtra as e on p.upc = e.upc
-				  left join departments as d on p.department = d.dept_no
-				  left join MasterSuperDepts as s on d.dept_no = s.dept_ID
-				  where e.distributor like ?
+				  from $dlog as t 
+                      left join products as p on t.upc=p.upc 
+                      left join vendors as v on p.default_vendor_id = v.vendorID
+                      left join departments as d on p.department = d.dept_no
+                      left join MasterSuperDepts as s on d.dept_no = s.dept_ID
+				  where v.vendorName like ?
 				  and t.tdate between ? AND ?
 				  group by t.upc,p.description,d.dept_no,d.dept_name,s.superID
 				  order by sum(t.total) desc";
@@ -78,20 +66,22 @@ class VendorMovementReport extends FannieReportPage
 		case 'date':
 			$query = "select year(t.tdate),month(t.tdate),day(t.tdate),
 				sum(t.quantity),sum(t.total)
-				  from products as p left join prodExtra as e on p.upc = e.upc
-				  left join $dlog as t on p.upc = t.upc
-				  where e.distributor like ?
+				  from products as p
+                      left join vendors as v on p.default_vendor_id = v.vendorID
+                      left join $dlog as t on p.upc = t.upc
+				  where v.vendorName like ?
 				  and t.tdate between ? AND ?
 				  group by year(t.tdate),month(t.tdate),day(t.tdate)
 				  order by year(t.tdate),month(t.tdate),day(t.tdate)";
 			break;
 		case 'dept':
 			$query = "select d.dept_no,d.dept_name,sum(t.quantity),sum(t.total),s.superID
-				  from products as p left join prodExtra as e on p.upc = e.upc
-				  left join $dlog as t on p.upc = t.upc
-				  left join departments as d on p.department = d.dept_no
-				  left join MasterSuperDepts as s on d.dept_no=s.dept_ID
-				  where e.distributor like ?
+				  from products as p
+                      left join vendors as v on p.default_vendor_id = v.vendorID
+                      left join $dlog as t on p.upc = t.upc
+                      left join departments as d on p.department = d.dept_no
+                      left join MasterSuperDepts as s on d.dept_no=s.dept_ID
+				  where v.vendorName like ?
 				  and t.tdate between ? AND ?
 				  group by d.dept_no,d.dept_name,s.superID
 				  order by sum(t.total) desc";
@@ -180,7 +170,7 @@ class VendorMovementReport extends FannieReportPage
 			<option value="date">Date</option>
 			<option value="dept">Department</option>
 			</select></td>
-			<th>End</th>	
+			<th>Date End</th>	
 			<td>
 			<input type=text size=14 id=date2 name=date2 onfocus="this.value='';showCalendarControl(this);">
 			</td>
@@ -204,6 +194,6 @@ class VendorMovementReport extends FannieReportPage
 	}
 }
 
-$obj = new VendorMovementReport();
-$obj->draw_page();
+FannieDispatch::conditionalExec(false);
+
 ?>

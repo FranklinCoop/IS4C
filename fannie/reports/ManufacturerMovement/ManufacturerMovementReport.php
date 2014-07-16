@@ -21,33 +21,17 @@
 
 *********************************************************************************/
 
-include('../../config.php');
-include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+include(dirname(__FILE__) . '/../../config.php');
+if (!class_exists('FannieAPI')) {
+    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
 
 class ManufacturerMovementReport extends FannieReportPage 
 {
+    protected $required_fields = array('date1', 'date2');
 
-	function preprocess()
-    {
-		$this->report_cache = 'day';
-		$this->title = "Fannie : Manufacturer Movement";
-		$this->header = "Manufacturer Movement Report";
-
-		if (isset($_REQUEST['date1'])){
-			$this->content_function = "report_content";
-			$this->has_menus(False);
-		
-			if (isset($_REQUEST['excel']) && $_REQUEST['excel'] == 'xls') {
-				$this->report_format = 'xls';
-			} elseif (isset($_REQUEST['excel']) && $_REQUEST['excel'] == 'csv') {
-				$this->report_format = 'csv';
-            }
-		}
-		else 
-			$this->add_script("../../src/CalendarControl.js");
-
-		return True;
-	}
+    public $description = '[Brand Movement] lists sales for products from a specific brand over a given date range. Brand is given either by name or as a UPC prefix.';
+    public $report_set = 'Movement Reports';
 
 	function fetch_report_data()
     {
@@ -62,7 +46,7 @@ class ManufacturerMovementReport extends FannieReportPage
 		$dlog = DTransactionsModel::selectDlog($date1,$date2);
 		$sumTable = $FANNIE_ARCHIVE_DB.$dbc->sep()."sumUpcSalesByDay";
 
-		$type_condition = "e.manufacturer like ?";
+		$type_condition = "p.brand like ?";
 		$args = array('%'.$manu.'%');
 		if ($type == 'prefix')
 			$type_condition = 't.upc LIKE ?';
@@ -75,10 +59,10 @@ class ManufacturerMovementReport extends FannieReportPage
 			$query = "select t.upc,p.description,
 				  sum(t.quantity) as qty,
 				  sum(t.total),d.dept_no,d.dept_name,s.superID
-				  from $dlog as t left join products as p
-				  on t.upc=p.upc left join prodExtra as e on p.upc = e.upc
-				  left join departments as d on p.department = d.dept_no
-				  left join MasterSuperDepts as s on d.dept_no = s.dept_ID
+				  from $dlog as t 
+                      left join products as p on t.upc=p.upc
+                      left join departments as d on p.department = d.dept_no
+                      left join MasterSuperDepts as s on d.dept_no = s.dept_ID
 				  where $type_condition
 				  and t.tdate between ? AND ?
 				  group by t.upc,p.description,d.dept_no,d.dept_name,s.superID
@@ -87,8 +71,8 @@ class ManufacturerMovementReport extends FannieReportPage
 		case 'date':
 			$query = "select year(t.tdate),month(t.tdate),day(t.tdate),
 				sum(t.quantity),sum(t.total)
-				  from products as p left join prodExtra as e on p.upc = e.upc
-				  left join $dlog as t on p.upc = t.upc
+				  from products as p 
+                      left join $dlog as t on p.upc = t.upc
 				  where $type_condition
 				  and t.tdate between ? AND ?
 				  group by year(t.tdate),month(t.tdate),day(t.tdate)
@@ -96,8 +80,8 @@ class ManufacturerMovementReport extends FannieReportPage
 			break;
 		case 'dept':
 			$query = "select d.dept_no,d.dept_name,sum(t.quantity),sum(t.total),s.superID
-				  from products as p left join prodExtra as e on p.upc = e.upc
-				  left join $dlog as t on p.upc = t.upc
+				  from products as p
+                      left join $dlog as t on p.upc = t.upc
 				  left join departments as d on p.department = d.dept_no
 				  left join MasterSuperDepts as s on d.dept_no=s.dept_ID
 				  where $type_condition
@@ -164,13 +148,16 @@ class ManufacturerMovementReport extends FannieReportPage
 		}
 	}
 
-	function form_content(){
+	function form_content()
+    {
+        $this->title = _("Fannie") . " : " . _("Manufacturer Movement Report");
+        $this->header = _("Manufacturer Movement Report");
 ?>
 <div id=main>	
 <form method = "get" action="ManufacturerMovementReport.php">
 	<table border="0" cellspacing="0" cellpadding="5">
 		<tr> 
-			<th>Manufacturer</th>
+			<th><?php echo _("Manufacturer"); ?></th>
 			<td>
 			<input type=text name=manu id=manu  />
 			</td>
@@ -216,6 +203,6 @@ class ManufacturerMovementReport extends FannieReportPage
 	}
 }
 
-$obj = new ManufacturerMovementReport();
-$obj->draw_page();
+FannieDispatch::conditionalExec(false);
+
 ?>

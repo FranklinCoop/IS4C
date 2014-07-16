@@ -22,40 +22,67 @@
 *********************************************************************************/
 
 // set a variable in the config file
-function confset($key, $value){
+function confset($key, $value)
+{
 	$FILEPATH = realpath(dirname(__FILE__).'/../');
 	$lines = array();
-	$found = False;
+	$found = false;
 	$fp = fopen($FILEPATH.'/config.php','r');
-	while($line = fgets($fp)){
-		if (strpos($line,"\$$key ") === 0){
+	while($line = fgets($fp)) {
+		if (strpos($line,"\$$key ") === 0) {
 			$lines[] = "\$$key = $value;\n";
-			$found = True;
-		}
-		elseif (strpos($line,"?>") === 0 && $found == False){
+			$found = true;
+		} else if (strpos($line,"?>") === 0 && $found == false) {
 			$lines[] = "\$$key = $value;\n";
 			$lines[] = "?>\n";
-		}
-		else
+            $found = true;
+            break; // stop at closing tag
+		} else {
 			$lines[] = $line;
+        }
 	}
 	fclose($fp);
 
+    // implies no closing tag was found so new settings
+    // still needs to be added
+    if ($found == false) {
+        $lines[] = "\$$key = $value;\n";
+    }
+
+    // verify first line is a proper opening php tag
+    // if it contains an opening tag with differnet format,
+    // just replace that line. Otherwise add one and scan
+    // through to make sure there isn't another one later
+    // in the file
+    if (isset($lines[0]) && $lines[0] != "<?php\n") {
+        if (strstr($lines[0], "<?php")) {
+            $lines[0] = "<?php\n";
+        } else {
+            $tmp = array("<?php\n");
+            for ($i=0; $i<count($lines); $i++) {
+                if (!strstr($lines[$i], "<?php")) {
+                    $tmp[] = $lines[$i];
+                }
+            }
+            $lines = $tmp;
+        }
+    }
+
 	$fp = fopen($FILEPATH.'/config.php','w');
-	foreach($lines as $line)
+	foreach($lines as $line) {
 		fwrite($fp,$line);
+    }
 	fclose($fp);
 }
 
 function db_test_connect($host,$type,$db,$user,$pw){
-	global $FANNIE_ROOT;
 	if (!function_exists("check_db_host"))
-		include($FANNIE_ROOT.'src/host_up.php');
+		include(dirname(__FILE__) . '/../src/host_up.php');
 	if (!check_db_host($host,$type))
 		return False;
 
 	if (!class_exists('SQLManager'))
-		include($FANNIE_ROOT.'src/SQLManager.php');
+		include(dirname(__FILE__) . '/../src/SQLManager.php');
 	$sql = False;
 	try {
 		$sql = new SQLManager($host,$type,$db,$user,$pw);
@@ -203,7 +230,7 @@ function check_writeable($filename, $optional=False, $template=False){
 			switch($template){
 			case 'PHP':
 				fwrite($fp,"<?php\n");
-				fwrite($fp,"?>\n");
+				fwrite($fp,"\n");
 				break;
 			}
 		}

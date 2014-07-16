@@ -58,7 +58,13 @@ class UPC extends Parser {
 			return $ret;
 		}
 
-		$entered = str_replace(".", " ", $entered);
+        // leading/trailing whitespace creates issues
+        $entered = trim($entered);
+
+        // 6Jan14 - I have no idea why this is here
+        // unless some else does, it's probably legacy
+        // cruft. spaces in UPCs are bad.
+		//$entered = str_replace(".", " ", $entered);
 
 		$quantity = $CORE_LOCAL->get("quantity");
 		if ($CORE_LOCAL->get("quantity") == 0 && $CORE_LOCAL->get("multiple") == 0) $quantity = 1;
@@ -76,26 +82,77 @@ class UPC extends Parser {
 
 		/* make sure upc length is 13 */
 		$upc = "";
-		if (strlen($entered) == 13 && substr($entered, 0, 1) != 0) $upc = "0".substr($entered, 0, 12);
-		else $upc = substr("0000000000000".$entered, -13);
+        if ($CORE_LOCAL->get('EanIncludeCheckDigits') != 1) {
+            /** 
+              If EANs do not include check digits, the value is 13 digits long,
+              and the value does not begin with a zero, it most likely
+              represented a hand-keyed EAN13 value w/ check digit. In this configuration
+              it's probably a miskey so trim the last digit.
+            */
+            if (strlen($entered) == 13 && substr($entered, 0, 1) != 0) {
+                $upc = "0".substr($entered, 0, 12);
+            }
+        }
+        // pad value to 13 digits
+		$upc = substr("0000000000000".$entered, -13);
 
-		/* extract scale-sticker prices */
+		/* extract scale-sticker prices 
+           Mixed check digit settings do not work here. 
+           Scale UPCs and EANs must uniformly start w/
+           002 or 02.
+        */
+        $scalePrefix = '002';
+        $scaleStickerItem = false;
+        $scaleCheckDigits = false;
+        if ($CORE_LOCAL->get('UpcIncludeCheckDigits') == 1) {
+            $scalePrefix = '02';
+            $scaleCheckDigits = true;
+        }
 		$scalepriceUPC = 0;
 		$scalepriceEAN = 0;
-		if (substr($upc, 0, 3) == "002") {
-			$scalepriceUPC = MiscLib::truncate2(substr($upc, -4)/100);
-			$scalepriceEAN = MiscLib::truncate2(substr($upc, -5)/100);
-			$upc = substr($upc, 0, 8)."00000";
+        // prefix indicates it is a scale-sticker
+		if (substr($upc, 0, strlen($scalePrefix)) == $scalePrefix) {
+            $scaleStickerItem = true;
+            // extract price portion of the barcode
+            // position varies depending whether a check
+            // digit is present in the upc
+            if ($scaleCheckDigits) {
+                $scalepriceUPC = MiscLib::truncate2(substr($upc, 8, 4)/100);
+                $scalepriceEAN = MiscLib::truncate2(substr($upc, 7, 5)/100);
+            } else {
+                $scalepriceUPC = MiscLib::truncate2(substr($upc, -4)/100);
+                $scalepriceEAN = MiscLib::truncate2(substr($upc, -5)/100);
+            }
+            $rewrite_class = $CORE_LOCAL->get('VariableWeightReWriter');
+            if ($rewrite_class === '' || !class_exists($rewrite_class)) {
+                $rewrite_class = 'ZeroedPriceReWrite';
+            }
+            $rewriter = new $rewrite_class();
+            $upc = $rewriter->translate($upc, $scaleCheckDigits);
+            // I think this is WFC special casing; needs revising.
 			if ($upc == "0020006000000" || $upc == "0020010000000") $scalepriceUPC *= -1;
 		}
 
 		$db = Database::pDataConnect();
-		$query = "select inUse,upc,description,normal_price,scale,deposit,
+        $table = $db->table_definition('products');
+		$query = "SELECT inUse,upc,description,normal_price,scale,deposit,
 			qttyEnforced,department,local,cost,tax,foodstamp,discount,
 			discounttype,specialpricemethod,special_price,groupprice,
 			pricemethod,quantity,specialgroupprice,specialquantity,
-			mixmatchcode,idEnforced,tareweight,scaleprice
-		       	from products where upc = '".$upc."'";
+			mixmatchcode,idEnforced,tareweight,scaleprice";
+        // New column 16Apr14
+        if (isset($table['line_item_discountable'])) {
+            $query .= ', line_item_discountable';
+        } else {
+            $query .= ', 1 AS line_item_discountable';
+        }
+        // New column 16Apr14
+        if (isset($table['formatted_name'])) {
+            $query .= ', formatted_name';
+        } else {
+            $query .= ', \'\' AS formatted_name';
+        }
+		$query .= " FROM products WHERE upc = '".$upc."'";
 		$result = $db->query($query);
 		$num_rows = $db->num_rows($result);
 
@@ -122,6 +179,16 @@ class UPC extends Parser {
 		   BEGIN error checking round #1
 		*/
 		$row = $db->fetch_array($result);
+
+        /**
+          If formatted_name is present, copy it directly over
+          products.description. This way nothing further down
+          the process has to worry about the distinction between
+          two potential naming fields.
+        */
+        if ($row['formatted_name'] != '') {
+            $row['description'] = $row['formatted_name'];
+        }
 
 		/* Implementation of inUse flag
 		 *   if the flag is not set, display a warning dialog noting this
@@ -165,7 +232,7 @@ class UPC extends Parser {
 		if ($num_rows > 0 && $row['scale'] == 1 
 			&& $CORE_LOCAL->get("lastWeight") > 0 && $CORE_LOCAL->get("weight") > 0
 			&& abs($CORE_LOCAL->get("weight") - $CORE_LOCAL->get("lastWeight")) < 0.0005
-			&& substr($upc,0,3) != "002" && abs($row['normal_price']) > 0.01){
+			&& !$scaleStickerItem && abs($row['normal_price']) > 0.01){
 			if ($CORE_LOCAL->get('msgrepeat') == 0){
 				$CORE_LOCAL->set("strEntered",$row["upc"]);
 				$CORE_LOCAL->set("boxMsg","<b>Same weight as last item</b>
@@ -240,14 +307,16 @@ class UPC extends Parser {
 		}
 
 		$scale = ($row["scale"] == 0) ? 0 : 1;
-		/* get correct scale price */
+		/* use scaleprice bit column to indicate 
+           whether values should be interpretted as 
+           UPC or EAN */ 
 		$scaleprice = ($row['scaleprice'] == 0) ? $scalepriceUPC : $scalepriceEAN;
 
 		/* need a weight with this item
 		   retry the UPC in a few milliseconds and see
 		*/
 		if ($scale != 0 && $CORE_LOCAL->get("weight") == 0 && 
-			$CORE_LOCAL->get("quantity") == 0 && substr($upc,0,3) != "002") {
+			$CORE_LOCAL->get("quantity") == 0 && !$scaleStickerItem) {
 
 			$CORE_LOCAL->set("SNR",$CORE_LOCAL->get('strEntered'));
 			$ret['output'] = DisplayLib::boxMsg(_("please put item on scale"),'',True);
@@ -259,7 +328,7 @@ class UPC extends Parser {
 
 		/* got a scale weight, make sure the tare
 		   is valid */
-		if ($scale != 0 and substr($upc,0,3) != "002"){
+		if ($scale != 0 && !$scaleStickerItem) {
 			$quantity = $CORE_LOCAL->get("weight") - $CORE_LOCAL->get("tare");
 			if ($CORE_LOCAL->get("quantity") != 0) 
 				$quantity = $CORE_LOCAL->get("quantity") - $CORE_LOCAL->get("tare");
@@ -325,7 +394,7 @@ class UPC extends Parser {
 		// wfc uses deposit field to link another upc
 		if (isset($row["deposit"]) && $row["deposit"] > 0){
 			$dupc = (int)$row["deposit"];
-			$this->add_deposit($dupc);
+			$this->addDeposit($dupc);
 		}
 
 		$upc = $row["upc"];
@@ -382,7 +451,7 @@ class UPC extends Parser {
            quantity and items that do not have a normal_price
            assigned cannot calculate a proper quantity.
 		*/
-		if (substr($upc,0,3) == "002") {
+		if ($scaleStickerItem) {
 			if ($DiscountObject->isSale() && $scale == 1 && $row['normal_price'] != 0) {
 				$quantity = MiscLib::truncate2($scaleprice / $row["normal_price"]);
             } else if ($scale == 1 && $row['normal_price'] != 0) {
@@ -455,7 +524,8 @@ class UPC extends Parser {
 		return $ret;
 	}
 
-	function add_deposit($upc){
+	private function addDeposit($upc)
+    {
 		global $CORE_LOCAL;
 
 		$upc = str_pad($upc,13,'0',STR_PAD_LEFT);
@@ -478,23 +548,23 @@ class UPC extends Parser {
 		if ($row["scale"] != 0) $scale = 1;
 
 		$tax = 0;
-		if ($row["tax"] > 0 && $CORE_LOCAL->get("toggletax") == 0) $tax = $row["tax"];
-		elseif ($row["tax"] > 0 && $CORE_LOCAL->get("toggletax") == 1) {
+		if ($row["tax"] > 0 && $CORE_LOCAL->get("toggletax") == 0) {
+            $tax = $row["tax"];
+		} else if ($row["tax"] > 0 && $CORE_LOCAL->get("toggletax") == 1) {
 			$tax = 0;
 			$CORE_LOCAL->set("toggletax",0);
-		}
-		elseif ($row["tax"] == 0 && $CORE_LOCAL->get("toggletax") == 1) {
+		} else if ($row["tax"] == 0 && $CORE_LOCAL->get("toggletax") == 1) {
 			$tax = 1;
 			$CORE_LOCAL->set("toggletax",0);
 		}
 						
 		$foodstamp = 0;
-		if ($row["foodstamp"] != 0 && $CORE_LOCAL->get("togglefoodstamp") == 0) $foodstamp = 1;
-		elseif ($row["foodstamp"] != 0 && $CORE_LOCAL->get("togglefoodstamp") == 1) {
+		if ($row["foodstamp"] != 0 && $CORE_LOCAL->get("togglefoodstamp") == 0) {
+            $foodstamp = 1;
+		} else if ($row["foodstamp"] != 0 && $CORE_LOCAL->get("togglefoodstamp") == 1) {
 			$foodstamp = 0;
 			$CORE_LOCAL->set("togglefoodstamp",0);
-		}
-		elseif ($row["foodstamp"] == 0 && $CORE_LOCAL->get("togglefoodstamp") == 1) {
+		} else if ($row["foodstamp"] == 0 && $CORE_LOCAL->get("togglefoodstamp") == 1) {
 			$foodstamp = 1;
 			$CORE_LOCAL->set("togglefoodstamp",0);
 		}
@@ -503,15 +573,28 @@ class UPC extends Parser {
 		$discountable = $row["discount"];
 
 		$quantity = 1;
-		if ($CORE_LOCAL->get("quantity") != 0) $quantity = $CORE_LOCAL->get("quantity");
+		if ($CORE_LOCAL->get("quantity") != 0) {
+            $quantity = $CORE_LOCAL->get("quantity");
+        }
 
 		$save_refund = $CORE_LOCAL->get("refund");
 
-		TransRecord::addItem($upc,$description,"I"," "," ",$row["department"],
-			$quantity,$row["normal_price"],
-			$quantity*$row["normal_price"],$row["normal_price"],
-			$scale,$tax,$foodstamp,0,0,$discountable,$discounttype,
-			$quantity,0,0,0,0,0,0);
+        TransRecord::addRecord(array(
+            'upc' => $upc,
+            'description' => $description,
+            'trans_type' => 'I',
+            'department' => $row['department'],
+            'quantity' => $quantity,
+            'ItemQtty' => $quantity,
+            'unitPrice' => $row['normal_price'],
+            'total' => $quantity * $row['normal_price'],
+            'regPrice' => $row['normal_price'],
+            'scale' => $scale,
+            'tax' => $tax,
+            'foodstamp' => $foodstamp,
+            'discountable' => $discountable,
+            'discounttype' => $discounttype,
+        ));
 
 		$CORE_LOCAL->set("refund",$save_refund);
 	}

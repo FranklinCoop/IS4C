@@ -270,10 +270,12 @@ foreach($dates as $date) {
     }
 } // for loop on dates in dtransactions
 
-/* drop dtransactions data */
+/* drop dtransactions data 
+   DO NOT TRUNCATE; that resets AUTO_INCREMENT column
+*/
 $sql = new SQLManager($FANNIE_SERVER,$FANNIE_SERVER_DBMS,$FANNIE_TRANS_DB,
 		$FANNIE_SERVER_USER,$FANNIE_SERVER_PW);
-$chk = $sql->query("TRUNCATE TABLE dtransactions");
+$chk = $sql->query("DELETE FROM dtransactions");
 if ($chk === false)
 	echo cron_msg("Error truncating dtransactions");
 else
@@ -385,6 +387,8 @@ function createViews($dstr,$db){
 
 	$dbms = $FANNIE_ARCHIVE_REMOTE?$FANNIE_ARCHIVE_DBMS:$FANNIE_SERVER_DBMS;
 
+    $table_def = $db->table_definition('transArchive' . $dstr);
+
 	$dlogQ = "CREATE  view dlog$dstr as
 		select 
 		d.datetime as tdate, 
@@ -392,6 +396,7 @@ function createViews($dstr,$db){
 		d.emp_no, 
 		d.trans_no, 
 		d.upc, 
+        d.description,
 		CASE WHEN (d.trans_subtype IN ('CP','IC') OR d.upc like('%000000052')) then 'T' 
 			WHEN d.upc = 'DISCOUNT' then 'S' else d.trans_type end as trans_type, 
 		CASE WHEN d.upc = 'MAD Coupon' THEN 'MA' ELSe 
@@ -399,18 +404,38 @@ function createViews($dstr,$db){
 		d.trans_status, 
 		d.department, 
 		d.quantity, 
+        d.scale,
+        d.cost,
 		d.unitPrice, 
 		d.total, 
+        d.regPrice,
 		d.tax, 
 		d.foodstamp, 
+        d.discount,
+        d.memDiscount,
+        d.discountable,
+        d.discounttype,
+        d.voided,
+        d.percentDiscount,
 		d.itemQtty, 
 		d.memType,
+        d.volDiscType,
+        d.volume,
+        d.VolSpecial,
+        d.mixMatch,
+        d.matched,
 		d.staff,
 		d.numflag,
 		d.charflag,
 		d.card_no, 
-		d.trans_id,
-		concat(convert(d.emp_no,char), '-', convert(d.register_no,char), '-',
+		d.trans_id, ";
+    if (isset($table_def['pos_row_id'])) {
+        $dlogQ .= "d.pos_row_id,";
+    }
+    if (isset($table_def['store_row_id'])) {
+        $dlogQ .= "d.store_row_id,";
+    }
+    $dlogQ .= "concat(convert(d.emp_no,char), '-', convert(d.register_no,char), '-',
 		convert(d.trans_no,char)) as trans_num
 
 		from transArchive$dstr as d
@@ -424,6 +449,7 @@ function createViews($dstr,$db){
 			d.emp_no, 
 			d.trans_no, 
 			d.upc, 
+            d.description,
 			CASE WHEN (d.trans_subtype IN ('CP','IC') OR d.upc like('%000000052')) then 'T' 
 				WHEN d.upc = 'DISCOUNT' then 'S' else d.trans_type end as trans_type, 
 			CASE WHEN d.upc = 'MAD Coupon' THEN 'MA' ELSe 
@@ -431,18 +457,38 @@ function createViews($dstr,$db){
 			d.trans_status, 
 			d.department, 
 			d.quantity, 
+            c.scale,
+            d.cost,
 			d.unitPrice, 
 			d.total, 
+            d.regPrice,
 			d.tax, 
 			d.foodstamp, 
+            d.discount,
+            d.memDiscount,
+            d.discountable,
+            d.discounttype,
+            d.voided,
+            d.percentDiscount,
 			d.itemQtty, 
+            d.volDiscType,
+            d.volume,
+            d.VolSpecial,
+            d.mixMatch,
+            d.matched,
 			d.memType,
 			d.isStaff,
 			d.numflag,
 			d.charflag,
 			d.card_no, 
-			d.trans_id,
-			(convert(varchar,d.emp_no) +  '-' + convert(varchar,d.register_no) + '-' + 
+			d.trans_id,";
+            if (isset($table_def['pos_row_id'])) {
+                $dlogQ .= "d.pos_row_id,";
+            }
+            if (isset($table_def['store_row_id'])) {
+                $dlogQ .= "d.store_row_id,";
+            }
+			$dlogQ .= "(convert(varchar,d.emp_no) +  '-' + convert(varchar,d.register_no) + '-' + 
 			convert(varchar,d.trans_no)) as trans_num
 
 			from transArchive$dstr as d
@@ -451,162 +497,6 @@ function createViews($dstr,$db){
 	$chk = $db->query($dlogQ,$FANNIE_ARCHIVE_DB);
 	if ($chk === false)
 		echo cron_msg("Error creating dlog view for new archive table");
-
-	$rp1Q = "CREATE  view rp_dt_receipt_$dstr as 
-		select 
-		datetime,
-		register_no,
-		emp_no,
-		trans_no,
-		description,
-		case 
-			when voided = 5 
-				then 'Discount'
-			when trans_status = 'M'
-				then 'Mbr special'
-			when scale <> 0 and quantity <> 0 
-				then concat(convert(quantity,char), ' @ ', convert(unitPrice,char))
-			when abs(itemQtty) > 1 and abs(itemQtty) > abs(quantity) and discounttype <> 3 and quantity = 1
-				then concat(convert(volume,char), ' /', convert(unitPrice,char))
-			when abs(itemQtty) > 1 and abs(itemQtty) > abs(quantity) and discounttype <> 3 and quantity <> 1
-				then concat(convert(Quantity,char), ' @ ', convert(Volume,char), ' /', convert(unitPrice,char))
-			when abs(itemQtty) > 1 and discounttype = 3
-				then concat(convert(ItemQtty,char), ' /', convert(UnitPrice,char))
-			when abs(itemQtty) > 1
-				then concat(convert(quantity,char), ' @ ', convert(unitPrice,char))	
-			when matched > 0
-				then '1 w/ vol adj'
-			else ''
-				
-		end
-		as comment,
-			total,
-
-		case 
-			when trans_status = 'V' 
-				then 'VD'
-			when trans_status = 'R'
-				then 'RF'
-			when tax <> 0 and foodstamp <> 0
-				then 'TF'
-			when tax <> 0 and foodstamp = 0
-				then 'T' 
-			when tax = 0 and foodstamp <> 0
-				then 'F'
-			when tax = 0 and foodstamp = 0
-				then '' 
-		end
-		as Status,
-		trans_type,
-		card_no as memberID,
-		unitPrice,
-		voided,
-		trans_id,
-		concat(convert(emp_no,char), '-', convert(register_no,char), '-', convert(trans_no,char)) as trans_num
-
-		from transArchive$dstr
-		where voided <> 5 and UPC <> 'TAX' and UPC <> 'DISCOUNT'";
-	if ($dbms == 'MSSQL'){
-		$rp1Q = "CREATE  view rp_dt_receipt_$dstr as 
-			select 
-			datetime,
-			register_no,
-			emp_no,
-			trans_no,
-			description,
-			case 
-				when voided = 5 
-					then 'Discount'
-				when trans_status = 'M'
-					then 'Mbr special'
-				when scale <> 0 and quantity <> 0 
-					then convert(varchar, quantity) + ' @ ' + convert(varchar, unitPrice)
-				when abs(itemQtty) > 1 and abs(itemQtty) > abs(quantity) and discounttype <> 3 and quantity = 1
-					then convert(varchar, volume) + ' /' + convert(varchar, unitPrice)
-				when abs(itemQtty) > 1 and abs(itemQtty) > abs(quantity) and discounttype <> 3 and quantity <> 1
-					then convert(varchar, Quantity) + ' @ ' + convert(varchar, Volume) + ' /' + convert(varchar, unitPrice)
-				when abs(itemQtty) > 1 and discounttype = 3
-					then convert(varchar,ItemQtty) + ' /' + convert(varchar, UnitPrice)
-				when abs(itemQtty) > 1
-					then convert(varchar, quantity) + ' @ ' + convert(varchar, unitPrice)	
-				when matched > 0
-					then '1 w/ vol adj'
-				else ''
-					
-			end
-			as comment,
-				total,
-
-			case 
-				when trans_status = 'V' 
-					then 'VD'
-				when trans_status = 'R'
-					then 'RF'
-				when tax <> 0 and foodstamp <> 0
-					then 'TF'
-				when tax <> 0 and foodstamp = 0
-					then 'T' 
-				when tax = 0 and foodstamp <> 0
-					then 'F'
-				when tax = 0 and foodstamp = 0
-					then '' 
-			end
-			as Status,
-			trans_type,
-			card_no as memberID,
-			unitPrice,
-			voided,
-			trans_id,
-			(convert(varchar,emp_no) +  '-' + convert(varchar,register_no) + '-' + convert(varchar,trans_no)) as trans_num
-
-			from transArchive$dstr
-			where voided <> 5 and UPC <> 'TAX' and UPC <> 'DISCOUNT'";
-	}
-	$chk = $db->query($rp1Q,$FANNIE_ARCHIVE_DB);
-	if ($chk === false)
-		echo cron_msg("Error creating receipt view for new archive table");
-
-	$rp2Q = "create  view rp_receipt_header_$dstr as
-		select
-		datetime as dateTimeStamp,
-		card_no as memberID,
-		concat(convert(emp_no,char), '-', convert(register_no,char), '-', convert(trans_no,char)) as trans_num,
-		register_no,
-		emp_no,
-		trans_no,
-		convert(sum(case when discounttype = 1 then discount else 0 end),decimal(10,2)) as discountTTL,
-		convert(sum(case when discounttype = 2 then memDiscount else 0 end),decimal(10,2)) as memSpecial,
-		convert(sum(case when upc = '0000000008005' then total else 0 end),decimal(10,2)) as couponTotal,
-		convert(sum(case when upc = 'MEMCOUPON' then unitPrice else 0 end),decimal(10,2)) as memCoupon,
-		abs(sum(case when trans_subtype = 'MI' or trans_subtype = 'CX' then total else 0 end)) as chargeTotal,
-		sum(case when upc = 'Discount' then total else 0 end) as transDiscount,
-		sum(case when trans_type = 'T' then -1 * total else 0 end) as tenderTotal
-
-		from transArchive$dstr
-		group by register_no, emp_no, trans_no, card_no, datetime";
-	if ($dbms == 'MSSQL'){
-		$rp2Q = "create  view rp_receipt_header_$dstr as
-			select
-			datetime as dateTimeStamp,
-			card_no as memberID,
-			(convert(varchar,emp_no) +  '-' + convert(varchar,register_no) + '-' + convert(varchar,trans_no)) as trans_num,
-			register_no,
-			emp_no,
-			trans_no,
-			convert(numeric(10,2), sum(case when discounttype = 1 then discount else 0 end)) as discountTTL,
-			convert(numeric(10,2), sum(case when discounttype = 2 then memDiscount else 0 end)) as memSpecial,
-			convert(numeric(10,2), sum(case when upc = '0000000008005' then total else 0 end)) as couponTotal,
-			convert(numeric(10,2), sum(case when upc = 'MEMCOUPON' then unitPrice else 0 end)) as memCoupon,
-			abs(sum(case when trans_subtype = 'MI' or trans_subtype = 'CX' then total else 0 end)) as chargeTotal,
-			sum(case when upc = 'Discount' then total else 0 end) as transDiscount,
-			sum(case when trans_type = 'T' then -1 * total else 0 end) as tenderTotal
-
-			from transArchive$dstr
-			group by register_no, emp_no, trans_no, card_no, datetime";
-	}
-	$chk = $db->query($rp2Q,$FANNIE_ARCHIVE_DB);
-	if ($chk === false)
-		echo cron_msg("Error creating receipt header view for new archive table");
 }
 
 ?>

@@ -60,7 +60,7 @@ static public function checkPassword($password,$activity=1)
 	$row_g = $db_g->fetch_array($result_g);
 	$password = $db_g->escape($password);
 
-	if ($row_g["LoggedIn"] == 0) {
+	if ($row_g["LoggedIn"] == 0 || Plugin::isEnabled('SingleTransactionSignOn')) {
 		$query_q = "select emp_no, FirstName, LastName, "
 			.$db_g->yeardiff($db_g->now(),'birthdate')." as age "
 			."from employees where EmpActive = 1 "
@@ -84,14 +84,13 @@ static public function checkPassword($password,$activity=1)
 
 			CoreState::cashierLogin($transno, $row_q['age']);
 
-            /**
-            alog and its variants are never used.
-            @deprecated
-			if ($transno == 1) {
-                TransRecord::addactivity($activity);
-            }
-            */
-			
+			if ($CORE_LOCAL->get("LastID") != 0 && Plugin::isEnabled('SingleTransactionSignOn')){
+				$quire = "UPDATE translog.localtemptrans SET emp_no = ?, trans_no = ?";
+				$args = array($row_q["emp_no"], $transno);
+				$prep = $db_g->prepare_statement($quire);
+				$result = $db_g->exec_statement($prep,$args);
+			}
+
 		} elseif ($password == 9999) {
 			Database::loadglobalvalues();
 

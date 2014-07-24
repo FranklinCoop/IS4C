@@ -70,7 +70,12 @@ class CreditCardTender extends TenderModule
 
     public function allowDefault()
     {
-        return true;
+        global $CORE_LOCAL;
+        if ($this->tender_code == 'CC' && $CORE_LOCAL->get('store') == 'wfc') {
+            return True;
+        } else {
+            return False;
+        }
     }
     
 }

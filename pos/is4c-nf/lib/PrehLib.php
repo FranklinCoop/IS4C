@@ -534,6 +534,7 @@ static public function tender($right, $strl)
 		$CORE_LOCAL->set("End",1);
 		$ret['receipt'] = 'full';
 		$ret['output'] = DisplayLib::printReceiptFooter();
+        TransRecord::finalizeTransaction();
 	} else {
 		$CORE_LOCAL->set("change",0);
 		$CORE_LOCAL->set("fntlflag",0);
@@ -703,12 +704,6 @@ static public function deptkey($price, $dept,$ret=array())
 		if ($CORE_LOCAL->get("togglefoodstamp") == 1) {
 			$foodstamp = ($foodstamp + 1) % 2;
 			$CORE_LOCAL->set("togglefoodstamp",0);
-		}
-
-		if ($CORE_LOCAL->get("ddNotify") != 0 &&  $CORE_LOCAL->get("itemPD") == 10) {  
-			$CORE_LOCAL->set("itemPD",0);
-			$deptDiscount = 7;
-			$intvoided = 22;
 		}
 
 		if ($price > $deptmax && $CORE_LOCAL->get("msgrepeat") == 0) {

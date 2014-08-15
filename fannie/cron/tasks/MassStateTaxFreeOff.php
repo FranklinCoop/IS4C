@@ -28,11 +28,10 @@
 */
 class MassStateTaxFreeOff extends FannieTask 
 {
-    public $name = 'Mass State Tax Free On';
+    public $name = 'Mass State Tax Free Off';
 
-    public $description = 'Used for tax free holidays. Switches the sales tax rate to 0 on each lane. 
-		Server side tax table remains the same. So that it can be used to reset the tax when the holiday is over.
-		Make sure to set MassStateTaxFreeOff to run to reenable taxes.';    
+    public $description = 'Used for tax free holidays. Switches the sales tax rate to 0.0625 on each lane. 
+Server side tax table remains the same.';    
 
     public $default_schedule = array(
         'min' => 0,

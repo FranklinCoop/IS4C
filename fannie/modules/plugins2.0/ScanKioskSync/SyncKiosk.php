@@ -22,9 +22,8 @@
 	parts of this file was adapted from http://sourceforge.net/projects/mysql2sqlite/
 
 *********************************************************************************/
-global $FANNIE_ROOT;
-if (!class_exists('FannieAPI'))
-  include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+include(dirname(__FILE__).'/../../../config.php');
+include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 
 class SyncKiosk extends FanniePage {
 
@@ -38,7 +37,7 @@ class SyncKiosk extends FanniePage {
 	
 	public function syncKiosk() {
 		global $FANNIE_ROOT;
-		$pdoLi = new PDO('sqlite:'.$FANNIE_ROOT.'modules/plugins2.0/S/db/items.db');
+		$pdoLi = new PDO('sqlite:'.$FANNIE_ROOT.'modules/plugins2.0/S/db/items.db') or die("can't connect to $liDb");
 		$this->makeSQLiteTable($pdoLi);
 		$retString = $this->insertTableData($pdoLi);
 

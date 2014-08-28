@@ -25,7 +25,7 @@
 include(dirname(__FILE__).'/../../../config.php');
 include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 
-class SyncScanner extends FanniePage {
+class SyncKiosk extends FanniePage {
 
 	protected $header = 'Oncue Scanner Sync';
 	protected $title = 'Oncue Scanner Sync';

@@ -22,8 +22,9 @@
 	parts of this file was adapted from http://sourceforge.net/projects/mysql2sqlite/
 
 *********************************************************************************/
-include(dirname(__FILE__).'/../../../config.php');
-include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+global $FANNIE_ROOT;
+if (!class_exists('FannieAPI'))
+  include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 
 class SyncKiosk extends FanniePage {
 

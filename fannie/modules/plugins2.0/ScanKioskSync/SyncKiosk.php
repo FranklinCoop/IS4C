@@ -37,7 +37,7 @@ class SyncKiosk extends FanniePage {
 	
 	public function syncKiosk() {
 		global $FANNIE_ROOT;
-		$pdoLi = new PDO('sqlite:'.$FANNIE_ROOT.'modules/plugins2.0/S/db/items.db') or die("can't connect to $liDb");
+		$pdoLi = new PDO('sqlite:'.$FANNIE_ROOT.'modules/plugins2.0/db/items.db') or die("can't connect to $liDb");
 		$this->makeSQLiteTable($pdoLi);
 		$retString = $this->insertTableData($pdoLi);
 

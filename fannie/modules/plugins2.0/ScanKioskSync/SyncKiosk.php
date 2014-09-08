@@ -37,7 +37,7 @@ class SyncKiosk extends FanniePage {
 	
 	public function syncKiosk() {
 		global $FANNIE_ROOT;
-		$pdoLi = new PDO('sqlite:'.$FANNIE_ROOT.'modules/plugins2.0/ScanKiosk/db/items.db') or die("can't connect to $liDb");
+		$pdoLi = new PDO('sqlite:'.$FANNIE_ROOT.'modules/plugins2.0/ScanKioskSync/db/items.db') or die("can't connect to $liDb");
 		$this->makeSQLiteTable($pdoLi);
 		$retString = $this->insertTableData($pdoLi);
 
@@ -50,7 +50,7 @@ class SyncKiosk extends FanniePage {
 				$login = ftp_login($connection, "admin", "mbtech");
 				if ($login) {
 					$retString .= "Logged in to: ".$scanner."\n";
-					if (ftp_put($connection, "/PermStorage/FranklinCommunity/includes/items.db", $FANNIE_ROOT.'modules/plugins2.0/PriceCheckKiosk/db/items.db',  FTP_BINARY)){
+					if (ftp_put($connection, "/PermStorage/FranklinCommunity/includes/items.db", $FANNIE_ROOT.'modules/plugins2.0/ScanKioskSync/db/items.db',  FTP_BINARY)){
 						$retString .= "Price scanner at ". $scanner." synced.\n";
 					} else {
 						$retString .= "FTP upload to ".$scanner."failed!\n";

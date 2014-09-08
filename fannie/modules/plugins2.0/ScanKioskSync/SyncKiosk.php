@@ -46,21 +46,22 @@ class SyncKiosk extends FanniePage {
 		foreach ($scanners as $scanner) {
 			$connection = ftp_connect($scanner);
 			if ($connection) {
-				$retString .= "Connected to: ".$scanner."\n";
+				$retString .= "Connected to: ".$scanner."<br>";
 				$login = ftp_login($connection, "admin", "mbtech");
 				if ($login) {
-					$retString .= "Logged in to: ".$scanner."\n";
-					if (ftp_put($connection, "/PermStorage/FranklinCommunity/includes/items.db", $FANNIE_ROOT.'modules/plugins2.0/ScanKioskSync/db/items.db',  FTP_BINARY)){
-						$retString .= "Price scanner at ". $scanner." synced.\n";
+					$retString .= "Logged in to: ".$scanner."<br>";
+					ftp_chdir($connection, '/PermStorage/FranklinCommunity/includes/');
+					if (ftp_put($connection, "items.db", $FANNIE_ROOT.'modules/plugins2.0/ScanKioskSync/db/items.db', FTP_BINARY)){
+						$retString .= "Price scanner at ". $scanner." synced.<br>";
 					} else {
-						$retString .= "FTP upload to ".$scanner."failed!\n";
+						$retString .= "FTP upload to ".$scanner."failed!<br>";
 		 			}
 				ftp_close($connection);
 				} else {
-					$retString .= "Connection attempt to ".$scanner." failed!\n";
+					$retString .= "Connection attempt to ".$scanner." failed!<br>";
 				}
 			} else {
-				$retString .= "Login attempt to ".$scanner." failed!\n"; 
+				$retString .= "Login attempt to ".$scanner." failed!<br>"; 
 			}
 		}
 		

@@ -38,8 +38,8 @@ class SyncKiosk extends FanniePage {
 	public function syncKiosk() {
 		global $FANNIE_ROOT;
 		$pdoLi = new PDO('sqlite:'.$FANNIE_ROOT.'modules/plugins2.0/ScanKioskSync/db/items.db') or die("can't connect to $liDb");
-		$this->makeSQLiteTable($pdoLi);
-		$retString = $this->insertTableData($pdoLi);
+		$retString = $this->makeSQLiteTable($pdoLi);
+		$retString .= $this->insertTableData($pdoLi);
 
 		//$retString ='';
 		$scanners =array('192.168.2.224');
@@ -50,8 +50,8 @@ class SyncKiosk extends FanniePage {
 				$login = ftp_login($connection, "admin", "mbtech");
 				if ($login) {
 					$retString .= "Logged in to: ".$scanner."<br>";
-					ftp_chdir($connection, '/PermStorage/FranklinCommunity/includes/');
-					if (ftp_put($connection, "items.db", $FANNIE_ROOT.'modules/plugins2.0/ScanKioskSync/db/items.db', FTP_BINARY)){
+					//ftp_chdir($connection, '/PermStorage/FranklinCommunity/includes/');
+					if (ftp_put($connection, '/PermStorage/FranklinCommunity/includes/items.db', $FANNIE_ROOT.'modules/plugins2.0/ScanKioskSync/db/items.db', FTP_BINARY)){
 						$retString .= "Price scanner at ". $scanner." synced.<br>";
 					} else {
 						$retString .= "FTP upload to ".$scanner."failed!<br>";
@@ -72,23 +72,27 @@ class SyncKiosk extends FanniePage {
 		global $FANNIE_OP_DB;
         $dbc = FannieDB::get($FANNIE_OP_DB);
         $table_data = $this->getTableData();
-		
+		$insertQuery = array();
 		$retString = '';
 		if ($table_data) {
         	while($row = $dbc->fetch_row($table_data)) {
-        		$insertQuery = "INSERT INTO items (upc,desc,price,memprice,brand,discounttype)
-        		VALUES ('".$row[1]."','".$row[2]."','".$row[3]."','".$row[4]."','".$row[5]."',".$row[6].");";
-				//$retString .= $insertQuery."\n";
-        		$this->query($insertQuery,$pdoLi);
+        		$insertQuery[] = "INSERT INTO items (id, upc,desc,price,memprice,brand,discounttype)
+        		VALUES (null,'".$row[1]."','".$row[2]."','".$row[3]."','".$row[4]."','".$row[5]."',".$row[6].");";
+				//$retString .= $insertQuery."<br>";
         	}
+			$this->query($insertQuery,$pdoLi);
 		}
 		return $retString;
 	}
 
 	function makeSQLiteTable($pdoLi) {
-		$createQuery = "DROP TABLE items;";
-		$createQuery .= "CREATE TABLE items (id INTEGER PRIMARY KEY, upc TEXT, desc TEXT, price TEXT, memprice TEXT, brand TEXT, discounttype INTEGER);";
-		$this->query($createQuery, $pdoLi);
+		$createQuery = array();
+		$createQuery[] = "DROP TABLE items;";
+		//$retString = $this->query($createQuery, $pdoLi);
+		
+		$createQuery[] = "CREATE TABLE items (id INTEGER PRIMARY KEY, upc TEXT, desc TEXT, price TEXT, memprice TEXT, brand TEXT, discounttype INTEGER);";
+		$retString .= $this->query($createQuery, $pdoLi);
+		return $retString;
 	}
 
 	function getTableData() {

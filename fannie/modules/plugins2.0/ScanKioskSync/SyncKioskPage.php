@@ -25,12 +25,17 @@
 include(dirname(__FILE__).'/../../../config.php');
 include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 
-class SyncKiosk {
-	
-	public function syncKiosk() {
-		$retString = 'Default Sync Module used. Plese overide this function or select another module.';
-		
-		return $retString;
-	}
+class SyncKioskPage extends FanniePage {
 
+	protected $header = 'Scanner Kiosk Sync';
+	protected $title = 'Scanner Kiosk Sync';
+
+    public function body_content()
+    {
+    	global $FANNIE_PLUGIN_SETTINGS;
+		$syncAgent = new $FANNIE_PLUGIN_SETTINGS['KioskModule'];
+		return $syncAgent->syncKiosk();
+    }
 }
+
+FannieDispatch::conditionalExec(false);

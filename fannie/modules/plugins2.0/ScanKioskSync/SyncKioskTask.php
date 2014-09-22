@@ -3,7 +3,7 @@
 
     Copyright 2014 Franklin Community Co-op
 
-    This file is part of IT CORE.
+    This file is part of Fannie.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -19,18 +19,36 @@
     in the file license.txt along with IT CORE; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-	parts of this file was adapted from http://sourceforge.net/projects/mysql2sqlite/
-
 *********************************************************************************/
-include(dirname(__FILE__).'/../../../config.php');
-include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 
-class SyncKiosk {
-	
-	public function syncKiosk() {
-		$retString = 'Default Sync Module used. Plese overide this function or select another module.';
-		
-		return $retString;
-	}
+/**
+  @class FannieTask
 
+  Base class for scheduled tasks
+*/
+class SyncKioskTask extends FannieTask 
+{
+    public $name = 'Sync Kiosk Task';
+
+    public $description = 'Nightly Sync task for the ScanKioskSync plugin.';    
+
+    public $default_schedule = array(
+        'min' => 0,
+        'hour' => 0,
+        'day' => 1,
+        'month' => 1,
+        'weekday' => '*',
+    );
+
+    /**
+      Implement task functionality here
+    */
+    public function run()
+    {
+		global $FANNIE_PLUGIN_SETTINGS;
+		$syncAgent = new $FANNIE_PLUGIN_SETTINGS['KioskModule'];
+		$syncAgent->syncKiosk();
+    }
 }
+
+

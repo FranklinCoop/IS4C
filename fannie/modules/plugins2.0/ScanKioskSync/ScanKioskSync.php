@@ -32,7 +32,28 @@ class ScanKioskSync extends FanniePlugin
       on the 'Plugins' area of the install page and
       written to ini.php
     */
-    public $plugin_settings = array();
+    public $plugin_settings = array(
+	    'KioskIPs' => array(
+			'label'=>'Kiosk IP Addresses',
+			'default'=>'192.168.2.224',
+			'description'=>'A comma seprated list of your kiosk ip addresses. No spaces.'
+	    ),
+	    'KioskUserName' => array(
+			'label'=>'Kiosk User Name',
+			'default'=>'admin',
+			'description'=>'Username for your kiosks.'
+	    ),
+	    'KioskPassword' => array(
+			'label'=>'Kiosk Password',
+			'default'=>'mbtech',
+			'description'=>'Password for logging in to your kiosks.'
+	    ),
+	    'KioskModule' => array(
+			'label'=>'Kiosk Module',
+			'default'=>'SyncKiosk',
+			'description'=>'File Name of sync module to use.'
+	    )
+    );
     //'example1' => array('default'=>'','label'=>'Setting #1',
       //      'description'=>'Text goes here'),
     //'example2' => array('default'=>1,

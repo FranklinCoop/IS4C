@@ -86,10 +86,10 @@ class OncueKioskSync extends SyncKiosk {
 
 	function makeSQLiteTable($pdoLi) {
 		$createQuery = array();
-		$createQuery[] = "DROP TABLE items;";
-		$retString = $this->query($createQuery, $pdoLi);
+		$createQuery[0] = "DROP TABLE items;";
+		//$retString .= $this->query($createQuery, $pdoLi);
 		
-		$createQuery[] = "CREATE TABLE items (id INTEGER PRIMARY KEY, upc TEXT, desc TEXT, price TEXT, memprice TEXT, brand TEXT, discounttype INTEGER);";
+		$createQuery[1] = "CREATE TABLE items (id INTEGER PRIMARY KEY, upc TEXT, desc TEXT, price TEXT, memprice TEXT, brand TEXT, discounttype INTEGER);";
 		$retString .= $this->query($createQuery, $pdoLi);
 		return $retString;
 	}

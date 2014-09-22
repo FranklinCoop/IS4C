@@ -31,14 +31,15 @@ class OncueKioskSync extends SyncKiosk {
 		global $FANNIE_ROOT, $FANNIE_PLUGIN_SETTINGS;
 		$pdoLi = new PDO('sqlite:'.$FANNIE_ROOT.'modules/plugins2.0/ScanKioskSync/db/items.db')
 				or die("can't connect to $liDb");
-		$retString = $this->makeSQLiteTable($pdoLi);
+		$retString = "Useing Oncue Sync Module<br>";
+		$retString .= $this->makeSQLiteTable($pdoLi);
 		$retString .= $this->insertTableData($pdoLi);
-		$retString .= 'Settings String: '.$FANNIE_PLUGIN_SETTINGS['KioskIPs'];
+		//$retString .= 'Settings String: '.$FANNIE_PLUGIN_SETTINGS['KioskIPs'];
 		$scanners = array($FANNIE_PLUGIN_SETTINGS['KioskIPs']);
-		$user = $$FANNIE_PLUGIN_SETTINGS['KioskUserName'];
+		$user = $FANNIE_PLUGIN_SETTINGS['KioskUserName'];
 		$password = $FANNIE_PLUGIN_SETTINGS['KioskPassword'];
 		foreach ($scanners as $scanner) {
-			$retString .= $scanner;
+			$retString .= $scanner.'<br>';
 			$connection = ftp_connect($scanner);
 			if ($connection) {
 				$retString .= "Connected to: ".$scanner."<br>";
@@ -56,10 +57,10 @@ class OncueKioskSync extends SyncKiosk {
 		 			}
 				ftp_close($connection);
 				} else {
-					$retString .= "Connection attempt to ".$scanner." failed!<br>";
+					$retString .= "Login attempt to ".$scanner." failed!<br>";
 				}
 			} else {
-				$retString .= "Login attempt to ".$scanner." failed!<br>"; 
+				$retString .= "Connection attempt to ".$scanner." failed!<br>"; 
 			}
 		}
 		

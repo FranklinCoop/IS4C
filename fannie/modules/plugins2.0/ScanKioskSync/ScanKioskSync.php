@@ -35,7 +35,7 @@ class ScanKioskSync extends FanniePlugin
     public $plugin_settings = array(
 	    'KioskIPs' => array(
 			'label'=>'Kiosk IP Addresses',
-			'default'=>'192.168.2.224',
+			'default'=>'',
 			'description'=>'A comma seprated list of your kiosk ip addresses. No spaces.'
 	    ),
 	    'KioskUserName' => array(

@@ -35,7 +35,7 @@ class OncueKioskSync extends SyncKiosk {
 		$retString .= $this->makeSQLiteTable($pdoLi);
 		$retString .= $this->insertTableData($pdoLi);
 		//$retString .= 'Settings String: '.$FANNIE_PLUGIN_SETTINGS['KioskIPs'];
-		$scanners = array($FANNIE_PLUGIN_SETTINGS['KioskIPs']);
+		$scanners = explode(",",$FANNIE_PLUGIN_SETTINGS['KioskIPs']);
 		$user = $FANNIE_PLUGIN_SETTINGS['KioskUserName'];
 		$password = $FANNIE_PLUGIN_SETTINGS['KioskPassword'];
 		foreach ($scanners as $scanner) {

@@ -49,6 +49,12 @@ class SyncKioskTask extends FannieTask
 		$syncAgent = new $FANNIE_PLUGIN_SETTINGS['KioskModule'];
 		$syncAgent->syncKiosk();
     }
+	
+    public function cronMsg($str)
+    {
+        $info = new ReflectionClass($this);
+        return date('r').': '.$info->getName().': '.$str."\n";
+    }
 }
 
 

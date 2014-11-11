@@ -21,12 +21,12 @@
 
 *********************************************************************************/
 
-class RunOldPriceChangeTask extends FannieTask
+class PriceChangeBatchTask extends FannieTask
 {
 
-    public $name = 'Run Old Price Change Once Task';
+    public $name = 'Price Change Batch Task';
 
-    public $description = 'A run once taks to run all of the price change batches that havent been run.';
+    public $description = 'Runs price change batches on the day they are set to run on.';
 
     public $default_schedule = array(
         'min' => 10,

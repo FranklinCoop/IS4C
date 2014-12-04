@@ -29,6 +29,8 @@ class OncueKioskSync extends SyncKiosk {
 	
 	public function syncKiosk() {
 		global $FANNIE_ROOT, $FANNIE_PLUGIN_SETTINGS;
+		
+		$sucess = 1;
 		$pdoLi = new PDO('sqlite:'.$FANNIE_ROOT.'modules/plugins2.0/ScanKioskSync/db/items.db')
 				or die("can't connect to $liDb");
 		$retString = "Useing Oncue Sync Module<br>";
@@ -53,16 +55,21 @@ class OncueKioskSync extends SyncKiosk {
 						){
 						$retString .= "Price scanner at ". $scanner." synced.<br>";
 					} else {
+						$sucess = 0;
 						$retString .= "FTP upload to ".$scanner."failed!<br>";
 		 			}
 				ftp_close($connection);
 				} else {
+					$sucess = 0;
 					$retString .= "Login attempt to ".$scanner." failed!<br>";
 				}
 			} else {
+				$sucess = 0;
 				$retString .= "Connection attempt to ".$scanner." failed!<br>"; 
 			}
 		}
+		
+		if ($sucess) {$this->sendEmail($retString);}
 		
 		return $retString;
 	}
@@ -145,6 +152,13 @@ class OncueKioskSync extends SyncKiosk {
 			}
 		}
 		return $retString;
+	}
+	
+	function sendEmail($message) {
+		$subject = "Batch Update notification: ";
+		$from = "From: automail\r\n";
+		$tos = "rowan.oberski@franklincommunity.coop";
+		mail($tos,$subject,$message,$from);
 	}
 }
 

@@ -116,6 +116,8 @@ class CustomerCountReport extends FannieReportPage {
 	  Sum the quantity and total columns
 	*/
 	function calculate_footers($data){
+		// this was all hardcoded so it wouldn't work without the right number
+		// of memtypes. I've rewritten it to calcualte everything so it should work for all setups now. -RO
 		$sum = 0;
 		$retArray = array();
 		$retArray[] = 'Grand Total';

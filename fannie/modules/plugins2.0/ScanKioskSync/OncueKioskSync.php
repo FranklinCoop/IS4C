@@ -69,7 +69,7 @@ class OncueKioskSync extends SyncKiosk {
 			}
 		}
 		
-		if ($sucess) {$this->sendEmail($retString);}
+		if (!$sucess) {$this->sendEmail($retString);}
 		
 		return $retString;
 	}

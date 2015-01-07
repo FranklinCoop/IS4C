@@ -241,7 +241,7 @@ class GoEMerchant extends BasicCCModule
         $sql = "SELECT commErr,
                     httpCode,
                     validResponse,
-                    xResponseCode,
+                    xResultCode AS xResponseCode,
                     xTransactionID
                 FROM PaycardTransactions 
                 WHERE dateID=" . $today . " 
@@ -283,7 +283,7 @@ class GoEMerchant extends BasicCCModule
                 FROM PaycardTransactions 
                 WHERE dateID=" . $today . "
                     AND empNo=" . $cashier . "
-                    AND cashierNo=" . $lane . "
+                    AND registerNo=" . $lane . "
                     AND transNo=" . $trans . "
                     AND transID=" . $transID . "
                     AND transType='VOID'
@@ -477,6 +477,7 @@ class GoEMerchant extends BasicCCModule
             $sqlValues .= sprintf(",%d",$resultCode);
         }
         $resultMsg = $xml->get_first("AUTH_RESPONSE");
+        $rMsg = $resultMsg;
         if ($resultMsg) {
             $sqlColumns .= ",xResultMessage";
             $rMsg = $resultMsg;
@@ -508,7 +509,9 @@ class GoEMerchant extends BasicCCModule
         }
 
         $sql = "INSERT INTO efsnetResponse (" . $sqlColumns . ") VALUES (" . $sqlValues . ")";
-        PaycardLib::paycard_db_query($sql, $dbTrans);
+        if ($dbTrans->table_exists('efsnetResponse')) {
+            PaycardLib::paycard_db_query($sql, $dbTrans);
+        }
 
         /**
           Log transaction in newer table
@@ -642,7 +645,9 @@ class GoEMerchant extends BasicCCModule
         $sqlValues .= sprintf(",%d",$validResponse);
 
         $sql = "INSERT INTO efsnetRequestMod (" . $sqlColumns . ") VALUES (" . $sqlValues . ")";
-        PaycardLib::paycard_db_query($sql, $dbTrans);
+        if ($dbTrans->table_exists('efsnetRequestMod')) {
+            PaycardLib::paycard_db_query($sql, $dbTrans);
+        }
 
         $normalized = ($validResponse == 0) ? 4 : 0;
         if ($resultCode == 1) {
@@ -715,10 +720,10 @@ class GoEMerchant extends BasicCCModule
                 if ($CORE_LOCAL->get('paycard_issuer') == 'American Express') {
                     $t_type = 'AX';
                 }
-                // if the transaction has a non-zero efsnetRequestID,
+                // if the transaction has a non-zero paycardTransactionID,
                 // include it in the tender line
-                $record_id = $this->last_req_id;
-                $charflag = ($record_id != 0) ? 'RQ' : '';
+                $record_id = $this->last_paycard_transaction_id;
+                $charflag = ($record_id != 0) ? 'PT' : '';
                 TransRecord::addFlaggedTender("Credit Card", $t_type, $amt, $record_id, $charflag);
                 $CORE_LOCAL->set("boxMsg",
                         "<b>Approved</b>
@@ -861,7 +866,7 @@ class GoEMerchant extends BasicCCModule
         $sql = "INSERT INTO efsnetRequest (" . $sqlCols . ") VALUES (" . $sqlVals . ")";
         $table_def = $dbTrans->table_definition('efsnetRequest');
 
-        if (!PaycardLib::paycard_db_query($sql, $dbTrans)) {
+        if ($dbTrans->table_exists('efsnetRequest') && !PaycardLib::paycard_db_query($sql, $dbTrans)) {
             PaycardLib::paycard_reset();
             // internal error, nothing sent (ok to retry)
             return $this->setErrorMsg(PaycardLib::PAYCARD_ERR_NOSEND);
@@ -1208,7 +1213,9 @@ class GoEMerchant extends BasicCCModule
                                 $db->escape($apprNumber),
                                 $db->escape($ref),
                                 $CORE_LOCAL->get('paycard_id'));
-                $upR = $db->query($upQ);
+                if ($db->table_exists('efsnetResponse')) {
+                    $upR = $db->query($upQ);
+                }
 
                 if ($status == 'APPROVED') {
                     PaycardLib::paycard_wipe_pan();

@@ -58,6 +58,27 @@ class UPC extends Parser {
 			return $ret;
 		}
 
+        /**
+          11Sep14 Andy
+          Disabled until keypress double form submission is
+          fixed on paycard confirmation screen. Depending on
+          sequence can case flag to be raised, cleared, and
+          re-raised leading to spurrious error notifications
+        */
+        if (false && $CORE_LOCAL->get('paycardTendered')) {
+            if ($CORE_LOCAL->get('msgrepeat') == 0 || $CORE_LOCAL->get('lastRepeat') != 'paycardAlreadyApplied') {
+                $CORE_LOCAL->set('boxMsg', 'Card already tendered<br />
+                                            Confirm adding more items');
+                $CORE_LOCAL->set('lastRepeat', 'paycardAlreadyApplied');
+                $ret['main_frame'] = $my_url . 'gui-modules/boxMsg2.php';
+
+                return $ret;
+            } else if ($CORE_LOCAL->get('lastRepeat') == 'paycardAlreadyApplied') {
+                $CORE_LOCAL->set('lastRepeat', '');
+                $CORE_LOCAL->set('paycardTendered', false);
+            }
+        }
+
         // leading/trailing whitespace creates issues
         $entered = trim($entered);
 
@@ -167,11 +188,13 @@ class UPC extends Parser {
 			}
 			// no match; not a product, not special
 			
-			$opts = array('upc'=>$upc,'description'=>'BADSCAN');
-			TransRecord::add_log_record($opts);
-			$CORE_LOCAL->set("boxMsg",$upc." "._("not a valid item"));
-			//$ret['udpmsg'] = 'errorBeep'; // 12/12/12 this seems to stack with DisplayLib::msgbox
-			$ret['main_frame'] = $my_url."gui-modules/boxMsg2.php";
+            $handler = $CORE_LOCAL->get('ItemNotFound');
+            if ($handler === '' || !class_exists($handler)) {
+                $handler = 'ItemNotFound';
+            }
+            $obj = new $handler();
+            $ret = $obj->handle($upc, $ret);
+
 			return $ret;
 		}
 
@@ -273,11 +296,14 @@ class UPC extends Parser {
 				return $ret;
 			}
 
-			if ($CORE_LOCAL->get("memAge")=="")
+			if ($CORE_LOCAL->get("memAge")=="") {
 				$CORE_LOCAL->set("memAge",date('Ymd'));
-			$diff = time() - ((int)strtotime($CORE_LOCAL->get("memAge")));
-			$age = floor($diff / (365*60*60*24));
-			if ($age < $row['idEnforced']){
+			}
+			$ts = strtotime($CORE_LOCAL->get("memAge"));
+			$required_age = $row['idEnforced'];
+			$of_age_on_day = mktime(0, 0, 0, date('n', $ts), date('j', $ts), date('Y', $ts) + $required_age);
+			$today = strtotime( date('Y-m-d') );
+			if ($of_age_on_day > $today) {
 				$ret['udpmsg'] = 'twoPairs';
 				$ret['main_frame'] = $my_url.'gui-modules/requestInfo.php?class=UPC';
 				return $ret;
@@ -429,10 +455,31 @@ class UPC extends Parser {
 			BEGIN: figure out discounts by type
 		*/
 
-		/* get discount object */
+		/* get discount object 
+
+           CORE reserves values 0 through 63 in 
+           DiscountType::$MAP for default options.
+
+           Additional discounts provided by plugins
+           can use values 64 through 127. Because
+           the DiscountTypeClasses array is zero-indexed,
+           subtract 64 as an offset  
+        */
 		$discounttype = MiscLib::nullwrap($row["discounttype"]);
+        $DiscountObject = null;
 		$DTClasses = $CORE_LOCAL->get("DiscountTypeClasses");
-		$DiscountObject = new $DTClasses[$discounttype];
+        if ($row['discounttype'] < 64 && isset(DiscountType::$MAP[$row['discounttype']])) {
+            $class = DiscountType::$MAP[$row['discounttype']];
+            $DiscountObject = new $class();
+        } else if ($row['discounttype'] >= 64 && isset($DTClasses[($row['discounttype']-64)])) {
+            $class = $DTClasses[($row['discounttype'])-64];
+            $DiscountObject = new $class();
+        } else {
+            // If the requested discounttype isn't available,
+            // fallback to normal pricing. Debatable whether
+            // this should be a hard error.
+            $DiscountObject = new NormalPricing();
+        }
 
 		/* add in sticker price and calculate a quantity
 		   if the item is stickered, scaled, and on sale. 
@@ -469,12 +516,30 @@ class UPC extends Parser {
 			END: figure out discounts by type
 		*/
 
-		/* get price method object  & add item*/
+		/* get price method object  & add item
+        
+           CORE reserves values 0 through 99 in 
+           PriceMethod::$MAP for default methods.
+
+           Additional methods provided by plugins
+           can use values 100 and up. Because
+           the PriceMethodClasses array is zero-indexed,
+           subtract 100 as an offset  
+        */
 		$pricemethod = MiscLib::nullwrap($row["pricemethod"]);
 		if ($DiscountObject->isSale())
 			$pricemethod = MiscLib::nullwrap($row["specialpricemethod"]);
 		$PMClasses = $CORE_LOCAL->get("PriceMethodClasses");
-		$PriceMethodObject = new $PMClasses[$pricemethod];
+        $PriceMethodObject = null;
+        if ($pricemethod < 100 && isset(PriceMethod::$MAP[$pricemethod])) {
+            $class = PriceMethod::$MAP[$pricemethod];
+            $PriceMethodObject = new $class();
+        } else if ($pricemethod >= 100 && isset($PMClasses[($pricemethod-100)])) {
+            $class = $PMClasses[($pricemethod-100)];
+            $PriceMethodObject = new $class();
+        } else {
+            $PriceMethodObject = new BasicPM();
+        }
 		// prefetch: otherwise object members 
 		// pass out of scope in addItem()
 		$prefetch = $DiscountObject->priceInfo($row,$quantity);
@@ -490,14 +555,6 @@ class UPC extends Parser {
 
 		// cleanup, reset flags and beep
 		if ($quantity != 0) {
-			// ddNotify is legacy/unknown. likely doesn't work
-			if ($CORE_LOCAL->get("ddNotify") == 1 && $CORE_LOCAL->get("itemPD") == 10) {
-				$CORE_LOCAL->set("itemPD",0);
-				$discountable = 7;
-			}
-			$intvoided = 0;
-			if ($CORE_LOCAL->get("ddNotify") == 1 && $discountable == 7) 
-				$intvoided = 22;
 
 			$CORE_LOCAL->set("msgrepeat",0);
 			$CORE_LOCAL->set("qttyvalid",0);

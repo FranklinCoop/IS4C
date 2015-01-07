@@ -21,13 +21,18 @@
 
 *********************************************************************************/
 
-include('../config.php');
-include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+require(dirname(__FILE__) . '/../config.php');
+if (!class_exists('FannieAPI')) {
+    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
 
 class MarginToolFromSearch extends FannieRESTfulPage
 {
     protected $header = 'Margin Search Results';
     protected $title = 'Margin Search Results';
+
+    public $description = '[Margin Preview] takes a set of advanced search results and shows the effect on
+    margin of various price changes. Must be accessed via Advanced Search.';
 
     protected $window_dressing = false;
 
@@ -385,10 +390,10 @@ class MarginToolFromSearch extends FannieRESTfulPage
     {
         global $FANNIE_OP_DB, $FANNIE_URL, $FANNIE_ARCHIVE_DB;
         $dbc = FannieDB::get($FANNIE_OP_DB);
-        $this->add_script($FANNIE_URL.'/src/jquery/jquery.js');
-        $this->add_script($FANNIE_URL.'src/jquery/jquery.tablesorter.js');
+        $this->add_script($FANNIE_URL.'/src/javascript/jquery.js');
+        $this->add_script($FANNIE_URL.'src/javascript/tablesorter/jquery.tablesorter.js');
         $this->add_css_file($FANNIE_URL.'/src/style.css');
-        $this->add_css_file($FANNIE_URL.'src/jquery/themes/blue/style.css');
+        $this->add_css_file($FANNIE_URL.'src/javascript/tablesorter/themes/blue/style.css');
         $ret = '';
 
         // list super depts & starting margins

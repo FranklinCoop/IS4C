@@ -234,11 +234,11 @@ static public function setMember($member, $personNumber, $row)
 	$CORE_LOCAL->set("isStaff",$row["staff"]);
 	$CORE_LOCAL->set("SSI",$row["SSI"]);
 
-    if ($CORE_LOCAL->get('useMemtypeTable') == 1 && $conn->table_exists('memtype')) {
-        $prep = $conn->prepare('SELECT discount, staff, ssi 
+    if ($CORE_LOCAL->get('useMemTypeTable') == 1 && $conn->table_exists('memtype')) {
+        $prep = $conn->prepare_statement('SELECT discount, staff, ssi 
                                  FROM memtype
                                  WHERE memtype=?');
-        $res = $conn->execute($prep, array((int)$CORE_LOCAL->get('memType')));
+        $res = $conn->exec_statement($prep, array((int)$CORE_LOCAL->get('memType')));
         if ($conn->num_rows($res) > 0) {
             $mt_row = $conn->fetch_row($res);
             $CORE_LOCAL->set('percentDiscount', $mt_row['discount']);
@@ -534,9 +534,11 @@ static public function tender($right, $strl)
 		$CORE_LOCAL->set("End",1);
 		$ret['receipt'] = 'full';
 		$ret['output'] = DisplayLib::printReceiptFooter();
+        TransRecord::finalizeTransaction();
 	} else {
 		$CORE_LOCAL->set("change",0);
 		$CORE_LOCAL->set("fntlflag",0);
+		Database::setglobalvalue("FntlFlag", 0);
 		$chk = self::ttl();
 		if ($chk === true) {
 			$ret['output'] = DisplayLib::lastpage();
@@ -592,16 +594,27 @@ static public function deptkey($price, $dept,$ret=array())
 	$total = $price * $CORE_LOCAL->get("quantity");
 	$intdept = $dept;
 
-	$query = "select dept_no,dept_name,dept_tax,dept_fs,dept_limit,
-		dept_minimum,dept_discount,";
+	$query = "SELECT dept_no,
+        dept_name,
+        dept_tax,
+        dept_fs,
+        dept_limit,
+		dept_minimum,
+        dept_discount,";
 	$db = Database::pDataConnect();
 	$table = $db->table_definition('departments');
 	if (isset($table['dept_see_id'])) {
-		$query .= 'dept_see_id';
+		$query .= 'dept_see_id,';
 	} else {
-		$query .= '0 as dept_see_id';
+		$query .= '0 as dept_see_id,';
     }
-	$query .= " from departments where dept_no = ".$intdept;
+    if (isset($table['memberOnly'])) {
+        $query .= 'memberOnly';
+    } else {
+        $query .= '0 AS memberOnly';
+    }
+	$query .= " FROM departments 
+                WHERE dept_no = " . $intdept;
 	$result = $db->query($query);
 
 	$num_rows = $db->num_rows($result);
@@ -649,9 +662,10 @@ static public function deptkey($price, $dept,$ret=array())
 	} else {
 		$row = $db->fetch_array($result);
 
+        $my_url = MiscLib::baseURL();
+
 		if ($row['dept_see_id'] > 0) {
 
-			$my_url = MiscLib::baseURL();
 
 			if ($CORE_LOCAL->get("cashierAge") < 18 && $CORE_LOCAL->get("cashierAgeOverride") != 1) {
 				$ret['main_frame'] = $my_url."gui-modules/adminlogin.php?class=AgeApproveAdminLogin";
@@ -661,14 +675,62 @@ static public function deptkey($price, $dept,$ret=array())
 			if ($CORE_LOCAL->get("memAge")=="") {
 				$CORE_LOCAL->set("memAge",date('Ymd'));
             }
-			$diff = time() - ((int)strtotime($CORE_LOCAL->get("memAge")));
-			$age = floor($diff / (365*60*60*24));
-			if ($age < $row['dept_see_id']) {
+			$ts = strtotime($CORE_LOCAL->get("memAge"));
+			$required_age = $row['dept_see_id'];
+			$of_age_on_day = mktime(0, 0, 0, date('n', $ts), date('j', $ts), date('Y', $ts) + $required_age);
+			$today = strtotime( date('Y-m-d') );
+			if ($of_age_on_day > $today) {
 				$ret['udpmsg'] = 'twoPairs';
 				$ret['main_frame'] = $my_url.'gui-modules/requestInfo.php?class=UPC';
 				return $ret;
 			}
 		}
+
+        /**
+          Enforce memberOnly flag
+        */
+        if ($row['memberOnly'] > 0) {
+            switch ($row['memberOnly']) {
+                case 1: // member only, no override
+                    if ($CORE_LOCAL->get('isMember') == 0) {
+                        $ret['output'] = DisplayLib::boxMsg(_(
+                                            'Department is member-only<br />' .
+                                            'Enter member number first'
+                                        ));
+                        return $ret;
+                    }
+                    break; 
+                case 2: // member only, can override
+                    if ($CORE_LOCAL->get('isMember') == 0) {
+                        if ($CORE_LOCAL->get('msgrepeat') == 0 || $CORE_LOCAL->get('lastRepeat') != 'memberOnlyDept') {
+                            $CORE_LOCAL->set('boxMsg', _(
+                                'Department is member-only<br />' .
+                                '[enter] to continue, [clear] to cancel'
+                            ));
+                            $CORE_LOCAL->set('lastRepeat', 'memberOnlyDept');
+                            $ret['main_frame'] = $my_url . 'gui-modules/boxMsg2.php';
+                            return $ret;
+                        } else if ($CORE_LOCAL->get('lastRepeat') == 'memberOnlyDept') {
+                            $CORE_LOCAL->set('lastRepeat', '');
+                        }
+                    }
+                    break;
+                case 3: // anyone but default non-member
+                    if ($CORE_LOCAL->get('memberID') == '0') {
+                        $ret['output'] = DisplayLib::boxMsg(_(
+                                            'Department is member-only<br />' .
+                                            'Enter member number first'
+                                        ));
+                        return $ret;
+                    } else if ($CORE_LOCAL->get('memberID') == $CORE_LOCAL->get('defaultNonMem')) {
+                        $ret['output'] = DisplayLib::boxMsg(_(
+                                            'Department not allowed with this member'
+                                        ));
+                        return $ret;
+                    }
+                    break;
+            }
+        }
 
 		if (!$row["dept_limit"]) {
             $deptmax = 0;
@@ -693,7 +755,7 @@ static public function deptkey($price, $dept,$ret=array())
 
 		if ($CORE_LOCAL->get("toggleDiscountable") == 1) {
 			$CORE_LOCAL->set("toggleDiscountable",0);
-			if  ($deptDiscount == 0) {
+			if ($deptDiscount == 0) {
 				$deptDiscount = 1;
 			} else {
 				$deptDiscount = 0;
@@ -703,12 +765,6 @@ static public function deptkey($price, $dept,$ret=array())
 		if ($CORE_LOCAL->get("togglefoodstamp") == 1) {
 			$foodstamp = ($foodstamp + 1) % 2;
 			$CORE_LOCAL->set("togglefoodstamp",0);
-		}
-
-		if ($CORE_LOCAL->get("ddNotify") != 0 &&  $CORE_LOCAL->get("itemPD") == 10) {  
-			$CORE_LOCAL->set("itemPD",0);
-			$deptDiscount = 7;
-			$intvoided = 22;
 		}
 
 		if ($price > $deptmax && $CORE_LOCAL->get("msgrepeat") == 0) {
@@ -856,7 +912,7 @@ static public function ttl()
                 // the other Subtotal record generated farther down?
                 TransRecord::addRecord(array(
                     'description' => 'Subtotal',
-                    'trans_type' => '',
+                    'trans_type' => '0',
                     'trans_status' => 'D',
                     'unitPrice' => MiscLib::truncate2($CORE_LOCAL->get('transDiscount') + $CORE_LOCAL->get('subtotal')),
                     'voided' => 7,
@@ -914,7 +970,7 @@ static public function ttl()
 		if ($CORE_LOCAL->get("fntlflag") == 1) {
             TransRecord::addRecord(array(
                 'description' => 'Foodstamps Eligible',
-                'trans_type' => '',
+                'trans_type' => '0',
                 'trans_status' => 'D',
                 'unitPrice' => MiscLib::truncate2($CORE_LOCAL->get('fsEligible')),
                 'voided' => 7,
@@ -1067,7 +1123,7 @@ static public function omtr_ttl()
 		if ($CORE_LOCAL->get("fntlflag") == 1) {
             TransRecord::addRecord(array(
                 'description' => 'Foodstamps Eligible',
-                'trans_type' => '',
+                'trans_type' => '0',
                 'trans_status' => 'D',
                 'unitPrice' => MiscLib::truncate2($CORE_LOCAL->get('fsEligible')),
                 'voided' => 7,
@@ -1082,17 +1138,54 @@ static public function omtr_ttl()
 }
 
 /**
-  See what the last item in the transaction is currently
-  @return localtemptrans.description for the last item
+  Calculate WIC eligible total
+  @return [number] WIC eligible items total
 */
-static public function peekItem()
+static public function wicableTotal()
+{
+    global $CORE_LOCAL;
+    $db = Database::tDataConnect();
+    $products = $CORE_LOCAL->get('pDatabase') . $db->sep() . 'products';
+
+    $query = '
+        SELECT SUM(total) AS wicableTotal
+        FROM localtemptrans AS t
+            INNER JOIN ' . $products . ' AS p ON t.upc=p.upc
+        WHERE t.trans_type = \'I\'
+            AND p.wicable = 1
+    ';
+
+    $result = $db->query($query);
+    if (!$result || $db->num_rows($result) == 0) {
+        return 0.00;
+    } else {
+        $row = $db->fetch_row($result);
+        
+        return $row['wicableTotal'];
+    }
+}
+
+/**
+  See what the last item in the transaction is currently
+  @param $full_record [boolean] return full database record.
+    Default is false. Just returns description.
+  @return localtemptrans.description for the last item
+    or localtemptrans record for the last item
+
+    If no record exists, returns false
+*/
+static public function peekItem($full_record=false)
 {
 	$db = Database::tDataConnect();
 	$q = "SELECT description FROM localtemptrans ORDER BY trans_id DESC";
 	$r = $db->query($q);
 	$w = $db->fetch_row($r);
 
-	return (isset($w['description'])?$w['description']:'');
+    if ($full_record) {
+        return is_array($w) ? $w : false;
+    } else {
+        return isset($w['description']) ? $w['description'] : false;
+    }
 }
 
 /**
@@ -1163,7 +1256,7 @@ static public function fsEligible()
 		} else {
             TransRecord::addRecord(array(
                 'description' => 'Foodstamps Eligible',
-                'trans_type' => '',
+                'trans_type' => '0',
                 'trans_status' => 'D',
                 'unitPrice' => MiscLib::truncate2($CORE_LOCAL->get('fsEligible')),
                 'voided' => 7,

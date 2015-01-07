@@ -81,6 +81,22 @@ class paycardSuccess extends BasicPage {
 				// remember the mode, type and transid before we reset them
 				$CORE_LOCAL->set("boxMsg","");
 
+                /**
+                  paycard_mode is sometimes cleared pre-emptively
+                  perhaps by a double keypress on enter so tender out
+                  if the last record in the transaction is a tender
+                  record 
+                */
+                $peek = PrehLib::peekItem(true);
+                if ($mode == PaycardLib::PAYCARD_MODE_AUTH || 
+                    ($peek !== false && isset($peek['trans_type']) && $peek['trans_type'] == 'T')) {
+                    $CORE_LOCAL->set("strRemembered","TO");
+                    $CORE_LOCAL->set("msgrepeat",1);
+                    $CORE_LOCAL->set('paycardTendered', true);
+                } else {
+                    TransRecord::debugLog('Not Tendering Out (mode): ' . print_r($mode, true));
+                }
+
                 // only reset terminal if the terminal was used for the transaction
                 // activating a gift card should not reset terminal
                 if ($CORE_LOCAL->get("paycard_type") == PaycardLib::PAYCARD_TYPE_ENCRYPTED) {
@@ -89,10 +105,9 @@ class paycardSuccess extends BasicPage {
                     $CORE_LOCAL->set("CacheCardType","");
                 }
 				PaycardLib::paycard_reset();
-				$CORE_LOCAL->set("strRemembered","TO");
-				$CORE_LOCAL->set("msgrepeat",1);
 
 				$this->change_page($this->page_url."gui-modules/pos2.php");
+
 				return False;
 			} else if ($mode == PaycardLib::PAYCARD_MODE_AUTH && $input == "VD" 
 				&& ($CORE_LOCAL->get('CacheCardType') == 'CREDIT' || $CORE_LOCAL->get('CacheCardType') == '')){
@@ -119,13 +134,14 @@ class paycardSuccess extends BasicPage {
 	function head_content(){
 		?>
 		<script type="text/javascript">
+        var formSubmitted = false;
 		function submitWrapper(){
 			var str = $('#reginput').val();
 			if (str.toUpperCase() == 'RP'){
 				$.ajax({url: '<?php echo $this->page_url; ?>ajax-callbacks/ajax-end.php',
 					cache: false,
 					type: 'post',
-					data: 'receiptType='+$('#rp_type').val(),
+					data: 'receiptType='+$('#rp_type').val()+'&ref=<?php echo ReceiptLib::receiptNumber(); ?>',
 					success: function(data) {
                         // If a paper signature slip is requested during
                         // electronic signature capture, abort capture
@@ -140,7 +156,13 @@ class paycardSuccess extends BasicPage {
 				$('#reginput').val('');
 				return false;
 			}
-			return true;
+            // avoid double submit
+            if (!formSubmitted) {
+                formSubmitted = true;
+                return true;
+            } else {
+                return false;
+            }
 		}
         function parseWrapper(str) {
             if (str.substring(0, 7) == 'TERMBMP') {
@@ -186,6 +208,11 @@ class paycardSuccess extends BasicPage {
         //   b) a Credit transaction
         //   c) Over limit threshold OR a return
         $isCredit = ($CORE_LOCAL->get('CacheCardType') == 'CREDIT' || $CORE_LOCAL->get('CacheCardType') == '') ? true : false;
+        // gift doesn't set CacheCardType so customer swipes and
+        // cashier types don't overwrite each other's type
+        if ($CORE_LOCAL->get('paycard_type') == PaycardLib::PAYCARD_TYPE_GIFT) {
+            $isCredit = false;
+        }
         $needSig = ($CORE_LOCAL->get('paycard_amount') > $CORE_LOCAL->get('CCSigLimit') || $CORE_LOCAL->get('paycard_amount') < 0) ? true : false;
         $isVoid = ($CORE_LOCAL->get('paycard_mode') == PaycardLib::PAYCARD_MODE_VOID) ? true : false;
 		if ($CORE_LOCAL->get("PaycardsSigCapture") == 1 && $isCredit && $needSig && !$isVoid) {
@@ -223,7 +250,6 @@ class paycardSuccess extends BasicPage {
             echo DisplayLib::boxMsg($CORE_LOCAL->get("boxMsg"), "", true);
             UdpComm::udpSend('termApproved');
         }
-		$CORE_LOCAL->set("msgrepeat",2);
 		$CORE_LOCAL->set("CachePanEncBlock","");
 		$CORE_LOCAL->set("CachePinEncBlock","");
 		?>

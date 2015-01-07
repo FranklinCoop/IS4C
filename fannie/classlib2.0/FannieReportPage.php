@@ -41,6 +41,8 @@ class FannieReportPage extends FanniePage
     Base class for creating reports.
     ";
 
+    public $page_set = 'Reports';
+
     /**
       Assign report to a "set" of reports
     */
@@ -141,6 +143,7 @@ class FannieReportPage extends FanniePage
     const META_BLANK        = 2;
     const META_REPEAT_HEADERS    = 4;
     const META_CHART_DATA    = 8;
+    const META_COLOR    = 16;
 
     /**
       Handle pre-display tasks such as input processing
@@ -153,13 +156,6 @@ class FannieReportPage extends FanniePage
       report_content method should be called. It
       also the value of "excel" for the request and
       sets necessary output options.
-
-      The CalendarControl javascript is automatically
-      included if the form_content method is selected.
-      This isn't strictly necessary if the form has
-      no date fields, but it will likely be useful
-      more often than not and cause no harm in other
-      cases.
     */
     public function preprocess()
     {
@@ -183,7 +179,6 @@ class FannieReportPage extends FanniePage
             $this->formatCheck();
         } else {
             $this->content_function = 'form_content'; 
-            $this->add_script($FANNIE_URL . 'src/CalendarControl.js');
         }
 
         return true;
@@ -472,6 +467,43 @@ class FannieReportPage extends FanniePage
     }
 
     /**
+      Standard lines to include above report data
+      @param $datefields [array] names of one or two date fields
+        in the GET/POST data. The fields "date", "date1", and
+        "date2" are detected automatically.
+      @return array of description lines
+    */
+    protected function defaultDescriptionContent($datefields=array())
+    {
+        $ret = array();
+        $ret[] = $this->header;
+        $ret[] = _('Report generated') . ' ' . date('l, F j, Y g:iA');
+        $dt1 = false;
+        $dt2 = false;
+        if (count($datefields) == 1) {
+            $dt1 = strtotime(FormLib::get($datefields[0])); 
+        } elseif (count($datefields) == 2) {
+            $dt1 = strtotime(FormLib::get($datefields[0])); 
+            $dt2 = strtotime(FormLib::get($datefields[1])); 
+        } elseif (FormLib::get('date') !== '') {
+            $dt1 = strtotime(FormLib::get('date'));
+        } elseif (FormLib::get('date1') !== '' && FormLib::get('date2') !== '') {
+            $dt1 = strtotime(FormLib::get('date1'));
+            $dt2 = strtotime(FormLib::get('date2'));
+        }
+        if ($dt1 && $dt2) {
+            $ret[] = _('From') . ' ' 
+                . date('l, F j, Y', $dt1) 
+                . ' ' . _('to') . ' ' 
+                . date('l, F j, Y', $dt2);
+        } elseif ($dt1 && !$dt2) {
+            $ret[] = _('For') . ' ' . date('l, F j, Y', $dt1);
+        }
+
+        return $ret;
+    }
+
+    /**
       Extra, non-tabular information appended to
       reports
       @return array of strings
@@ -511,24 +543,41 @@ class FannieReportPage extends FanniePage
         switch(strtolower($format)) {
             case 'html':
                 if ($this->multi_counter == 1) {
-                    $this->add_css_file($FANNIE_URL.'src/jquery/themes/blue/style.css');
+                    $this->add_css_file($FANNIE_URL.'src/javascript/tablesorter/themes/blue/style.css');
                     if (!$this->window_dressing) {
                         $ret .= '<!DOCTYPE html><html><head>' .
                         '<meta http-equiv="Content-Type" ' .
                             'content="text/html; charset=iso-8859-1">' .
                         '</head><body>';
                     }
-                    $ret .= sprintf('<a href="%s%sexcel=xls">Download Excel</a>
-                        &nbsp;&nbsp;&nbsp;&nbsp;
-                        <a href="%s%sexcel=csv">Download CSV</a>
+                    /**
+                      Detect PEAR and only offer XLS if
+                      the system is capable.
+                    */
+                    $pear = true;
+                    if (!class_exists('PEAR')) {
+                        $pear = @include_once('PEAR.php');
+                        if (!$pear) {
+                            $pear = false;
+                        }
+                    }
+                    if ($pear) {
+                        $ret .= sprintf('<a href="%s%sexcel=xls">Download Excel</a>
+                            &nbsp;&nbsp;&nbsp;&nbsp;',
+                            $_SERVER['REQUEST_URI'],
+                            (strstr($_SERVER['REQUEST_URI'],'?') ===False ? '?' : '&')
+                        );
+                    }
+                    $ret .= sprintf('<a href="%s%sexcel=csv">Download CSV</a>
                         &nbsp;&nbsp;&nbsp;&nbsp;
                         <a href="javascript:history:back();">Back</a>',
                         $_SERVER['REQUEST_URI'],
-                        (strstr($_SERVER['REQUEST_URI'],'?') ===False ? '?' : '&'),
-                        $_SERVER['REQUEST_URI'],
                         (strstr($_SERVER['REQUEST_URI'],'?') ===False ? '?' : '&')
                     );
-                    foreach($this->report_description_content() as $line) {
+                    foreach ($this->defaultDescriptionContent() as $line) {
+                        $ret .= (substr($line,0,1)=='<'?'':'<br />').$line;
+                    }
+                    foreach ($this->report_description_content() as $line) {
                         $ret .= (substr($line,0,1)=='<'?'':'<br />').$line;
                     }
                 }
@@ -542,7 +591,10 @@ class FannieReportPage extends FanniePage
                     cellpadding="4" border="1">';
                 break;
             case 'csv':
-                foreach($this->report_description_content() as $line) {
+                foreach ($this->defaultDescriptionContent() as $line) {
+                    $ret .= $this->csvLine(array(strip_tags($line)));
+                }
+                foreach ($this->report_description_content() as $line) {
                     $ret .= $this->csvLine(array(strip_tags($line)));
                 }
             case 'xls':
@@ -620,8 +672,8 @@ class FannieReportPage extends FanniePage
                 foreach($this->report_end_content() as $line) {
                     $ret .= (substr($line,0,1)=='<'?'':'<br />').$line;
                 }
-                $this->add_script($FANNIE_URL.'src/jquery/js/jquery.js');
-                $this->add_script($FANNIE_URL.'src/jquery/jquery.tablesorter.js');
+                $this->add_script($FANNIE_URL.'src/javascript/jquery.js');
+                $this->add_script($FANNIE_URL.'src/javascript/tablesorter/jquery.tablesorter.js');
                 $sort = sprintf('[[%d,%d]]',$this->sort_column,$this->sort_direction);
                 if ($this->sortable) {
                     $this->add_onload_command("\$('.mySortableTable').tablesorter({sortList: $sort, widgets: ['zebra']});");
@@ -663,10 +715,13 @@ class FannieReportPage extends FanniePage
                         }
                     }
                 }
-                foreach($this->report_end_content() as $line) {
+                foreach ($this->report_end_content() as $line) {
                     array_push($xlsdata, array(strip_tags($line)));
                 }
-                foreach($this->report_description_content() as $line) {
+                foreach ($this->defaultDescriptionContent() as $line) {
+                    array_unshift($xlsdata,array(strip_tags($line)));
+                }
+                foreach ($this->report_description_content() as $line) {
                     array_unshift($xlsdata,array(strip_tags($line)));
                 }
                 if (!function_exists('ArrayToXls')) {
@@ -726,7 +781,7 @@ class FannieReportPage extends FanniePage
         $tag = $header ? 'th' : 'td';
 
         if (($meta & self::META_BOLD) != 0) {
-            $ret = '</tbody><tbody><tr>';
+            $ret = '</tbody><tbody>' . $ret;
             $tag = 'th';
         }
         if (($meta & self::META_BLANK) != 0) {
@@ -747,6 +802,17 @@ class FannieReportPage extends FanniePage
                 $row[] = $h;
             }
         }
+        $color_styles = '';
+        if (($meta & self::META_COLOR) != 0) {
+            if (isset($row['meta_background'])) {
+                $color_styles .= 'background-color:' . $row['meta_background'] . ';';
+                unset($row['meta_background']);
+            }
+            if (isset($row['meta_foreground'])) {
+                $color_styles .= 'color:' . $row['meta_foreground'] . ';';
+                unset($row['meta_foreground']);
+            }
+        }
 
         $date = false;
         /* After removing HTML, the cell will be seen as a number
@@ -763,8 +829,8 @@ class FannieReportPage extends FanniePage
             while(array_key_exists($i+$span,$row) && $row[$i+$span] === null && ($i+$span)<count($row)) {
                 $span++;
             }
-            $align = '';
             $date = '';
+            $styles = $color_styles;
             if ($row[$i] === "" || $row[$i] === null) {
                 $row[$i] = '&nbsp;';
             } elseif (is_numeric($row[$i]) && strlen($row[$i]) == 13) {
@@ -783,7 +849,7 @@ class FannieReportPage extends FanniePage
                                     $date, $row[$i], $row[$i]);
             } else {
                 if (preg_match($numberPattern, strip_tags($row[$i]))) {
-                    $align = ' style="text-align:right;" ';
+                    $styles .= 'text-align:right;';
                 }
             }
 
@@ -800,7 +866,7 @@ class FannieReportPage extends FanniePage
             }
             $class .= '"';
 
-            $ret .= '<'.$tag.' '.$class.' '.$align.' colspan="'.$span.'">'.$row[$i].'</'.$tag.'>';
+            $ret .= '<'.$tag.' '.$class.' style="'.$styles.'" colspan="'.$span.'">'.$row[$i].'</'.$tag.'>';
             $i += $span;
         }
         $ret .= '</tr>';
@@ -914,6 +980,17 @@ class FannieReportPage extends FanniePage
         if (FormLib::get('excel') === 'xls') {
             $this->report_format = 'xls';
             $this->window_dressing = false;
+            /**
+              Verify whether PEAR is available. If it is not,
+              fall back to CSV output. Should probably
+              generate some kind of log message or notification.
+            */
+            if (!class_exists('PEAR')) {
+                $pear = @include_once('PEAR.php');
+                if (!$pear) {
+                    $this->report_format = 'csv';
+                }
+            }
         } elseif (FormLib::get('excel') === 'csv') {
             $this->report_format = 'csv';
             $this->window_dressing = false;

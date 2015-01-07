@@ -167,8 +167,8 @@ static public function addItem($strupc, $strdescription, $strtransType, $strtran
 		'upc'		=> MiscLib::nullwrap($strupc),
 		'description'	=> $db->escape($strdescription),
 		'trans_type'	=> MiscLib::nullwrap($strtransType),
-		'trans_subtype'	=> MiscLib::nullwrap($strtranssubType),
-		'trans_status'	=> MiscLib::nullwrap($strtransstatus),
+		'trans_subtype'	=> MiscLib::nullwrap($strtranssubType, true),
+		'trans_status'	=> MiscLib::nullwrap($strtransstatus, true),
 		'department'	=> MiscLib::nullwrap($intdepartment),
 		'quantity'	=> MiscLib::nullwrap($dblquantity),
 		'cost'		=> MiscLib::nullwrap($cost),
@@ -207,7 +207,6 @@ static public function addItem($strupc, $strdescription, $strtransType, $strtran
 		$CORE_LOCAL->set("repeatable",1);
 	}
 
-	$CORE_LOCAL->set("msgrepeat",0);
 	$CORE_LOCAL->set("toggletax",0);
 	$CORE_LOCAL->set("togglefoodstamp",0);
 	$CORE_LOCAL->set("SNR",0);
@@ -548,7 +547,7 @@ static public function discountnotify($strl)
 	}
     self::addRecord(array(
         'description' => '** ' . $strl . '% Discount Applied **',
-        'trans_type' => '',
+        'trans_type' => '0',
         'trans_status' => 'D',
         'voided' => 4,
     ));
@@ -563,7 +562,7 @@ static public function addTaxExempt()
 
     self::addRecord(array(
         'description' => '** Order is Tax Exempt **',
-        'trans_type' => '',
+        'trans_type' => '0',
         'trans_status' => 'D',
         'voided' => 10,
         'tax' => 9,
@@ -580,7 +579,7 @@ static public function reverseTaxExempt()
 	global $CORE_LOCAL;
     self::addRecord(array(
         'description' => '** Tax Exemption Reversed **',
-        'trans_type' => '',
+        'trans_type' => '0',
         'trans_status' => 'D',
         'voided' => 10,
         'tax' => 9,
@@ -600,7 +599,7 @@ static public function addcdnotify()
 
     self::addRecord(array(
         'description' => '** ' . $CORE_LOCAL->get('casediscount') . '% Case Discount Applied',
-        'trans_type' => '',
+        'trans_type' => '0',
         'trans_status' => 'D',
         'voided' => 6,
     ));
@@ -709,7 +708,7 @@ static public function addTare($dbltare)
 	$rc = $CORE_LOCAL->get("refundComment");
     self::addRecord(array(
         'description' => '** Tare Weight ' . $CORE_LOCAL->get('tare') . ' **',
-        'trans_type' => '',
+        'trans_type' => '0',
         'trans_status' => 'D',
         'voided' => 6,
     ));
@@ -843,6 +842,78 @@ static public function addLogRecord($opts)
 static public function add_log_record($opts)
 {
     self::addLogRecord($opts);
+}
+
+/**
+  Finish the current transaction
+  @param $incomplete [boolean] optional, default false
+
+  This method:
+  1) Adds tax and discount lines if transaction is complete
+     (i.e., $incomplete == false)
+  2) Rotates data out of localtemptrans
+  3) Advances trans_no variable to next available value
+
+  This method replaces older ajax-end.php / end.php operations
+  where the receipt was printed first and then steps 1-3
+  above happened. This method should be called BEFORE printing
+  a receipt. Receipts are now always printed via localtranstoday.
+*/
+static public function finalizeTransaction($incomplete=false)
+{
+    global $CORE_LOCAL;
+    if (!$incomplete) {
+        self::addtransDiscount();
+        self::addTax();
+        $taxes = Database::LineItemTaxes();
+        foreach($taxes as $tax) {
+            if ($CORE_LOCAL->get('TaxExempt') == 1) {
+                $tax['amount'] = 0.00;
+            }
+            self::addLogRecord(array(
+                'upc' => 'TAXLINEITEM',
+                'description' => $tax['description'],
+                'numflag' => $tax['rate_id'],
+                'amount2' => $tax['amount'],
+            ));
+        }
+    }
+
+    if (Database::rotateTempData()) { // rotate data
+        Database::clearTempTables();
+    }
+
+    // advance trans_no value
+    $nextTransNo = Database::gettransno($CORE_LOCAL->get('CashierNo'));
+    $CORE_LOCAL->set('transno', $nextTransNo);
+    Database::setglobalvalue('TransNo', $nextTransNo);
+}
+
+static public function debugLog($val)
+{
+    global $CORE_LOCAL;
+
+	$tdate = "";
+	if ($CORE_LOCAL->get("DBMS") == "mssql") {
+		$tdate = strftime("%m/%d/%y %H:%M:%S %p", time());
+	} else {
+		$tdate = strftime("%Y-%m-%d %H:%M:%S", time());
+	}
+    $trans_num = ReceiptLib::receiptNumber();
+    $lastID = $CORE_LOCAL->get('LastID');
+
+    $db = Database::tDataConnect();
+    if ($db->table_exists('DebugLog')) {
+        $prep = $db->prepare('INSERT INTO DebugLog 
+                              (tdate, transNum, transID, entry)
+                              VALUES
+                              (?, ?, ?, ?)');
+        $res = $db->execute($prep, array($tdate, $trans_num, $lastID, $val));
+
+        return $res ? true : false;
+    } else {
+        return false;
+    }
 }
 
 }

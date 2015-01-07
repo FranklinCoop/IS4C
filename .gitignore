@@ -31,7 +31,4 @@ fannie/locale/*.po
 fannie/locale/*.pot
 *.dll
 *.exe
-README
-pos/is4c-nf/scale-drivers/drivers/NewMagellan/ports.conf
-*.orig
-.gitignore
+fannie/INSTALL

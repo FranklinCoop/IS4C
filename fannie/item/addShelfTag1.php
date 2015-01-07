@@ -23,13 +23,18 @@
 
 /* --COMMENTS - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-	* 21Mar2013 EL Assign all fields on update, not just price, ppu. OK per AT.
-	*               This routine will be replaced by Andy's of March 18 soon.
+    * 21Mar2013 EL Assign all fields on update, not just price, ppu. OK per AT.
+    *               This routine will be replaced by Andy's of March 18 soon.
 
 */
 
-require('../config.php');
-include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+require(dirname(__FILE__) . '/../config.php');
+if (!class_exists('FannieAPI')) {
+    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
+if (basename(__FILE__) != basename($_SERVER['PHP_SELF'])) {
+    return;
+}
 $dbc = FannieDB::get($FANNIE_OP_DB);
 
 $id = 0;
@@ -38,7 +43,7 @@ $description = $_REQUEST['description'];
 $brand = $_REQUEST['brand'];
 $units = $_REQUEST['units'];
 if ( $units == '' )
-	$units = 'NULL';
+    $units = 'NULL';
 $size = $_REQUEST['size'];
 $ppo = $_REQUEST['ppo'];
 $vendor = $_REQUEST['vendor'];

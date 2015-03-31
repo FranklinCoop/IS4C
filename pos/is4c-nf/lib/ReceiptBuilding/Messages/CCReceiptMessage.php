@@ -47,8 +47,8 @@ class CCReceiptMessage extends ReceiptMessage {
 	  signature slip, the other is just a list of date, amount,
 	  approval code, etc
 	*/
-	protected function variable_slip($ref, $reprint=False, $sigSlip=False){
-		global $CORE_LOCAL;
+	protected function variable_slip($ref, $reprint=False, $sigSlip=False)
+    {
 		$date = ReceiptLib::build_time(time());
 		list($emp,$reg,$trans) = explode('-', $ref);
 		$sort = 'asc';
@@ -58,8 +58,8 @@ class CCReceiptMessage extends ReceiptMessage {
 		$db = Database::tDataConnect();
 		if ($reprint)
 			$db = Database::mDataConnect();
-		if ($sigSlip && is_numeric($CORE_LOCAL->get('paycard_id'))) {
-			$idclause = ' AND transID='.$CORE_LOCAL->get('paycard_id');
+		if ($sigSlip && is_numeric(CoreLocal::get('paycard_id'))) {
+			$idclause = ' AND transID='.CoreLocal::get('paycard_id');
 		}
 
 		// query database for cc receipt info 
@@ -69,15 +69,10 @@ class CCReceiptMessage extends ReceiptMessage {
 			." and transNo = ".$trans ." ".$idclause
 			." order by datetime $sort, transID DESC";
 
-        /**
-          Temp disabled 30Apr14
-          Not tested yet but I don't want to delay the next release
-          Andy
-        */
-        if (false && $db->table_exists('PaycardTransactions')) {
+        if ($db->table_exists('PaycardTransactions')) {
             $trans_type = $db->concat('p.cardType', "' '", 'p.transType', '');
 
-            $query = "SELECT $trans_type AS transType,
+            $query = "SELECT $trans_type AS tranType,
                         CASE WHEN p.transType = 'Return' THEN -1*p.amount ELSE p.amount END as amount,
                         p.PAN,
                         CASE WHEN p.manual=1 THEN 'Manual' ELSE 'Swiped' END as entryMethod,
@@ -117,10 +112,9 @@ class CCReceiptMessage extends ReceiptMessage {
 
 			$slip .= ReceiptLib::centerString("................................................")."\n";
 			if ($sigSlip){
-				$slip .= ReceiptLib::centerString($CORE_LOCAL->get("chargeSlip1"))."\n"		// store name 
-					.ReceiptLib::centerString($CORE_LOCAL->get("chargeSlip3").", ".$CORE_LOCAL->get("chargeSlip4"))."\n"  // address
-					.ReceiptLib::centerString($CORE_LOCAL->get("chargeSlip5"))."\n"		// merchant code 
-					.ReceiptLib::centerString($CORE_LOCAL->get("receiptHeader2"))."\n\n";	// phone
+                for ($i=1; $i<= CoreLocal::get('chargeSlipCount'); $i++) {
+                    $slip .= ReceiptLib::centerString(CoreLocal::get("chargeSlip" . $i))."\n";
+                }
 				$slip .= $trantype."\n"			// trans type:  purchase, canceled purchase, refund or canceled refund
 					."Card: ".$cardBrand."  ".$pan."\n"
 					."Reference:  ".$ref."\n"

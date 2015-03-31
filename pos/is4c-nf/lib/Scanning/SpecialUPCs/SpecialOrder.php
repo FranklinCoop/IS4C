@@ -52,13 +52,16 @@ class SpecialOrder extends SpecialUPC
 
     public function handle($upc,$json)
     {
-        global $CORE_LOCAL;
-
         $orderID = substr($upc,5,6);
         $transID = substr($upc,11,2);
 
         if ((int)$transID === 0) {
-            $json['output'] = DisplayLib::boxMsg(_("Not a valid order"));
+            $json['output'] = DisplayLib::boxMsg(
+                _("Not a valid order"),
+                '',
+                false,
+                DisplayLib::standardClearButton()
+            );
             return $json;
         }
 
@@ -73,14 +76,33 @@ class SpecialOrder extends SpecialUPC
         $result = $db->query($query);
 
         if ($db->num_rows($result) != 1) {
-            $json['output'] = DisplayLib::boxMsg(_("Order not found"));
+            $json['output'] = DisplayLib::boxMsg(
+                _("Order not found"),
+                '',
+                false,
+                DisplayLib::standardClearButton()
+            );
             return $json;
         }
 
         $row = $db->fetch_array($result);
-        TransRecord::addItem($row['upc'],$row['description'],'I','','',$row['department'],$row['quantity'],
-            $row['unitPrice'],$row['total'],$row['regPrice'],0,$row['dept_tax'],
-            $row['dept_fs'],0.00,0.00,$row['discountable'],0,$row['ItemQtty'],0,0,0,$orderID,$transID,0,0.00,0,'SO');
+        TransRecord::addRecord(array(
+            'upc' => $row['upc'],
+            'description' => $row['description'],
+            'trans_type' => 'I',
+            'department' => $row['department'],
+            'quantity' => $row['quantity'],
+            'unitPrice' => $row['unitPrice'],
+            'total' => $row['total'],
+            'regPrice' => $row['regPrice'],
+            'tax' => $row['dept_tax'],
+            'foodstamp' => $row['dept_fs'],
+            'discountable' => $row['discountable'],
+            'ItemQtty' => $row['ItemQtty'],
+            'mixMatch' => $orderID,
+            'matched' => $transID,
+            'charflag' => 'SO',
+        ));
         $json['output'] = DisplayLib::lastpage();
         $json['udpmsg'] = 'goodBeep';
         $json['redraw_footer'] = True;

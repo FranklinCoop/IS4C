@@ -26,8 +26,8 @@ include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 class undo extends NoInputPage {
 	var $msg;
 
-	function body_content(){
-		global $CORE_LOCAL;
+	function body_content()
+    {
 		?>
 		<div class="baseHeight">
 		<div class="<?php echo $this->box_color; ?> centeredDisplay">
@@ -46,8 +46,8 @@ class undo extends NoInputPage {
 		$this->add_onload_command("\$('#reginput').focus();");
 	}
 
-	function preprocess(){
-		global $CORE_LOCAL;
+	function preprocess()
+    {
 		$this->box_color = "coloredArea";
 		$this->msg = "Undo transaction";
 
@@ -88,7 +88,7 @@ class undo extends NoInputPage {
 
 			$db = 0;
 			$query = "";
-			if ($register_no == $CORE_LOCAL->get("laneno")){
+			if ($register_no == CoreLocal::get("laneno")){
 				// look up transation locally
 				$db = Database::tDataConnect();
 				$query = "select upc, description, trans_type, trans_subtype,
@@ -103,7 +103,7 @@ class undo extends NoInputPage {
 					and trans_status <> 'X'
 					order by trans_id";
 			}
-			else if ($CORE_LOCAL->get("standalone") == 1){
+			else if (CoreLocal::get("standalone") == 1){
 				// error: remote lookups won't work in standalone
 				$this->box_color="errorColoredArea";
 				$this->msg = "Transaction not found";
@@ -134,9 +134,9 @@ class undo extends NoInputPage {
 			}
 
 			/* change the cashier to the original transaction's cashier */
-			$prevCashier = $CORE_LOCAL->get("CashierNo");
-			$CORE_LOCAL->set("CashierNo",$emp_no);
-			$CORE_LOCAL->set("transno",Database::gettransno($emp_no));	
+			$prevCashier = CoreLocal::get("CashierNo");
+			CoreLocal::set("CashierNo",$emp_no);
+			CoreLocal::set("transno",Database::gettransno($emp_no));	
 
 			/* rebuild the transaction, line by line, in reverse */
 			$card_no = 0;
@@ -148,11 +148,7 @@ class undo extends NoInputPage {
 					//TransRecord::addtax();
 				}
 				elseif ($row["trans_type"] ==  "T"){
-                    if ($row["upc"] == "MAD Coupon") {
-                        $madCoup = $row['total'];
-                        TransRecord::addItem("MAD Coupon", "Member Appreciation Coupon", "I", "CP", "C", 0, 1, 
-                            -1*$madCoup, -1*$madCoup, -1*$madCoup, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 17);
-					} else if ($row["description"] == "Change")
+					if ($row["description"] == "Change")
 						TransRecord::addchange(-1*$row["total"]);
 					elseif ($row["description"] == "FS Change")
 						TransRecord::addfsones(-1*$row["total"]);
@@ -190,25 +186,12 @@ class undo extends NoInputPage {
 					$row["memDiscount"] *= -1;
 					$row["quantity"] *= -1;
 					$row["ItemQtty"] *= -1;
-					TransRecord::addItem($row["upc"],$row["description"],$row["trans_type"],$row["trans_subtype"],
-						$row["trans_status"],$row["department"],$row["quantity"],
-						$row["unitPrice"],$row["total"],$row["regPrice"],
-						$row["scale"],$row["tax"],$row["foodstamp"],$row["discount"],
-						$row["memDiscount"],$row["discountable"],$row["discounttype"],
-						$row["ItemQtty"],$row["volDiscType"],$row["volume"],$row["VolSpecial"],
-						$row["mixMatch"],$row["matched"],$row["voided"]);
+					TransRecord::addRecord($row);
 				}
 			}
 
-			$op = Database::pDataConnect();
-			$query = "select CardNo,personNum,LastName,FirstName,CashBack,Balance,Discount,
-				ChargeOk,WriteChecks,StoreCoupons,Type,memType,staff,
-				SSI,Purchases,NumberOfChecks,memCoupons,blueLine,Shown,id from custdata 
-				where CardNo = '".$card_no."'";
-			$res = $op->query($query);
-			$row = $op->fetch_row($res);
-			PrehLib::setMember($card_no,1,$row);
-			$CORE_LOCAL->set("autoReprint",0);
+			PrehLib::setMember($card_no, 1);
+			CoreLocal::set("autoReprint",0);
 
 			/* do NOT restore logged in cashier until this transaction is complete */
 			

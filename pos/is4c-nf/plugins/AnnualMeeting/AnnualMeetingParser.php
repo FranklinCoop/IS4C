@@ -23,13 +23,14 @@
 
 class AnnualMeetingParser extends Parser {
 
-	var $plus = array('1042','1041');
-	var $descriptions = array(
+	private $plus = array('1042','1041');
+	private $descriptions = array(
 		'1042' => 'OWNER MEAL',
 		'1041' => 'GUEST MEAL'
 	);
 
-	function check($str){
+	function check($str)
+    {
 		if (strlen($str) < 4) return False;
 		$plu = substr($str,0,4);
 		if (in_array($plu, $this->plus)){
@@ -47,11 +48,11 @@ class AnnualMeetingParser extends Parser {
 		return False;
 	}
 
-	function parse($str){
-		global $CORE_LOCAL;
+	function parse($str)
+    {
 		$ret = $this->default_json();
 		if (strlen($str)==4){
-			$CORE_LOCAL->set('qmInput',$str);
+			CoreLocal::set('qmInput',$str);
 			$desc = $this->descriptions[$str];
 			$opts = array(
 				$desc.' (Steak)' => 'M',
@@ -61,7 +62,7 @@ class AnnualMeetingParser extends Parser {
 			if ($str == 1041){
 				$opts[$desc.' (Kids)'] = 'K';
 			}
-			$CORE_LOCAL->set('qmNumber', $opts);
+			CoreLocal::set('qmNumber', $opts);
 			$plugin_info = new QuickMenus();
 			$ret['main_frame'] = $plugin_info->plugin_url().'/QMDisplay.php';
 			return $ret;
@@ -70,19 +71,18 @@ class AnnualMeetingParser extends Parser {
 			$flag = strtoupper($str[4]);
 			$plu = substr($str,0,4);
 			$price = ($flag == 'K') ? 5.00 : 20.00;
-			TransRecord::addItem(
-				str_pad($plu,13,'0',STR_PAD_LEFT),
-				$this->descriptions[$plu].' ('.$flag.')',
-				'I','','',
-				235, 1.0, 
-				$price, $price, $price,
-				0, 0, 0,
-				0.00, 0.00,
-				0, 0,
-				1.0, 0, 0, 0.00,
-				0, 0, 0,
-				0.00, 0, $flag
-			);
+			TransRecord::addRecord(array(
+				'upc' => str_pad($plu,13,'0',STR_PAD_LEFT),
+				'description' => $this->descriptions[$plu].' ('.$flag.')',
+				'trans_type' => 'I',
+				'department' => 235, 
+                'quantity' => 1.0, 
+                'ItemQtty' => 1.0, 
+                'unitPrice' => $price,
+                'total' => $price,
+                'regPrice' => $price,
+				'charflag' => $flag
+			));
 			$ret['output'] = DisplayLib::lastpage();
 			$ret['redraw_footer'] = True;
 			return $ret;

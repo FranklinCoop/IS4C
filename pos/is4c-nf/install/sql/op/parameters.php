@@ -4,20 +4,16 @@ Table: parameters
 
 Columns:
 	store_id int
-    lane_id int
+	lane_id int
 	param_key varchar
-	param_value smallint
-    is_array int
+	param_value varchar
+	is_array int
 
 Depends on:
     none
 
 Use:
 Partial replacement for ini.php.
-This differs from the lane_config table.
-This contains actual values where as lane_config
-contains PHP code snippets that can
-be written to a file.
 
 Values with store_id=0 (or NULL) and lane_id=0 (or NULL)
 are applied first, then values with the lane's own

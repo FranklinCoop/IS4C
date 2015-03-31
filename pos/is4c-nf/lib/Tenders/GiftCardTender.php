@@ -54,8 +54,8 @@ class GiftCardTender extends TenderModule
     */
     public function preReqCheck()
     {
-        global $CORE_LOCAL;
-        $CORE_LOCAL->set("autoReprint",1);
+        CoreLocal::set("autoReprint",1);
+
         return true;
     }
 }

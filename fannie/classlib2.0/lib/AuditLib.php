@@ -3,14 +3,14 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -20,6 +20,8 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
+
+namespace COREPOS\Fannie\API\lib {
 
 /**
   @class AuditLib
@@ -39,19 +41,19 @@ class AuditLib
     */
     public static function itemUpdate($upc, $likecode=false)
     {
-        global $FANNIE_OP_DB, $FANNIE_URL;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $conf = \FannieConfig::factory();
+        $dbc = \FannieDB::get($conf->get('OP_DB'));
 
-        $product = new ProductsModel($dbc);
+        $product = new \ProductsModel($dbc);
         $product->upc($upc);
         $product->load();
         $desc = $product->description();
 
         $subject = "Item Update notification: ".$upc;
 
-        $message = "Item $upc ($desc) has been changed\n";	
+        $message = "Item $upc ($desc) has been changed\n";  
         $message .= "Price: " . $product->normal_price() . "\n";
-		$taxQ = $dbc->prepare_statement('SELECT description FROM taxrates WHERE id=?');
+        $taxQ = $dbc->prepare_statement('SELECT description FROM taxrates WHERE id=?');
         $taxR = $dbc->execute($taxQ, array($product->tax()));
         $taxname = 'No Tax';
         if ($dbc->num_rows($taxR) > 0) {
@@ -63,13 +65,14 @@ class AuditLib
         $message .= "Scale: " . ($product->scale()==1 ? "Yes" :"No") . "\n";
         $message .= "Discountable: " . ($product->discount()==1 ? "Yes" : "No") . "\n";
         if ($likecode) {
-			$message .= "All items in this likecode ($likecode) were changed\n";
+            $message .= "All items in this likecode ($likecode) were changed\n";
         }
         $message .= "\n";
         $message .= "Adjust this item?\n";
-        $message .= "http://{$_SERVER['SERVER_NAME']}/{$FANNIE_URL}item/ItemEditorPage.php?searchupc=$upc\n";
+        $url = $conf->get('URL');
+        $message .= "http://{$_SERVER['SERVER_NAME']}/{$url}item/ItemEditorPage.php?searchupc=$upc\n";
         $message .= "\n";
-        $username = FannieAuth::checkLogin();
+        $username = \FannieAuth::checkLogin();
         if (!$username) {
             $username = 'unknown';
         }
@@ -88,8 +91,8 @@ class AuditLib
 
     static public function batchNotification($batchID, $upc, $type, $is_likecode=false)
     {
-        global $FANNIE_OP_DB, $FANNIE_URL;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $conf = \FannieConfig::factory();
+        $dbc = \FannieDB::get($conf->get('OP_DB'));
 
         $lc = '';
         $desc = '';
@@ -102,10 +105,12 @@ class AuditLib
             }
             // upc is a like code. find the description
             // and a valid upc (hence inner join)
-            $infoQ = 'SELECT department, likeCodeDesc FROM upcLike AS u
-                    INNER JOIN products AS p ON u.upc=l.upc
-                    LEFT JOIN likeCodes AS l ON u.likeCode=l.likeCode
-                    WHERE u.likeCode=?';
+            $infoQ = 'SELECT p.department,
+                        l.likeCodeDesc 
+                      FROM upcLike AS u
+                        INNER JOIN products AS p ON u.upc=p.upc
+                        LEFT JOIN likeCodes AS l ON u.likeCode=l.likeCode
+                      WHERE u.likeCode=?';
             $infoP = $dbc->prepare($infoQ);
             $infoR = $dbc->execute($infoP, array($lc));
             if ($dbc->num_rows($infoR) == 0) {
@@ -129,11 +134,11 @@ class AuditLib
             return false;
         }
 
-        $batch = new BatchesModel($dbc);
+        $batch = new \BatchesModel($dbc);
         $batch->batchID($batchID);
         $batch->load();
 
-        $batchList = new BatchListModel($dbc);
+        $batchList = new \BatchListModel($dbc);
         $batchList->upc($upc);
         $batchList->batchID($batchID);
         $batchList->load();
@@ -166,9 +171,10 @@ class AuditLib
 
         $message .= "\n";
         $message .= "Go to the batch page:\n";
-        $message .= "http://{$_SERVER['SERVER_NAME']}{$FANNIE_URL}batches/newbatch/\n";
+        $url = $conf->get('URL');
+        $message .= "http://{$_SERVER['SERVER_NAME']}{$url}batches/newbatch/\n";
         $message .= "\n";
-        $username = FannieAuth::checkLogin();
+        $username = \FannieAuth::checkLogin();
         if (!$username) {
             $username = 'unknown';
         }
@@ -188,15 +194,15 @@ class AuditLib
     */
     public static function getAddresses($dept)
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $conf = \FannieConfig::factory();
+        $dbc = \FannieDB::get($conf->get('OP_DB'));
         
         $query = 'SELECT superID from superdepts WHERE dept_ID=? GROUP BY superID';
         $prep = $dbc->prepare($query);
         $res = $dbc->execute($prep, array($dept));
         $emails = '';
         while($row = $dbc->fetch_row($res)) {
-            $model = new SuperDeptEmailsModel($dbc);
+            $model = new \SuperDeptEmailsModel($dbc);
             $model->superID($row['superID']);
             if (!$model->load()) {
                 continue;
@@ -212,5 +218,11 @@ class AuditLib
 
         return ($emails === '') ? false : $emails;
     }
+}
+
+}
+
+namespace {
+    class AuditLib extends \COREPOS\Fannie\API\lib\AuditLib {}
 }
 

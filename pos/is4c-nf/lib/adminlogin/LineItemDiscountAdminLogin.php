@@ -36,8 +36,8 @@ class LineItemDiscountAdminLogin
     static public function adminLoginCallback($success)
     {
         if ($success) {
-            $CORE_LOCAL->set('strRemembered', $CORE_LOCAL->get('strEntered'));
-            $CORE_LOCAL->set('msgrepeat', 1);
+            CoreLocal::set('strRemembered', CoreLocal::get('strEntered'));
+            CoreLocal::set('msgrepeat', 1);
             return true;
         } else {
             return false;

@@ -3,14 +3,14 @@
 
     Copyright 2011 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -31,6 +31,9 @@ class ReportsIndexPage extends FanniePage {
     protected $title = "Fannie : Reports";
     protected $header = "Reports";
 
+    public $description = '[Reports Menu] lists all known reports.';
+    public $themed = true;
+
     public function body_content()
     {
         global $FANNIE_ROOT, $FANNIE_URL;
@@ -38,8 +41,8 @@ class ReportsIndexPage extends FanniePage {
         ob_start();
         $terminology = '
 <ul>
-<li><span style="font-weight:bold;">Terminology (<a href="" onclick="$(\'#terminologyList\').toggle(); return false;">Show/Hide</a>)</span>
-<ul style="display:none;" id="terminologyList">
+<li><strong>Terminology (<a href="" onclick="$(\'#terminologyList\').toggle(); return false;">Show/Hide</a>)</strong>
+<ul class="collapse" id="terminologyList">
 <li>"Buyer" and "Super Department" usually refer to the same kind of thing:
 a grouping of Departments. 
 Some coops organize their Super Departments by Buyer, the person buying, but others do not.
@@ -72,20 +75,20 @@ The Membership Card number, the barcode on the card is different; it is used to 
 All member-related things in IS4C are on the member number.
 </li>
 <li><span style="font-weight:bold;">Download</span>
-	<ul>
-	<li>"Excel", in newer reports, where "CSV" is also an option, refers to a file
-	with formatting similar to that on the page.
-	It is for further use in Excel or another similar spreadsheet program.
-	In older reports, where there is no "CSV" option, it is more like CSV (raw data).
-	</li>
-	<li>"CSV" refers to a file of raw data, without formatting.
-	Literally, "Comma-Separated Values".  Many applications, including Excel, can import this format.
-	</li>
-	</ul>
-	</li>
-	</ul>
+    <ul>
+    <li>"Excel", in newer reports, where "CSV" is also an option, refers to a file
+    with formatting similar to that on the page.
+    It is for further use in Excel or another similar spreadsheet program.
+    In older reports, where there is no "CSV" option, it is more like CSV (raw data).
+    </li>
+    <li>"CSV" refers to a file of raw data, without formatting.
+    Literally, "Comma-Separated Values".  Many applications, including Excel, can import this format.
+    </li>
+    </ul>
+    </li>
+    </ul>
 </li>
-<li><span style="font-weight:bold;">Note</span>
+<li><strong>Note</strong>
 <br />While making these reports it can be useful to have the 
 <a href="../item/ItemEditorPage.php" target="_itemEdit">Item Maintenance</a> application
 open in a separate tab or window as a reference for Manufacturers and Vendors (Distributors).
@@ -119,7 +122,7 @@ open in a separate tab or window as a reference for Manufacturers and Vendors (D
                 );
             }
         }
-        $tools = FannieAPI::listModules('FannieReportTool');
+        $tools = FannieAPI::listModules('\COREPOS\Fannie\API\FannieReportTool');
         foreach($tools as $class) {
             $obj = new $class();
             if (!$obj->discoverable) {

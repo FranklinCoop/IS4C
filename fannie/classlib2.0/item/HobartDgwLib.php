@@ -3,7 +3,7 @@
 
     Copyright 2014 Whole Foods Co-op, Duluth, MN
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -20,6 +20,8 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
+
+namespace COREPOS\Fannie\API\item {
 
 class HobartDgwLib 
 {
@@ -103,16 +105,19 @@ class HobartDgwLib
         One additional key, ExpandedText, is used to write Expanded Text. This
         is separate from the Write Item operation so it's excluded from that
         set of fields.
+      @param $scales [keyed array, optional] List of scales items will be written to
+        Must have keys "host", "type", and "dept". 
+        May have boolean value with key "new".
     */
-    static public function writeItemsToScales($items)
+    static public function writeItemsToScales($items, $scales=array())
     {
-        include(dirname(__FILE__).'/../../config.php');
+        $config = \FannieConfig::factory(); 
         if (!isset($items[0])) {
             $items = array($items);
         }
         $new_item = false;
         $header_line = '';
-        foreach(self::$WRITE_ITEM_FIELDS as $key => $field_info) {
+        foreach (self::$WRITE_ITEM_FIELDS as $key => $field_info) {
             if (isset($items[0][$key])) {
                 $header_line .= $field_info['name'] . ',';
                 if ($key == 'PLU') {
@@ -136,8 +141,12 @@ class HobartDgwLib
 
         $file_prefix = self::sessionKey();
         $output_dir = realpath(dirname(__FILE__) . '/../../item/hobartcsv/csv_output');
+        $selected_scales = $scales;
+        if (!is_array($scales) || count($selected_scales) == 0) {
+            $selected_scales = $config->get('SCALES');
+        }
         $i = 0;
-        foreach($FANNIE_SCALES as $scale) {
+        foreach ($selected_scales as $scale) {
             $file_name = sys_get_temp_dir() . '/' . $file_prefix . '_writeItem_' . $i . '.csv';
             $fp = fopen($file_name, 'w');
             fwrite($fp,"Record Type,Task Department,Task Destination,Task Destination Device,Task Destination Type\r\n");
@@ -164,7 +173,13 @@ class HobartDgwLib
                     $has_et = true;
                     $mode = $new_item ? 'WriteOneExpandedText' : 'ChangeOneExpandedText';
                     fwrite($fp,"Record Type,Expanded Text Number,Expanded Text\r\n");
-                    fwrite($fp, $mode . ',' . $item['PLU'] . ',"' . $item['ExpandedText'] . "\"\r\n");
+                    $text = '';
+                    foreach (explode("\n", $item['ExpandedText']) as $line) {
+                        $text .= wordwrap($line, 50, "\n") . "\n";
+                    }
+                    $text = preg_replace("/\\r/", '', $text);
+                    $text = preg_replace("/\\n/", '<br />', $text);
+                    fwrite($fp, $mode . ',' . $item['PLU'] . ',"' . $text . "\"\r\n");
                 }
             }
             fclose($fp);
@@ -189,7 +204,7 @@ class HobartDgwLib
     */
     static public function deleteItemsFromScales($items)
     {
-        include(dirname(__FILE__).'/../../config.php');
+        $config = \FannieConfig::factory(); 
 
         if (!is_array($items)) {
             $items = array($items);
@@ -198,7 +213,7 @@ class HobartDgwLib
         $file_prefix = self::sessionKey();
         $output_dir = realpath(dirname(__FILE__) . '/../../item/hobartcsv/csv_output');
         $i = 0;
-        foreach($FANNIE_SCALES as $scale) {
+        foreach($config->get('SCALES', array()) as $scale) {
             $file_name = sys_get_temp_dir() . '/' . $file_prefix . '_deleteItem_' . $i . '.csv';
             $et_name = sys_get_temp_dir() . '/' . $file_prefix . '_deleteText_' . $i . '.csv';
             $fp = fopen($file_name, 'w');
@@ -246,11 +261,10 @@ class HobartDgwLib
     */
     static public function readItemsFromFile($filename)
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = \FannieDB::get(\FannieConfig::factory()->get('OP_DB'));
 
-        $product = new ProductsModel($dbc);
-        $scaleItem = new ScaleItemsModel($dbc);
+        $product = new \ProductsModel($dbc);
+        $scaleItem = new \ScaleItemsModel($dbc);
         
         $fp = fopen($filename, 'r');
         // detect column indexes via header line
@@ -340,11 +354,10 @@ class HobartDgwLib
     */
     static public function readTextsFromFile($filename)
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = \FannieDB::get(\FannieConfig::factory()->get('OP_DB'));
 
-        $product = new ProductsModel($dbc);
-        $scaleItem = new ScaleItems($dbc);
+        $product = new \ProductsModel($dbc);
+        $scaleItem = new \ScaleItems($dbc);
 
         $number_index = -1;
         $text_index = -1;
@@ -391,6 +404,62 @@ class HobartDgwLib
         return $item_count;
     }
 
+    /**
+      Get attributes for a given label number
+      @param $label_number [integer]
+      @return keyed array
+        - align => vertical or horizontal
+        - fixed_weight => boolean
+        - graphics => boolean
+    */
+    static public function labelToAttributes($label_number)
+    {
+        $ret = array(
+            'align' => 'vertical',
+            'fixed_weight' => false,
+            'graphics' => false,
+        );
+        switch ($label_number) {
+            case 23:
+                $ret['fixed_weight'] = true;
+                break;
+            case 53:
+                $ret['graphics'] = true;
+                break;
+            case 63:
+                $ret['fixed_weight'] = true;
+                $ret['align'] = 'horizontal';
+                break;
+            case 103:
+                break;
+            case 113:
+                $ret['align'] = 'horizontal';
+                break;
+        }
+
+        return $ret;
+    }
+
+    /**
+      Get appropriate label number for given attributes
+      @param $align [string] vertical or horizontal
+      @param $fixed_weight [boolean, default false]
+      @param $graphics [boolean, default false]
+      @return [integer] label number
+    */
+    static public function attributesToLabel($align, $fixed_weight=false, $graphics=false)
+    {
+        if ($graphics) {
+            return 53;
+        }
+
+        if ($align == 'horizontal') {
+            return ($fixed_weight) ? 63 : 113;
+        } else {
+            return ($fixed_weight) ? 23 : 103;
+        }
+    }
+
     static private function scalePluToUpc($plu)
     {
         // convert PLU to UPC
@@ -413,5 +482,11 @@ class HobartDgwLib
 
         return $session_key;
     }
+}
+
+}
+
+namespace {
+    class HobartDgwLib extends \COREPOS\Fannie\API\item\HobartDgwLib {}
 }
 

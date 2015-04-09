@@ -3,14 +3,14 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -30,6 +30,7 @@ class EquityReport extends FannieReportPage
 {
     public $description = '[Member Equity] lists all equity transactions for a given member';
     public $report_set = 'Membership';
+    public $themed = true;
 
     protected $report_headers = array('Date', 'Receipt', 'Amount', 'Type');
     protected $sort_direction = 1;
@@ -37,7 +38,7 @@ class EquityReport extends FannieReportPage
     protected $header = "Equity Activity Report";
     protected $required_fields = array('memNum');
 
-	public function preprocess()
+    public function preprocess()
     {
         $this->card_no = FormLib::get('memNum','');
 
@@ -49,7 +50,7 @@ class EquityReport extends FannieReportPage
         return array('Activity for account #'.$this->card_no);
     }
 
-	public function fetch_report_data()
+    public function fetch_report_data()
     {
         global $FANNIE_OP_DB,$FANNIE_TRANS_DB, $FANNIE_URL;
         $dbc = FannieDB::get($FANNIE_OP_DB);
@@ -80,10 +81,14 @@ class EquityReport extends FannieReportPage
 
     public function form_content()
     {
+        $this->add_onload_command('$(\'#memNum\').focus()');
         return '<form method="get" action="EquityReport.php">
-            <b>Member #</b> <input type="text" name="memNum" value="" size="6" />
-            <br /><br />
-            <input type="submit" value="Get Report" />
+            <label>Member #</label>
+            <input type="text" name="memNum" value="" 
+                id="memNum" class="form-control" />
+            <p>
+            <button type="submit" class="btn btn-default">Get Report</button>
+            </p>
             </form>';
     }
 

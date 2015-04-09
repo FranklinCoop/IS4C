@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -24,56 +24,12 @@
 class FannieDispatch 
 {
 
-    /**
-      Helper: get output-appropriate newline
-    */
-    static private function nl()
-    {
-        if (php_sapi_name() == 'cli') { 
-            return "\n";
-        } else {
-            return "<br />";
-        }
-    }
-    
-    /**
-      Helper: get output-appropriate tab
-    */
-    static private function tab()
-    {
-        if (php_sapi_name() == 'cli') {
-            return "\t";
-        } else {
-            return "<li>";
-        }
-    }
+    private static $logger;
 
-    /**
-      Helper: tabs in html are implemented with <li> tags
-      but the first block of a given indentation level
-      needs a <ul> tag
-    */
-    static private function indent()
+    static private function setLogger($l)
     {
-        if (php_sapi_name() == 'cli') {
-            return "";
-        } else {
-            return "<ul>";
-        }
+        self::$logger = $l;
     }
-
-    /**
-      Helper: reverse of indent()
-    */
-    static private function outdent()
-    {
-        if (php_sapi_name() == 'cli') {
-            return "";
-        } else {
-            return "</ul>";
-        }
-    }
-
 
     /**
       Error handler function. Can register as PHP's error
@@ -81,8 +37,11 @@ class FannieDispatch
     */
     static public function errorHandler($errno, $errstr, $errfile='', $errline=0, $errcontext=array())
     {
-        echo $errstr.' Line '.$errline.', '.$errfile.self::nl();
-        self::printStack(debug_backtrace());
+        $msg = $errstr . ' Line '
+                . $errline
+                . ', '
+                . $errfile;
+        self::$logger->debug($msg);
 
         return true;
     }
@@ -93,41 +52,14 @@ class FannieDispatch
     */
     static public function exceptionHandler($exception)
     {
-        echo $exception->getMessage()." Line ".$exception->getLine().", ".$exception->getFile().self::nl();
-        self::printStack($exception->getTrace());
+        $msg = $exception->getMessage()
+                . " Line "
+                . $exception->getLine()
+                . ", "
+                . $exception->getFile();
+        self::$logger->debug($msg);
     }
     
-    /**
-      Print entire call stack
-      @param $stack [array] current call stack
-    */
-    static public function printStack($stack)
-    {
-        echo "STACK:".self::nl();
-        $i = 1;
-        foreach($stack as $frame) {
-            if (!isset($frame['line'])) $frame['line']=0;
-            if (!isset($frame['file'])) $frame['file']='File not given';
-            if (!isset($frame['args'])) $frame['args'] =array();
-            if (isset($frame['class'])) $frame['function'] = $frame['class'].'::'.$frame['function'];
-            echo self::indent();
-            echo "Frame $i".self::nl();
-            echo self::tab().$frame['function'].'(';
-            $args = '';
-            foreach($frame['args'] as $arg) {
-                $args .= $arg.', ';
-            }
-            $args = rtrim($args);
-            $args = rtrim($args,',');
-            echo $args.')'.self::nl();
-            echo self::tab().'Line '.$frame['line'].', '.$frame['file'].self::nl();
-            $i++;
-        }
-        for ($j=0; $j < ($i-1); $j++) {
-            echo self::outdent();
-        }
-    }
-
     /**
       Try to print a call stack on fatal errors
       if the environment / configuration permits
@@ -142,19 +74,17 @@ class FannieDispatch
 
     /**
       Log page load in usageStats table
+      @param $dbc [SQLManager] database connection
       @return [boolean] success / fail
     */
-    static public function logUsage()
+    static public function logUsage(SQLManager $dbc, $op_db)
     {
-        global $FANNIE_OP_DB;
-
         if (php_sapi_name() === 'cli') {
             // don't log cli usage
             return false;
         }
 
-        $dbc = FannieDB::get($FANNIE_OP_DB);
-        if (!$dbc || !isset($dbc->connections[$FANNIE_OP_DB]) || $dbc->connections[$FANNIE_OP_DB] == false) {
+        if (!$dbc || !isset($dbc->connections[$op_db]) || $dbc->connections[$op_db] == false) {
             // database unavailable
             return false;
         }
@@ -178,7 +108,7 @@ class FannieDispatch
 
     static public function i18n()
     {
-        if (function_exists('bindtextdomain')) {
+        if (function_exists('bindtextdomain') && defined('LC_MESSAGES')) {
             setlocale(LC_MESSAGES, "en_US");
             bindtextdomain('messages', realpath(dirname(__FILE__).'/../locale'));
             bind_textdomain_codeset('messages', 'UTF-8');
@@ -186,43 +116,11 @@ class FannieDispatch
         }
     }
 
-    /**
-      Render the current page if appropriate
-      The page is only shown if it's accessed
-      directly rather than through an include().
-    */
-    static public function go()
+    static public function setErrorHandlers()
     {
-        $bt = debug_backtrace();
-        // go() is the only function on the stack
-        if (count($bt) == 1) {
-
-            // log PHP errors local to Fannie
-            $elog = realpath(dirname(__FILE__).'/../logs/').'/php-errors.log';
-            ini_set('error_log', $elog);
-    
-            // use stack traces if desired
-            include(dirname(__FILE__).'/../config.php');
-            if (isset($FANNIE_CUSTOM_ERRORS) && $FANNIE_CUSTOM_ERRORS) {
-                set_error_handler(array('FannieDispatch','errorHandler'));
-                set_exception_handler(array('FannieDispatch','exceptionHandler'));
-                register_shutdown_function(array('FannieDispatch','catchFatal'));
-            }
-
-            // initialize locale & gettext
-            self::i18n();
-            // write URL log
-            self::logUsage();
-
-            $page = basename($_SERVER['PHP_SELF']);
-            $class = substr($page,0,strlen($page)-4);
-            if (class_exists($class)) {
-                $obj = new $class();
-                $obj->draw_page();
-            } else {
-                trigger_error('Missing class '.$class, E_USER_NOTICE);
-            }
-        }
+        set_error_handler(array('FannieDispatch','errorHandler'));
+        set_exception_handler(array('FannieDispatch','exceptionHandler'));
+        register_shutdown_function(array('FannieDispatch','catchFatal'));
     }
 
     /**
@@ -242,29 +140,27 @@ class FannieDispatch
         $bt = debug_backtrace();
         // conditionalExec() is the only function on the stack
         if (count($bt) == 1) {
+            $config = FannieConfig::factory();
+            $logger = new FannieLogger();
+            $op_db = $config->get('OP_DB');
+            $dbc = FannieDB::get($op_db);
+            self::setLogger($logger);
 
-            // log PHP errors local to Fannie
-            $elog = realpath(dirname(__FILE__).'/../logs/').'/php-errors.log';
-            ini_set('error_log', $elog);
-    
-            // use stack traces if desired
-            include(dirname(__FILE__).'/../config.php');
-            if (isset($FANNIE_CUSTOM_ERRORS) && $FANNIE_CUSTOM_ERRORS) {
-                set_error_handler(array('FannieDispatch','errorHandler'));
-                set_exception_handler(array('FannieDispatch','exceptionHandler'));
-                register_shutdown_function(array('FannieDispatch','catchFatal'));
-            }
-
+            // setup error logging
+            self::setErrorHandlers();
             // initialize locale & gettext
             self::i18n();
             // write URL log
-            self::logUsage();
+            self::logUsage($dbc, $op_db);
 
             // draw current page
             $page = basename($_SERVER['PHP_SELF']);
             $class = substr($page,0,strlen($page)-4);
             if ($class != 'index' && class_exists($class)) {
                 $obj = new $class();
+                $obj->setConfig($config);
+                $obj->setLogger($logger);
+                $obj->setConnection($dbc);
                 $obj->draw_page();
             } else {
                 trigger_error('Missing class '.$class, E_USER_NOTICE);

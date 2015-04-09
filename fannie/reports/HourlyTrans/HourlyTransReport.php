@@ -3,14 +3,14 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -30,6 +30,7 @@ class HourlyTransReport extends FannieReportPage
 {
     public $description = '[Hourly Transactions] lists transactions per hour over a given date range.';
     public $report_set = 'Sales Reports';
+    public $themed = true;
 
     protected $title = "Fannie : Hourly Transactions Report";
     protected $header = "Hourly Transactions";
@@ -39,31 +40,27 @@ class HourlyTransReport extends FannieReportPage
     protected $sortable = false;
     protected $no_sort_but_style = true;
 
-	public function preprocess()
+    public function preprocess()
     {
         parent::preprocess();
         // custom: needs graphing JS/CSS
         if ($this->content_function == 'report_content' && $this->report_format == 'html') {
-            $this->add_script('../../src/d3.js/d3.v3.min.js');
-            $this->add_script('../../src/d3.js/charts/singleline/singleline.js');
-            $this->add_css_file('../../src/d3.js/charts/singleline/singleline.css');
-		}
+            $this->add_script('../../src/javascript/d3.js/d3.v3.min.js');
+            $this->add_script('../../src/javascript/d3.js/charts/singleline/singleline.js');
+            $this->add_css_file('../../src/javascript/d3.js/charts/singleline/singleline.css');
+        }
 
-		return true;
-	}
+        return true;
+    }
 
     public function report_description_content()
     {
-        $date1 = FormLib::get('date1', date('Y-m-d'));
-        $date2 = FormLib::get('date2', date('Y-m-d'));
         $deptStart = FormLib::get('deptStart');
         $deptEnd = FormLib::get('deptEnd');
         $weekday = FormLib::get('weekday', 0);
         $buyer = FormLib::get('buyer', '');
-	
+    
         $ret = array();
-        $ret[] = 'Hourly Transactions Report';
-        $ret[] = 'From '.$date1.' to '.$date2;
         if ($buyer === '') {
             $ret[] = 'Department '.$deptStart.' to '.$deptEnd;
         } else if ($buyer == -1) {
@@ -77,7 +74,7 @@ class HourlyTransReport extends FannieReportPage
         }
 
         if ($this->report_format == 'html') {
-            $ret[] = sprintf('<a href="../HourlySales/HourlySalesReport.php?%s">Sales for Same Period</a>', 
+            $ret[] = sprintf(' <a href="../HourlySales/HourlySalesReport.php?%s">Sales for Same Period</a>', 
                             $_SERVER['QUERY_STRING']);
         }
 
@@ -114,7 +111,7 @@ class HourlyTransReport extends FannieReportPage
         $deptStart = FormLib::get('deptStart');
         $deptEnd = FormLib::get('deptEnd');
         $weekday = FormLib::get('weekday', 0);
-	
+    
         $buyer = FormLib::get('buyer', '');
 
         // args/parameters differ with super
@@ -230,7 +227,7 @@ class HourlyTransReport extends FannieReportPage
         }
         
         return $data;
-	}
+    }
 
     public function calculate_footers($data)
     {
@@ -286,7 +283,7 @@ function showGraph(i) {
 
     var xdata = Array();
     $('td.reportColumn0').each(function(){
-        var hour = $(this).html().substring(0,2);
+        var hour = $(this).html().trim().substring(0,2);
         if (hour.charAt(0) == '0') {
             hour = hour.charAt(1);
         }
@@ -339,74 +336,102 @@ function showGraph(i) {
 
         ob_start();
         ?>
-<script type="text/javascript">
-function swap(src,dst){
-    var val = document.getElementById(src).value;
-    document.getElementById(dst).value = val;
-}
-</script>
-<div id=main>	
-<form method = "get" action="HourlyTransReport.php">
-	<table border="0" cellspacing="0" cellpadding="5">
-		<tr>
-			<td><b>Select Buyer/Dept</b></td>
-			<td><select id=buyer name=buyer>
-			   <option value=""></option>
-			   <?php echo $deptSubList; ?>
-			   <option value=-1 >All</option>
-			   </select>
- 			</td>
-			<td><b>Send to Excel</b></td>
-			<td><input type=checkbox name=excel id=excel value=1></td>
-		</tr>
-		<tr>
-			<td colspan=5><i>Selecting a Buyer/Dept overrides Department Start/Department End, but not Date Start/End.
-			To run reports for a specific department(s) leave Buyer/Dept or set it to 'blank'</i></td>
-		</tr>
-		<tr> 
-			<td> <p><b>Department Start</b></p>
-			<p><b>End</b></p></td>
-			<td> <p>
- 			<select id=deptStartSel onchange="swap('deptStartSel','deptStart');">
-			<?php echo $deptsList ?>
-			</select>
-			<input type=text name=deptStart id=deptStart size=5 value=1 />
-			</p>
-			<p>
-			<select id=deptEndSel onchange="swap('deptEndSel','deptEnd');">
-			<?php echo $deptsList ?>
-			</select>
-			<input type=text name=deptEnd id=deptEnd size=5 value=1 />
-			</p></td>
-
-			 <td>
-			<p><b>Date Start</b> </p>
-		         <p><b>End</b></p>
-		       </td>
-		            <td>
-		             <p>
-		               <input type=text id=date1 name=date1 onfocus="this.value='';showCalendarControl(this);">
-		               </p>
-		               <p>
-		                <input type=text id=date2 name=date2 onfocus="this.value='';showCalendarControl(this);">
-		         </p>
-		       </td>
-
-		</tr>
-		<tr> 
-             <td colspan="2"><input type=checkbox name=weekday value=1>Group by weekday?</td>
-			<td colspan="2" rowspan="2">
-                <?php echo FormLib::date_range_picker(); ?>
-            </td>
-		</tr>
-        <tr>
-			<td> <input type=submit name=submit value="Submit"> </td>
-			<td> <input type=reset name=reset value="Start Over"> </td>
-		</tr>
-	</table>
+<div class="well">Selecting a Buyer/Dept overrides Department Start/Department End, but not Date Start/End.
+        To run reports for a specific department(s) leave Buyer/Dept or set it to 'blank'
+</div>
+<form method="get" action="HourlyTransReport.php" class="form-horizontal">
+<div class="row">
+    <div class="col-sm-5">
+        <div class="form-group">
+            <label class="control-label col-sm-4">Select Buyer/Dept</label>
+            <div class="col-sm-8">
+            <select id=buyer name=buyer class="form-control">>
+               <option value=0 >
+               <?php echo $deptSubList; ?>
+               <option value=-2 >All Retail</option>
+               <option value=-1 >All</option>
+           </select>
+           </div>
+        </div>
+        <div class="form-group">
+            <label class="control-label col-sm-4">Department Start</label>
+            <div class="col-sm-6">
+            <select id=deptStartSel onchange="$('#deptStart').val(this.value);" class="form-control col-sm-6">
+                <?php echo $deptsList ?>
+            </select>
+            </div>
+            <div class="col-sm-2">
+            <input type=number name=deptStart id=deptStart size=5 value=1 class="form-control col-sm-2" />
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="control-label col-sm-4">Department End</label>
+            <div class="col-sm-6">
+                <select id=deptEndSel onchange="$('#deptEnd').val(this.value);" class="form-control">
+                    <?php echo $deptsList ?>
+                </select>
+            </div>
+            <div class="col-sm-2">
+                <input type=number name=deptEnd id=deptEnd size=5 value=1 class="form-control" />
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-4 control-label">
+                Group by weekday?
+                <input type=checkbox name=weekday value=1>
+            </label>
+        </div>
+        <div class="form-group">
+            <label class="control-label col-sm-4">Save to Excel
+                <input type=checkbox name=excel id=excel value=1>
+            </label>
+            <label class="col-sm-4 control-label">Store</label>
+            <div class="col-sm-4">
+                <?php $ret=FormLib::storePicker();echo $ret['html']; ?>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-5">
+        <div class="form-group">
+            <label class="col-sm-4 control-label">Start Date</label>
+            <div class="col-sm-8">
+                <input type=text id=date1 name=date1 class="form-control date-field" required />
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-4 control-label">End Date</label>
+            <div class="col-sm-8">
+                <input type=text id=date2 name=date2 class="form-control date-field" required />
+            </div>
+        </div>
+        <div class="form-group">
+            <?php echo FormLib::date_range_picker(); ?>                            
+        </div>
+    </div>
+</div>
+    <p>
+        <button type=submit name=submit value="Submit" class="btn btn-default">Submit</button>
+        <button type=reset name=reset class="btn btn-default">Start Over</button>
+    </p>
 </form>
         <?php
+
         return ob_get_clean();
+    }
+
+    public function helpContent()
+    {
+        return '<p>This report shows the number of transaction per hour
+             over a range of dates.
+            The rows are always hours. The columns are either calendar
+            dates or named weekdays (e.g., Monday, Tuesday) if grouping
+            by week day.</p>
+            <p>If a <em>Buyer/Dept</em> option is used, the result will
+            be transactions from that super department. Otherwise, the result
+            will be transactions from the specified department range. Note there
+            are a couple special options in the <em>Buyer/Dept</em> list:
+            <em>All</em> is simply all transactions and <em>All Retail</em> is
+            everything except for super department #0 (zero).</p>';
     }
 }
 

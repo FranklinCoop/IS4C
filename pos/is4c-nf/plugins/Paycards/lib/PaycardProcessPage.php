@@ -48,7 +48,7 @@ class PaycardProcessPage extends BasicPage {
 
 	function PaycardProcessPage(){
 		$this->action = "";
-		parent::BasicPage();
+		parent::__construct();
 	}
 
 	/**
@@ -70,7 +70,7 @@ class PaycardProcessPage extends BasicPage {
 						$.ajax({url: '<?php echo $this->page_url; ?>ajax-callbacks/ajax-end.php',
 							cache: false,
 							type: 'post',
-							data: 'receiptType='+data.receipt,
+                            data: 'receiptType='+data.receipt+'&ref=<?php echo ReceiptLib::receiptNumber(); ?>',
 							error: function(){
 								location = destination;
 							},

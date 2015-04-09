@@ -61,14 +61,14 @@ class login3 extends BasicPage {
 
 	function head_content(){
 		$this->default_parsewrapper_js('scannerInput');
+        $this->add_onload_command("\$('#formlocal').append('<input type=\"hidden\" name=\"scannerInput\" id=\"scannerInput\" />');");
 	}
 
-	function body_content(){
-		global $CORE_LOCAL;
+	function body_content()
+    {
 		$this->input_header();
 		echo DisplayLib::printheaderb();
 		?>
-		<input type="hidden" name="scannerInput" id="scannerInput" value="" />
 		<div class="baseHeight">
 			<div class="<?php echo $this->color; ?> centeredDisplay">
 			<img alt="key" src='<?php echo $this->img ?>' />

@@ -3,14 +3,14 @@
 
     Copyright 2013 Whole Foods Community Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -23,13 +23,13 @@
 ?>
 <html>
 <head>
-	<title>Handheld tools</title>
+    <title>Handheld tools</title>
 <meta name="viewport" content="width=device-width; initial-scale=1.0;">
 </head>
 <body>
 <ul>
-	<li><a href="handheld.php">Item Editor</a></li>
-	<li><a href="hhStatus.php">Status Check</a></li>
+    <li><a href="handheld.php">Item Editor</a></li>
+    <li><a href="hhStatus.php">Status Check</a></li>
 </ul>
 </body>
 </html>

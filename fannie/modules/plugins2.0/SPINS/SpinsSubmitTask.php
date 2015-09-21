@@ -88,7 +88,7 @@ class SpinsSubmitTask extends FannieTask
 
         $dlog = DTransactionsModel::selectDlog(date('Y-m-d', $start), date('Y-m-d',$end));
 
-        $lastDay = date("M d, Y", $end-86400) . ' 11:59PM'; 
+        $lastDay = 'GFM02' . date("M d, Y", $end-86400) . ' 11:59PM'; 
 
         echo $this->cronMsg('SPINS data for week #' . $iso_week . '(' . date('Y-m-d', $start) . ' to ' . date('Y-m-d', $end) . ')');
 

@@ -88,7 +88,7 @@ class SpinsSubmitTask extends FannieTask
 
         $dlog = DTransactionsModel::selectDlog(date('Y-m-d', $start), date('Y-m-d',$end));
 
-        $lastDay = 'GFM02' . date("M d, Y", $end-86400) . ' 11:59PM'; 
+        $lastDay = date("M d, Y", $end-86400) . ' 11:59PM'; 
 
         echo $this->cronMsg('SPINS data for week #' . $iso_week . '(' . date('Y-m-d', $start) . ' to ' . date('Y-m-d', $end) . ')');
 
@@ -105,7 +105,7 @@ class SpinsSubmitTask extends FannieTask
                     AND tdate BETWEEN ? AND ?
                   GROUP BY d.upc, p.description";
 
-        $filename = date('mdY', $end) . '.csv';
+        $filename = 'GFM02' . date('mdY', $end) . '.csv';
         $outfile = sys_get_temp_dir()."/".$filename;
         $fp = fopen($outfile,"w");
 

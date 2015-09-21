@@ -77,9 +77,9 @@ class SpinsSubmitTask extends FannieTask
         // First day of ISO week is a Monday
         $start = strtotime($year . 'W' . str_pad($iso_week, 2, '0', STR_PAD_LEFT));
         // Backtrack to Sunday
-        while(date('w', $start) != 0) {
-            $start = mktime(0,0,0,date('n',$start),date('j',$start)+1,date('Y',$start));
-        }
+        //while(date('w', $start) != 0) {
+        //    $start = mktime(0,0,0,date('n',$start),date('j',$start)+1,date('Y',$start));
+        //}
         // walk forward to Saturday
         $end = $start;
         while(date('w', $end) != 6) {
@@ -105,7 +105,7 @@ class SpinsSubmitTask extends FannieTask
                     AND tdate BETWEEN ? AND ?
                   GROUP BY d.upc, p.description";
 
-        $filename = 'GFM02' . date('mdY', $end) . '.csv';
+        $filename = 'GFM02_' . date('mdY', $end) . '.csv';
         $outfile = sys_get_temp_dir()."/".$filename;
         $fp = fopen($outfile,"w");
 

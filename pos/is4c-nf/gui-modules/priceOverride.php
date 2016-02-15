@@ -25,8 +25,8 @@ include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
 class PriceOverride extends NoInputCorePage {
 
-    var $description;
-    var $price;
+    private $item_description = '';
+    private $price = '';
 
     function preprocess()
     {
@@ -34,7 +34,7 @@ class PriceOverride extends NoInputCorePage {
         $dbc = Database::tDataConnect();
         
         $query = "SELECT description,total,department FROM localtemptrans
-            WHERE trans_type IN ('I','D') AND trans_status IN ('', ' ', '0')
+            WHERE trans_type IN ('I','D') AND upc <> '0'
             AND trans_id=".((int)$line_id);
         $res = $dbc->query($query);
         if ($dbc->num_rows($res)==0){
@@ -43,7 +43,7 @@ class PriceOverride extends NoInputCorePage {
             return false;
         }
         $row = $dbc->fetch_row($res);
-        $this->description = $row['description'];
+        $this->item_description = $row['description'];
         $this->price = sprintf('$%.2f',$row['total']);
 
         if (isset($_REQUEST['reginput'])){
@@ -57,7 +57,7 @@ class PriceOverride extends NoInputCorePage {
                 $this->change_page($this->page_url."gui-modules/pos2.php");
                 return False;
             } elseif (is_numeric($input) && $input != 0){
-                $this->rePrice($input);
+                $this->rePrice($input, $line_id, $this->isBottleReturn($row['department']));
                 $this->change_page($this->page_url."gui-modules/pos2.php");
                 return false;
             }
@@ -75,21 +75,39 @@ class PriceOverride extends NoInputCorePage {
         $res = $dbc->query($query);
     }
 
-    private function rePrice($input)
+    private function isBottleReturn($dept)
+    {
+        if ($dept == CoreLocal::get("BottleReturnDept")) {
+            return true;
+        } else {
+            $deptmods = CoreLocal::get('SpecialDeptMap');
+            if (is_array($deptmods) && isset($deptmods[$row['department']])){
+                foreach($deptmods[$row['department']] as $mod){
+                    if ($mod === 'BottleReturnDept') {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+    }
+
+    private function rePrice($input, $line_id, $negate)
     {
         $dbc = Database::tDataConnect();
         $cents = 0;
         $dollars = 0;
-        if (strlen($input)==1 || strlen($input)==2)
+        if (strlen($input)==1 || strlen($input)==2) {
             $cents = $input;
-        else {
+        } else {
             $cents = substr($input,-2);
             $dollars = substr($input,0,strlen($input)-2);
         }
         $ttl = ((int)$dollars) + ((int)$cents / 100.0);
         $ttl = number_format($ttl,2);
-        if ($row['department'] == CoreLocal::get("BottleReturnDept"))
+        if ($negate) {
             $ttl = $ttl * -1;
+        }
             
         $query = sprintf("UPDATE localtemptrans SET unitPrice=%.2f, regPrice=%.2f,
             total = quantity*%.2f, charflag='PO'
@@ -107,7 +125,7 @@ class PriceOverride extends NoInputCorePage {
             id="overrideform" action="<?php echo filter_input(INPUT_SERVER, 'PHP_SELF'); ?>">
         <input type="text" id="reginput" name='reginput' tabindex="0" onblur="$('#reginput').focus()" />
         </form>
-        <span><?php echo $this->description; ?> - <?php echo $this->price; ?></span>
+        <span><?php echo $this->item_description; ?> - <?php echo $this->price; ?></span>
         <p>
         <span class="smaller">[clear] to cancel</span>
         </p>
@@ -116,6 +134,17 @@ class PriceOverride extends NoInputCorePage {
         <?php
         $this->add_onload_command("\$('#reginput').focus();\n");
     } // END body_content() FUNCTION
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertInternalType('boolean', $this->isBottleReturn(1));
+        $this->rePrice(1, 1, false);
+        $this->rePrice(101, 1, true);
+        $this->markZeroRecord(1);
+        ob_start();
+        $this->body_content();
+        $phpunit->assertNotEquals(0, strlen(ob_get_clean()));
+    }
 }
 
 AutoLoader::dispatch();

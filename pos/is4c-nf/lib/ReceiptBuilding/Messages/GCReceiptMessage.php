@@ -39,12 +39,11 @@ class GCReceiptMessage extends ReceiptMessage
 
     protected function varied_message($ref, $reprint=false, $sigSlip=false)
     {
-        global $CORE_LOCAL;
-        if ($CORE_LOCAL->get('autoReprint') == 1) {
+        if (CoreLocal::get('autoReprint') == 1) {
             $sigSlip = true;
         }
         $date = ReceiptLib::build_time(time());
-        list($emp, $reg, $trans) = explode('-',$ref);
+        list($emp, $reg, $trans) = ReceiptLib::parseRef($ref);
         $slip = '';
 
         // query database for gc receipt info 
@@ -81,12 +80,10 @@ class GCReceiptMessage extends ReceiptMessage
         while($row = $db->fetch_row($result)){
             $slip .= ReceiptLib::centerString("................................................")."\n";
             // store header
-            $slip .= ReceiptLib::centerString($CORE_LOCAL->get("chargeSlip2"))."\n"  // "wedge copy"
-                    . ReceiptLib::centerString("................................................")."\n"
-                    . ReceiptLib::centerString($CORE_LOCAL->get("chargeSlip1"))."\n"  // store name 
-                    . ReceiptLib::centerString($CORE_LOCAL->get("chargeSlip3").", ".$CORE_LOCAL->get("chargeSlip4"))."\n"  // address
-                    . ReceiptLib::centerString($CORE_LOCAL->get("receiptHeader2"))."\n"  // phone
-                    . "\n";
+            for ($i=1; $i<= CoreLocal::get('chargeSlipCount'); $i++) {
+                $slip .= ReceiptLib::centerString(CoreLocal::get("chargeSlip" . $i))."\n";
+            }
+            $slip .= "\n";
             $col1 = array();
             $col2 = array();
             $col1[] = $row['tranType'];

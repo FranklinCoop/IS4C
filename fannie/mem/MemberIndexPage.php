@@ -3,7 +3,7 @@
 
     Copyright 2010 Whole Foods Co-op, Duluth, MN
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -20,30 +20,57 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
-include('../config.php');
-include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+include(dirname(__FILE__) . '/../config.php');
+if (!class_exists('FannieAPI')) {
+    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
 
 class MemberIndexPage extends FanniePage {
 
-	protected $title = "Fannie :: Member Tools";
-	protected $header = "Member Tools";
+    protected $title = "Fannie :: Member Tools";
+    protected $header = "Member Tools";
 
-	function body_content(){
-		ob_start();
-		?>
-		<ul>
-		<li><a href="MemberSearchPage.php">View/Edit Members</a></li>
-		<li><a href="MemberTypeEditor.php">Manage Member Types</a></li>
-		<li><a href="NewMemberTool.php">Create New Members</a></li>
-		<li><a href="numbers/index.php">Print Member Stickers</a></li>
-		<li><a href="MemCorrectionIndex.php ">Equity, AR, &amp; Patronage Corrections</a></li>
-		<li><a href="import/">Import Data</a></li>
-		</ul>
-		<?php
-		return ob_get_clean();
-	}
+    public $description = '[Member Menu] lists member related pages.';
+    public $themed = true;
+
+    function body_content(){
+        ob_start();
+        ?>
+        <ul>
+        <li><a href="MemberSearchPage.php">View/Edit Members</a></li>
+        <li><a href="MemberTypeEditor.php">Manage Member Types</a></li>
+        <li><a href="NewMemberTool.php">Create New Members</a></li>
+        <li><a href="numbers/index.php">Print Member Stickers</a></li>
+        <li><a href="MemCorrectionIndex.php ">Equity, AR, &amp; Patronage Corrections</a></li>
+        <li><a href="import/">Import Data</a></li>
+        </ul>
+        <?php
+        return ob_get_clean();
+    }
+
+    public function helpContent()
+    {
+        return '<p>
+            A collection of membership tools.
+            </p>
+            <p>
+            View/edit is the primary tool for managing individual
+            memberships. Members can be categorized into Member Types.
+            Types can even include customers who are not members
+            of the co-op. Creating new members is oriented towards
+            pre-allocating sets of memberships so they are available
+            for purchase and immediate use. Stickers is perhaps
+            WFC-only. Corrections deal with adjusting activity on
+            and between memberships. Import data is for loading initial
+            data into CORE.
+            </p>';
+    }
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertNotEquals(0, strlen($this->body_content()));
+    }
 }
 
-FannieDispatch::conditionalExec(false);
+FannieDispatch::conditionalExec();
 
-?>

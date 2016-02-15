@@ -21,6 +21,9 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\models\trans;
+use COREPOS\pos\lib\models\BasicModel;
+
 /**
   @class EfsnetRequestModel
 */
@@ -51,294 +54,47 @@ class EfsnetRequestModel extends BasicModel
     'sentTr1' => array('type'=>'TINYINT'),
     'sentTr2' => array('type'=>'TINYINT'),
     'efsnetRequestID' => array('type'=>'INT', 'increment'=>true, 'primary_key'=>true),
-	);
+    );
 
-    /* START ACCESSOR FUNCTIONS */
-
-    public function date()
+    public function doc()
     {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["date"])) {
-                return $this->instance["date"];
-            } elseif(isset($this->columns["date"]["default"])) {
-                return $this->columns["date"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["date"] = func_get_arg(0);
-        }
-    }
+        return '
+Use:
+This table logs information that is
+sent to a credit-card payment gateway.
+All current paycard modules use this table
+structure. Future ones don\'t necessarily have
+to, but doing so may enable more code re-use.
 
-    public function cashierNo()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["cashierNo"])) {
-                return $this->instance["cashierNo"];
-            } elseif(isset($this->columns["cashierNo"]["default"])) {
-                return $this->columns["cashierNo"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["cashierNo"] = func_get_arg(0);
-        }
-    }
+Some column usage may vary depending on a
+given gateway\'s requirements and/or formatting,
+but in general:
 
-    public function laneNo()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["laneNo"])) {
-                return $this->instance["laneNo"];
-            } elseif(isset($this->columns["laneNo"]["default"])) {
-                return $this->columns["laneNo"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["laneNo"] = func_get_arg(0);
-        }
-    }
+cashierNo, laneNo, transNo, and transID are
+equivalent to emp_no, register_no, trans_no, and
+trans_id in dtransactions (respectively).
 
-    public function transNo()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["transNo"])) {
-                return $this->instance["transNo"];
-            } elseif(isset($this->columns["transNo"]["default"])) {
-                return $this->columns["transNo"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["transNo"] = func_get_arg(0);
-        }
-    }
+mode indicates the type of transaction, such as
+refund or sale. Exact value can vary from gateway
+to gateway.
 
-    public function transID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["transID"])) {
-                return $this->instance["transID"];
-            } elseif(isset($this->columns["transID"]["default"])) {
-                return $this->columns["transID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["transID"] = func_get_arg(0);
-        }
-    }
+PAN is the cardnumber - for the love of $deity
+only save the last 4 digits here - issuer is
+Visa, MC, etc, and name is the cardholder\'s name
+(if available).
 
-    public function datetime()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["datetime"])) {
-                return $this->instance["datetime"];
-            } elseif(isset($this->columns["datetime"]["default"])) {
-                return $this->columns["datetime"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["datetime"] = func_get_arg(0);
-        }
-    }
+The sent* columns indicate which information was
+sent. Most gateways will accept PAN + expiration
+date, or either track. Sending both tracks is
+usually fine; I\'ve never seen a system where
+you send all 4 pieces of card info.
 
-    public function refNum()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["refNum"])) {
-                return $this->instance["refNum"];
-            } elseif(isset($this->columns["refNum"]["default"])) {
-                return $this->columns["refNum"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["refNum"] = func_get_arg(0);
-        }
+efsnetRequestID is an incrementing ID columns. This
+is unique at a lane level but not an overall system
+level since different lanes will increment through
+the same ID values. The combination of laneNo and
+efsnetRequestID should be unique though.
+        ';
     }
-
-    public function live()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["live"])) {
-                return $this->instance["live"];
-            } elseif(isset($this->columns["live"]["default"])) {
-                return $this->columns["live"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["live"] = func_get_arg(0);
-        }
-    }
-
-    public function mode()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["mode"])) {
-                return $this->instance["mode"];
-            } elseif(isset($this->columns["mode"]["default"])) {
-                return $this->columns["mode"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["mode"] = func_get_arg(0);
-        }
-    }
-
-    public function amount()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["amount"])) {
-                return $this->instance["amount"];
-            } elseif(isset($this->columns["amount"]["default"])) {
-                return $this->columns["amount"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["amount"] = func_get_arg(0);
-        }
-    }
-
-    public function PAN()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["PAN"])) {
-                return $this->instance["PAN"];
-            } elseif(isset($this->columns["PAN"]["default"])) {
-                return $this->columns["PAN"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["PAN"] = func_get_arg(0);
-        }
-    }
-
-    public function issuer()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["issuer"])) {
-                return $this->instance["issuer"];
-            } elseif(isset($this->columns["issuer"]["default"])) {
-                return $this->columns["issuer"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["issuer"] = func_get_arg(0);
-        }
-    }
-
-    public function name()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["name"])) {
-                return $this->instance["name"];
-            } elseif(isset($this->columns["name"]["default"])) {
-                return $this->columns["name"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["name"] = func_get_arg(0);
-        }
-    }
-
-    public function manual()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["manual"])) {
-                return $this->instance["manual"];
-            } elseif(isset($this->columns["manual"]["default"])) {
-                return $this->columns["manual"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["manual"] = func_get_arg(0);
-        }
-    }
-
-    public function sentPAN()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["sentPAN"])) {
-                return $this->instance["sentPAN"];
-            } elseif(isset($this->columns["sentPAN"]["default"])) {
-                return $this->columns["sentPAN"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["sentPAN"] = func_get_arg(0);
-        }
-    }
-
-    public function sentExp()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["sentExp"])) {
-                return $this->instance["sentExp"];
-            } elseif(isset($this->columns["sentExp"]["default"])) {
-                return $this->columns["sentExp"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["sentExp"] = func_get_arg(0);
-        }
-    }
-
-    public function sentTr1()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["sentTr1"])) {
-                return $this->instance["sentTr1"];
-            } elseif(isset($this->columns["sentTr1"]["default"])) {
-                return $this->columns["sentTr1"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["sentTr1"] = func_get_arg(0);
-        }
-    }
-
-    public function sentTr2()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["sentTr2"])) {
-                return $this->instance["sentTr2"];
-            } elseif(isset($this->columns["sentTr2"]["default"])) {
-                return $this->columns["sentTr2"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["sentTr2"] = func_get_arg(0);
-        }
-    }
-
-    public function pairID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["pairID"])) {
-                return $this->instance["pairID"];
-            } elseif(isset($this->columns["pairID"]["default"])) {
-                return $this->columns["pairID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["pairID"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
 }
 

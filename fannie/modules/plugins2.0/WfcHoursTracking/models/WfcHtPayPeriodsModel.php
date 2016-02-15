@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -35,54 +35,6 @@ class WfcHtPayPeriodsModel extends BasicModel
     'year' => array('type'=>'SMALLINT', 'index'=>true),
     'startDate' => array('type'=>'DATETIME'),
     'endDate' => array('type'=>'DATETIME'),
-	);
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function periodID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["periodID"])) {
-                return $this->instance["periodID"];
-            } elseif(isset($this->columns["periodID"]["default"])) {
-                return $this->columns["periodID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["periodID"] = func_get_arg(0);
-        }
-    }
-
-    public function dateStr()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["dateStr"])) {
-                return $this->instance["dateStr"];
-            } elseif(isset($this->columns["dateStr"]["default"])) {
-                return $this->columns["dateStr"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["dateStr"] = func_get_arg(0);
-        }
-    }
-
-    public function year()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["year"])) {
-                return $this->instance["year"];
-            } elseif(isset($this->columns["year"]["default"])) {
-                return $this->columns["year"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["year"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
+    );
 }
 

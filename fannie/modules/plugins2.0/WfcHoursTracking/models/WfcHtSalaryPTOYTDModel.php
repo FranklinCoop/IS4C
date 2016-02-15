@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ class WfcHtSalaryPTOYTDModel extends BasicModel
     protected $columns = array(
     'empID' => array('type'=>'INT'),
     'totalTaken' => array('type'=>'INT'),
-	);
+    );
 
     public function create()
     {
@@ -48,38 +48,5 @@ class WfcHtSalaryPTOYTDModel extends BasicModel
             return false;
         }
     }
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function empID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["empID"])) {
-                return $this->instance["empID"];
-            } elseif(isset($this->columns["empID"]["default"])) {
-                return $this->columns["empID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["empID"] = func_get_arg(0);
-        }
-    }
-
-    public function totalTaken()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["totalTaken"])) {
-                return $this->instance["totalTaken"];
-            } elseif(isset($this->columns["totalTaken"]["default"])) {
-                return $this->columns["totalTaken"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["totalTaken"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
 }
 

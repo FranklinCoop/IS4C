@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -34,69 +34,6 @@ class WfcHtWeeklyHoursModel extends BasicModel
     'weekEnd' => array('type'=>'DATETIME'),
     'empID' => array('type'=>'INT', 'index'=>true),
     'hours' => array('type'=>'DOUBLE'),
-	);
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function weekStart()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["weekStart"])) {
-                return $this->instance["weekStart"];
-            } elseif(isset($this->columns["weekStart"]["default"])) {
-                return $this->columns["weekStart"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["weekStart"] = func_get_arg(0);
-        }
-    }
-
-    public function weekEnd()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["weekEnd"])) {
-                return $this->instance["weekEnd"];
-            } elseif(isset($this->columns["weekEnd"]["default"])) {
-                return $this->columns["weekEnd"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["weekEnd"] = func_get_arg(0);
-        }
-    }
-
-    public function empID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["empID"])) {
-                return $this->instance["empID"];
-            } elseif(isset($this->columns["empID"]["default"])) {
-                return $this->columns["empID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["empID"] = func_get_arg(0);
-        }
-    }
-
-    public function hours()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["hours"])) {
-                return $this->instance["hours"];
-            } elseif(isset($this->columns["hours"]["default"])) {
-                return $this->columns["hours"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["hours"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
+    );
 }
 

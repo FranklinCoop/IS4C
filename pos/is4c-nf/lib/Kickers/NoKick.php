@@ -26,14 +26,14 @@
   Never open cash drawer
 
 */
-class NoKick 
+class NoKick extends Kicker
 {
 
     /**
       Determine whether to open the drawer
       @return boolean
     */
-    public function doKick()
+    public function doKick($trans_num)
     {
         return false;
     }

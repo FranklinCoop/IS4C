@@ -31,23 +31,33 @@ class Kicker
 
     /**
       Determine whether to open the drawer
+      @param $trans_num [string] transaction identifier
       @return boolean
     */
-    public function doKick()
+    public function doKick($trans_num)
     {
-        global $CORE_LOCAL;
-        if($CORE_LOCAL->get('training') == 1) {
+        if (CoreLocal::get('training') == 1) {
             return false;
         }
-        $db = Database::tDataConnect();
+        $dbc = Database::tDataConnect();
 
-        $query = "select trans_id from localtemptrans where 
-            (trans_subtype = 'CA' and total <> 0)";
+        $query = "SELECT trans_id   
+                  FROM localtranstoday 
+                  WHERE 
+                    (trans_subtype = 'CA' and total <> 0)
+                    AND " . $this->refToWhere($trans_num);
 
-        $result = $db->query($query);
-        $num_rows = $db->num_rows($result);
+        $result = $dbc->query($query);
+        $num_rows = $dbc->num_rows($result);
 
         return ($num_rows > 0) ? true : false;
+    }
+
+    protected function refToWhere($ref)
+    {
+        list($e, $r, $t) = explode('-', $ref, 3);
+        return sprintf(' emp_no=%d AND register_no=%d AND trans_no=%d ',
+                        $e, $r, $t);
     }
 
     /**
@@ -57,8 +67,7 @@ class Kicker
     */
     public function kickOnSignIn()
     {
-        global $CORE_LOCAL;
-        if($CORE_LOCAL->get('training') == 1) {
+        if (CoreLocal::get('training') == 1) {
             return false;
         }
 
@@ -72,12 +81,22 @@ class Kicker
     */
     public function kickOnSignOut()
     {
-        global $CORE_LOCAL;
-        if($CORE_LOCAL->get('training') == 1) {
+        if (CoreLocal::get('training') == 1) {
             return false;
         }
 
         return true;
+    }
+
+    protected function sessionOverride()
+    {
+        // use session to override default behavior
+        // based on specific cashier actions rather
+        // than transaction state
+        $override = CoreLocal::get('kickOverride');
+        CoreLocal::set('kickOverride',false);
+
+        return $override ? true : false;
     }
 }
 

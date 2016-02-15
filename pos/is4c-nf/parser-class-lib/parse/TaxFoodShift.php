@@ -23,64 +23,63 @@
 
 class TaxFoodShift extends Parser {
 
-	function check($str){
-		global $CORE_LOCAL;
-		$id = $CORE_LOCAL->get("currentid");
-		if ($str == "TFS" && $id > 0){
-			return True;
-		}
-		return False;
-	}
+    function check($str)
+    {
+        if ($str == "TFS" && CoreLocal::get('currentid') > 0){
+            return True;
+        }
+        return False;
+    }
 
-	function parse($str){
-		global $CORE_LOCAL;
-		$id = $CORE_LOCAL->get("currentid");
+    function parse($str)
+    {
+        $curID = CoreLocal::get("currentid");
 
-		$db = Database::tDataConnect();
+        $dbc = Database::tDataConnect();
 
-		$q = "SELECT trans_type,tax,foodstamp FROM localtemptrans WHERE trans_id=$id";
-		$r = $db->query($q);
-		if ($db->num_rows($r) == 0) return True; // shouldn't ever happen
-		$row = $db->fetch_row($r);
+        $query = "SELECT trans_type,tax,foodstamp FROM localtemptrans WHERE trans_id=$curID";
+        $res = $dbc->query($query);
+        if ($dbc->num_rows($res) == 0) return True; // shouldn't ever happen
+        $item = $dbc->fetch_row($res);
 
-		$q = "SELECT MAX(id) FROM taxrates";
-		$r = $db->query($q);
-		$tax_cap = 0;
-		if ($db->num_rows($r)>0){
-			$max = array_pop($db->fetch_row($r));
-			if (!empty($max)) $tax_cap = $max;
-		}
-		$db->query($q);	
+        $query = "SELECT MAX(id) FROM taxrates";
+        $res = $dbc->query($query);
+        $tax_cap = 0;
+        if ($dbc->num_rows($res)>0) {
+            $taxID = $dbc->fetch_row($res);
+            $max = $taxID[0];
+            if (!empty($max)) $tax_cap = $max;
+        }
+        $dbc->query($query);    
 
-		$next_tax = $row['tax']+1;
-		$next_fs = 0;
-		if ($next_tax > $max){
-			$next_tax = 0;
-			$next_fs = 1;
-		}
+        $next_tax = $item['tax']+1;
+        $next_fs = 0;
+        if ($next_tax > $max){
+            $next_tax = 0;
+            $next_fs = 1;
+        }
 
-		$q = "UPDATE localtemptrans 
-			set tax=$next_tax,foodstamp=$next_fs 
-			WHERE trans_id=$id";
-		$db->query($q);	
-		
-		$ret = $this->default_json();
-		$ret['output'] = DisplayLib::listItems($CORE_LOCAL->get("currenttopid"),$id);
-		return $ret; // maintain item cursor position
-	}
+        $query = "UPDATE localtemptrans 
+            set tax=$next_tax,foodstamp=$next_fs 
+            WHERE trans_id=$curID";
+        $dbc->query($query);    
+        
+        $ret = $this->default_json();
+        $ret['output'] = DisplayLib::listItems(CoreLocal::get("currenttopid"),$curID);
+        return $ret; // maintain item cursor position
+    }
 
-	function doc(){
-		return "<table cellspacing=0 cellpadding=3 border=1>
-			<tr>
-				<th>Input</th><th>Result</th>
-			</tr>
-			<tr>
-				<td>TFS</td>
-				<td>Roll through tax/foodstamp settings
-				on the current item</td>
-			</tr>
-			</table>";
-	}
+    function doc(){
+        return "<table cellspacing=0 cellpadding=3 border=1>
+            <tr>
+                <th>Input</th><th>Result</th>
+            </tr>
+            <tr>
+                <td>TFS</td>
+                <td>Roll through tax/foodstamp settings
+                on the current item</td>
+            </tr>
+            </table>";
+    }
 }
 
-?>

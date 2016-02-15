@@ -21,20 +21,21 @@
 
 *********************************************************************************/
 
+use COREPOS\pos\lib\FormLib;
+
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
-class HouseCouponList extends NoInputPage 
+class HouseCouponList extends NoInputCorePage 
 {
 
     function preprocess()
     {
-        global $CORE_LOCAL;
-        if (isset($_REQUEST['selectlist'])) {
-            if (!empty($_REQUEST['selectlist'])) {
-                $CORE_LOCAL->set('strRemembered', $_REQUEST['selectlist']);
-                $CORE_LOCAL->set('msgrepeat', 1);
+        if (FormLib::get('selectlist', false) !== false) {
+            $qstr = '';
+            if (FormLib::get('selectlist', false) != '') {
+                $qstr .= '?reginput=' . urlencode(FormLib::get('selectlist')) . '&repeat=1';
             }
-            $this->change_page($this->page_url."gui-modules/pos2.php");
+            $this->change_page($this->page_url."gui-modules/pos2.php" . $qstr);
 
             return false;
         }
@@ -53,35 +54,34 @@ class HouseCouponList extends NoInputPage
     
     function body_content()
     {
-        global $CORE_LOCAL;
-
-        $prefix = $CORE_LOCAL->get('houseCouponPrefix');
+        $prefix = CoreLocal::get('houseCouponPrefix');
         if ($prefix == '') {
             $prefix = '00499999';
         }
 
-        $db = Database::pDataConnect();
+        $dbc = Database::pDataConnect();
         $query = "SELECT h.coupID, h.description
                 FROM houseCoupons AS h
                 WHERE h.description <> ''
-                    AND " . $db->datediff('endDate', $db->now()) . " >= 0
+                    AND " . $dbc->datediff('endDate', $dbc->now()) . " >= 0
                 ORDER BY h.description";
     
-        $result = $db->query($query);
-        $num_rows = $db->num_rows($result);
+        $result = $dbc->query($query);
+        $num_rows = $dbc->num_rows($result);
         ?>
 
         <div class="baseHeight">
         <div class="listbox">
         <form name="selectform" method="post" id="selectform" 
             action="<?php echo $_SERVER['PHP_SELF']; ?>" >
-        <select name="selectlist" size="10" id="selectlist"
+        <select name="selectlist" size="15" id="selectlist"
+            style="min-width: 200px;"
             onblur="$('#selectlist').focus()" >
 
         <?php
         $selected = "selected";
         for ($i = 0; $i < $num_rows; $i++) {
-            $row = $db->fetch_array($result);
+            $row = $dbc->fetch_array($result);
             printf('<option value="%s" %s>%d. %s</option>',
                     ($prefix . str_pad($row['coupID'], 5, '0', STR_PAD_LEFT)),
                     $selected, ($i+1), $row['description']
@@ -91,13 +91,28 @@ class HouseCouponList extends NoInputPage
         ?>
 
         </select>
-        </form>
         </div>
+        <?php
+        if (CoreLocal::get('touchscreen')) {
+            echo '<div class="listbox listboxText">'
+                . DisplayLib::touchScreenScrollButtons('#selectlist')
+                . '</div>';
+        }
+        ?>
         <div class="listboxText coloredText centerOffset">
         <?php echo _("use arrow keys to navigate"); ?><br />
-        <?php echo _("enter to reprint receipt"); ?><br />
-        <?php echo _("clear to cancel"); ?>
+        <p>
+            <button type="submit" class="pos-button wide-button coloredArea">
+            Reprint <span class="smaller">[enter]</span>
+            </button>
+        </p>
+        <p>
+            <button type="submit" class="pos-button wide-button errorColoredArea"
+            onclick="$('#selectlist').append($('<option>').val(''));$('#selectlist').val('');">
+            Cancel <span class="smaller">[clear]</span>
+        </button></p>
         </div>
+        </form>
         <div class="clear"></div>
         </div>
 
@@ -105,8 +120,5 @@ class HouseCouponList extends NoInputPage
     } // END body_content() FUNCTION
 }
 
-if (basename(__FILE__) == basename($_SERVER['PHP_SELF'])) {
-    new HouseCouponList();
-}
+AutoLoader::dispatch();
 
-?>

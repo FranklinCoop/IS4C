@@ -3,7 +3,7 @@
 
     Copyright 2014 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -35,49 +35,6 @@ class GumEquityPayoffMapModel extends BasicModel
     protected $columns = array(
     'gumEquityShareID' => array('type'=>'INT', 'primary_key'=>true),
     'gumPayoffID' => array('type'=>'INT', 'primary_key'=>true),
-	);
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function gumEquityShareID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["gumEquityShareID"])) {
-                return $this->instance["gumEquityShareID"];
-            } else if (isset($this->columns["gumEquityShareID"]["default"])) {
-                return $this->columns["gumEquityShareID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            if (!isset($this->instance["gumEquityShareID"]) || $this->instance["gumEquityShareID"] != func_get_args(0)) {
-                if (!isset($this->columns["gumEquityShareID"]["ignore_updates"]) || $this->columns["gumEquityShareID"]["ignore_updates"] == false) {
-                    $this->record_changed = true;
-                }
-            }
-            $this->instance["gumEquityShareID"] = func_get_arg(0);
-        }
-    }
-
-    public function gumPayoffID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["gumPayoffID"])) {
-                return $this->instance["gumPayoffID"];
-            } else if (isset($this->columns["gumPayoffID"]["default"])) {
-                return $this->columns["gumPayoffID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            if (!isset($this->instance["gumPayoffID"]) || $this->instance["gumPayoffID"] != func_get_args(0)) {
-                if (!isset($this->columns["gumPayoffID"]["ignore_updates"]) || $this->columns["gumPayoffID"]["ignore_updates"] == false) {
-                    $this->record_changed = true;
-                }
-            }
-            $this->instance["gumPayoffID"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
+    );
 }
 

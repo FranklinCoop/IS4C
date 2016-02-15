@@ -21,46 +21,44 @@
 
 *********************************************************************************/
 
-if (!class_exists('FannieAPI'))
-	include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+if (!class_exists('FannieAPI')) {
+    include(dirname(__FILE__) . '/classlib2.0/FannieAPI.php');
+}
 
 /**
 */
-class ShelfAudit extends FanniePlugin {
+class ShelfAudit extends \COREPOS\Fannie\API\FanniePlugin {
 
-	/**
-	  Desired settings. These are automatically exposed
-	  on the 'Plugins' area of the install page and
-	  written to ini.php
-	*/
-	public $plugin_settings = array(
-	'ShelfAuditDB' => array(
-			'label'=>'Database',
-			'default'=>'core_shelfaudit',
-			'description'=>'Database to store plugin-specific inventory tables.
-				Can be one of the default CORE databases or a separate one.'
-		)
-	);
+    /**
+      Desired settings. These are automatically exposed
+      on the 'Plugins' area of the install page and
+      written to ini.php
+    */
+    public $plugin_settings = array(
+    'ShelfAuditDB' => array(
+            'label'=>'Database',
+            'default'=>'core_shelfaudit',
+            'description'=>'Database to store plugin-specific inventory tables.
+                Can be one of the default CORE databases or a separate one.'
+        )
+    );
 
 
-	public $plugin_description = 'Plugin for scanning items on hand';
+    public $plugin_description = 'Plugin for scanning items on hand';
 
-	public function setting_change(){
-		global $FANNIE_ROOT, $FANNIE_PLUGIN_SETTINGS;
+    public function settingChange()
+    {
+        global $FANNIE_ROOT, $FANNIE_PLUGIN_SETTINGS;
 
-		$db_name = $FANNIE_PLUGIN_SETTINGS['ShelfAuditDB'];
-		if (empty($db_name)) return;
+        $db_name = $FANNIE_PLUGIN_SETTINGS['ShelfAuditDB'];
+        if (empty($db_name)) return;
 
-		$dbc = FannieDB::get($db_name);
-
-		$errors = array();
-		$errors[] = $this->plugin_db_struct($dbc, 'sa_inventory', $db_name);
-
-		foreach($errors as $e){
-			if ($e === True) continue;
-			echo 'ShelfAuditPlugin error: '.$e.'<br />';
-		}
-	}
+        $dbc = FannieDB::get($db_name);
+        if (!class_exists('SaInventoryModel')) {
+            include(dirname(__FILE__) . '/models/SaInventoryModel.php');
+        }
+        $obj = new SaInventoryModel($dbc);
+        $obj->create();
+    }
 }
 
-?>

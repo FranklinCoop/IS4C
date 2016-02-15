@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@ class WfcHtHoursYearlyModel extends BasicModel
     'emergencyHours' => array('type'=>'DOUBLE'),
     'rateHours' => array('type'=>'DOUBLE'),
     'totalHours' => array('type'=>'DOUBLE'),
-	);
+    );
 
     public function create()
     {
@@ -58,113 +58,5 @@ class WfcHtHoursYearlyModel extends BasicModel
             return false;
         }
     }
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function empID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["empID"])) {
-                return $this->instance["empID"];
-            } elseif(isset($this->columns["empID"]["default"])) {
-                return $this->columns["empID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["empID"] = func_get_arg(0);
-        }
-    }
-
-    public function year()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["year"])) {
-                return $this->instance["year"];
-            } elseif(isset($this->columns["year"]["default"])) {
-                return $this->columns["year"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["year"] = func_get_arg(0);
-        }
-    }
-
-    public function regularHours()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["regularHours"])) {
-                return $this->instance["regularHours"];
-            } elseif(isset($this->columns["regularHours"]["default"])) {
-                return $this->columns["regularHours"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["regularHours"] = func_get_arg(0);
-        }
-    }
-
-    public function overtimeHours()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["overtimeHours"])) {
-                return $this->instance["overtimeHours"];
-            } elseif(isset($this->columns["overtimeHours"]["default"])) {
-                return $this->columns["overtimeHours"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["overtimeHours"] = func_get_arg(0);
-        }
-    }
-
-    public function emergencyHours()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["emergencyHours"])) {
-                return $this->instance["emergencyHours"];
-            } elseif(isset($this->columns["emergencyHours"]["default"])) {
-                return $this->columns["emergencyHours"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["emergencyHours"] = func_get_arg(0);
-        }
-    }
-
-    public function rateHours()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["rateHours"])) {
-                return $this->instance["rateHours"];
-            } elseif(isset($this->columns["rateHours"]["default"])) {
-                return $this->columns["rateHours"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["rateHours"] = func_get_arg(0);
-        }
-    }
-
-    public function totalHours()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["totalHours"])) {
-                return $this->instance["totalHours"];
-            } elseif(isset($this->columns["totalHours"]["default"])) {
-                return $this->columns["totalHours"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["totalHours"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
 }
 

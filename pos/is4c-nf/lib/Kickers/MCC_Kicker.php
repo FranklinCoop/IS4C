@@ -33,18 +33,21 @@ class MCC_Kicker extends Kicker
       Determine whether to open the drawer
       @return boolean
     */
-    public function doKick()
+    public function doKick($trans_num)
     {
-        global $CORE_LOCAL;
-        if($CORE_LOCAL->get('training') == 1) {
+        if(CoreLocal::get('training') == 1) {
             return false;
         }
-        $db = Database::tDataConnect();
+        $dbc = Database::tDataConnect();
 
-        $query = "select trans_id from localtemptrans where total <> 0";
+        $query = "SELECT trans_id   
+                  FROM localtranstoday 
+                  WHERE 
+                    total <> 0
+                    AND " . $this->refToWhere($trans_num);
 
-        $result = $db->query($query);
-        $num_rows = $db->num_rows($result);
+        $result = $dbc->query($query);
+        $num_rows = $dbc->num_rows($result);
 
         return ($num_rows > 0) ? true : false;
     }
@@ -56,11 +59,6 @@ class MCC_Kicker extends Kicker
     */
     public function kickOnSignIn()
     {
-        global $CORE_LOCAL;
-        if($CORE_LOCAL->get('training') == 1) {
-            return false;
-        }
-
         return false;
     }
 
@@ -71,11 +69,6 @@ class MCC_Kicker extends Kicker
     */
     public function kickOnSignOut()
     {
-        global $CORE_LOCAL;
-        if($CORE_LOCAL->get('training') == 1) {
-            return false;
-        }
-
         return false;
     }
 }

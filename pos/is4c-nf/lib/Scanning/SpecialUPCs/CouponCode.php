@@ -44,14 +44,12 @@ class CouponCode extends SpecialUPC
 
     public function isSpecial($upc)
     {
-        global $CORE_LOCAL;
-
         $upcPrefix = '005';
-        if ($CORE_LOCAL->get('UpcIncludeCheckDigits') == 1) {
+        if (CoreLocal::get('UpcIncludeCheckDigits') == 1) {
             $upcPrefix = '05';
         }
         $eanPrefix = '099';
-        if ($CORE_LOCAL->get('EanIncludeCheckDigits') == 1) {
+        if (CoreLocal::get('EanIncludeCheckDigits') == 1) {
             $eanPrefix = '99';
         }
 
@@ -66,10 +64,8 @@ class CouponCode extends SpecialUPC
         return false;
     }
 
-    public function handle($upc,$json)
+    private function upcToParts($upc)
     {
-        global $CORE_LOCAL;
-
         /**
           Adjust string index of pieces
           based on whether check digits
@@ -78,8 +74,8 @@ class CouponCode extends SpecialUPC
         $man_id_start = 3;
         $fam_start = 8;
         $val_start = 11;
-        if ( ($this->ean && $CORE_LOCAL->get('EanIncludeCheckDigits') == 1) ||
-             (!$this->ean && $CORE_LOCAL->get('UpcIncludeCheckDigits') == 1)
+        if ( ($this->ean && CoreLocal::get('EanIncludeCheckDigits') == 1) ||
+             (!$this->ean && CoreLocal::get('UpcIncludeCheckDigits') == 1)
            ) {
             $man_id_start = 2;
             $fam_start = 9;
@@ -90,41 +86,76 @@ class CouponCode extends SpecialUPC
         $fam = substr($upc, $fam_start, 3);
         $val = substr($upc, $val_start, 2);
 
-        $db = Database::pDataConnect();
+        return array($man_id, $fam, $val, $man_id_start);
+    }
+
+    private function getValue($val)
+    {
+        $dbc = Database::pDataConnect();
         $query = "select Value,Qty from couponcodes where Code = '".$val."'";
-        $result = $db->query($query);
-        $num_rows = $db->num_rows($result);
-
-        if ($num_rows == 0) {
-            $json['output'] = DisplayLib::boxMsg(_("coupon type unknown")."<br />"._("enter coupon manually"));
-            return $json;
-        }
-
+        $result = $dbc->query($query);
+        return $dbc->fetchRow($result);
+    }
+    
+    private function checkLimits($upc, $json)
+    {
+        $dbc = Database::pDataConnect();
         $query2 = "SELECT reason, threshold FROM disableCoupon WHERE upc='$upc'";
-        $result2 = $db->query($query2);
-        if ($result2 && $db->num_rows($result2) > 0) {
-            $row = $db->fetch_row($result2);
+        $result2 = $dbc->query($query2);
+        if ($result2 && $dbc->num_rows($result2) > 0) {
+            $row = $dbc->fetch_row($result2);
             if ($row['threshold'] <= 0) {
-                $json['output'] = DisplayLib::boxMsg(_("coupon disabled")."<br />".$row['reason']);
+                $json['output'] = DisplayLib::boxMsg(
+                    $row['reason'],
+                    _("coupon disabled"),
+                    false,
+                    DisplayLib::standardClearButton()
+                );
                 return $json;
             } else {
                 $transDB = Database::tDataConnect();
-                $q = "SELECT SUM(quantity) FROM localtemptrans WHERE upc='$upc'";
-                $r = $transDB->query($q);
-                if ($transDB->num_rows($r) > 0) {
-                    $w = $transDB->fetch_row($r);
-                    $qty = $w[0];
+                $qtyQ = "SELECT SUM(quantity) FROM localtemptrans WHERE upc='$upc'";
+                $qtyR = $transDB->query($qtyQ);
+                if ($transDB->num_rows($qtyR) > 0) {
+                    $qtyW = $transDB->fetch_row($qtyR);
+                    $qty = $qtyW[0];
                     if ($qty >= $row['threshold']) {
-                        $json['output'] = DisplayLib::boxMsg(_('coupon already applied'));
+                        $json['output'] = DisplayLib::boxMsg(
+                            _('coupon already applied'),
+                            '',
+                            false,
+                            DisplayLib::standardClearButton()
+                        );
                         return $json;
                     }
                 }
             }
         }
 
-        $row = $db->fetch_array($result);
-        $value = $row["Value"];
-        $qty = $row["Qty"];
+        return true;
+    }
+
+    public function handle($upc,$json)
+    {
+        list($man_id, $fam, $val, $man_id_start) = $this->upcToParts($upc);
+
+        $valueInfo = $this->getValue($val);
+        if (!$valueInfo) {
+            $json['output'] = DisplayLib::boxMsg(
+                _("coupon type unknown")."<br />"._("enter coupon manually"),
+                '',
+                false,
+                DisplayLib::standardClearButton()
+            );
+            return $json;
+        }
+        $value = $valueInfo["Value"];
+        $qty = $valueInfo["Qty"];
+
+        $chk = $this->checkLimits($upc, $json);
+        if ($chk !== true) {
+            return $chk;
+        }
 
         if ($fam == "992") { 
             // 992 basically means blanket accept
@@ -134,20 +165,20 @@ class CouponCode extends SpecialUPC
             // (since that's what would happen anyway when the
             // confused cashier does a generic coupon tender)
             $value = MiscLib::truncate2($value);
-            $CORE_LOCAL->set("couponupc",$upc);
-            $CORE_LOCAL->set("couponamt",$value);
+            CoreLocal::set("couponupc",$upc);
+            CoreLocal::set("couponamt",$value);
 
             $dept = 0;
-            $db = Database::tDataConnect();
+            $dbc = Database::tDataConnect();
             // SQL strings are indexed starting w/ one instead of zero
             // hence $man_id_start+1
             $query = "select department from localtemptrans 
                 WHERE substring(upc," . ($man_id_start+1) . ",5)='$man_id' 
                 GROUP BY department
                 ORDER BY count(*) desc";
-            $result = $db->query($query);
-            if ($db->num_rows($result) > 0) {
-                $row = $db->fetch_row($result);
+            $result = $dbc->query($query);
+            if ($dbc->num_rows($result) > 0) {
+                $row = $dbc->fetch_row($result);
                 $dept = $row['department'];
             }
 
@@ -158,7 +189,7 @@ class CouponCode extends SpecialUPC
         }
 
         // validate coupon
-        $db = Database::tDataConnect();
+        $dbc = Database::tDataConnect();
         $fam = substr($fam, 0, 2);
 
         /* the idea here is to track exactly which
@@ -190,12 +221,17 @@ class CouponCode extends SpecialUPC
         $query .= ") and t.trans_status <> 'C'
             group by t.trans_id
             order by t.unitPrice desc";
-        $result = $db->query($query);
-        $num_rows = $db->num_rows($result);
+        $result = $dbc->query($query);
+        $num_rows = $dbc->num_rows($result);
 
         /* no item w/ matching manufacturer */
         if ($num_rows == 0) {
-            $json['output'] = DisplayLib::boxMsg(_("product not found")."<br />"._("in transaction"));
+            $json['output'] = DisplayLib::boxMsg(
+                _("product not found")."<br />"._("in transaction"),
+                '',
+                false,
+                DisplayLib::standardClearButton()
+            );
             return $json;
         }
 
@@ -204,14 +240,14 @@ class CouponCode extends SpecialUPC
         $available = array();
         $emp_no=$transno=$dept=$foodstamp=$tax=-1;
         $act_qty = 0;
-        while($row = $db->fetch_array($result)) {
+        while($row = $dbc->fetch_array($result)) {
             if ($row["itemQtty"] - $row["couponQtty"] > 0) {
-                $id = $row["trans_id"];
-                $available["$id"] = array(0,0);
-                $available["$id"][0] = $row["unitPrice"];
-                $available["$id"][1] += $row["itemQtty"];
-                $available["$id"][1] -= $row["couponQtty"];
-                $act_qty += $available["$id"][1];
+                $trans_id = $row["trans_id"];
+                $available[$trans_id] = array(0,0);
+                $available[$trans_id][0] = $row["unitPrice"];
+                $available[$trans_id][1] += $row["itemQtty"];
+                $available[$trans_id][1] -= $row["couponQtty"];
+                $act_qty += $available[$trans_id][1];
             }
             if ($emp_no == -1) {
                 $emp_no = $row["emp_no"];
@@ -224,18 +260,24 @@ class CouponCode extends SpecialUPC
 
         /* every line has maximum coupons applied */
         if (count($available) == 0) {
-            $json['output'] = DisplayLib::boxMsg(_("Coupon already applied")."<br />"._("for this item"));
+            $json['output'] = DisplayLib::boxMsg(
+                _("Coupon already applied")."<br />"._("for this item"),
+                '',
+                false,
+                DisplayLib::standardClearButton()
+            );
             return $json;
         }
 
         /* insufficient number of matching items */
         if ($qty > $act_qty) {
-            $json['output'] = DisplayLib::boxMsg(sprintf(_("coupon requires %d items"),$qty)."<br />".
-                        sprintf(_("there are only %d item(s)"),$act_qty)."<br />"._("in this transaction"));
+            $msg = sprintf(_("coupon requires %d items"),$qty) . "<br />"
+                 . sprintf(_("there are only %d item(s)"),$act_qty) . "<br />"
+                 . _("in this transaction");
+            $json['output'] = DisplayLib::boxMsg($msg, '', false, DisplayLib::standardClearButton());
             return $json;
         }
         
-
         /* free item, multiple choices
            needs work, obviously */
         if ($value == 0 && count($available) > 1) {
@@ -246,25 +288,25 @@ class CouponCode extends SpecialUPC
         /* log the item(s) this coupon is
            being applied to */
         $applied = 0;
-        foreach(array_keys($available) as $id) {
+        foreach(array_keys($available) as $trans_id) {
             if ($value == 0) {
-                $value = -1 * $available["$id"][0];
+                $value = -1 * $available[$trans_id][0];
             }
-            if ($qty <= $available["$id"][1]) {
+            if ($qty <= $available[$trans_id][1]) {
                 $q = "INSERT INTO couponApplied 
                     (emp_no,trans_no,quantity,trans_id)
                     VALUES (
-                    $emp_no,$transno,$qty,$id)";
-                $r = $db->query($q);
+                    $emp_no,$transno,$qty,$trans_id)";
+                $r = $dbc->query($q);
                 $applied += $qty;
             } else {
                 $q = "INSERT INTO couponApplied 
                     (emp_no,trans_no,quantity,trans_id)
                     VALUES (
                     $emp_no,$transno,".
-                    $available["$id"][1].",$id)";
-                $r = $db->query($q);
-                $applied += $available["$id"][1];
+                    $available[$trans_id][1].",$trans_id)";
+                $r = $dbc->query($q);
+                $applied += $available[$trans_id][1];
             }
 
             if ($applied >= $qty) {

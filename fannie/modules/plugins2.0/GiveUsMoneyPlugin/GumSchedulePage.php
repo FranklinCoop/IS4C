@@ -33,6 +33,9 @@ class GumSchedulePage extends FannieRESTfulPage
     protected $must_authenticate = true;
     protected $auth_classes = array('GiveUsMoney');
 
+    public $page_set = 'Plugin :: Give Us Money';
+    public $description = '[Loan Schedule] lists annual interest accrued for a loan account.';
+
     public function preprocess()
     {
         $acct = FormLib::get('id');
@@ -130,8 +133,8 @@ class GumSchedulePage extends FannieRESTfulPage
         $ret .= '</tr>';
         $ret .= '<tr>';
         $ret .= '<td>Address</td><td>' . $this->meminfo->street() . '</td>';
-        $ld = strtotime($this->loan->loanDate());
-        $ret .= '<td>Loan Date</td><td>' . date('m/d/Y', $ld) . '</td>';
+        $ldate = strtotime($this->loan->loanDate());
+        $ret .= '<td>Loan Date</td><td>' . date('m/d/Y', $ldate) . '</td>';
         $ret .= '</tr>';
         $ret .= '<tr>';
         $ret .= '<td>City</td><td>' . $this->meminfo->city() . '</td>';
@@ -143,8 +146,8 @@ class GumSchedulePage extends FannieRESTfulPage
         $ret .= '</tr>';
         $ret .= '<tr>';
         $ret .= '<td>Zip Code</td><td>' . $this->meminfo->zip() . '</td>';
-        $ed = mktime(0, 0, 0, date('n', $ld)+$this->loan->termInMonths(), date('j', $ld), date('Y', $ld));
-        $ret .= '<td>Maturity Date</td><td>' . date('m/d/Y', $ed) . '</td>';
+        $enddate = mktime(0, 0, 0, date('n', $ldate)+$this->loan->termInMonths(), date('j', $ldate), date('Y', $ldate));
+        $ret .= '<td>Maturity Date</td><td>' . date('m/d/Y', $enddate) . '</td>';
         $ret .= '</tr>';
         $ret .= '</table>';
 
@@ -158,17 +161,7 @@ class GumSchedulePage extends FannieRESTfulPage
 
         $loan_info = GumLib::loanSchedule($this->loan);
         foreach($loan_info['schedule'] as $period) {
-            $ret .= sprintf('<tr>
-                            <td class="textfield">%s</td>
-                            <td class="textfield">%s</td>
-                            <td class="moneyfield">%s</td>
-                            <td class="moneyfield">%s</td>
-                            </tr>',
-                            $period['end_date'],
-                            $period['days'],
-                            number_format($period['interest'], 2),
-                            number_format($period['balance'], 2)
-            );
+            $ret .= $this->printRow($period);
         }
 
         $ret .= '<tr class="subheader">';
@@ -181,6 +174,21 @@ class GumSchedulePage extends FannieRESTfulPage
         $ret .= '</table>';
 
         return $ret;
+    }
+
+    private function printRow($period)
+    {
+        return sprintf('<tr>
+                        <td class="textfield">%s</td>
+                        <td class="textfield">%s</td>
+                        <td class="moneyfield">%s</td>
+                        <td class="moneyfield">%s</td>
+                        </tr>',
+                        $period['end_date'],
+                        $period['days'],
+                        number_format($period['interest'], 2),
+                        number_format($period['balance'], 2)
+        );
     }
 }
 

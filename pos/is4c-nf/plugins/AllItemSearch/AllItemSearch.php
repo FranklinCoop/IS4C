@@ -23,18 +23,10 @@
 
 class AllItemSearch extends Plugin {
 
-	public $plugin_settings = array(
-	);
+    public $plugin_settings = array(
+    );
 
-	public $plugin_description = 'Include all items in product searches instead of
-				just PLU items';
-
-	public function plugin_enable(){
-
-	}
-
-	public function plugin_disable(){
-
-	}
-
+    public $plugin_description = 'Include all items in product searches instead of
+                just PLU items';
 }
+

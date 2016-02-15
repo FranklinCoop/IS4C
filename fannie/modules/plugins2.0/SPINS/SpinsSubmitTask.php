@@ -105,13 +105,13 @@ class SpinsSubmitTask extends FannieTask
                     SUM(d.total) AS dollars,
                     '$lastDay' AS lastDay
                   FROM $dlog AS d
-                    INNER JOIN products AS p ON d.upc=p.upc
+                    " . DTrans::joinProducts('d', 'p', 'INNER') . "
                   WHERE p.Scale = 0
                     AND d.upc > '0000000999999' 
                     AND tdate BETWEEN ? AND ?
                   GROUP BY d.upc, p.description";
 
-        $filename = 'GFM01_' . date('mdY', $end) . '.csv';
+        $filename = date('mdY', $end) . '.csv';
         $outfile = sys_get_temp_dir()."/".$filename;
         $fp = fopen($outfile,"w");
 
@@ -152,4 +152,5 @@ class SpinsSubmitTask extends FannieTask
         }
     }
 }
+
 

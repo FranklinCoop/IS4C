@@ -21,6 +21,9 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\models\trans;
+use COREPOS\pos\lib\models\BasicModel;
+
 /**
   @class EfsnetTokensModel
 */
@@ -37,84 +40,26 @@ class EfsnetTokensModel extends BasicModel
     'token' => array('type'=>'VARCHAR(100)', 'primary_key'=>true),
     'processData' => array('type'=>'VARCHAR(255)'),
     'acqRefData' => array('type'=>'VARCHAR(255)'),
-	);
+    );
 
-    /* START ACCESSOR FUNCTIONS */
-
-    public function expireDay()
+    public function doc()
     {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["expireDay"])) {
-                return $this->instance["expireDay"];
-            } elseif(isset($this->columns["expireDay"]["default"])) {
-                return $this->columns["expireDay"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["expireDay"] = func_get_arg(0);
-        }
-    }
+        return '
+Use:
+This table logs tokens used for modifying
+later transactions.
 
-    public function refNum()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["refNum"])) {
-                return $this->instance["refNum"];
-            } elseif(isset($this->columns["refNum"]["default"])) {
-                return $this->columns["refNum"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["refNum"] = func_get_arg(0);
-        }
-    }
+expireDay is when(ish) the token is no longer valid
 
-    public function token()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["token"])) {
-                return $this->instance["token"];
-            } elseif(isset($this->columns["token"]["default"])) {
-                return $this->columns["token"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["token"] = func_get_arg(0);
-        }
-    }
+refNum maps to efsnetRequest & efsnetResponse
+records
 
-    public function processData()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["processData"])) {
-                return $this->instance["processData"];
-            } elseif(isset($this->columns["processData"]["default"])) {
-                return $this->columns["processData"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["processData"] = func_get_arg(0);
-        }
-    }
+token is the actual token
 
-    public function acqRefData()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["acqRefData"])) {
-                return $this->instance["acqRefData"];
-            } elseif(isset($this->columns["acqRefData"]["default"])) {
-                return $this->columns["acqRefData"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["acqRefData"] = func_get_arg(0);
-        }
+processData and acqRefData are additional
+values needed in addition to the token for
+certain kinds of modifying transactions
+        ';
     }
-    /* END ACCESSOR FUNCTIONS */
 }
 

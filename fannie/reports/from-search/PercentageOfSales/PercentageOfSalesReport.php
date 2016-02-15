@@ -3,14 +3,14 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -36,24 +36,13 @@ class PercentageOfSalesReport extends FannieReportPage
     protected $report_headers = array('UPC', 'Desc', 'Super', 'Dept');
     protected $required_fields = array('u');
 
-    public function report_description_content()
-    {
-        return '';
-    }
-
     public function fetch_report_data()
     {
-        global $FANNIE_OP_DB, $FANNIE_ARCHIVE_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
 
         $upcs = FormLib::get('u', array());
-        $in = '';
-        $args = array();
-        foreach($upcs as $u) {
-            $in .= '?,';
-            $args[] = BarcodeLib::padUPC($u);
-        }
-        $in = substr($in, 0, strlen($in)-1);
+        list($in, $args) = $dbc->safeInClause($upcs);
 
         $query = "SELECT p.upc, p.description, p.department,
                     d.dept_name, l.quantity, l.total,
@@ -63,9 +52,9 @@ class PercentageOfSalesReport extends FannieReportPage
                 FROM products AS p
                     LEFT JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
                     LEFT JOIN departments AS d ON p.department=d.dept_no
-                    LEFT JOIN " . $FANNIE_ARCHIVE_DB . $dbc->sep() . "productWeeklyLastQuarter AS l
+                    LEFT JOIN " . $this->config->get('ARCHIVE_DB') . $dbc->sep() . "productWeeklyLastQuarter AS l
                         ON p.upc=l.upc
-                    LEFT JOIN " . $FANNIE_ARCHIVE_DB . $dbc->sep() . "weeksLastQuarter AS w
+                    LEFT JOIN " . $this->config->get('ARCHIVE_DB') . $dbc->sep() . "weeksLastQuarter AS w
                         ON l.weekLastQuarterID=w.weekLastQuarterID 
                 WHERE p.upc IN ($in)
                 ORDER BY l.weekLastQuarterID, p.upc";
@@ -133,7 +122,7 @@ class PercentageOfSalesReport extends FannieReportPage
         }
 
         return $data;
-	}
+    }
 
     public function calculate_footers($data)
     {

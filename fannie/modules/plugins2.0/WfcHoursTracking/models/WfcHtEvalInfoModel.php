@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -35,84 +35,6 @@ class WfcHtEvalInfoModel extends BasicModel
     'nextEval' => array('type'=>'DATETIME'),
     'hireDate' => array('type'=>'DATETIME'),
     'nextTypeID' => array('type'=>'INT'),
-	);
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function empID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["empID"])) {
-                return $this->instance["empID"];
-            } elseif(isset($this->columns["empID"]["default"])) {
-                return $this->columns["empID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["empID"] = func_get_arg(0);
-        }
-    }
-
-    public function positions()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["positions"])) {
-                return $this->instance["positions"];
-            } elseif(isset($this->columns["positions"]["default"])) {
-                return $this->columns["positions"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["positions"] = func_get_arg(0);
-        }
-    }
-
-    public function nextEval()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["nextEval"])) {
-                return $this->instance["nextEval"];
-            } elseif(isset($this->columns["nextEval"]["default"])) {
-                return $this->columns["nextEval"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["nextEval"] = func_get_arg(0);
-        }
-    }
-
-    public function hireDate()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["hireDate"])) {
-                return $this->instance["hireDate"];
-            } elseif(isset($this->columns["hireDate"]["default"])) {
-                return $this->columns["hireDate"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["hireDate"] = func_get_arg(0);
-        }
-    }
-
-    public function nextTypeID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["nextTypeID"])) {
-                return $this->instance["nextTypeID"];
-            } elseif(isset($this->columns["nextTypeID"]["default"])) {
-                return $this->columns["nextTypeID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["nextTypeID"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
+    );
 }
 

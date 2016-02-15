@@ -3,7 +3,7 @@
 
     Copyright 2014 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -31,50 +31,9 @@ class CalendarsModel extends BasicModel
 
     protected $columns = array(
     'calendarID' => array('type'=>'INT', 'primary_key'=>true, 'increment'=>true),
-    'name' => array('type'=>'VARCHAR(50)'),
-	);
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function calendarID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["calendarID"])) {
-                return $this->instance["calendarID"];
-            } else if (isset($this->columns["calendarID"]["default"])) {
-                return $this->columns["calendarID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            if (!isset($this->instance["calendarID"]) || $this->instance["calendarID"] != func_get_args(0)) {
-                if (!isset($this->columns["calendarID"]["ignore_updates"]) || $this->columns["calendarID"]["ignore_updates"] == false) {
-                    $this->record_changed = true;
-                }
-            }
-            $this->instance["calendarID"] = func_get_arg(0);
-        }
-    }
-
-    public function name()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["name"])) {
-                return $this->instance["name"];
-            } else if (isset($this->columns["name"]["default"])) {
-                return $this->columns["name"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            if (!isset($this->instance["name"]) || $this->instance["name"] != func_get_args(0)) {
-                if (!isset($this->columns["name"]["ignore_updates"]) || $this->columns["name"]["ignore_updates"] == false) {
-                    $this->record_changed = true;
-                }
-            }
-            $this->instance["name"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
+    'name' => array('type'=>'VARCHAR(75)'),
+    'modified' => array('type'=>'TINYINT', 'default'=>0),
+    'calendarSubscriptionID' => array('type'=>'INT'),
+    );
 }
 

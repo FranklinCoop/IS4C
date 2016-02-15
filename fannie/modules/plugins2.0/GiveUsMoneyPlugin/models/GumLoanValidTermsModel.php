@@ -3,7 +3,7 @@
 
     Copyright 2014 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -40,69 +40,6 @@ class GumLoanValidTermsModel extends BasicModel
     'gumLoanValidTermID' => array('type'=>'INT', 'increment'=>true, 'index'=>true),
     'termInMonths' => array('type'=>'INT', 'primary_key'=>true),
     'totalPrincipalLimit' => array('type'=>'MONEY', 'default'=>0),
-	);
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function gumLoanValidTermID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["gumLoanValidTermID"])) {
-                return $this->instance["gumLoanValidTermID"];
-            } else if (isset($this->columns["gumLoanValidTermID"]["default"])) {
-                return $this->columns["gumLoanValidTermID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            if (!isset($this->instance["gumLoanValidTermID"]) || $this->instance["gumLoanValidTermID"] != func_get_args(0)) {
-                if (!isset($this->columns["gumLoanValidTermID"]["ignore_updates"]) || $this->columns["gumLoanValidTermID"]["ignore_updates"] == false) {
-                    $this->record_changed = true;
-                }
-            }
-            $this->instance["gumLoanValidTermID"] = func_get_arg(0);
-        }
-    }
-
-    public function termInMonths()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["termInMonths"])) {
-                return $this->instance["termInMonths"];
-            } else if (isset($this->columns["termInMonths"]["default"])) {
-                return $this->columns["termInMonths"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            if (!isset($this->instance["termInMonths"]) || $this->instance["termInMonths"] != func_get_args(0)) {
-                if (!isset($this->columns["termInMonths"]["ignore_updates"]) || $this->columns["termInMonths"]["ignore_updates"] == false) {
-                    $this->record_changed = true;
-                }
-            }
-            $this->instance["termInMonths"] = func_get_arg(0);
-        }
-    }
-
-    public function totalPrincipalLimit()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["totalPrincipalLimit"])) {
-                return $this->instance["totalPrincipalLimit"];
-            } else if (isset($this->columns["totalPrincipalLimit"]["default"])) {
-                return $this->columns["totalPrincipalLimit"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            if (!isset($this->instance["totalPrincipalLimit"]) || $this->instance["totalPrincipalLimit"] != func_get_args(0)) {
-                if (!isset($this->columns["totalPrincipalLimit"]["ignore_updates"]) || $this->columns["totalPrincipalLimit"]["ignore_updates"] == false) {
-                    $this->record_changed = true;
-                }
-            }
-            $this->instance["totalPrincipalLimit"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
+    );
 }
 

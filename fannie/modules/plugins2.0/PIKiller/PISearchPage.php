@@ -22,114 +22,140 @@
 *********************************************************************************/
 
 include(dirname(__FILE__).'/../../../config.php');
-if (!class_exists('FannieAPI'))
-	include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+if (!class_exists('FannieAPI')) {
+    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
 if (!class_exists('PIKillerPage')) {
     include('lib/PIKillerPage.php');
 }
 
 class PISearchPage extends PIKillerPage {
 
-	protected $title = 'Search';
+    protected $title = 'Search';
+    protected $results = array();
 
-	function preprocess(){
-		$this->__routes[] = 'get<id><first><last>';
-		return parent::preprocess();
-	}
+    function preprocess(){
+        $this->__routes[] = 'get<id><first><last>';
+        return parent::preprocess();
+    }
 
-	function get_id_handler(){
-		$this->first = '';
-		$this->last = '';
-		return $this->get_id_first_last_handler();
-	}
+    function get_id_handler(){
+        $this->first = '';
+        $this->last = '';
+        return $this->get_id_first_last_handler();
+    }
 
-	function get_id_first_last_handler(){
-		global $FANNIE_OP_DB;
-		$dbc = FannieDB::get($FANNIE_OP_DB);
+    public function get_id_first_last_handler()
+    {
+        if (empty($this->id) && empty($this->last) && empty($this->first)) {
+            return true; // invalid search  
+        }
+            
+        if (!empty($this->id)) {
+            $account = \COREPOS\Fannie\API\member\MemberREST::get($this->id);
+            if ($account != false) {
+                header('Location: PIMemberPage.php?id='.$this->id);
+                return false;
+            }
 
-		if (empty($this->id) && empty($this->last)) 
-			return True; // invalid search	
-			
-		if (!empty($this->id)){
-			$custdata = new CustdataModel($dbc);
-			$custdata->CardNo($this->id);
-			if (count($custdata->find()) > 0){
-				header('Location: PIMemberPage.php?id='.$this->id);
-				return False;
-			}
-			$cards = new MemberCardsModel($dbc);
-			$cards->upc(str_pad($this->id,13,'0',STR_PAD_LEFT));
-			foreach($cards->find() as $obj){
-				header('Location: PIMemberPage.php?id='.$obj->card_no());
-				return False;
-			}
-		}
-		else {
-			$q = $dbc->prepare_statement('SELECT CardNo, LastName, FirstName FROM
-				custdata WHERE LastName LIKE ? AND FirstName LIKE ?
-				ORDER BY LastName,FirstName,CardNo');
-			$r = $dbc->exec_statement($q, array($this->last.'%',$this->first.'%'));
-			$this->__models['custdata'] = array();
-			while($w = $dbc->fetch_row($r)){
-				$this->__models['custdata'][] = $w;
-			}
-			if (count($this->__models['custdata'])==1){
-				header('Location: PIMemberPage.php?id='.$this->__models['custdata'][0]['CardNo']);
-				return False;
-			}
-		}
-		return True;
-	}
+            $json = array('idCardUPC' => BarcodeLib::padUPC($this->id));
+            $accounts = \COREPOS\Fannie\API\member\MemberREST::search($json, 0, true);
+            foreach ($accounts as $a) {
+                header('Location: PIMemberPage.php?id='.$a['cardNo']);
+                return false;
+            }
+        } else {
+            $json = array(
+                'customers' => array(
+                    array(
+                        'firstName' => $this->first,
+                        'lastName' => $this->last,
+                    ),
+                ),
+            );
+            $accounts = \COREPOS\Fannie\API\member\MemberREST::search($json, 250, true);
+            if (count($accounts) == 1) {
+                header('Location: PIMemberPage.php?id='.$accounts[0]['cardNo']);
+                return false;
+            } else {
+                $this->results = $accounts;
+            }
+        }
 
-	function get_view(){
-		ob_start();
-		?>
-		<tr>
-		<form name="memNum" id="memNum" method="get" action="PISearchPage.php">
-		<td width="1" align="right">&nbsp;</td>
-		<td width="47" align="right" valign="middle"><font size="2" face="Papyrus, Verdana, Arial, Helvetica, sans-serif">Owner
-		# or UPC:</font></td>
-		<td>
-      		<font size="2" face="Papyrus, Verdana, Arial, Helvetica, sans-serif">
-      		<input name="id" type="text" id="memNum_t" size="5" maxlength="12" />
-      		</font>
-		</td>
-		<td width="82" valign="middle"><font size="2" face="Papyrus, Verdana, Arial, Helvetica, sans-serif">Last Name</font></td>
-		<td colspan="5">
-		<font size="2" face="Papyrus, Verdana, Arial, Helvetica, sans-serif">
-		<input name="last" type="text" id="last" size="25" maxlength="50" />
-		</font>
-		</td>
-		<td width="75" valign="middle"><font size="2" face="Papyrus, Verdana, Arial, Helvetica, sans-serif">First
-		Name:</font></td><td>
-		<input name="first" type="text" id="first" size="20" maxlength="50" /></td>
-		<td><input type="submit" name="submit" value="submit">
-		</form></td>
-		</tr>
-		<?php
-		$this->add_onload_command('$(\'#memNum_t\').focus();');
-		return ob_get_clean();
-	}
+        return true;
+    }
 
-	function get_id_first_last_view(){
-		if (!isset($this->__models['custdata']) || count($this->__models['custdata']) == 0){
-			return '<tr><td colspan="9"><p>No results from search</p></td></tr>'
-				.$this->get_view();
-		}
-		$ret = '<tr><td colspan="9"><p>There is more than one result</p>';
-		$ret .= '<form action="PISearchPage.php" method="get">';
-		$ret .= '<select name="id" id="memNum_s">';
-		foreach($this->__models['custdata'] as $row){
-			$ret .= sprintf('<option value="%d">%d %s %s</option>',
-				$row['CardNo'],$row['CardNo'],
-				$row['FirstName'],$row['LastName']);
-		}
-		$ret .= '</select> ';
-		$ret .= '<input type="submit" value="submit" />';
-		$ret .= '</form></td></tr>';
-		$this->add_onload_command('$(\'#memNum_s\').focus();');
-		return $ret;
-	}
+    public function get_view()
+    {
+        global $FANNIE_URL;
+        ob_start();
+        ?>
+        <tr>
+        <form name="memNum" id="memNum" method="get" action="PISearchPage.php">
+        <td width="1" align="right">&nbsp;</td>
+        <td width="47" align="right" valign="middle" style="padding: 3px;">
+        Owner # or UPC:
+        </td>
+        <td>
+            <input name="id" type="text" id="memNum_t" size="5" maxlength="12" />
+        </td>
+        <td width="82" valign="middle" align="right">Last Name: </td>
+        <td colspan="5">
+            <input name="last" type="text" id="last" size="25" maxlength="50" />
+        </td>
+        <td width="75" valign="middle" align="right">First Name: </td>
+        <td>
+        <input name="first" type="text" id="first" size="20" maxlength="50" /></td>
+        <td><input type="submit" name="submit" value="submit">
+        </form></td>
+        </tr>
+        <?php
+        $this->add_script($FANNIE_URL . 'item/autocomplete.js');
+        $this->add_onload_command("bindAutoComplete('#last', '" . $FANNIE_URL . "ws/', 'mLastName');\n");
+        $this->add_onload_command("bindAutoComplete('#first', '" . $FANNIE_URL . "ws/', 'mFirstName');\n");
+        $this->add_onload_command('$(\'#memNum_t\').focus();');
+        return ob_get_clean();
+    }
+
+    function get_id_first_last_view()
+    {
+        if (count($this->results) == 0) {
+            return '<tr><td colspan="9"><p>No results from search</p></td></tr>'
+                .$this->get_view();
+        }
+        $ret = '<tr><td colspan="9"><p>There is more than one result</p>';
+        $ret .= '<form action="PISearchPage.php" method="get">';
+        $ret .= '<select name="id" id="memNum_s">';
+        $names = array();
+        foreach ($this->results as $account) {
+            foreach ($account['customers'] as $row) {
+                if ($this->first && !stristr($row['firstName'], $this->first)) {
+                    continue;
+                }
+                if ($this->last && !stristr($row['lastName'], $this->last)) {
+                    continue;
+                }
+                $names[] = $row['firstName'] . ' ' . $row['lastName'] . '::' . $account['cardNo'];
+                /*
+                $ret .= sprintf('<option value="%d">%d %s %s</option>',
+                    $account['cardNo'],$account['cardNo'],
+                    $row['firstName'],$row['lastName']);
+                */
+            }
+        }
+        sort($names);
+        foreach ($names as $name) {
+            list($n, $id) = explode('::', $name, 2);
+            $ret .= sprintf('<option value="%d">%s (%d)</option>',
+                    $id, $n, $id); 
+        }
+        $ret .= '</select> ';
+        $ret .= '<input type="submit" value="submit" />';
+        $ret .= '</form></td></tr>';
+        $this->add_onload_command('$(\'#memNum_s\').focus();');
+        return $ret;
+    }
 }
 
 FannieDispatch::conditionalExec();
+

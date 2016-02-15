@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ class WfcHtUTOModel extends BasicModel
     protected $columns = array(
     'empID' => array('type'=>'INT'),
     'hours' => array('type'=>'DOUBLE'),
-	);
+    );
 
     public function create()
     {
@@ -54,38 +54,5 @@ class WfcHtUTOModel extends BasicModel
             return false;
         }
     }
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function empID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["empID"])) {
-                return $this->instance["empID"];
-            } elseif(isset($this->columns["empID"]["default"])) {
-                return $this->columns["empID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["empID"] = func_get_arg(0);
-        }
-    }
-
-    public function hours()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["hours"])) {
-                return $this->instance["hours"];
-            } elseif(isset($this->columns["hours"]["default"])) {
-                return $this->columns["hours"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["hours"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
 }
 

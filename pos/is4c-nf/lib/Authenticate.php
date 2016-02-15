@@ -41,101 +41,142 @@ class Authenticate extends LibraryClass
   a user with frontendsecurity >= 30 in the
   employee table will be accepted.
 */
-static public function checkPassword($password,$activity=1)
+static public function checkPassword($password, $activity=1)
 {
-	global $CORE_LOCAL;
+    $password = strtoupper($password);
+    $password = str_replace("'", "", $password);
+    $password = str_replace(",", "", $password);
+    $paswword = str_replace("+", "", $password);
 
-	$password = strtoupper($password);
-	$password = str_replace("'", "", $password);
-	$password = str_replace(",", "", $password);
-	$paswword = str_replace("+", "", $password);
-
-	if ($password == "TRAINING") {
+    if ($password == "TRAINING") {
         $password = 9999; // if password is training, change to '9999'
     }
 
-	$query_g = "select LoggedIn,CashierNo from globalvalues";
-	$db_g = Database::pDataConnect();
-	$result_g = $db_g->query($query_g);
-	$row_g = $db_g->fetch_array($result_g);
-	$password = $db_g->escape($password);
+    $query_g = "select LoggedIn,CashierNo from globalvalues";
+    $db_g = Database::pDataConnect();
+    $result_g = $db_g->query($query_g);
+    $row_g = $db_g->fetch_array($result_g);
 
-	if ($row_g["LoggedIn"] == 0 || Plugin::isEnabled('SingleTransactionSignOn')) {
-		$query_q = "select emp_no, FirstName, LastName, "
-			.$db_g->yeardiff($db_g->now(),'birthdate')." as age "
-			."from employees where EmpActive = 1 "
-			."and CashierPassword = '".$password."'";
-		$result_q = $db_g->query($query_q);
-		$num_rows_q = $db_g->num_rows($result_q);
+    if ($row_g["LoggedIn"] == 0) {
+        $query_q = '
+            SELECT emp_no, 
+                FirstName, 
+                LastName, '
+                . $db_g->yeardiff($db_g->now(),'birthdate') . ' AS age
+            FROM employees 
+            WHERE EmpActive = 1 
+                AND CashierPassword = ?';
+        $prep_q = $db_g->prepare($query_q);
+        $result_q = $db_g->execute($prep_q, array($password));
+        $num_rows_q = $db_g->num_rows($result_q);
 
-		if ($num_rows_q > 0) {
-			$row_q = $db_g->fetch_array($result_q);
+        if ($num_rows_q > 0) {
+            $row_q = $db_g->fetch_array($result_q);
 
-			Database::loadglobalvalues();
+            Database::loadglobalvalues();
 
-			$transno = Database::gettransno($row_q["emp_no"]);
-			$globals = array(
-				"CashierNo" => $row_q["emp_no"],
-				"Cashier" => $row_q["FirstName"]." ".substr($row_q["LastName"], 0, 1).".",
-				"TransNo" => $transno,
-				"LoggedIn" => 1
-			);
-			Database::setglobalvalues($globals);
+            $transno = Database::gettransno($row_q["emp_no"]);
+            $globals = array(
+                "CashierNo" => $row_q["emp_no"],
+                "Cashier" => $row_q["FirstName"]." ".substr($row_q["LastName"], 0, 1).".",
+                "TransNo" => $transno,
+                "LoggedIn" => 1
+            );
+            Database::setglobalvalues($globals);
 
-			CoreState::cashierLogin($transno, $row_q['age']);
+            CoreState::cashierLogin($transno, $row_q['age']);
 
-			if ($CORE_LOCAL->get("LastID") != 0 && Plugin::isEnabled('SingleTransactionSignOn')){
-				$quire = "UPDATE translog.localtemptrans SET emp_no = ?, trans_no = ?";
-				$args = array($row_q["emp_no"], $transno);
-				$prep = $db_g->prepare_statement($quire);
-				$result = $db_g->exec_statement($prep,$args);
-			}
+        } elseif ($password == 9999) {
+            Database::loadglobalvalues();
 
-		} elseif ($password == 9999) {
-			Database::loadglobalvalues();
+            $transno = Database::gettransno(9999);
+            $globals = array(
+                "CashierNo" => 9999,
+                "Cashier" => "Training Mode",
+                "TransNo" => $transno,
+                "LoggedIn" => 1
+            );
+            Database::setglobalvalues($globals);
 
-			$transno = Database::gettransno(9999);
-			$globals = array(
-				"CashierNo" => 9999,
-				"Cashier" => "Training Mode",
-				"TransNo" => $transno,
-				"LoggedIn" => 1
-			);
-			Database::setglobalvalues($globals);
-
-			CoreState::cashierLogin($transno, 0);
-		} else {
+            CoreState::cashierLogin($transno, 0);
+        } else {
             return False;
         }
-	} else {
-		// longer query but simpler. since someone is logged in already,
-		// only accept password from that person OR someone with a high
-		// frontendsecurity setting
-		$query_a = "select emp_no, FirstName, LastName, "
-			.$db_g->yeardiff($db_g->now(),'birthdate')." as age "
-			."from employees "
-			."where EmpActive = 1 and "
-			."(frontendsecurity >= 30 or emp_no = ".$row_g["CashierNo"].") "
-			."and (CashierPassword = '".$password."' or AdminPassword = '".$password."')";
+    } else {
+        // longer query but simpler. since someone is logged in already,
+        // only accept password from that person OR someone with a high
+        // frontendsecurity setting
+        $query_a = '
+            SELECT emp_no, 
+                FirstName, 
+                LastName, '
+                . $db_g->yeardiff($db_g->now(),'birthdate') . ' AS age
+            FROM employees 
+            WHERE EmpActive = 1 
+                AND (frontendsecurity >= 30 OR emp_no = ?)
+                AND (CashierPassword = ? OR AdminPassword = ?)';
+        $args = array($row_g['CashierNo'], $password, $password);
+        $prep_a = $db_g->prepare($query_a);
+        $result_a = $db_g->execute($prep_a, $args);
 
-		$result_a = $db_g->query($query_a);	
+        $num_rows_a = $db_g->num_rows($result_a);
 
-		$num_rows_a = $db_g->num_rows($result_a);
+        if ($num_rows_a > 0) {
 
-		if ($num_rows_a > 0) {
-
-			Database::loadglobalvalues();
-			$row = $db_g->fetch_row($result_a);
-			CoreState::cashierLogin(False, $row['age']);
-		} elseif ($row_g["CashierNo"] == "9999" && $password == "9999") {
-			Database::loadglobalvalues();
-			CoreState::cashierLogin(False, 0);
-		} else {
+            Database::loadglobalvalues();
+            $row = $db_g->fetch_row($result_a);
+            CoreState::cashierLogin(False, $row['age']);
+        } elseif ($row_g["CashierNo"] == "9999" && $password == "9999") {
+            Database::loadglobalvalues();
+            CoreState::cashierLogin(False, 0);
+        } else {
             return false;
         }
-	}
+    }
 
-	return true;
+    return true;
+}
+
+static public function checkPermission($password, $level)
+{
+    $emp = self::getEmployeeByPassword($password);
+    if ($emp !== false && $emp['frontendsecurity'] >= $level) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+static public function getEmployeeByPassword($password)
+{
+    $dbc = Database::pDataConnect();
+    $prep = $dbc->prepare('
+        SELECT *
+        FROM employees
+        WHERE EmpActive=1 
+            AND (CashierPassword=? OR AdminPassword=?)');
+    return $dbc->getRow($prep, array($password, $password));
+}
+
+static public function getEmployeeByNumber($emp_no)
+{
+    $dbc = Database::pDataConnect();
+    $prep = $dbc->prepare('
+        SELECT *
+        FROM employees
+        WHERE EmpActive=1 
+            AND emp_no=?');
+    return $dbc->getRow($prep, array($emp_no));
+}
+
+static public function getPermission($emp_no)
+{
+    $emp = self::getEmployeeByNumber($emp_no);
+    if ($emp !== false) {
+        return $emp['frontendsecurity'];
+    } else {
+        return 0;
+    }
 }
 
 } // end class Authenticate

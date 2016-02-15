@@ -21,6 +21,9 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\models\op;
+use COREPOS\pos\lib\models\BasicModel;
+
 /**
   @class ParametersModel
 */
@@ -36,84 +39,51 @@ class ParametersModel extends BasicModel
     'param_key' => array('type'=>'VARCHAR(100)', 'primary_key'=>true),
     'param_value' => array('type'=>'VARCHAR(255)'),
     'is_array' => array('type'=>'TINYINT'),
-	);
+    );
 
-    /* START ACCESSOR FUNCTIONS */
-
-    public function store_id()
+    public function doc()
     {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["store_id"])) {
-                return $this->instance["store_id"];
-            } elseif(isset($this->columns["store_id"]["default"])) {
-                return $this->columns["store_id"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["store_id"] = func_get_arg(0);
-        }
+        return '
+Use:
+Partial replacement for ini.php.
+
+Values with store_id=0 (or NULL) and lane_id=0 (or NULL)
+are applied first, then values with the lane\'s own
+lane_id are applied second as local overrides. A similar
+precedent level based on store_id may be added at a later date.
+        ';
     }
 
-    public function lane_id()
+    /**
+      Get the parameter's effective value by
+      transforming it into an array or boolean
+      if appropriate
+      @return [mixed] param_value as correct PHP type
+    */
+    public function materializeValue()
     {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["lane_id"])) {
-                return $this->instance["lane_id"];
-            } elseif(isset($this->columns["lane_id"]["default"])) {
-                return $this->columns["lane_id"]["default"];
+        $value = $this->param_value();
+        if ($this->is_array()) {
+            if ($value === '') {
+                $value = array();
             } else {
-                return null;
+                $value = explode(',', $value);
             }
-        } else {
-            $this->instance["lane_id"] = func_get_arg(0);
+            if (isset($value[0]) && strstr($value[0], '=>')) {
+                $tmp = array();
+                foreach ($value as $pair) {
+                    list($key, $val) = explode('=>', $pair, 2);
+                    $tmp[$key] = $val;
+                }
+                $value = $tmp;
+            }
+        } elseif (strtoupper($value) === 'TRUE') {
+            $value = true;
+        } elseif (strtoupper($value) === 'FALSE') {
+            $value = false;
         }
-    }
 
-    public function param_key()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["param_key"])) {
-                return $this->instance["param_key"];
-            } elseif(isset($this->columns["param_key"]["default"])) {
-                return $this->columns["param_key"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["param_key"] = func_get_arg(0);
-        }
+        return $value;
     }
-
-    public function param_value()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["param_value"])) {
-                return $this->instance["param_value"];
-            } elseif(isset($this->columns["param_value"]["default"])) {
-                return $this->columns["param_value"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["param_value"] = func_get_arg(0);
-        }
-    }
-
-    public function is_array()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["is_array"])) {
-                return $this->instance["is_array"];
-            } elseif(isset($this->columns["is_array"]["default"])) {
-                return $this->columns["is_array"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["is_array"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
 }
 

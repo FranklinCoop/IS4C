@@ -20,56 +20,60 @@
 
 *********************************************************************************/
 
-function deptchange(){
-	var dID = $('#deptselect').val();
-	if (dID == 0){ 
-		$('#infodiv').html("");
-		return;
-	}
+var deptEdit = (function($) {
 
-	$.ajax({
-		url: 'DepartmentEditor.php',
-		type: 'POST',
-		timeout: 5000,
-		data: 'did='+dID+'&action=deptDisplay',
-		error: function(){
-		alert('Error loading XML document');
-		},
-		success: function(resp){
-			$('#infodiv').html(resp);
-		}
-	});
-}
+    var mod = {};
 
-function deptSave(){
-	var qs = "action=deptSave";
-	qs += "&new="+$('#isNew').val();
-	qs += "&did="+$('#deptno').val();
-	qs += "&name="+$('#deptname').val();
-	qs += "&tax="+$('#depttax').val();
-	if ($('#deptfs').is(':checked'))
-		qs += "&fs=1";
-	else
-		qs += "&fs=0";
-	if ($('#deptdisc').is(':checked'))
-		qs += "&disc=1";
-	else
-		qs += "&disc=0";
-	qs += "&min="+$('#deptmin').val();
-	qs += "&max="+$('#deptmax').val();
-	qs += "&margin="+$('#deptmargin').val();
-	qs += "&pcode="+$('#deptsalescode').val();
+    mod.deptSave = function() {
+        var fields = $('.deptFields :input').serialize();
 
-	$.ajax({
-		url: 'DepartmentEditor.php',
-		type: 'POST',
-		timeout: 5000,
-		data: qs,
-		error: function(){
-		alert('Error loading XML document');
-		},
-		success: function(resp){
-			alert(resp);
-		}
-	});
-}
+        $.ajax({
+            url: 'DepartmentEditor.php',
+            type: 'post',
+            timeout: 5000,
+            data: fields,
+            dataType: 'json',
+            error: function(){
+                showBootstrapAlert('#deptdiv', 'danger', 'Error saving department');
+            },
+            success: function(resp){
+                if (resp.did && resp.msg) {
+                    showBootstrapAlert('#deptdiv', 'success', resp.msg);
+                } else {
+                    showBootstrapAlert('#deptdiv', 'danger', 'Error saving department');
+                }
+            }
+        });
+    };
+
+    mod.deptchange = function() {
+        var dID = $('#deptselect').val();
+        if (dID == 0){ 
+            $('#infodiv').html("");
+            return;
+        }
+
+        $.ajax({
+            url: 'DepartmentEditor.php',
+            type: 'get',
+            timeout: 5000,
+            data: 'id='+dID,
+            error: function(){
+                showBootstrapAlert('#deptdiv', 'danger', 'Error loading department');
+            },
+            success: function(resp){
+                $('#infodiv').html(resp);
+                $('#infodiv input[type=text]').keyup(function (e){
+                    if (e.which == 13) {
+                        mod.deptSave();
+                    }
+                });
+                $('#infodiv input[type=text]:first').focus();
+            }
+        });
+    };
+
+    return mod;
+
+}(jQuery)); 
+

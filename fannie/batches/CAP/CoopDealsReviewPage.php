@@ -3,14 +3,14 @@
 
     Copyright 2009,2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -21,130 +21,268 @@
 
 *********************************************************************************/
 
-include("../../config.php");
-include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
-
-class CoopDealsReviewPage extends FanniePage {
-	protected $title = "Fannie - CAP sales";
-	protected $header = "Review Data";
-	
-	private $mode = 'form';
-
-	function preprocess(){
-		if (FormLib::get_form_value('start') !== '')
-			$this->mode = 'results';
-		return True;
-	}
-
-	function body_content(){
-		if ($this->mode == 'form')
-			return $this->form_content();
-		elseif($this->mode == 'results')
-			return $this->results_content();
-	}
-
-	function results_content(){
-		global $FANNIE_OP_DB;
-		$dbc = FannieDB::get($FANNIE_OP_DB);
-		$start = FormLib::get_form_value('start',date('Y-m-d'));
-		$end = FormLib::get_form_value('end',date('Y-m-d'));
-		$b_start = FormLib::get_form_value('bstart',date('Y-m-d'));
-		$b_end = FormLib::get_form_value('bend',date('Y-m-d'));
-		$naming = FormLib::get_form_value('naming','');
-		$upcs = FormLib::get_form_value('upc',array());
-		$prices = FormLib::get_form_value('price',array());
-		$names = FormLib::get_form_value('batch',array());
-		$batchIDs = array();
-
-		$batchP = $dbc->prepare_statement('INSERT INTO batches (batchName, batchType,
-				discountType, priority, startDate, endDate) VALUES 
-				(?, ?, ?, 0, ?, ?)');
-		$listP = $dbc->prepare_statement('INSERT INTO batchList (upc, batchID, salePrice, active)
-				VALUES (?, ?, ?, 0)');
-		$list = new BatchListModel($dbc);
-		$list->active(0);
-		$list->pricemethod(0);
-		$list->quantity(0);
-
-		for($i=0;$i<count($upcs);$i++){
-			if(!isset($batchIDs[$names[$i]])){
-				$args = array($names[$i].' '.$naming,1,1);
-				if (substr($names[$i],-2) == " A"){
-					$args[] = $start;
-					$args[] = $end;
-				}
-				elseif (substr($names[$i],-2) == " B"){
-					$args[] = $b_start;
-					$args[] = $b_end;
-				}
-				else{
-					$args[] = $start;
-					$args[] = $b_end;
-				}
-	
-				$dbc->exec_statement($batchP,$args);
-				$bID = $dbc->insert_id();
-				$batchIDs[$names[$i]] = $bID;
-			}
-			$id = $batchIDs[$names[$i]];
-
-			$list->upc($upcs[$i]);
-			$list->batchID($id);
-			$list->salePrice(sprintf("%.2f",$prices[$i]));
-			$list->save();
-		}
-
-		$ret = "New sales batches have been created!<p />";
-		$ret .= "<a href=\"../newbatch/\">View batches</a>";	
-		return $ret;
-	}
-
-	
-	function form_content(){
-		global $FANNIE_OP_DB, $FANNIE_URL;
-		$dbc = FannieDB::get($FANNIE_OP_DB);
-		$query = $dbc->prepare_statement("SELECT t.upc,p.description,t.price,
-			CASE WHEN s.super_name IS NULL THEN 'sale' ELSE s.super_name END as batch,
-			t.abtpr as subbatch
-			FROM tempCapPrices as t
-			INNER JOIN products AS p
-			on t.upc = p.upc LEFT JOIN
-			MasterSuperDepts AS s
-			ON p.department=s.dept_ID
-			ORDER BY s.super_name,t.upc");
-		$result = $dbc->exec_statement($query);
-
-		$ret = "<form action=CoopDealsReviewPage.php method=post>
-		<table cellpadding=4 cellspacing=0 border=1>
-		<tr><th>UPC</th><th>Desc</th><th>Sale Price</th><th>Batch</th></tr>";
-		while($row = $dbc->fetch_row($result)){
-			$ret .= sprintf("<tr><td>%s</td><td>%s</td><td>%.2f</td><td>%s Co-op Deals %s</tr>",
-				$row[0],$row[1],$row[2],$row[3],$row[4]);
-			$ret .= sprintf("<input type=hidden name=upc[] value=\"%s\" />
-				<input type=hidden name=price[] value=\"%s\" />
-				<input type=hidden name=batch[] value=\"%s Co-op Deals %s\" />",
-				$row[0],$row[2],$row[3],$row[4]);
-		}
-		$ret .= "</table><p />
-		<table cellpadding=4 cellspacing=0><tr>
-		<td><b>A Start</b></td><td><input type=text name=start onclick=\"showCalendarControl(this);\" /></td>
-		</tr><tr>
-		<td><b>A End</b></td><td><input type=text name=end onclick=\"showCalendarControl(this);\" /></td>
-		</tr><tr>
-		<td><b>B Start</b></td><td><input type=text name=bstart onclick=\"showCalendarControl(this);\" /></td>
-		</tr><tr>
-		<td><b>B End</b></td><td><input type=text name=bend onclick=\"showCalendarControl(this);\" /></td>
-		</tr><tr>
-		<td><b>Month</b></td><td><input type=text name=naming /></td>
-		</tr></table>
-		<input type=submit value=\"Create Batch(es)\" />
-		</form>";
-
-		$this->add_script($FANNIE_URL.'src/CalendarControl.js');
-
-		return $ret;
-	}
+include(dirname(__FILE__) . '/../../config.php');
+if (!class_exists('FannieAPI')) {
+    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 }
 
-FannieDispatch::conditionalExec(false);
+class CoopDealsReviewPage extends FanniePage 
+{
+    protected $title = "Fannie - CAP sales";
+    protected $header = "Review Data";
+
+    public $description = '[Co+op Deals Review] lists the currently load Co+op Deals data
+    and can create sales batches from that data.';
+    public $themed = true;
+
+    protected $auth_classes = array('batches');
+    protected $must_authenticate = true;
+    
+    private $mode = 'form';
+
+    public function preprocess()
+    {
+        if (FormLib::get_form_value('start') !== '') {
+            $this->mode = 'results';
+        }
+
+        return true;
+    }
+
+    public function body_content()
+    {
+        if ($this->mode == 'form') {
+            return $this->form_content();
+        } elseif ($this->mode == 'results') {
+            return $this->results_content();
+        }
+    }
+
+    public function results_content()
+    {
+        global $FANNIE_OP_DB;
+        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $start = date('Y-m-d', strtotime(FormLib::get_form_value('start',date('Y-m-d'))));
+        $end = date('Y-m-d', strtotime(FormLib::get_form_value('end',date('Y-m-d'))));
+        $b_start = date('Y-m-d', strtotime(FormLib::get_form_value('bstart',date('Y-m-d'))));
+        $b_end = date('Y-m-d', strtotime(FormLib::get_form_value('bend',date('Y-m-d'))));
+        $naming = FormLib::get_form_value('naming','');
+        $upcs = FormLib::get_form_value('upc',array());
+        $prices = FormLib::get_form_value('price',array());
+        $names = FormLib::get_form_value('batch',array());
+        $set = FormLib::get('deal-set');
+        $batchIDs = array();
+
+        if( FormLib::get_form_value('group_by_superdepts','') == 'on' ){
+            $superdept_grouping = "CASE WHEN s.super_name IS NULL THEN 'sale' ELSE s.super_name END";
+        } else {
+            $superdept_grouping = "";
+        }
+        $saleItemsP = $dbc->prepare("
+            SELECT t.upc,
+                t.price,
+                t.multiplier,"
+                . $dbc->concat(
+                    ($superdept_grouping ? $superdept_grouping : "''"),
+                    ($superdept_grouping ? "' '" : "''"),
+                    "'Co-op Deals '",
+                    "t.abtpr",
+                    ''
+                ) . " AS batch
+            FROM CoopDealsItems as t
+                " . DTrans::joinProducts('t', 'p', 'INNER') . "
+                LEFT JOIN MasterSuperDepts AS s ON p.department=s.dept_ID
+            WHERE p.inUse=1
+                AND t.dealSet=?
+            ORDER BY s.super_name, t.upc
+        ");
+        $saleItemsR = $dbc->execute($saleItemsP, array($set));
+
+        $batchP = $dbc->prepare('
+            INSERT INTO batches (
+                batchName,
+                batchType,
+                discountType,
+                priority,
+                startDate,
+                endDate
+            )
+            VALUES (?, ?, ?, 0, ?, ?)
+        ');
+
+        $list = new BatchListModel($dbc);
+        $list->active(0);
+        $list->pricemethod(0);
+        $list->quantity(0);
+
+        while ($row = $dbc->fetch_row($saleItemsR)) {
+            if (!isset($batchIDs[$row['batch']])) {
+                $args = array($row['batch'] . ' ' . $naming, 1, 1);
+                if (substr($row['batch'],-2) == " A"){
+                    $args[] = $start;
+                    $args[] = $end;
+                } else if (substr($row['batch'],-2) == " B") {
+                    $args[] = $b_start;
+                    $args[] = $b_end;
+                } else {
+                    $args[] = $start;
+                    $args[] = $b_end;
+                }
+    
+                $dbc->execute($batchP,$args);
+                $bID = $dbc->insertID();
+                $batchIDs[$row['batch']] = $bID;
+
+                if ($this->config->get('STORE_MODE') === 'HQ') {
+                    StoreBatchMapModel::initBatch($bID);
+                }
+            }
+            $id = $batchIDs[$row['batch']];
+
+            $list->upc($row['upc']);
+            $list->batchID($id);
+            $list->salePrice(sprintf("%.2f",$row['price']));
+            $list->signMultiplier($row['multiplier']);
+            $list->save();
+        }
+
+        $ret = "<p>New sales batches have been created!</p>";
+        $ret .= "<p><a href=\"../newbatch/\">View batches</a></p>";
+
+        return $ret;
+    }
+
+    public function form_content()
+    {
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
+
+        $set = FormLib::get('deal-set');
+        $optsR = $dbc->query('
+            SELECT dealSet
+            FROM CoopDealsItems
+            GROUP BY dealSet
+            ORDER BY MAX(coopDealsItemID) DESC');
+        $opts = '';
+        while ($optsW = $dbc->fetchRow($optsR)) {
+            if ($set === '') {
+                $set = $optsW['dealSet'];
+            }
+            $opts .= sprintf('<option %s>%s</option>',
+                ($set == $optsW['dealSet'] ? 'selected' : ''),
+                $optsW['dealSet']
+            );
+        }
+
+        $query = $dbc->prepare("
+            SELECT
+                t.upc,
+                p.brand,
+                p.description,
+                t.price,
+                CASE WHEN s.super_name IS NULL THEN 'sale' ELSE s.super_name END as batch,
+                t.abtpr as subbatch
+            FROM CoopDealsItems as t
+                " . DTrans::joinProducts('t', 'p', 'INNER') . "
+                LEFT JOIN MasterSuperDepts AS s ON p.department=s.dept_ID
+            WHERE t.dealSet=?
+                AND p.inUse=1
+            ORDER BY s.super_name,t.upc
+        ");
+        $result = $dbc->execute($query, array($set));
+
+        $ret = "<form action=CoopDealsReviewPage.php method=post>
+        <div class=\"form-group\">
+            <label>Month</label>
+            <select name=\"deal-set\" class=\"form-control\" 
+                onchange=\"location='?deal-set='+this.value;\">
+            " . $opts . "
+            </select>
+        </div>
+        <table class=\"table table-bordered table-striped tablesorter tablesorter-core small\">
+        <thead>
+        <tr><th>UPC</th><th>Brand</th><th>Desc</th><th>Sale Price</th>
+        <th>New Batch Name</th></tr>\n
+        </thead><tbody>";
+        while ($row = $dbc->fetch_row($result)) {
+            $ret .= sprintf('<tr>
+                        <td>%s</td>
+                        <td>%s</td>
+                        <td>%s</td>
+                        <td>%.2f</td>
+                        <td><span class="superNameSpan">%s </span>Co-op Deals %s</td>
+                        </tr>' . "\n",
+                        $row['upc'],
+                        $row['brand'],
+                        $row['description'],
+                        $row['price'],
+                        $row['batch'],
+                        $row['subbatch']
+                        );
+        }
+        $ret .= <<<html
+        </tbody>
+        </table><p />
+        <div class="row form-horizontal form-group">
+            <label class="col-sm-2 control-label">A Start</label>
+            <div class="col-sm-4">
+                <input type="text" name="start" id="start" class="form-control date-field" />
+            </div>
+            <label class="col-sm-2 control-label">B Start</label>
+            <div class="col-sm-4">
+                <input type="text" name="bstart" id="bstart" class="form-control date-field" />
+            </div>
+        </div>
+        <div class="row form-horizontal form-group">
+            <label class="col-sm-2 control-label">A End</label>
+            <div class="col-sm-4">
+                <input type="text" name="end" id="end" class="form-control date-field" />
+            </div>
+            <label class="col-sm-2 control-label">B End</label>
+            <div class="col-sm-4">
+                <input type="text" name="bend" id="bend" class="form-control date-field" />
+            </div>
+        </div>
+        <div class="row form-horizontal form-group">
+            <label class="col-sm-2 control-label">Month</label>
+            <div class="col-sm-4">
+                <input type="text" name="naming" class="form-control" value="{{set}}" />
+            </div>
+            <label class="col-sm-6">
+                <input type="checkbox" name="group_by_superdepts" checked="true" 
+                    onchange="$('.superNameSpan').toggle(); " />
+                Group sale batches by Superdepartment
+            </label>
+        </div>
+        <p>    
+            <button type=submit class="btn btn-default">Create Batch(es)</button>
+            <a href="CoopDealsMergePage.php" class="pull-right btn btn-default">Merge New Items into Existing Batch(es)</a>
+        </p>
+        </form>
+html;
+        $ret = str_replace('{{set}}', $set, $ret);
+
+        return $ret;
+    }
+    
+    public function helpContent()
+    {
+        return '<p>This tool creates A, B, and TPR batches. The TPR batches will
+            start on <em>A Start</em> and end on <em>B End</em>. The Month field
+            is used in batch names. For example, if Month is <em>January</em>, 
+            batches will have names like <em>Co+op Deals January A</em>.</p>
+            <p><em>Group sale batches by superdepartment</em> means create 
+            separate sales batches for each appicable superdepartment rather
+            than having a single A batch, single B batch, and single TPR
+            batch.</p>
+            ';
+    }
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertNotEquals(0, strlen($this->body_content()));
+    }
+}
+
+FannieDispatch::conditionalExec();
 

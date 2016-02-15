@@ -3,14 +3,14 @@
 
     Copyright 2009,2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -21,105 +21,108 @@
 
 *********************************************************************************/
 
-include('../../config.php');
-include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+include(dirname(__FILE__) . '/../../config.php');
+if (!class_exists('FannieAPI')) {
+    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
 
 class CreateTagsByManu extends FanniePage {
 
-	private $msgs = '';
+    private $msgs = '';
 
-	function preprocess(){
-		global $FANNIE_OP_DB;
+    public $description = '[Brand Shelf Tags] generates a set of shelf tags for brand or UPC prefix.';
+    public $themed = true;
+
+    function preprocess()
+    {
+        global $FANNIE_OP_DB;
 
         $this->title = _("Fannie") . ' : ' . _("Manufacturer Shelf Tags");
         $this->header = _("Manufacturer Shelf Tags");
 
-		if (FormLib::get_form_value('manufacturer',False) !== False){
-			$manu = FormLib::get_form_value('manufacturer');
-			$pageID = FormLib::get_form_value('sID',0);
-			$cond = "";
-			if (is_numeric($_REQUEST['manufacturer']))
-				$cond = " p.upc LIKE ? ";
-			else
-				$cond = " x.manufacturer LIKE ? ";
-			$dbc = FannieDB::get($FANNIE_OP_DB);
-			$q = $dbc->prepare_statement("select p.upc,p.description,p.normal_price,
-				x.manufacturer,x.distributor,v.sku,v.size,
-				CASE WHEN v.units IS NULL THEN 1 ELSE v.units END as units
-				FROM products as p
-				left join prodExtra as x on p.upc=x.upc
-				left join vendorItems as v ON p.upc=v.upc
-				left join vendors as n on v.vendorID=n.vendorID
-				where $cond AND (
-					x.distributor=n.vendorName
-					or (x.distributor='' and n.vendorName='UNFI')
-					or (x.distributor is null and n.vendorName='UNFI')
-					or (n.vendorName is NULL)
-				)");
-			$r = $dbc->exec_statement($q,array('%'.$manu.'%'));
-            $tag = new ShelfTagModel($dbc);
-			while($w = $dbc->fetch_row($r)){
+        if (FormLib::get_form_value('manufacturer',False) !== false) {
+            $manu = FormLib::get_form_value('manufacturer');
+            $pageID = FormLib::get_form_value('sID',0);
+            $cond = "";
+            if (is_numeric($_REQUEST['manufacturer']))
+                $cond = " p.upc LIKE ? ";
+            else
+                $cond = " p.brand LIKE ? ";
+            $dbc = FannieDB::get($FANNIE_OP_DB);
+            $prodP = $dbc->prepare("
+                SELECT
+                    p.upc
+                FROM
+                    products AS p
+                WHERE $cond
+            ");
+            $prodR = $dbc->execute($prodP, array('%'.$manu.'%'));
+            $tag = new ShelftagsModel($dbc);
+            $product = new ProductsModel($dbc);
+            while ($prodW = $dbc->fetch_row($prodR)) {
+                $product->upc($prodW['upc']);
+                $info = $product->getTagData();
                 $tag->id($pageID);
-                $tag->upc($w['upc']);
-                $tag->description($w['description']);
-                $tag->normal_price($w['normal_price']);
-                $tag->brand($w['manufacturer']);
-                $tag->sku($w['sku']);
-                $tag->size($w['units']);
-                $tag->units($w['size']);
-                $tag->vendor($w['distributor']);
-                $tag->pricePerUnit(PriceLib::pricePerUnit($w['normal_price'], $w['size']));
+                $tag->upc($prodW['upc']);
+                $tag->setData($info);
                 $tag->save();
-			}
-			$this->msgs = '<em>Created tags for manufacturer</em>
-					<br /><a href="ShelfTagIndex.php">Home</a>';
-		}
-		return True;
-	}
+            }
+            $this->msgs = '<em>Created tags for manufacturer</em>
+                    <br /><a href="ShelfTagIndex.php">Home</a>';
+        }
 
-	function body_content(){
-		global $FANNIE_OP_DB;
-		$dbc = FannieDB::get($FANNIE_OP_DB);
-		$deptSubQ = $dbc->prepare_statement("SELECT superID,super_name FROM MasterSuperDepts
-				GROUP BY superID,super_name
-				ORDER BY superID");
-		$deptSubR = $dbc->exec_statement($deptSubQ);
+        return true;
+    }
 
-		$deptSubList = "";
-		while($deptSubW = $dbc->fetch_array($deptSubR)){
-			$deptSubList .=" <option value=$deptSubW[0]>$deptSubW[1]</option>";
-		}
+    function body_content(){
+        $dbc = FannieDB::getReadOnly($this->config->get('OP_DB'));
 
-		$ret = '';
-		if (!empty($this->msgs)){
-			$ret .= '<blockquote style="border:solid 1px black; padding:5px;
-					margin:5px;">';
-			$ret .= $this->msgs;
-			$ret .= '</blockquote>';
-		}
+        $qmodel = new ShelfTagQueuesModel($dbc);
+        $deptSubList = $qmodel->toOptions();
 
-		ob_start();
-		?>
-		<form action="CreateTagsByManu.php" method="get">
-		<table>
-		<tr> 
-			<td align="right"> <p><b>Name or UPC prefix</b></p></td>
-			<td> 
-			</p>
-			<input type=text name=manufacturer />
-			</p></td>
-		</tr>
-		<tr>
-			<td><p><b>Page:</b> <select name="sID"><?php echo $deptSubList; ?></select></p></td>
-			<td align="right"><input type="submit" value="Create Shelftags" />
-		</tr>
-		</table>
-		</form>
-		<?php
-		return $ret.ob_get_clean();
-	}
+        $ret = '';
+        if (!empty($this->msgs)){
+            $ret .= '<div class="alert alert-success">';
+            $ret .= $this->msgs;
+            $ret .= '</div>';
+        }
+
+        ob_start();
+        ?>
+        <form action="CreateTagsByManu.php" method="get">
+        <div class="form-group">
+            <label>Name or UPC prefix</label>
+            <input type="text" name="manufacturer" id="manu-field" 
+                class="form-control" required />
+        </div>
+        <div class="form-group">
+        <label>Page</label>
+        <select name="sID" class="form-control">
+            <?php echo $deptSubList; ?>
+        </select>
+        </div>
+        <p>
+            <button type="submit" class="btn btn-default">Create Shelftags</button>
+        </p>
+        </form>
+        <?php
+        $this->add_onload_command('$(\'#manu-field\').focus();');
+
+        return $ret.ob_get_clean();
+    }
+
+    public function helpContent()
+    {
+        return '<p>Create shelf tags for all items with
+            a given brand name or UPC prefix. Tags will be queued for
+            printing under the selected super department.</p>';
+    }
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertNotEquals(0, strlen($this->body_content()));
+    }
 }
 
-FannieDispatch::conditionalExec(false);
+FannieDispatch::conditionalExec();
 
-?>

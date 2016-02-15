@@ -22,12 +22,5 @@
 *********************************************************************************/
 
 ini_set('display_errors','Off');
-include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
+header('Location: AjaxCabReceipt.php?input=' . $_REQUEST['input']);
 
-$CORE_LOCAL->set("cabReference",$_REQUEST['input']);
-$receipt = ReceiptLib::printReceipt('cab');
-ReceiptLib::writeLine($receipt);
-
-echo "Done";
-
-?>

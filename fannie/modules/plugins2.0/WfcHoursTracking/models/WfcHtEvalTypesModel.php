@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,39 +32,6 @@ class WfcHtEvalTypesModel extends BasicModel
     protected $columns = array(
     'id' => array('type'=>'INT', 'increment'=>true, 'primary_key'=>true),
     'title' => array('type'=>'VARCHAR(50)'),
-	);
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function id()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["id"])) {
-                return $this->instance["id"];
-            } elseif(isset($this->columns["id"]["default"])) {
-                return $this->columns["id"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["id"] = func_get_arg(0);
-        }
-    }
-
-    public function title()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["title"])) {
-                return $this->instance["title"];
-            } elseif(isset($this->columns["title"]["default"])) {
-                return $this->columns["title"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["title"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
+    );
 }
 

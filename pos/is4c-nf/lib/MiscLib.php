@@ -36,16 +36,16 @@ class MiscLib extends LibraryClass
 */
 static public function baseURL($check_file="css/pos.css")
 {
-	$ret = "";
-	$cutoff = 0;
-	while($cutoff < 20 && !file_exists($ret.$check_file)) {
-		$ret .= "../";
-		$cutoff++;
-	}
-	if ($cutoff >= 20) {
+    $ret = "";
+    $cutoff = 0;
+    while($cutoff < 20 && !file_exists($ret.$check_file)) {
+        $ret .= "../";
+        $cutoff++;
+    }
+    if ($cutoff >= 20) {
         return false;
-	} else {
-        return $ret;	
+    } else {
+        return $ret;    
     }
 }
 
@@ -57,22 +57,25 @@ static public function base_url($check_file="css/pos.css")
 /**
   Sanitizes values
   @param $num a value
+  @param $char [optional] boolean is character
   @return a sanitized value
 
   Probably an artifact of ASP implementation.
   In practice any argument that evaluates to False
   get translated to integer zero.
 */
-static public function nullwrap($num) 
+static public function nullwrap($num, $char=false) 
 {
 
-	if ( !$num && $num !== '') {
-		 return 0;
-	} elseif (!is_numeric($num) && strlen($num) < 1) {
-		return " ";
-	} else {
-		return $num;
-	}
+    if ($char && ($num === '' || $num === null)) {
+        return '';
+    } else if (!$num) {
+         return 0;
+    } else if (!is_numeric($num) && strlen($num) < 1) {
+        return ' ';
+    } else {
+        return $num;
+    }
 }
 
 /**
@@ -86,7 +89,7 @@ static public function truncate2($num)
         $num = 0;
     }
 
-	return number_format($num, 2);
+    return number_format($num, 2);
 }
 
 /**
@@ -103,17 +106,17 @@ static public function truncate2($num)
 */
 static public function pingport($host, $dbms)
 {
-	$port = strstr($dbms,'mysql') ? 3306 : 1433;	
-	if (strstr($host,":")) {
-		list($host,$port) = explode(":",$host);
+    $port = strstr(strtolower($dbms),'mysql') ? 3306 : 1433;    
+    if (strstr($host,":")) {
+        list($host,$port) = explode(":",$host);
     }
-	$sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-	socket_set_option($sock, SOL_SOCKET, SO_SNDTIMEO, array('sec' => 1, 'usec' => 0)); 
-	socket_set_block($sock);
-	$test = socket_connect($sock,$host,$port);
-	socket_close($sock);
+    $sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+    socket_set_option($sock, SOL_SOCKET, SO_SNDTIMEO, array('sec' => 1, 'usec' => 0)); 
+    socket_set_block($sock);
+    $test = @socket_connect($sock,$host,$port);
+    socket_close($sock);
 
-	return ($test ? 1 : 0);
+    return ($test ? 1 : 0);
 }
 
 /**
@@ -124,12 +127,12 @@ static public function pingport($host, $dbms)
 */
 static public function win32() 
 {
-	$winos = 0;
-	if (substr(PHP_OS, 0, 3) == "WIN") {
+    $winos = 0;
+    if (strtoupper(substr(PHP_OS, 0, 3)) == "WIN") {
         $winos = 1;
     }
 
-	return $winos;
+    return $winos;
 }
 
 /**
@@ -137,41 +140,18 @@ static public function win32()
   @return An ScaleDriverWrapper object
   
   The driver is chosen via "scaleDriver"
-  in $CORE_LOCAL. If the object cannot be 
+  in session. If the object cannot be 
   found this returns zero
 */
 static public function scaleObject()
 {
-	global $CORE_LOCAL;
-	$scaleDriver = $CORE_LOCAL->get("scaleDriver");
-	$sd = 0;
-	if ($scaleDriver != ""){
-		$sd = new $scaleDriver();
-	}
+    $scaleDriver = CoreLocal::get("scaleDriver");
+    $sdh = 0;
+    if ($scaleDriver != ""){
+        $sdh = new $scaleDriver();
+    }
 
-	return $sd;
-}
-
-/**
-  Get the signature capture wrapper object
-  @return An ScaleDriverWrapper object
-  
-  The driver is chosen via "termDriver"
-  in $CORE_LOCAL. If the object cannot be 
-  found this returns zero.
-
-  Signature capture support is very alpha.
-*/
-static public function sigTermObject()
-{
-	global $CORE_LOCAL;
-	$termDriver = $CORE_LOCAL->get("termDriver");
-	$st = 0;
-	if ($termDriver != "") {
-		$st = new $termDriver();
-	}
-
-	return $st;
+    return $sdh;
 }
 
 /**
@@ -179,10 +159,9 @@ static public function sigTermObject()
 */
 static public function goodBeep() 
 {
-	global $CORE_LOCAL;
-	$sd = self::scaleObject();
-	if (is_object($sd)) {
-		$sd->WriteToScale("goodBeep");
+    $sdh = self::scaleObject();
+    if (is_object($sdh)) {
+        $sdh->WriteToScale("goodBeep");
     }
 }
 
@@ -191,10 +170,9 @@ static public function goodBeep()
 */
 static public function rePoll() 
 {
-	global $CORE_LOCAL;
-	$sd = self::scaleObject();
-	if (is_object($sd)) {
-		$sd->WriteToScale("rePoll");
+    $sdh = self::scaleObject();
+    if (is_object($sdh)) {
+        $sdh->WriteToScale("rePoll");
     }
 }
 
@@ -203,10 +181,9 @@ static public function rePoll()
 */
 static public function errorBeep() 
 {
-	global $CORE_LOCAL;
-	$sd = self::scaleObject();
-	if (is_object($sd)) {
-		$sd->WriteToScale("errorBeep");
+    $sdh = self::scaleObject();
+    if (is_object($sdh)) {
+        $sdh->WriteToScale("errorBeep");
     }
 }
 
@@ -215,11 +192,151 @@ static public function errorBeep()
 */
 static public function twoPairs() 
 {
-	global $CORE_LOCAL;
-	$sd = self::scaleObject();
-	if (is_object($sd)) {
-		$sd->WriteToScale("twoPairs");
+    $sdh = self::scaleObject();
+    if (is_object($sdh)) {
+        $sdh->WriteToScale("twoPairs");
     }
+}
+
+/**
+  Use ipconfig.exe or ifconfig, depending on OS,
+  to determine all available IP addresses
+  @return [array] of [string] IP addresses
+*/
+static public function getAllIPs()
+{
+    /**
+      First: use OS utilities to check IP(s)
+      This should be most complete but also
+      may be blocked by permission settings
+    */
+    $ret = array();
+    if (strstr(strtoupper(PHP_OS), 'WIN')) {
+        // windows
+        $ret = self::getWindowsIPs();
+    } else {
+        // unix-y system
+        $ret = self::getLinuxIPs();
+    }
+
+    /**
+      PHP 5.3 adds gethostname() function
+      Try getting host name and resolving to an IP
+    */
+    if (function_exists('gethostname')) {
+        $name = gethostname();
+        $resolved = gethostbyname($name);
+        if (preg_match('/^[\d\.+]$/', $resolved) && !in_array($resolved, $ret)) {
+            $ret[] = $resolved;
+        }
+    }
+    
+    $ret = self::globalIPs($ret);
+
+    return $ret;
+}
+
+static private function globalIPs($ret)
+{
+    /**
+      $_SERVER may simply contain an IP address
+    */
+    $addr = filter_input(INPUT_SERVER, 'SERVER_ADDR');
+    if ($addr !== null && !in_array($addr, $ret)) {
+        $ret[] = $addr;
+    }
+
+    /**
+      $_SERVER may contain a host name that can
+      be resolved to an IP address
+    */
+    $sname = filter_input(INPUT_SERVER, 'SERVER_NAME');
+    if ($sname !== null) {
+        $resolved = gethostbyname($sname);
+        if (preg_match('/^[\d\.+]$/', $resolved) && !in_array($resolved, $ret)) {
+            $ret[] = $resolved;
+        }
+    }
+
+    return $ret;
+}
+
+static private function getWindowsIPs()
+{
+    $cmd = "ipconfig.exe";
+    exec($cmd, $output_lines, $retval);
+    $ret = array();
+    foreach ($output_lines as $line) {
+        if (preg_match('/IP Address[\. ]+?: ([\d\.]+)/', $line, $matches)) {
+            $ret[] = $matches[1];
+        } elseif (preg_match('/IPv4 Address[\. ]+?: ([\d\.]+)/', $line, $matches)) {
+            $ret[] = $matches[1];
+        }
+    }
+
+    return $ret;
+}
+
+static private function getLinuxIPs()
+{
+    $bins = array('/sbin/', '/usr/sbin/', '/usr/bin/', '/bin/', '/usr/local/sbin/', '/usr/local/bin/');
+    $bins = array_filter($bins, function($i){ return file_exists($i . 'ifconfig'); });
+    if (count($bins) > 0) {
+        $cmd = array_shift($bins) . 'ifconfig';
+    } else {
+        // give up; hope $PATH is correct
+        $cmd = 'ifconfig';
+    }
+
+    exec($cmd, $output_lines, $retval);
+    $ret = array();
+    foreach ($output_lines as $line) {
+        if (preg_match('/inet addr:([\d\.]+?) /', $line, $matches)) {
+            $ret[] = $matches[1];
+        }
+    }
+
+    return $ret;
+}
+
+static public function getNumbers($string)
+{
+    if (empty($string)) {
+        return array(-999999);
+    } elseif (is_array($string)) {
+        $ret = array();
+        foreach ($string as $s) {
+            $ret[] = (int)$s;
+        }
+        return $ret;
+    }
+    $pieces = preg_split('/[^\d]+/', $string, 0, PREG_SPLIT_NO_EMPTY);
+    for ($i=0; $i<count($pieces); $i++) {
+        $pieces[$i] = (int)$pieces[$i];
+    }
+
+    return $pieces;
+}
+
+public static function centStrToDouble($str)
+{
+    if (strlen($str) == 0) {
+        return 0.0;
+    }
+    /* when processing as strings, weird things happen
+     * in excess of 1000, so use floating point */
+    $str .= ""; // force type to string
+    $mult = 1;
+    if ($str[0] == "-") {
+        $mult = -1;
+        $str = substr($str,1,strlen($str));
+    }
+    $dollars = (int)substr($str,0,strlen($str)-2);
+    $cents = ((int)substr($str,-2))/100.0;
+    $ret = (double)($dollars+round($cents,2));
+    $ret *= $mult;
+
+    return $ret;
 }
 
 } // end class MiscLib

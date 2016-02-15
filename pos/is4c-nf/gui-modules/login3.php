@@ -21,72 +21,76 @@
 
 *********************************************************************************/
 
+use COREPOS\pos\lib\FormLib;
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
-class login3 extends BasicPage {
+class login3 extends BasicCorePage 
+{
+    private $color;
+    private $img;
+    private $msg;
 
-	var $color;
-	var $img;
-	var $msg;
+    protected $mask_input = True;
 
-	protected $mask_input = True;
+    private function getPassword()
+    {
+        $passwd = FormLib::get('reginput');
+        if ($passwd === '') {
+            $passwd = FormLib::get('scannerInput');
+            if ($passwd !== '') {
+                UdpComm::udpSend('goodBeep');
+            }
+        }
 
-	function preprocess(){
-		$this->color = "coloredArea";
-		$this->img = $this->page_url."graphics/key-icon.png";
-		$this->msg = _("please enter password");
-		if (isset($_REQUEST['reginput']) || isset($_REQUEST['scannerInput'])){
+        return $passwd;
+    }
 
-			$passwd = '';
-			if (isset($_REQUEST['reginput']) && !empty($_REQUEST['reginput'])){
-				$passwd = $_REQUEST['reginput'];
-			}
-			elseif (isset($_REQUEST['scannerInput']) && !empty($_REQUEST['scannerInput'])){
-				$passwd = $_REQUEST['scannerInput'];
-				UdpComm::udpSend('goodBeep');
-			}
+    function preprocess(){
+        $this->color = "coloredArea";
+        $this->img = $this->page_url."graphics/key-icon.png";
+        $this->msg = _("please enter password");
+        if (FormLib::get('reginput', false) !== false || FormLib::get('scannerInput', false) !== false) {
 
-			if (Authenticate::checkPassword($passwd,4)){
-				$this->change_page($this->page_url."gui-modules/pos2.php");
-				return False;
-			}
-			else {
-				$this->color = "errorColoredArea";
-				$this->img = $this->page_url."graphics/redkey4.gif";
-				$this->msg = _("Password Invalid, Please Re-Enter");
-			}
-		}
-		return True;
-	}
+            $passwd = $this->getPassword();
 
-	function head_content(){
-		$this->default_parsewrapper_js('scannerInput');
-	}
+            if (Authenticate::checkPassword($passwd,4)){
+                $this->change_page($this->page_url."gui-modules/pos2.php");
+                return False;
+            } else {
+                $this->color = "errorColoredArea";
+                $this->img = $this->page_url."graphics/redkey4.gif";
+                $this->msg = _("Password Invalid, Please Re-Enter");
+            }
+        }
+        return True;
+    }
 
-	function body_content(){
-		global $CORE_LOCAL;
-		$this->input_header();
-		echo DisplayLib::printheaderb();
-		?>
-		<input type="hidden" name="scannerInput" id="scannerInput" value="" />
-		<div class="baseHeight">
-			<div class="<?php echo $this->color; ?> centeredDisplay">
-			<img alt="key" src='<?php echo $this->img ?>' />
-			<p>
-			<?php echo $this->msg ?>
-			</p>
-			</div>
-		</div>
-		<?php
-		Database::getsubtotals();
-		echo "<div id=\"footer\">";
-		echo DisplayLib::printfooter();
-		echo "</div>";
-	} // END true_body() FUNCTION
+    function head_content(){
+        $this->default_parsewrapper_js('scannerInput');
+        $this->add_onload_command("\$('#formlocal').append('<input type=\"hidden\" name=\"scannerInput\" id=\"scannerInput\" />');");
+    }
+
+    function body_content()
+    {
+        $this->input_header();
+        echo DisplayLib::printheaderb();
+        ?>
+        <div class="baseHeight">
+            <div class="<?php echo $this->color; ?> centeredDisplay">
+            <img alt="key" src='<?php echo $this->img ?>' />
+            <p>
+            <?php echo $this->msg ?>
+            </p>
+            </div>
+        </div>
+        <?php
+        Database::getsubtotals();
+        echo "<div id=\"footer\">";
+        echo DisplayLib::printfooter();
+        echo "</div>";
+    } // END true_body() FUNCTION
 
 }
 
-if (basename(__FILE__) == basename($_SERVER['PHP_SELF']))
-	new login3();
+AutoLoader::dispatch();
 
-?>

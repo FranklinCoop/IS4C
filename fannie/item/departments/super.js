@@ -20,95 +20,125 @@
 
 *********************************************************************************/
 
-function superSelected(){
-	var superID = $('#superselect').val();
-	if (superID == -1){
-		$('#namespan').show();
-        $('#sd_email').val('');
-	}
-	else {
-		$('#namespan').hide();
-	}
+var superDept = (function($) {
+    var mod = {};
 
-	var name = $('#superselect :selected').text();
-	$('#newname').val(name);	
+    var showAlert = function(type, msg) {
+        var alertbox = '<div class="alert alert-' + type + '" role="alert">';
+        alertbox += '<button type="button" class="close" data-dismiss="alert">';
+        alertbox += '<span>&times;</span></button>';
+        alertbox += msg + '</div>';
+        $('#alertarea').append(alertbox);
+    };
 
-	$.ajax({
-		url: 'SuperDeptEditor.php',
-		type: 'POST',
-		timeout: 5000,
-		data: 'sid='+superID+'&action=deptsInSuper',
-		error: function(e1,e2){
-			alert('Error loading XML document');
-		},
-		success: function(resp){
-			$('#deptselect').html(resp);	
-		}
-	});
-
-	$.ajax({
-		url: 'SuperDeptEditor.php',
-		type: 'POST',
-		timeout: 5000,
-		data: 'sid='+superID+'&action=deptsNotInSuper',
-		error: function(){
-		alert('Error loading XML document');
-		},
-		success: function(resp){
-			$('#deptselect2').html(resp);	
-		}
-	});
-
-    $.ajax({
-        url: 'SuperDeptEditor.php',
-        type: 'get',
-        data: 'sid='+superID+'&action=superDeptEmail',
-        success: function(resp) {
-            $('#sd_email').val(resp);
-        }
-    });
-}
-
-function addDepts(){
-	$("#deptselect2 option:selected").each(function(){  
-		$("#deptselect").append($(this).clone());  
-		$(this).remove();  
-	}); 
-}
-
-function remDepts(){
-	$("#deptselect option:selected").each(function(){  
-		$("#deptselect2").append($(this).clone());  
-		$(this).remove();  
-	}); 
-}
-
-function saveData(){
-	var name = $('#newname').val();
-	var sID = $('#superselect').val();
-	var depts = "";
-	$("#deptselect option").each(function(){  
-		depts += "&depts[]="+$(this).val();
-	}); 
-
-	var qs = "action=save&sid="+sID+"&name="+name+depts;
-    qs += '&email='+$('#sd_email').val();
-
-	$.ajax({
-		url: 'SuperDeptEditor.php',
-		type: 'POST',
-		timeout: 5000,
-		data: qs,
-		error: function(){
-		alert('Error loading XML document');
-		},
-		success: function(resp){
-			alert(resp);
-            if (sID == -1) {
-                top.location = 'SuperDeptEditor.php';
+    var loadSelected = function(superID) {
+        $.ajax({
+            url: 'SuperDeptEditor.php',
+            type: 'POST',
+            timeout: 5000,
+            data: 'sid='+superID+'&action=deptsInSuper',
+            error: function(){
+                showAlert('danger', 'Unable to load department data');
+            },
+            success: function(resp){
+                $('#deptselect').html(resp);	
             }
-			// reload the page so the form resets
-			// when a new super department is created
-		}
-	});
-}
+        });
+    };
+
+    var loadNotSelected = function(superID) {
+        $.ajax({
+            url: 'SuperDeptEditor.php',
+            type: 'POST',
+            timeout: 5000,
+            data: 'sid='+superID+'&action=deptsNotInSuper',
+            error: function(){
+                showAlert('danger', 'Unable to load department data');
+            },
+            success: function(resp){
+                $('#deptselect2').html(resp);	
+            }
+        });
+    };
+
+    var loadEmail = function(superID) {
+        $.ajax({
+            url: 'SuperDeptEditor.php',
+            type: 'get',
+            data: 'sid='+superID+'&action=superDeptEmail',
+            success: function(resp) {
+                $('#sd_email').val(resp);
+            }
+        });
+    };
+
+    mod.superSelected = function(){
+        var superID = $('#superselect').val();
+        if (superID === '-1'){
+            $('#namefield').show();
+            $('#sd_email').val('');
+            $('#newname').val('');
+            $('#newname').focus();
+        } else {
+            $('#namefield').hide();
+            var name = $('#superselect :selected').text();
+            $('#newname').val(name);	
+        }
+
+        loadSelected(superID);
+        loadNotSelected(superID);
+        loadEmail(superID);
+    };
+
+    var shiftOptions = function(src, dest) {
+        $(src+" option:selected").each(function(){  
+            $(dest).append($(this).clone());  
+            $(this).remove();  
+        }); 
+    };
+
+    mod.addDepts = function(){
+        shiftOptions('#deptselect2', '#deptselect');
+    };
+
+    mod.remDepts = function(){
+        shiftOptions('#deptselect', '#deptselect2');
+    };
+
+    mod.saveData = function(){
+        var name = $('#newname').val();
+        var sID = $('#superselect').val();
+        var depts = "";
+        $("#deptselect option").each(function(){  
+            depts += "&depts[]="+$(this).val();
+        }); 
+
+        var qs = "action=save&sid="+sID+"&name="+name+depts;
+        qs += '&email='+$('#sd_email').val();
+
+        $.ajax({
+            url: 'SuperDeptEditor.php',
+            type: 'POST',
+            timeout: 5000,
+            data: qs,
+            dataType: 'json',
+            error: function(){
+                showAlert('danger', 'Save failed!');
+            },
+            success: function(resp){
+                // reload the page so the form resets
+                // when a new super department is created
+                showAlert('success', 'Saved #' + resp.id + ' ' + resp.name);
+                if (sID === '-1') {
+                    var newOpt = $('<option/>').val(resp.id).html(resp.name);
+                    $('#superselect').append(newOpt);
+                    $('#superselect').val(resp.id);
+                }
+            }
+        });
+    };
+
+    return mod;
+
+}(jQuery));
+

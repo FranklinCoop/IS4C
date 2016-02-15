@@ -3,14 +3,14 @@
 
     Copyright 2009 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -21,13 +21,15 @@
 
 *********************************************************************************/
 
-if (!chdir("CompressProdUpdate")){
-	echo "Error: Can't find directory (archive prod update)";
-	exit;
+if (!chdir(dirname(__FILE__))){
+    echo "Error: Can't find directory (archive prod update)";
+    return;
 }
 
 include('../../config.php');
-include($FANNIE_ROOT.'src/SQLManager.php');
+if (!class_exists('FannieAPI')) {
+    include($FANNIE_ROOT . 'classlib2.0/FannieAPI.php');
+}
 
 /* HELP
 
@@ -44,7 +46,7 @@ set_time_limit(0);
 ini_set('memory_limit','256M');
 
 $sql = new SQLManager($FANNIE_SERVER,$FANNIE_SERVER_DBMS,$FANNIE_OP_DB,
-		$FANNIE_SERVER_USER,$FANNIE_SERVER_PW);
+        $FANNIE_SERVER_USER,$FANNIE_SERVER_PW);
 
 $matching = $sql->matchingColumns('prodUpdate', 'prodUpdateArchive');
 $col_list = '';
@@ -58,11 +60,10 @@ $col_list = substr($col_list, 0, strlen($col_list)-1);
 
 $worked = $sql->query("INSERT INTO prodUpdateArchive ($col_list) SELECT $col_list FROM prodUpdate");
 if ($worked){
-	$sql->query("TRUNCATE TABLE prodUpdate");
+    $sql->query("TRUNCATE TABLE prodUpdate");
 }
 else {
-	echo "There was an archiving error on prodUpdate\n";
-	flush();
+    echo "There was an archiving error on prodUpdate\n";
+    flush();
 }
 
-?>

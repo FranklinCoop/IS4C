@@ -40,6 +40,46 @@ class WfcVcTask extends FannieTask
         global $FANNIE_OP_DB;
         $dbc = FannieDB::get($FANNIE_OP_DB);
 
+        $last_year = date('Y-m-d', mktime(0, 0, 0, date('n'), date('j'), date('Y')-1));
+        $last_year = '2014-06-01';
+        $dlog_ly = DTransactionsModel::selectDlog($last_year, date('Y-m-d'));
+        $accessQ = 'SELECT card_no
+                    FROM ' . $dlog_ly . '
+                    WHERE trans_type=\'I\'
+                        AND upc=\'ACCESS\'
+                        AND tdate >= ?
+                    GROUP BY card_no
+                    HAVING SUM(quantity) > 0';
+        $accessP = $dbc->prepare($accessQ);
+        $accessR = $dbc->execute($accessP, array($last_year));
+        $mems = array();
+        $in = '';
+        while ($accessW = $dbc->fetch_row($accessR)) {
+            $mems[] = $accessW['card_no'];
+            $in .= '?,';
+        }
+        $in = substr($in, 0, strlen($in)-1);
+
+        if (count($mems) == 0) {
+            $mems = array(-1);
+            $in = '?';
+        }
+
+        $redo = $dbc->prepare('UPDATE custdata 
+                               SET memType=5,
+                                Discount=10
+                               WHERE Type=\'PC\' 
+                                AND memType IN (1,5)
+                                AND CardNo IN (' . $in . ')');
+        $dbc->execute($redo, $mems);
+        $undo = $dbc->prepare('UPDATE custdata 
+                               SET memType=1,
+                                Discount=0
+                               WHERE Type=\'PC\'
+                                AND memType IN (5)
+                                AND CardNo NOT IN (' . $in . ')');
+        $dbc->execute($undo, $mems);
+
         $start = date('Y-m-01');
         $end = date('Y-m-t');
         $dlog = DTransactionsModel::selectDlog($start, $end);
@@ -54,9 +94,10 @@ class WfcVcTask extends FannieTask
         // normalize everyone to zero
         $dbc->query('UPDATE custdata AS c SET memCoupons=0, blueLine=' . $default_blueline);
         // grant coupon to all members
+        /*
         $dbc->query("UPDATE custdata AS c SET memCoupons=1 WHERE Type='PC'");
 
-        // lookup usage in the last month
+        // lookup OB usage in the last month
         $usageP = $dbc->prepare("SELECT card_no 
                                 FROM $dlog
                                 WHERE upc='0049999900001'
@@ -64,25 +105,33 @@ class WfcVcTask extends FannieTask
                                 GROUP BY card_no
                                 HAVING SUM(total) <> 0");
         $usageR = $dbc->execute($usageP, array($start . ' 00:00:00', $end . ' 23:59:59'));
+        $no_ob = array();
 
         // remove coupon from members that have used it
-        $removeP = $dbc->prepare('UPDATE custdata AS c SET memCoupons=0 WHERE CardNo=?');
+        $removeP = $dbc->prepare('UPDATE custdata AS c SET memCoupons=memCoupons-1 WHERE CardNo=?');
         while($usageW = $dbc->fetch_row($usageR)) {
             $dbc->execute($removeP, array($usageW['card_no']));
+            $no_ob[$usageW['card_no']] = true;
         }
 
         $coupon_blueline = $dbc->concat(
                         $dbc->convert('c.CardNo', 'CHAR'),
                         "' '",
                         'LastName',
-                        "' Coup('",
-                        $dbc->convert('c.memCoupons', 'CHAR'),
-                        "')'",
+                        "' Coup(OB)'",
                         ''
         );
+        $dbc->query("UPDATE custdata AS c SET blueLine=$coupon_blueline WHERE Type='PC' AND memCoupons > 0");
 
-        // set member blueLine based on number of coupons
-        $dbc->query("UPDATE custdata AS c SET blueLine=$coupon_blueline WHERE Type='PC'");
+        $coupon_blueline = $dbc->concat(
+                        $dbc->convert('c.CardNo', 'CHAR'),
+                        "' '",
+                        'LastName',
+                        "' Coup(0)'",
+                        ''
+        );
+        $dbc->query("UPDATE custdata AS c SET blueLine=$coupon_blueline WHERE Type='PC' AND memCoupons = 0");
+        */
     }
 }
 

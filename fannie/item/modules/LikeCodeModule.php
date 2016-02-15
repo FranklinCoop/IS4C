@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op, Duluth, MN
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,150 +21,370 @@
 
 *********************************************************************************/
 
-include_once(dirname(__FILE__).'/../../config.php');
-include_once(dirname(__FILE__).'/../../classlib2.0/item/ItemModule.php');
-include_once(dirname(__FILE__).'/../../classlib2.0/lib/FormLib.php');
-include_once(dirname(__FILE__).'/../../classlib2.0/data/models/ProductsModel.php');
-include_once(dirname(__FILE__).'/../../src/JsonLib.php');
+if (!class_exists('FannieAPI')) {
+    include_once(dirname(__FILE__).'/../../classlib2.0/FannieAPI.php');
+}
 
-class LikeCodeModule extends ItemModule {
+class LikeCodeModule extends ItemModule 
+{
 
-	function ShowEditForm($upc){
-		global $FANNIE_URL;
-		$ret = '<fieldset id="LikeCodeFieldSet"><legend>Likecode</legend>';
+    private function getLikeCode($dbc, $upc)
+    {
+        $prep = $dbc->prepare('SELECT likeCode FROM upcLike WHERE upc=?');
+        $res = $dbc->execute($prep,array($upc));
+        $myLC = -1;     
+        if ($dbc->numRows($res) > 0) {
+            $row = $dbc->fetchRow($res);
+            $myLC = $row['likeCode'];
+        }
 
-		$dbc = $this->db();
-		$p = $dbc->prepare_statement('SELECT likeCode FROM upcLike WHERE upc=?');
-		$r = $dbc->exec_statement($p,array($upc));
-		$myLC = -1;		
-		if ($dbc->num_rows($r) > 0)
-			$myLC = array_pop($dbc->fetch_row($r));
+        return $myLC;
+    }
 
-		$ret .= "<table border=0><tr><td><b>Like code</b> ";
-		$ret .= "<select name=likeCode style=\"{width: 175px;}\"
-				onchange=\"updateLcModList(this.value);\">";
-		$ret .= "<option value=-1>(none)</option>";
-	
-		$p = $dbc->prepare_statement('SELECT likeCode, likeCodeDesc FROM likeCodes ORDER BY likeCode');
-		$r = $dbc->exec_statement($p);
-		while($w = $dbc->fetch_row($r)){
-			$ret .= sprintf('<option %s value="%d">%d %s</option>',
-				($w['likeCode'] == $myLC ? 'selected': ''),
-				$w['likeCode'],$w['likeCode'],$w['likeCodeDesc']
-			);
-		}
-		$ret .= "</select></td>";
-		$ret .= "<td><input type=checkbox name=LikeCodeNoUpdate value='noupdate'>Check to not update like code items</td>
-			</tr><tr>";
-		$ret .= '<td id="LikeCodeItemList">';
-		$ret .= $this->LikeCodeItems($myLC);	
-		$ret .= '</td>';
-		$ret .= '<td id="LikeCodeHistoryLink" valign="top">';
-		$ret .= $this->HistoryLink($myLC);	
-		$ret .= '</td>';
-		$ret .= '</tr></table></fieldset>';
-		$ret .= $this->js();
+    public function showEditForm($upc, $display_mode=1, $expand_mode=1)
+    {
+        $dbc = $this->db();
+        $myLC = $this->getLikeCode($dbc, $upc);
+        $ret = '<div id="LikeCodeFieldSet" class="panel panel-default">';
+        $ret .=  "<div class=\"panel-heading\">
+                <a href=\"\" onclick=\"\$('#LikeCodeFieldsetContent').toggle();return false;\">
+                Likecode
+                </a></div>";
+        $style = '';
+        if ($expand_mode == 1) {
+            $style = '';
+        } else if ($expand_mode == 2 && $myLC != -1) {
+            $style = '';
+        } else {
+            $style = ' collapse';
+        }
+        $ret .= '<div id="LikeCodeFieldsetContent" class="panel-body' . $style . '">';
 
-		return $ret;
-	}
+        $ret .= "<div class=\"form-group form-inline\">
+                <b>Like code</b> <button type=\"button\" id=\"lcAddButton\"
+                class=\"btn btn-default\">+</button> ";
+        $ret .= "<select name=likeCode id=\"likeCodeSelect\" 
+                onchange=\"updateLcModList(this.value);\" class=\"chosenSelect form-control\">";
+        $ret .= "<option value=-1>(none)</option>";
+    
+        $lcm = new LikeCodesModel($dbc);
+        $ret .= $lcm->toOptions($myLC);
+        $ret .= "</select>";
+        $ret .= " <label><input type=checkbox name=LikeCodeNoUpdate value='noupdate'>Check to not update like code items</label>";
+        $ret .= ' <span id="LikeCodeHistoryLink">' . $this->HistoryLink($myLC) . '</span>';
+        $ret .= '</div>';
 
-	function SaveFormData($upc){
-		$lc = FormLib::get_form_value('likeCode');	
-		$dbc = $this->db();
+        $ret .= '<div id="LikeCodeItemList">';
+        $ret .= $this->LikeCodeItems($myLC, $upc);
+        $ret .= '</div>';
 
-		$delP = $dbc->prepare_statement('DELETE FROM upcLike WHERE upc=?');	
-		$delR = $dbc->exec_statement($delP,array($upc));
-		if ($lc == -1){
-			return ($delR === False) ? False : True;
-		}
+        $ret .= '<div id="addLikeCodeDialog" title="Add Like Code" class="collapse">';
+        $ret .= '<fieldset>';
+        $ret .= '<label for="newLikeID">LC #</label>';
+        $ret .= '<input type="text" name="newLC" id="newLikeID" class="form-control" />';
+        $ret .= '<label for="newLikeName">LC Name</label>';
+        $ret .= '<input type="text" name="lcName" id="newLikeName" class="form-control" />';
+        $ret .= '</fieldset>';
+        $ret .= '</div>';
 
-		$insP = 'INSERT INTO upcLike (upc,likeCode) VALUES (?,?)';
-		$insR = $dbc->exec_statement($insP,array($upc,$lc));
-		
-		if (FormLib::get_form_value('LikeCodeNoUpdate') == 'noupdate'){
-			return ($insR === False) ? False : True;
-		}
+        $ret .= '</div>';
+        $ret .= '</div>';
 
-		/* get values for current item */
-		$valuesP = $dbc->prepare_statement('SELECT normal_price,pricemethod,groupprice,quantity,
-			department,scale,tax,foodstamp,discount,qttyEnforced,local
-			FROM products WHERE upc=?');
-		$valuesR = $dbc->exec_statement($valuesP,array($upc));	
-		if ($dbc->num_rows($valuesR) == 0) return False;
-		$values = $dbc->fetch_row($valuesR);
+        return $ret;
+    }
 
-		/* apply current values to other other items
-		   in the like code */
-		$upcP = $dbc->prepare_statement('SELECT upc FROM upcLike WHERE likeCode=? AND upc<>?');
-		$upcR = $dbc->exec_statement($upcP,array($lc,$upc));
-		while($upcW = $dbc->fetch_row($upcR)){
-			ProductsModel::update($upcW['upc'],$values);
-			updateProductAllLanes($upcW['upc']);
-		}
-		return True;
-	}
+    public function SaveFormData($upc)
+    {
+        try {
+            $likecode = $this->form->likeCode;
+        } catch (Exception $ex) {
+            return false;
+        }
+        $dbc = $this->db();
 
-	private function js(){
-		global $FANNIE_URL;
-		ob_start();
-		?>
-		<script type="text/javascript">
-		function updateLcModList(val){
-			$.ajax({
-				url: '<?php echo $FANNIE_URL; ?>item/modules/LikeCodeModule.php',
-				data: 'lc='+val,
-				dataType: 'json',
-				cache: false,
-				success: function(data){
-					if (data.items){
-						$('#LikeCodeItemList').html(data.items);
-					}
-					if (data.link){
-						$('#LikeCodeHistoryLink').html(data.link);
-					}
-				}
-			});
-		}
-		</script>
-		<?php
-		return ob_get_clean();
-	}
+        $delP = $dbc->prepare('DELETE FROM upcLike WHERE upc=?'); 
+        $delR = $dbc->execute($delP,array($upc));
+        if ($likecode == -1){
+            return ($delR === False) ? False : True;
+        }
 
-	private function HistoryLink($lc){
-		global $FANNIE_URL;
-		if ($lc == -1) return '';
-		$ret = '<a href="'.$FANNIE_URL.'reports/RecentSales/?likecode='.$lc.'" target="_recentlike">';
-		$ret .= 'Likecode Sales History</a>';
-		return $ret;
-	}
+        $insP = 'INSERT INTO upcLike (upc,likeCode) VALUES (?,?)';
+        $insR = $dbc->execute($insP,array($upc,$likecode));
+        
+        if (FormLib::get('LikeCodeNoUpdate') == 'noupdate'){
+            return ($insR === False) ? False : True;
+        }
 
-	private function LikeCodeItems($lc){
-		if ($lc == -1) return '';
-		$ret = "<b>Like Code Linked Items</b><div id=lctable>";
-		$ret .= "<table border=0 bgcolor=\"#FFFFCC\">";
-		$dbc = $this->db();
-		$p = $dbc->prepare_statement("SELECT p.upc,p.description FROM
-			products AS p INNER JOIN upcLike AS u ON
-			p.upc=u.upc WHERE u.likeCode=?
-			ORDER BY p.upc");
-		$res = $dbc->exec_statement($p,array($lc));
-		while($row = $dbc->fetch_row($res)){
-			$ret .= sprintf("<tr><td><a href=itemMaint.php?upc=%s>%s</a></td>
-					<td>%s</td></tr>",$row[0],$row[0],$row[1]);
-		}
-		$ret .= "</table>";
-		$ret .= '</div>';
-		return $ret;
-	}
+        /* get values for current item */
+        $valuesP = $dbc->prepare('SELECT normal_price,pricemethod,groupprice,quantity,
+            department,scale,tax,foodstamp,discount,qttyEnforced,local,wicable
+            FROM products WHERE upc=?');
+        $values = $dbc->getRow($valuesP,array($upc));  
+        if ($values === false) {
+            return false;
+        }
 
-	function AjaxCallback(){
-		$lc = FormLib::get_form_value('lc',-1);
-		$json = array(
-		'items' => $this->LikeCodeItems($lc),
-		'link' => $this->HistoryLink($lc)
-		);
-		echo JsonLib::array_to_json($json);
-	}
+        $stores = new StoresModel($dbc);
+        $stores = array_map(
+            function($obj){ return $obj->storeID(); },
+            array_filter($stores->find(), function($obj){ return $obj->hasOwnItems(); }));
+
+        $model = new ProductsModel($dbc);
+        $model->upc($upc);
+        $model->mixmatchcode($likecode+500);
+        $this->saveModelToStores($model, $stores);
+
+        /* apply current values to other other items
+           in the like code */
+        $upcP = $dbc->prepare('SELECT upc FROM upcLike WHERE likeCode=? AND upc<>?');
+        $upcR = $dbc->execute($upcP,array($likecode,$upc));
+        while ($upcW = $dbc->fetchRow($upcR)) {
+            $this->updateItem($dbc, $upcW['upc'], $likecode, $values);
+            updateProductAllLanes($upcW['upc']);
+        }
+
+        return true;
+    }
+
+    private $upP = null;
+    private function updateStatement($dbc)
+    {
+        if ($this->upP === null) {
+            $this->upP = $dbc->prepare('
+                UPDATE products
+                SET normal_price=?,
+                    pricemethod=?,
+                    groupprice=?,
+                    quantity=?,
+                    department=?,
+                    scale=?,
+                    tax=?,
+                    foodstamp=?,
+                    discount=?,
+                    qttyEnforced=?,
+                    local=?,
+                    wicable=?,
+                    mixmatchcode=?
+                WHERE upc=?');
+        }
+        return $this->upP;
+    }
+
+    private function updateItem($dbc, $upc, $likecode, $values)
+    {
+        $upP = $this->updateStatement($dbc);
+        $args = array(
+            $values['normal_price'],
+            $values['pricemethod'],
+            $values['groupprice'],
+            $values['quantity'],
+            $values['department'],
+            $values['scale'],
+            $values['tax'],
+            $values['foodstamp'],
+            $values['discount'],
+            $values['qttyEnforced'],
+            $values['local'],
+            $values['wicable'],
+            $likecode+500,
+            $upc
+        );
+        return $dbc->execute($upP, $args);
+    }
+
+    private function saveModelToStores($model, $stores)
+    {
+        $isHQ = FannieConfig::config('STORE_MODE') == 'HQ' ? true : false;
+        if ($isHQ) {
+            foreach ($stores as $store_id) {
+                $model->store_id($store_id);
+                $model->save();
+            }
+        } else {
+            $model->save();
+        }
+    }
+
+    public function getFormJavascript($upc)
+    {
+        $FANNIE_URL = FannieConfig::config('URL');
+        ob_start();
+        ?>
+        function updateLcModList(val){
+            if (val == -1) {
+                $('#LikeCodeItemList').hide();
+                $('#LikeCodeHistoryLink').hide();
+                return true;
+            }
+            $.ajax({
+                url: '<?php echo $FANNIE_URL; ?>item/modules/LikeCodeModule.php',
+                data: 'lc='+val,
+                dataType: 'json',
+                cache: false,
+                success: function(data){
+                    if (data.items){
+                        $('#LikeCodeItemList').html(data.items);
+                    }
+                    if (data.link){
+                        $('#LikeCodeHistoryLink').html(data.link);
+                        $('#LikeCodeHistoryLink a.fancyboxLink').fancybox();
+                    }
+                }
+            });
+        }
+        function addLcDialog()
+        {
+            var lc_dialog = $('#addLikeCodeDialog').dialog({
+                autoOpen: false,
+                height: 300,
+                width: 300,
+                modal: true,
+                buttons: {
+                    "Create Like Code" : addLcCallback,
+                    "Cancel" : function() {
+                        lc_dialog.dialog("close");
+                    }
+                },
+                close: function() {
+                    $('#addLikeCodeDialog :input').each(function(){
+                        $(this).val('');
+                    });
+                    $('#addLikeAreaAlert').html('');
+                }
+            });
+
+            $('#addLikeCodeDialog :input').keyup(function (e) {
+                if (e.which == 13) {
+                    addLcCallback();
+                }
+            });
+
+            $('#lcAddButton').click(function(e){
+                e.preventDefault();
+                lc_dialog.dialog("open"); 
+            });
+
+            function addLcCallback()
+            {
+                var data = $('#addLikeCodeDialog :input').serialize();
+                $.ajax({
+                    url: '<?php echo $FANNIE_URL; ?>item/modules/LikeCodeModule.php',
+                    data: data,
+                    dataType: 'json',
+                    error: function() {
+                        $('#addLikeAreaAlert').html('Communication error');
+                    },
+                    success: function(resp) {
+                        if (resp.error) {
+                            $('#addLikeAreaAlert').html(resp.error);
+                        } else {
+                            var newOpt = $('<option></option>');
+                            newOpt.val(resp.likeCode);
+                            newOpt.html(resp.likeCode + ' ' + resp.likeCodeDesc);
+                            $('#LikeCodeFieldSet select').append(newOpt);
+                            $('#LikeCodeFieldSet select').val(resp.likeCode);
+                            lc_dialog.dialog("close");
+                        }
+                    }
+                });
+            }
+        }
+        <?php
+
+        return ob_get_clean();
+    }
+
+    private function HistoryLink($likecode)
+    {
+        $FANNIE_URL = FannieConfig::config('URL');
+        if ($likecode == -1) return '';
+        $ret = '<a href="'.$FANNIE_URL.'reports/RecentSales/?likecode='.$likecode.'" 
+                title="Likecode Sales History" class="iframe fancyboxLink">';
+        $ret .= 'Likecode Sales History</a>';
+
+        return $ret;
+    }
+
+    private function LikeCodeItems($likecode, $upc='nomatch')
+    {
+        if ($likecode == -1) return '';
+        $ret = "<b>Like Code Linked Items</b><div id=lctable>";
+        $ret .= "<table class=\"alert alert-warning table\">";
+        $dbc = $this->db();
+        $p = $dbc->prepare("
+            SELECT p.upc,
+                p.description 
+            FROM products AS p 
+                INNER JOIN upcLike AS u ON p.upc=u.upc 
+            WHERE u.likeCode=?
+            ORDER BY p.upc");
+        $res = $dbc->execute($p,array($likecode));
+        $prev = false;
+        while($row = $dbc->fetch_row($res)){
+            if ($prev === $row['upc']) {
+                continue;
+            }
+            $tag = ($upc == $row['upc']) ? 'th' : 'td';
+            $ret .= sprintf("<tr><%s><a href=itemMaint.php?upc=%s>%s</a></%s>
+                    <%s>%s</%s></tr>",
+                    $tag, $row['upc'],$row['upc'], $tag,
+                    $tag, $row[1], $tag);
+            $prev = $row['upc'];
+        }
+        $ret .= "</table>";
+        $ret .= '</div>';
+        return $ret;
+    }
+
+    function AjaxCallback()
+    {
+        $likecode = FormLib::get('lc',-1);
+        $newLC = FormLib::get('newLC', false);
+        $json = array();
+
+        /** create new like code **/
+        if ($newLC !== false) {
+            $newName = FormLib::get('lcName');
+            $json['error'] = '';
+            if ($newName == '') {
+                $json['error'] .= '<li>Name is required</li>';
+            }
+            if ($newLC == '') {
+                $json['error'] .= '<li>Number is required</li>';
+            } elseif (!is_numeric($newLC)) {
+                $json['error'] .= '<li>' . $newLC . ' is not a number</li>';
+            }
+            if (empty($json['error'])) {
+                $dbc = FannieDB::get(FannieConfig::config('OP_DB'));
+                $chkP = $dbc->prepare('
+                    SELECT likeCode
+                    FROM likeCodes
+                    WHERE likeCode = ?
+                ');
+                $chkR = $dbc->execute($chkP, array($newLC));
+                if ($dbc->num_rows($chkR) > 0) {
+                    $json['error'] .= '<li>' . $newLC . ' is already a like code</li>';
+                } else {
+                    unset($json['error']);
+                    $insP = $dbc->prepare('
+                        INSERT INTO likeCodes (likeCode, likeCodeDesc)
+                        VALUES (?, ?)
+                    ');
+                    $insR = $dbc->execute($insP, array($newLC, $newName));
+                    $json['likeCode'] = $newLC;
+                    $json['likeCodeDesc'] = $newName;
+                }
+            }
+        /** lookup items associated w/ like code **/
+        } else {
+            $json = array(
+            'items' => $this->LikeCodeItems($likecode),
+            'link' => $this->HistoryLink($likecode)
+            );
+        }
+
+        echo json_encode($json);
+    }
 }
 
 /**
@@ -174,8 +394,7 @@ class LikeCodeModule extends ItemModule {
   another PHP script.
 */
 if (basename($_SERVER['SCRIPT_NAME']) == basename(__FILE__)){
-	$obj = new LikeCodeModule();
-	$obj->AjaxCallback();	
+    $obj = new LikeCodeModule();
+    $obj->AjaxCallback();   
 }
 
-?>

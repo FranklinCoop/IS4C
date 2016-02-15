@@ -3,14 +3,14 @@
 
     Copyright 2011 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -31,34 +31,36 @@
    Currently applies to products & custdata.
 
 */
-
-include('../config.php');
-include($FANNIE_ROOT.'src/SQLManager.php');
-include($FANNIE_ROOT.'src/cron_msg.php');
+include(dirname(__FILE__) . '/../config.php');
+if (!class_exists('FannieAPI')) {
+    include($FANNIE_ROOT . 'classlib2.0/FannieAPI.php');
+}
+if (!function_exists('cron_msg')) {
+    include($FANNIE_ROOT.'src/cron_msg.php');
+}
 
 set_time_limit(0);
 
 $sql = new SQLManager($FANNIE_SERVER,$FANNIE_SERVER_DBMS,$FANNIE_OP_DB,
-		$FANNIE_SERVER_USER,$FANNIE_SERVER_PW);
+        $FANNIE_SERVER_USER,$FANNIE_SERVER_PW);
 
 // drop and recreate because SQL Server
 // really hates identity inserts
 $sql->query("DROP TABLE productBackup");
 if ($FANNIE_SERVER_DBMS == "MSSQL"){
-	$sql->query("SELECT * INTO productBackup FROM products");
+    $sql->query("SELECT * INTO productBackup FROM products");
 }
 else {
-	$sql->query("CREATE TABLE productBackup LIKE products");
-	$sql->query("INSERT INTO productBackup SELECT * FROM products");
+    $sql->query("CREATE TABLE productBackup LIKE products");
+    $sql->query("INSERT INTO productBackup SELECT * FROM products");
 }
 
 $sql->query("DROP TABLE custdataBackup");
 if ($FANNIE_SERVER_DBMS == "MSSQL"){
-	$sql->query("SELECT * INTO custdataBackup FROM custdata");
+    $sql->query("SELECT * INTO custdataBackup FROM custdata");
 }
 else {
-	$sql->query("CREATE TABLE custdataBackup LIKE custdata");
-	$sql->query("INSERT INTO custdataBackup SELECT * FROM custdata");
+    $sql->query("CREATE TABLE custdataBackup LIKE custdata");
+    $sql->query("INSERT INTO custdataBackup SELECT * FROM custdata");
 }
 
-?>

@@ -3,14 +3,14 @@
 
     Copyright 2009 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -30,8 +30,8 @@ unless otherwise noted
 
 /* --COMMENTS - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-	* 10Nov12 Eric Lee Add FANNIE_AUTH_ENABLED test in createLogin per intent(?)
-	*                   in first-user call from install/auth.php.
+    * 10Nov12 Eric Lee Add FANNIE_AUTH_ENABLED test in createLogin per intent(?)
+    *                   in first-user call from install/auth.php.
 
 */
 
@@ -53,11 +53,9 @@ function login($name,$password){
   }
   if ($password == "") return false;
 
-  table_check();
-
   $sql = dbconnect();
-  $gatherQ = $sql->prepare_statement("select password,salt from Users where name=?");
-  $gatherR = $sql->exec_statement($gatherQ,array($name));
+  $gatherQ = $sql->prepare("select password,salt from Users where name=?");
+  $gatherR = $sql->execute($gatherQ,array($name));
   if ($sql->num_rows($gatherR) == 0){
     return false;
   }
@@ -75,99 +73,103 @@ function login($name,$password){
 }
 
 /* 
-	Revised login for use with UNIX system
-	
-	shadowread searches the shadow password file
-	and returns the user's password hash
+    Revised login for use with UNIX system
+    
+    shadowread searches the shadow password file
+    and returns the user's password hash
 */
 
 function shadow_login($name,$passwd){
-	if (!isAlphanumeric($name))
-		return false;
-	if ($passwd == "") return false;
+    if (!isAlphanumeric($name))
+        return false;
+    if ($passwd == "") return false;
 
-	$output = array();
-	$return_value = -1;
-	exec("../shadowread/shadowread \"$name\"",$output,$return_value);
-	if ($return_value != 0)
-		return false;
+    $output = array();
+    $return_value = -1;
+    exec("../shadowread/shadowread \"$name\"",$output,$return_value);
+    if ($return_value != 0)
+        return false;
 
-	$pwhash = $output[0];
-	if (crypt($passwd,$pwhash) == $pwhash){
-		syncUserShadow($name);
-		doLogin($name);
-		return true;
-	}	
-	return false;
+    $pwhash = $output[0];
+    if (crypt($passwd,$pwhash) == $pwhash){
+        syncUserShadow($name);
+        doLogin($name);
+        return true;
+    }   
+    return false;
 }
 
 /* login using an ldap server 
  * 
  * Tested against openldap 2.3.27
  */
-function ldap_login($name,$passwd){
-	global $FANNIE_LDAP_SERVER, $FANNIE_LDAP_PORT, $FANNIE_LDAP_DN, $FANNIE_LDAP_SEARCH_FIELD, $FANNIE_LDAP_UID_FIELD, $FANNIE_LDAP_RN_FIELD;
-	if (!isAlphanumeric($name))
-		return false;
-	if ($passwd == "") return false;
+function ldap_login($name,$passwd)
+{
+    $config = FannieConfig::factory();
+    if (!isAlphanumeric($name))
+        return false;
+    if ($passwd == "") return false;
 
-	$conn = ldap_connect($FANNIE_LDAP_SERVER,$FANNIE_LDAP_PORT);
-	if (!$conn) return false;
+    $conn = ldap_connect($config->get('LDAP_SERVER'), $config->get('LDAP_PORT'));
+    if (!$conn) return false;
 
-	$search_result = ldap_search($conn,$FANNIE_LDAP_DN,
-				     $FANNIE_LDAP_SEARCH_FIELD."=".$name);
-	if (!$search_result) return false;
+    $search_result = ldap_search($conn,$config->get('LDAP_DN'),
+                     $config->get('LDAP_SEARCH_FIELD')."=".$name);
+    if (!$search_result) return false;
 
-	$ldap_info = ldap_get_entries($conn,$search_result);
-	if (!$ldap_info) {
+    $ldap_info = ldap_get_entries($conn,$search_result);
+    if (!$ldap_info) {
         return false;
     } else if ($ldap_info['count'] == 0) {
         return false;
     }
 
-	$user_dn = $ldap_info[0]["dn"];
-	$uid = $ldap_info[0][$FANNIE_LDAP_UID_FIELD][0];
-	$fullname = $ldap_info[0][$FANNIE_LDAP_RN_FIELD][0];
+    $user_dn = $ldap_info[0]["dn"];
+    $uid = $ldap_info[0][$config->get('LDAP_UID_FIELD')][0];
+    $fullname = $ldap_info[0][$config->get('LDAP_RN_FIELD')][0];
 
-	if (ldap_bind($conn,$user_dn,$passwd)){
-		syncUserLDAP($name,$uid,$fullname);	
-		doLogin($name);
-		return true;
-	}	
-	return false;
+    if (ldap_bind($conn,$user_dn,$passwd)){
+        syncUserLDAP($name,$uid,$fullname); 
+        doLogin($name);
+        return true;
+    }
+
+    return false;
 }
 
 /*
 sets a cookie.  nothing before this function call can have output
 */
 function logout(){
-	$name = checkLogin();
-	if (!$name){
-		return true;
-	}
+    $name = checkLogin();
+    if (!$name){
+        return true;
+    }
 
-	/**
-	  Remove session data from the database
-	*/
-	if (isset($_COOKIE['session_data'])){
-		$cookie_data = base64_decode($_COOKIE['session_data']);
-		$session_data = unserialize($cookie_data);
+    /**
+      Remove session data from the database
+    */
+    if (filter_input(INPUT_COOKIE, 'session_data') !== null) {
+        $cookie_data = base64_decode(filter_input(INPUT_COOKIE, 'session_data'));
+        $session_data = unserialize($cookie_data);
 
-		$name = $session_data['name'];
-		$session_id = $session_data['session_id'];
-		$uid = getUID($name);
+        $name = $session_data['name'];
+        $session_id = $session_data['session_id'];
+        $uid = getUID($name);
 
-		$sql = dbconnect();
-		$delP = $sql->prepare_statement('DELETE FROM userSessions
-				WHERE uid=? AND session_id=?');
-		$delR = $sql->exec_statement($delP, array($uid,$session_id));
+        $sql = dbconnect();
+        $delP = $sql->prepare('DELETE FROM userSessions
+                WHERE uid=? AND session_id=?');
+        $delR = $sql->execute($delP, array($uid,$session_id));
 
-		$upP = $sql->prepare_statement("UPDATE Users SET session_id='' WHERE name=?");
-		$upR = $sql->exec_statement($upP,array($name));
-	}
+        $upP = $sql->prepare("UPDATE Users SET session_id='' WHERE name=?");
+        $upR = $sql->execute($upP,array($name));
+    }
 
-	setcookie('session_data','',time()+(60*600),'/');
-	return true;
+    if (!headers_sent()) {
+        setcookie('session_data','',0,'/');
+    }
+    return true;
 }
 
 /*
@@ -180,26 +182,25 @@ a session id is also stored in this table, but that is created
 when the user actually logs in
 */
 function createLogin($name,$password){
-	// 10Nov12 EL Add FANNIE_AUTH_ENABLED
-	global $FANNIE_AUTH_ENABLED;
+    // 10Nov12 EL Add FANNIE_AUTH_ENABLED
+    global $FANNIE_AUTH_ENABLED;
   if (!isAlphanumeric($name) ){
     //echo 'failed alphanumeric';
     return false;
   }
 
   if (init_check())
-    table_check();
 
-	// 10Nov12 EL Add FANNIE_AUTH_ENABLED test per intent in first-user call from auth.php.
-	if ( $FANNIE_AUTH_ENABLED ) {
-		if (!validateUser('admin')){
-			return false;
-		}
+    // 10Nov12 EL Add FANNIE_AUTH_ENABLED test per intent in first-user call from auth.php.
+    if ( $FANNIE_AUTH_ENABLED ) {
+        if (!validateUser('admin')){
+            return false;
+        }
   }
 
   $sql = dbconnect();
-  $checkQ = $sql->prepare_statement("select * from Users where name=?");
-  $checkR = $sql->exec_statement($checkQ,array($name));
+  $checkQ = $sql->prepare("select * from Users where name=?");
+  $checkR = $sql->execute($checkQ,array($name));
   if ($sql->num_rows($checkR) != 0){
     return false;
   }
@@ -212,18 +213,18 @@ function createLogin($name,$password){
   // Users currently in the database
   $uid = '';
   srand($salt);
-  $verifyQ = $sql->prepare_statement("select * from Users where uid=?");
+  $verifyQ = $sql->prepare("select * from Users where uid=?");
   while ($uid == ''){
     $newid = (rand() % 9998) + 1;
     $newid = str_pad($newid,4,'0',STR_PAD_LEFT);
-    $verifyR = $sql->exec_statement($verifyQ,array($newid));
+    $verifyR = $sql->execute($verifyQ,array($newid));
     if ($sql->num_rows($verifyR) == 0){
       $uid = $newid;
     }
   }
 
-  $addQ = $sql->prepare_statement("insert into Users (name,uid,password,salt) values (?,?,?,?)");
-  $addR = $sql->exec_statement($addQ,array($name,$uid,$crypt_pass,$salt));
+  $addQ = $sql->prepare("insert into Users (name,uid,password,salt) values (?,?,?,?)");
+  $addR = $sql->execute($addQ,array($name,$uid,$crypt_pass,$salt));
 
   return true;
 }
@@ -239,14 +240,14 @@ function deleteLogin($name){
 
   $sql=dbconnect();
   $uid = getUID($name);
-  $delQ = $sql->prepare_statement("delete from userPrivs where uid=?");
-  $delR = $sql->exec_statement($delQ,array($uid));
+  $delQ = $sql->prepare("delete from userPrivs where uid=?");
+  $delR = $sql->execute($delQ,array($uid));
 
-  $deleteQ = $sql->prepare_statement("delete from Users where name=?");
-  $deleteR = $sql->exec_statement($deleteQ,array($name));
+  $deleteQ = $sql->prepare("delete from Users where name=?");
+  $deleteR = $sql->execute($deleteQ,array($name));
 
-  $groupQ = $sql->prepare_statement("DELETE FROM userGroups WHERE username=?");
-  $groupR = $sql->exec_statement($groupQ,array($name));
+  $groupQ = $sql->prepare("DELETE FROM userGroups WHERE username=?");
+  $groupR = $sql->execute($groupQ,array($name));
 
   return true;
 }
@@ -261,11 +262,11 @@ function checkLogin(){
   if (init_check())
     return 'init';
 
-  if (!isset($_COOKIE['session_data'])){
+  if (filter_input(INPUT_COOKIE, 'session_data') === null) {
     return false;
   }
 
-  $cookie_data = base64_decode($_COOKIE['session_data']);
+  $cookie_data = base64_decode(filter_input(INPUT_COOKIE, 'session_data'));
   $session_data = unserialize($cookie_data);
 
   $name = $session_data['name'];
@@ -280,10 +281,13 @@ function checkLogin(){
     Could enforce expired, optionally
   */
   $sql = dbconnect();
-  $checkQ = $sql->prepare_statement("select * from Users AS u LEFT JOIN
-			userSessions AS s ON u.uid=s.uid where u.name=? 
-			and s.session_id=?");
-  $checkR = $sql->exec_statement($checkQ,array($name,$session_id));
+  if (!$sql->isConnected()) {
+      return false;
+  }
+  $checkQ = $sql->prepare("select * from Users AS u LEFT JOIN
+            userSessions AS s ON u.uid=s.uid where u.name=? 
+            and s.session_id=?");
+  $checkR = $sql->execute($checkQ,array($name,$session_id));
 
   if ($sql->num_rows($checkR) == 0){
     return false;
@@ -292,33 +296,20 @@ function checkLogin(){
   return $name;
 }
 
-function showUsers(){
-  if (!validateUser('admin')){
-    return false;
-  }
-  echo "Displaying current users";
-  echo "<table cellspacing=2 cellpadding=2 border=1>";
-  echo "<tr><th>Name</th><th>User ID</th></tr>";
-  $sql = dbconnect();
-  $usersQ = $sql->prepare_statement("select name,uid from Users order by name");
-  $usersR = $sql->exec_statement($usersQ);
-  while ($row = $sql->fetch_array($usersR)){
-    echo "<tr>";
-    echo "<td>$row[0]</td>";
-    echo "<td>$row[1]</td>";
-    echo "</tr>";
-  }
-  echo "</table>";
-}
+function getUserList()
+{
+    $sql = dbconnect();
+    $ret = array();
+    $result = $sql->query('
+        SELECT name,
+            uid
+        FROM Users
+        ORDER BY name');
+    while ($row = $sql->fetch_row($result)) {
+        $ret[$row['uid']] = $row['name'];
+    }
 
-function getUserList(){
-	$sql = dbconnect();
-	$ret = array();
-	$prep = $sql->prepare_statement("SELECT name,uid FROM Users ORDER BY name");
-	$result = $sql->exec_statement($prep);
-	while($row = $sql->fetch_row($result))
-		$ret[$row['uid']] = $row['name'];
-	return $ret;
+    return $ret;
 }
 
 /* 
@@ -346,8 +337,8 @@ function changePassword($name,$oldpassword,$newpassword){
   $salt = time();
   $crypt_pass = crypt($newpassword,$salt);
 
-  $updateQ = $sql->prepare_statement("update Users set password=?,salt=? where name=?");
-  $updateR = $sql->exec_statement($updateQ,array($crypt_pass,$salt,$name));
+  $updateQ = $sql->prepare("update Users set password=?,salt=? where name=?");
+  $updateR = $sql->execute($updateQ,array($crypt_pass,$salt,$name));
   
   return true;
 }
@@ -365,8 +356,8 @@ function changeAnyPassword($name,$newpassword){
   $salt = time();
   $crypt_pass = crypt($newpassword,$salt);
 
-  $updateQ = $sql->prepare_statement("update Users set password=?,salt=? where name=?");
-  $updateR = $sql->exec_statement($updateQ,array($crypt_pass,$salt,$name));
+  $updateQ = $sql->prepare("update Users set password=?,salt=? where name=?");
+  $updateR = $sql->execute($updateQ,array($crypt_pass,$salt,$name));
 
   return true;
 }
@@ -381,7 +372,7 @@ function validateUser($auth,$sub='all'){
      if (!auth_enabled()) return 'null';
 
      if (init_check())
-	return 'init';
+    return 'init';
 
      $current_user = checkLogin();
      if (!$current_user){
@@ -406,7 +397,7 @@ function validateUserQuiet($auth,$sub='all'){
      if (!auth_enabled()) return 'null';
 
      if (init_check())
-	return 'init';
+    return 'init';
 
      $current_user = checkLogin();
      if (!$current_user){
@@ -429,22 +420,21 @@ function validateUserQuiet($auth,$sub='all'){
 // user is currently logged in
 // must be called prior to any output
 function refreshSession(){
-  return true;
-  if (!isset($_COOKIE['session_data']))
-    return false;
-  setcookie('session_data',$_COOKIE['session_data'],time()+(60*600),'/');
-  return true;
+    return true;
+    if (filter_input(INPUT_COOKIE, 'session_data') === null)
+        return false;
+    setcookie('session_data',filter_input(INPUT_COOKIE, 'session_data'),0,'/');
+    return true;
 }
 
 function pose($username){
-	if (!isset($_COOKIE['session_data']))
-		return false;
-	if (!isAlphanumeric($username))
-		return false;
+    if (filter_input(INPUT_COOKIE, 'session_data') === null)
+        return false;
+    if (!isAlphanumeric($username))
+        return false;
 
-	doLogin($username);
+    doLogin($username);
 
-	return true;
+    return true;
 }
 
-?>

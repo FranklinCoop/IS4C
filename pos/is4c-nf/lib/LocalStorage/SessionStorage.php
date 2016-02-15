@@ -37,8 +37,8 @@ if (!class_exists("LocalStorage")) {
 */
 class SessionStorage extends LocalStorage 
 {
-    public function SessionStorage(){
-        if(ini_get('session.auto_start')==0 && !headers_sent()) {
+    public function __construct(){
+        if(php_sapi_name() !== 'cli' && ini_get('session.auto_start')==0 && !headers_sent()) {
             @session_start();
         }
     }
@@ -68,6 +68,11 @@ class SessionStorage extends LocalStorage
             $_SESSION["$key"] = $val;
         }
         $this->debug($key,$val);
+    }
+
+    public function iteratorKeys()
+    {
+        return array_merge(parent::iteratorKeys(), array_keys($_SESSION));
     }
 }
 

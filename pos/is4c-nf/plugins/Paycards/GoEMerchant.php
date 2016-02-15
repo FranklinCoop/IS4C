@@ -25,11 +25,6 @@ if (!class_exists("BasicCCModule")) include_once(realpath(dirname(__FILE__)."/Ba
 if (!class_exists("xmlData")) include_once(realpath(dirname(__FILE__)."/lib/xmlData.php"));
 if (!class_exists("PaycardLib")) include_once(realpath(dirname(__FILE__)."/lib/PaycardLib.php"));
 
-if (!isset($CORE_LOCAL)){
-    include(realpath(dirname(__FILE__)."/lib/LS_Access.php"));
-    $CORE_LOCAL = new LS_Access();
-}
-
 if (!class_exists("AutoLoader")) include_once(realpath(dirname(__FILE__).'/../../lib/AutoLoader.php'));
 
 define('GOEMERCH_ID','');
@@ -59,374 +54,20 @@ class GoEMerchant extends BasicCCModule
 
     public function entered($validate,$json)
     {
-        global $CORE_LOCAL;
-        // error checks based on card type
-        if ($CORE_LOCAL->get("CCintegrate") != 1) { // credit card integration must be enabled
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_GIFT,
-                                                         "Card Integration Disabled",
-                                                         "Please process credit cards in standalone",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        }
-        $this->trans_pan['pan'] = $CORE_LOCAL->get("paycard_PAN");
-
-        // error checks based on processing mode
-        switch( $CORE_LOCAL->get("paycard_mode")) {
-            case PaycardLib::PAYCARD_MODE_VOID:
-                // use the card number to find the trans_id
-                $dbTrans = PaycardLib::paycard_db();
-                $today = date('Ymd');
-                $pan4 = substr($this->trans_pan['pan'],-4);
-                $cashier = $CORE_LOCAL->get("CashierNo");
-                $lane = $CORE_LOCAL->get("laneno");
-                $trans = $CORE_LOCAL->get("transno");
-                $sql = "SELECT transID,
-                            empNo AS cashierNo,
-                            registerNo AS laneNo,
-                            transNo AS transNo
-                        FROM PaycardTransactions
-                        WHERE dateID=" . $today . "
-                            AND PAN LIKE '%" . $pan4 . "'";
-                if (!$dbTrans->table_exists('PaycardTransactions')) {
-                    $sql = "SELECT transID,cashierNo,laneNo,transNo FROM efsnetRequest WHERE "
-                        .$dbTrans->identifier_escape('date')."='".$today."' AND (PAN LIKE '%".$pan4."')"; 
-                }
-                $search = PaycardLib::paycard_db_query($sql, $dbTrans);
-                $num = PaycardLib::paycard_db_num_rows($search);
-                if ($num < 1) {
-                    PaycardLib::paycard_reset();
-                    $json['output'] = PaycardLib::paycard_msgBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                                 "Card Not Used",
-                                                                 "That card number was not used in this transaction",
-                                                                 "[clear] to cancel"
-                    );
-
-                    return $json;
-                } else if ($num > 1) {
-                    PaycardLib::paycard_reset();
-                    $json['output'] = PaycardLib::paycard_msgBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                                 "Multiple Uses",
-                                                                 "That card number was used more than once in this transaction; select the payment and press VOID",
-                                                                 "[clear] to cancel"
-                    );
-
-                    return $json;
-                }
-                $payment = PaycardLib::paycard_db_fetch_row($search);
-
-                return $this->paycard_void($payment['transID'],$lane,$trans,$json);
-                break;
-
-            case PaycardLib::PAYCARD_MODE_AUTH:
-                if ($validate) {
-                    if (PaycardLib::paycard_validNumber($this->trans_pan['pan']) != 1) {
-                        PaycardLib::paycard_reset();
-                        $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                            "Invalid Card Number",
-                            "Swipe again or type in manually",
-                            "[clear] to cancel");
-                        return $json;
-                    } else if (PaycardLib::paycard_accepted($this->trans_pan['pan'],  !PaycardLib::paycard_live(PaycardLib::PAYCARD_TYPE_CREDIT)) != 1) {
-                        PaycardLib::paycard_reset();
-                        $json['output'] = PaycardLib::paycard_msgBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                            "Unsupported Card Type",
-                            "We cannot process " . $CORE_LOCAL->get("paycard_issuer") . " cards",
-                            "[clear] to cancel");
-                        return $json;
-                    } else if (PaycardLib::paycard_validExpiration($CORE_LOCAL->get("paycard_exp")) != 1) {
-                        PaycardLib::paycard_reset();
-                        $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                            "Invalid Expiration Date",
-                            "The expiration date has passed or was not recognized",
-                            "[clear] to cancel");
-                        return $json;
-                    }
-                }
-                // set initial variables
-                //Database::getsubtotals();
-                if ($CORE_LOCAL->get("paycard_amount") == 0) {
-                    $CORE_LOCAL->set("paycard_amount",$CORE_LOCAL->get("amtdue"));
-                }
-                $CORE_LOCAL->set("paycard_id",$CORE_LOCAL->get("LastID")+1); // kind of a hack to anticipate it this way..
-                $plugin_info = new Paycards();
-                $json['main_frame'] = $plugin_info->plugin_url().'/gui/paycardboxMsgAuth.php';
-                $json['output'] = '';
-
-                return $json;
-                break;
-        } // switch mode
-    
-        // if we're still here, it's an error
-        PaycardLib::paycard_reset();
-        $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                     "Invalid Mode",
-                                                     "This card type does not support that processing mode",
-                                                     "[clear] to cancel"
-        );
-
-        return $json;
+        $this->trans_pan['pan'] = CoreLocal::get("paycard_PAN");
+        return PaycardModule::ccEntered($this->trans_pan['pan'], $validate, $json);
     }
 
     public function paycard_void($transID,$laneNo=-1,$transNo=-1,$json=array()) 
     {
-        global $CORE_LOCAL;
         $this->voidTrans = "";
         $this->voidRef = "";
-        // situation checking
-        if ($CORE_LOCAL->get("CCintegrate") != 1) { // credit card integration must be enabled
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Card Integration Disabled",
-                                                         "Please process credit cards in standalone",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        }
-    
-        // initialize
-        $dbTrans = PaycardLib::paycard_db();
-        $today = date('Ymd');
-        $cashier = $CORE_LOCAL->get("CashierNo");
-        $lane = $CORE_LOCAL->get("laneno");
-        $trans = $CORE_LOCAL->get("transno");
-        if ($laneNo != -1) $lane = $laneNo;
-        if ($transNo != -1) $trans = $transNo;
-    
-        // look up the request using transID (within this transaction)
-        $sql = "SELECT live,
-                    PAN,
-                    transType AS mode,
-                    amount,
-                    name
-                FROM PaycardTransactions
-                WHERE dateID=" . $today . "
-                    AND empNo=" . $cashier . "
-                    AND registerNo=" . $lane . "
-                    AND transNo=" . $trans . " 
-                    AND transID=" . $transID;
-        // @deprecated table 5May14
-        if (!$dbTrans->table_exists('PaycardTransactions')) {
-            $sql = "SELECT live,PAN,mode,amount,name FROM efsnetRequest 
-                WHERE ".$dbTrans->identifier_escape('date')."='".$today."' AND cashierNo=".$cashier." AND 
-                laneNo=".$lane." AND transNo=".$trans." AND transID=".$transID;
-        }
-        $search = PaycardLib::paycard_db_query($sql, $dbTrans);
-        $num = PaycardLib::paycard_db_num_rows($search);
-        if ($num < 1) {
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Internal Error",
-                                                         "Card request not found, unable to void",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        } else if ($num > 1) {
-            PaycardLib::paycard_reset();
-            $json['output'] =  PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                          "Internal Error",
-                                                          "Card request not distinct, unable to void",
-                                                          "[clear] to cancel"
-            );
-
-            return $json;
-        }
-        $request = PaycardLib::paycard_db_fetch_row($search);
-
-        // look up the response
-        $sql = "SELECT commErr,
-                    httpCode,
-                    validResponse,
-                    xResponseCode,
-                    xTransactionID
-                FROM PaycardTransactions 
-                WHERE dateID=" . $today . " 
-                    AND empNo=" . $cashier . "
-                    AND registerNo=" . $lane ."
-                    AND transNo=" . $trans . "
-                    AND transID=" . $transID;
-        // @deprecated table 5May14
-        if (!$dbTrans->table_exists('PaycardTransactions')) {
-            $sql = "SELECT commErr,httpCode,validResponse,xResponseCode,
-                xTransactionID FROM efsnetResponse WHERE ".$dbTrans->identifier_escape('date')."='".$today."' 
-                AND cashierNo=".$cashier." AND laneNo=".$lane." AND transNo=".$trans." AND transID=".$transID;
-        }
-        $search = PaycardLib::paycard_db_query($sql, $dbTrans);
-        $num = PaycardLib::paycard_db_num_rows($search);
-        if ($num < 1) {
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Internal Error",
-                                                         "Card response not found, unable to void",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        } else if ($num > 1) {
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Internal Error",
-                                                         "Card response not distinct, unable to void",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        }
-        $response = PaycardLib::paycard_db_fetch_row($search);
-
-        // look up any previous successful voids
-        $sql = "SELECT transID 
-                FROM PaycardTransactions 
-                WHERE dateID=" . $today . "
-                    AND empNo=" . $cashier . "
-                    AND cashierNo=" . $lane . "
-                    AND transNo=" . $trans . "
-                    AND transID=" . $transID . "
-                    AND transType='VOID'
-                    AND xResultCode=1";
-        // @deprecated table 5May14
-        if (!$dbTrans->table_exists('PaycardTransactions')) {
-            $sql = "SELECT transID FROM efsnetRequestMod WHERE "
-                    .$dbTrans->identifier_escape('date')."=".$today
-                    ." AND cashierNo=".$cashier." AND laneNo=".$lane
-                    ." AND transNo=".$trans." AND transID=".$transID
-                    ." AND mode='void' AND xResponseCode=0";
-        }
-        $search = PaycardLib::paycard_db_query($sql, $dbTrans);
-        $voided = PaycardLib::paycard_db_num_rows($search);
-        if ($voided > 0) {
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Unable to Void",
-                                                         "Card transaction already voided",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        }
-
-        // look up the transaction tender line-item
-        $sql = "SELECT trans_type,
-                    trans_subtype,
-                    trans_status,
-                    voided
-                FROM localtemptrans 
-                WHERE trans_id=" . $transID;
-        $search = PaycardLib::paycard_db_query($sql, $dbTrans);
-        $num = PaycardLib::paycard_db_num_rows($search);
-        if ($num < 1) {
-            $sql = "SELECT * FROM localtranstoday WHERE trans_id=".$transID." and emp_no=".$cashier
-                ." and register_no=".$lane." and trans_no=".$trans
-                ." AND datetime >= " . $dbTrans->curdate();
-            $search = PaycardLib::paycard_db_query($sql, $dbTrans);
-            $num = PaycardLib::paycard_db_num_rows($search);
-            if ($num != 1){
-                PaycardLib::paycard_reset();
-                $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                             "Internal Error",
-                                                             "Transaction item not found, unable to void",
-                                                             "[clear] to cancel"
-                );
-
-                return $json;
-            }
-        } else if ($num > 1) {
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Internal Error",
-                                                         "Transaction item not distinct, unable to void",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        }
-        $lineitem = PaycardLib::paycard_db_fetch_row($search);
-
-        // make sure the payment is applicable to void
-        if ($response['commErr'] != 0 || $response['httpCode'] != 200 || $response['validResponse'] != 1) {
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_msgBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Unable to Void",
-                                                         "Card transaction not successful",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        } else if ($request['live'] != PaycardLib::paycard_live(PaycardLib::PAYCARD_TYPE_CREDIT)) {
-            // this means the transaction was submitted to the test platform, but we now think we're in live mode, or vice-versa
-            // I can't imagine how this could happen (short of serious $_SESSION corruption), but worth a check anyway.. --atf 7/26/07
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Unable to Void",
-                                                         "Processor platform mismatch",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        } else if ($response['xResponseCode'] != 1) {
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_msgBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Unable to Void",
-                                                         "Card transaction not approved",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        } else if ($response['xTransactionID'] < 1) {
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_msgBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Internal Error",
-                                                         "Invalid reference number",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        }
-
-        // make sure the tender line-item is applicable to void
-        if ($lineitem['trans_type'] != "T" || $lineitem['trans_subtype'] != "CC" ){
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Internal Error",
-                                                         "Authorization and tender records do not match $transID",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        } else if ($lineitem['trans_status'] == "V" || $lineitem['voided'] != 0) {
-            PaycardLib::paycard_reset();
-            $json['output'] = PaycardLib::paycard_errBox(PaycardLib::PAYCARD_TYPE_CREDIT,
-                                                         "Internal Error",
-                                                         "Void records do not match",
-                                                         "[clear] to cancel"
-            );
-
-            return $json;
-        }
-    
-        // save the details
-        $CORE_LOCAL->set("paycard_amount",(($request['mode']=='retail_alone_credit') ? -1 : 1) * $request['amount']);
-        $CORE_LOCAL->set("paycard_id",$transID);
-        $CORE_LOCAL->set("paycard_trans",$cashier."-".$lane."-".$trans);
-        $CORE_LOCAL->set("paycard_type",PaycardLib::PAYCARD_TYPE_CREDIT);
-        $CORE_LOCAL->set("paycard_mode",PaycardLib::PAYCARD_MODE_VOID);
-        $CORE_LOCAL->set("paycard_name",$request['name']);
-    
-        // display FEC code box
-        $plugin_info = new Paycards();
-        $json['main_frame'] = $plugin_info->plugin_url().'/gui/paycardboxMsgVoid.php';
-
-        return $json;
+        return PaycardModule::ccVoid($transID, $laneNo, $transNo, $json);
     }
 
     public function handleResponse($authResult)
     {
-        global $CORE_LOCAL;
-        switch ($CORE_LOCAL->get("paycard_mode")) {
+        switch (CoreLocal::get("paycard_mode")) {
             case PaycardLib::PAYCARD_MODE_AUTH:
                 return $this->handleResponseAuth($authResult);
             case PaycardLib::PAYCARD_MODE_VOID:
@@ -436,21 +77,20 @@ class GoEMerchant extends BasicCCModule
 
     private function handleResponseAuth($authResult)
     {
-        global $CORE_LOCAL;
         $xml = new xmlData($authResult['response']);
         $dbTrans = PaycardLib::paycard_db();
 
         // prepare some fields to store the parsed response; we'll add more as we verify it
         $today = date('Ymd'); // numeric date only, it goes in an 'int' field as part of the primary key
         $now = date('Y-m-d H:i:s'); // full timestamp
-        $cashierNo = $CORE_LOCAL->get("CashierNo");
-        $laneNo = $CORE_LOCAL->get("laneno");
-        $transNo = $CORE_LOCAL->get("transno");
-        $transID = $CORE_LOCAL->get("paycard_id");
-        $cvv2 = $CORE_LOCAL->get("paycard_cvv2");
+        $cashierNo = CoreLocal::get("CashierNo");
+        $laneNo = CoreLocal::get("laneno");
+        $transNo = CoreLocal::get("transno");
+        $transID = CoreLocal::get("paycard_id");
+        $cvv2 = CoreLocal::get("paycard_cvv2");
         $sqlColumns =
-            $dbTrans->identifier_escape('date').",cashierNo,laneNo,transNo,transID," .
-            $dbTrans->identifier_escape('datetime').
+            $dbTrans->identifierEscape('date').",cashierNo,laneNo,transNo,transID," .
+            $dbTrans->identifierEscape('datetime').
             ",seconds,commErr,httpCode";
         $sqlValues =
             sprintf("%d,%d,%d,%d,%d,",  $today, $cashierNo, $laneNo, $transNo, $transID) .
@@ -477,6 +117,7 @@ class GoEMerchant extends BasicCCModule
             $sqlValues .= sprintf(",%d",$resultCode);
         }
         $resultMsg = $xml->get_first("AUTH_RESPONSE");
+        $rMsg = $resultMsg;
         if ($resultMsg) {
             $sqlColumns .= ",xResultMessage";
             $rMsg = $resultMsg;
@@ -501,14 +142,16 @@ class GoEMerchant extends BasicCCModule
         $sqlColumns .= ",validResponse";
         $sqlValues .= sprintf(",%d",$validResponse);
 
-        $table_def = $dbTrans->table_definition('efsnetResponse');
+        $table_def = $dbTrans->tableDefinition('efsnetResponse');
         if (isset($table_def['efsnetRequestID'])) {
             $sqlColumns .= ', efsnetRequestID';
             $sqlValues .= sprintf(', %d', $this->last_req_id);
         }
 
         $sql = "INSERT INTO efsnetResponse (" . $sqlColumns . ") VALUES (" . $sqlValues . ")";
-        PaycardLib::paycard_db_query($sql, $dbTrans);
+        if ($dbTrans->table_exists('efsnetResponse')) {
+            PaycardLib::paycard_db_query($sql, $dbTrans);
+        }
 
         /**
           Log transaction in newer table
@@ -547,37 +190,28 @@ class GoEMerchant extends BasicCCModule
         );
         $dbTrans->query($finishQ);
 
-        if ($authResult['curlErr'] != CURLE_OK || $authResult['curlHTTP'] != 200) {
-            TransRecord::addcomment("");
-            if ($authResult['curlHTTP'] == '0') {
-                $CORE_LOCAL->set("boxMsg","No response from processor<br />
-                            The transaction did not go through");
-
-                return PaycardLib::PAYCARD_ERR_PROC;
-            }    
-
-            return $this->setErrorMsg(PaycardLib::PAYCARD_ERR_COMM);
+        $comm = PaycardModule::commError($authResult);
+        if ($comm !== false) {
+            TransRecord::addcomment('');
+            return $comm === true ? $this->setErrorMsg(PaycardLib::PAYCARD_ERR_COMM) : $comm;
         }
 
         switch ($xml->get("STATUS")) {
             case 1: // APPROVED
-                $CORE_LOCAL->set("ccTermOut","approval:".str_pad($xml->get("AUTH_CODE"),6,'0',STR_PAD_RIGHT));
                 return PaycardLib::PAYCARD_ERR_OK;
             case 2: // DECLINED
-                $CORE_LOCAL->set("ccTermOut","approval:denied");
-                $CORE_LOCAL->set("boxMsg",$resultMsg);
+                CoreLocal::set("boxMsg",$resultMsg);
                 TransRecord::addcomment("");    
                 break;
             case 0: // ERROR
-                $CORE_LOCAL->set("ccTermOut","resettotal");
-                $CORE_LOCAL->set("boxMsg","");
+                CoreLocal::set("boxMsg","");
                 $texts = $xml->get_first("ERROR");
-                $CORE_LOCAL->set("boxMsg","Error: $texts");
+                CoreLocal::set("boxMsg","Error: $texts");
                 TransRecord::addcomment("");    
                 break;
             default:
                 TransRecord::addcomment("");    
-                $CORE_LOCAL->set("boxMsg","An unknown error occurred<br />at the gateway");
+                CoreLocal::set("boxMsg","An unknown error occurred<br />at the gateway");
         }
 
         return PaycardLib::PAYCARD_ERR_PROC;
@@ -585,24 +219,23 @@ class GoEMerchant extends BasicCCModule
 
     private function handleResponseVoid($authResult)
     {
-        global $CORE_LOCAL;
         $xml = new xmlData($authResult['response']);
         // prepare some fields to store the parsed response; we'll add more as we verify it
         $today = date('Ymd'); // numeric date only, it goes in an 'int' field as part of the primary key
         $now = date('Y-m-d H:i:s'); // full timestamp
-        $cashierNo = $CORE_LOCAL->get("CashierNo");
-        $laneNo = $CORE_LOCAL->get("laneno");
-        $transNo = $CORE_LOCAL->get("transno");
-        $transID = $CORE_LOCAL->get("paycard_id");
-        $amount = $CORE_LOCAL->get("paycard_amount");
+        $cashierNo = CoreLocal::get("CashierNo");
+        $laneNo = CoreLocal::get("laneno");
+        $transNo = CoreLocal::get("transno");
+        $transID = CoreLocal::get("paycard_id");
+        $amount = CoreLocal::get("paycard_amount");
         $amountText = number_format(abs($amount), 2, '.', '');
         $refNum = $this->refnum($transID);
 
         $dbTrans = PaycardLib::paycard_db();
         // prepare some fields to store the request and the parsed response; we'll add more as we verify it
         $sqlColumns =
-            $dbTrans->identifier_escape('date').",cashierNo,laneNo,transNo,transID,"
-            .$dbTrans->identifier_escape('datetime').
+            $dbTrans->identifierEscape('date').",cashierNo,laneNo,transNo,transID,"
+            .$dbTrans->identifierEscape('datetime').
             ",origAmount,mode,altRoute," .
             "seconds,commErr,httpCode";
         $sqlValues =
@@ -642,7 +275,9 @@ class GoEMerchant extends BasicCCModule
         $sqlValues .= sprintf(",%d",$validResponse);
 
         $sql = "INSERT INTO efsnetRequestMod (" . $sqlColumns . ") VALUES (" . $sqlValues . ")";
-        PaycardLib::paycard_db_query($sql, $dbTrans);
+        if ($dbTrans->table_exists('efsnetRequestMod')) {
+            PaycardLib::paycard_db_query($sql, $dbTrans);
+        }
 
         $normalized = ($validResponse == 0) ? 4 : 0;
         if ($resultCode == 1) {
@@ -676,7 +311,7 @@ class GoEMerchant extends BasicCCModule
 
         if ($authResult['curlErr'] != CURLE_OK || $authResult['curlHTTP'] != 200) {
             if ($authResult['curlHTTP'] == '0') {
-                $CORE_LOCAL->set("boxMsg","No response from processor<br />
+                CoreLocal::set("boxMsg","No response from processor<br />
                             The transaction did not go through");
 
                 return PaycardLib::PAYCARD_ERR_PROC;
@@ -689,15 +324,15 @@ class GoEMerchant extends BasicCCModule
             case 1: // APPROVED
                 return PaycardLib::PAYCARD_ERR_OK;
             case 2: // DECLINED
-                $CORE_LOCAL->set("boxMsg", $resultMsg);
+                CoreLocal::set("boxMsg", $resultMsg);
                 break;
             case 0: // ERROR
-                $CORE_LOCAL->set("boxMsg","");
+                CoreLocal::set("boxMsg","");
                 $texts = $xml->get_first("ERROR1");
-                $CORE_LOCAL->set("boxMsg","Error: $texts");
+                CoreLocal::set("boxMsg","Error: $texts");
                 break;
             default:
-                $CORE_LOCAL->set("boxMsg","An unknown error occurred<br />at the gateway");
+                CoreLocal::set("boxMsg","An unknown error occurred<br />at the gateway");
         }
 
         return PaycardLib::PAYCARD_ERR_PROC;
@@ -705,22 +340,21 @@ class GoEMerchant extends BasicCCModule
 
     public function cleanup($json)
     {
-        global $CORE_LOCAL;
-        switch ($CORE_LOCAL->get("paycard_mode")) {
+        switch (CoreLocal::get("paycard_mode")) {
             case PaycardLib::PAYCARD_MODE_AUTH:
                 // cast to string. tender function expects string input
                 // numeric input screws up parsing on negative values > $0.99
-                $amt = "".(-1*($CORE_LOCAL->get("paycard_amount")));
+                $amt = "".(-1*(CoreLocal::get("paycard_amount")));
                 $t_type = 'CC';
-                if ($CORE_LOCAL->get('paycard_issuer') == 'American Express') {
+                if (CoreLocal::get('paycard_issuer') == 'American Express') {
                     $t_type = 'AX';
                 }
-                // if the transaction has a non-zero efsnetRequestID,
+                // if the transaction has a non-zero paycardTransactionID,
                 // include it in the tender line
-                $record_id = $this->last_req_id;
-                $charflag = ($record_id != 0) ? 'RQ' : '';
+                $record_id = $this->last_paycard_transaction_id;
+                $charflag = ($record_id != 0) ? 'PT' : '';
                 TransRecord::addFlaggedTender("Credit Card", $t_type, $amt, $record_id, $charflag);
-                $CORE_LOCAL->set("boxMsg",
+                CoreLocal::set("boxMsg",
                         "<b>Approved</b>
                         <font size=-1>
                         <p>Please verify cardholder signature
@@ -728,34 +362,32 @@ class GoEMerchant extends BasicCCModule
                         <br>\"rp\" to reprint slip
                         <br>[void] " . _('to reverse the charge') . "
                         </font>");
-                if ($CORE_LOCAL->get("paycard_amount") <= $CORE_LOCAL->get("CCSigLimit") && $CORE_LOCAL->get("paycard_amount") >= 0) {
-                    $CORE_LOCAL->set("boxMsg",
+                if (CoreLocal::get("paycard_amount") <= CoreLocal::get("CCSigLimit") && CoreLocal::get("paycard_amount") >= 0) {
+                    CoreLocal::set("boxMsg",
                             "<b>Approved</b>
                             <font size=-1>
                             <p>No signature required
                             <p>[enter] to continue
                             <br>[void] " . _('to reverse the charge') . "
                             </font>");
-                } else if ($CORE_LOCAL->get('PaycardsSigCapture') != 1) {
+                } else if (CoreLocal::get('PaycardsSigCapture') != 1) {
                     $json['receipt'] = 'ccSlip';
                 }
                 break;
             case PaycardLib::PAYCARD_MODE_VOID:
                 $v = new Void();
-                $v->voidid($CORE_LOCAL->get("paycard_id"));
-                $CORE_LOCAL->set("boxMsg","<b>Voided</b>
+                $v->voidid(CoreLocal::get("paycard_id"), array());
+                CoreLocal::set("boxMsg","<b>Voided</b>
                                            <p><font size=-1>[enter] to continue
                                            <br>\"rp\" to reprint slip</font>");
                 break;    
         }
-        $CORE_LOCAL->set("ccCustCopy",0);
 
         return $json;
     }
 
     public function doSend($type)
     {
-        global $CORE_LOCAL;
         switch ($type) {
             case PaycardLib::PAYCARD_MODE_AUTH: 
                 return $this->send_auth();
@@ -769,7 +401,6 @@ class GoEMerchant extends BasicCCModule
 
     private function send_auth()
     {
-        global $CORE_LOCAL;
         // initialize
         $dbTrans = PaycardLib::paycard_db();
         if (!$dbTrans) {
@@ -780,35 +411,35 @@ class GoEMerchant extends BasicCCModule
 
         $today = date('Ymd'); // numeric date only, it goes in an 'int' field as part of the primary key
         $now = date('Y-m-d H:i:s'); // full timestamp
-        $cashierNo = $CORE_LOCAL->get("CashierNo");
-        $laneNo = $CORE_LOCAL->get("laneno");
-        $transNo = $CORE_LOCAL->get("transno");
-        $transID = $CORE_LOCAL->get("paycard_id");
-        $amount = $CORE_LOCAL->get("paycard_amount");
+        $cashierNo = CoreLocal::get("CashierNo");
+        $laneNo = CoreLocal::get("laneno");
+        $transNo = CoreLocal::get("transno");
+        $transID = CoreLocal::get("paycard_id");
+        $amount = CoreLocal::get("paycard_amount");
         $amountText = number_format(abs($amount), 2, '.', '');
         $mode = (($amount < 0) ? 'retail_alone_credit' : 'retail_sale');
         // standardize transaction type for PaycardTransactions
         $logged_mode = ($mode == 'retail_sale') ? 'Sale' : 'Return';
-        $manual = ($CORE_LOCAL->get("paycard_manual") ? 1 : 0);
-        $this->trans_pan['pan'] = $CORE_LOCAL->get("paycard_PAN");
+        $manual = (CoreLocal::get("paycard_manual") ? 1 : 0);
+        $this->trans_pan['pan'] = CoreLocal::get("paycard_PAN");
         $cardPAN = $this->trans_pan['pan'];
         $cardPANmasked = PaycardLib::paycard_maskPAN($cardPAN,0,4);
-        $cardIssuer = $CORE_LOCAL->get("paycard_issuer");
-        $cardExM = substr($CORE_LOCAL->get("paycard_exp"),0,2);
-        $cardExY = substr($CORE_LOCAL->get("paycard_exp"),2,2);
-        $cardTr1 = $CORE_LOCAL->get("paycard_tr1");
-        $cardTr2 = $CORE_LOCAL->get("paycard_tr2");
-        $cardTr3 = $CORE_LOCAL->get("paycard_tr3");
-        $cardName = $CORE_LOCAL->get("paycard_name");
+        $cardIssuer = CoreLocal::get("paycard_issuer");
+        $cardExM = substr(CoreLocal::get("paycard_exp"),0,2);
+        $cardExY = substr(CoreLocal::get("paycard_exp"),2,2);
+        $cardTr1 = CoreLocal::get("paycard_tr1");
+        $cardTr2 = CoreLocal::get("paycard_tr2");
+        $cardTr3 = CoreLocal::get("paycard_tr3");
+        $cardName = CoreLocal::get("paycard_name");
         $refNum = $this->refnum($transID);
         $this->last_ref_num = $refNum;
         $live = 1;
-        $cvv2 = $CORE_LOCAL->get("paycard_cvv2");
+        $cvv2 = CoreLocal::get("paycard_cvv2");
 
         $merchantID = GOEMERCH_ID;
         $password = GOEMERCH_PASSWD;
         $gatewayID = GOEMERCH_GATEWAY_ID;
-        if ($CORE_LOCAL->get("training") == 1) {
+        if (CoreLocal::get("training") == 1) {
             $merchantID = "1264";
             $password = "password";
             $gatewayID = "a91c38c3-7d7f-4d29-acc7-927b4dca0dbe";
@@ -846,46 +477,53 @@ class GoEMerchant extends BasicCCModule
             $magstripe .= ";".$cardTr3."?";
         }
 
-        $sqlCols = "sentPAN,sentExp,sentTr1,sentTr2";
-        $sqlVals = "$sendPAN,$sendExp,$sendTr1,$sendTr2";
         // store request in the database before sending it
-        $sqlCols .= "," . // already defined some sent* columns
-            $dbTrans->identifier_escape('date').",cashierNo,laneNo,transNo,transID," .
-            $dbTrans->identifier_escape('datetime').",refNum,live,mode,amount," .
-            "PAN,issuer,manual,name";
-        $fixedName = PaycardLib::paycard_db_escape($cardName, $dbTrans);
-        $sqlVals .= "," . // already defined some sent* values
-            sprintf("%d,%d,%d,%d,%d,",        $today, $cashierNo, $laneNo, $transNo, $transID) .
-            sprintf("'%s','%s',%d,'%s',%s,",  $now, $refNum, $live, $mode, $amountText) .
-            sprintf("'%s','%s',%d,'%s'",           $cardPANmasked, $cardIssuer, $manual,$fixedName);
-        $sql = "INSERT INTO efsnetRequest (" . $sqlCols . ") VALUES (" . $sqlVals . ")";
-        $table_def = $dbTrans->table_definition('efsnetRequest');
+        $sql = 'INSERT INTO efsnetRequest (' .
+                    $dbTrans->identifierEscape('date') . ', cashierNo, laneNo, transNo, transID, ' .
+                    $dbTrans->identifierEscape('datetime') . ', refNum, live, mode, amount,
+                    PAN, issuer, manual, name,
+                    sentPAN, sentExp, sentTr1, sentTr2)
+                VALUES (
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, 
+                    ?, ?, ?, ?)'; 
+        $efsArgs = array(
+            $today, $cashierNo, $laneNo, $transNo, $transID,
+            $now, $refNum, $live, $mode, $amountText,
+            $cardPANmasked, $cardIssuer, $manual, $cardName,
+            $sendPAN, $sendExp, $sendTr1, $sendTr2);
+        $prep = $dbTrans->prepare($sql);
+        $table_def = $dbTrans->tableDefinition('efsnetRequest');
 
-        if (!PaycardLib::paycard_db_query($sql, $dbTrans)) {
+        if ($dbTrans->table_exists('efsnetRequest') && !$dbTrans->execute($prep, $efsArgs)) {
             PaycardLib::paycard_reset();
             // internal error, nothing sent (ok to retry)
             return $this->setErrorMsg(PaycardLib::PAYCARD_ERR_NOSEND);
         }
 
         if (isset($table_def['efsnetRequestID'])) {
-            $this->last_req_id = $dbTrans->insert_id();
+            $this->last_req_id = $dbTrans->insertID();
         }
 
-        $insQ = sprintf("INSERT INTO PaycardTransactions (
+        $insQ = '
+                INSERT INTO PaycardTransactions (
                     dateID, empNo, registerNo, transNo, transID,
                     processor, refNum, live, cardType, transType,
                     amount, PAN, issuer, name, manual, requestDateTime)
-                 VALUES (
-                    %d,     %d,    %d,         %d,      %d,
-                    '%s',     '%s',    %d,   '%s',     '%s',
-                    %.2f,  '%s', '%s',  '%s',  %d,     '%s')",
-                    $today, $cashierNo, $laneNo, $transNo, $transID,
+                VALUES (
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?
+                )';
+        $ptArgs = array($today, $cashierNo, $laneNo, $transNo, $transID,
                     'GoEMerchant', $refNum, $live, 'Credit', $logged_mode,
                     $amountText, $cardPANmasked,
-                    $cardIssuer, $fixedName, $manual, $now);
-        $insR = $dbTrans->query($insQ);
+                    $cardIssuer, $cardName, $manual, $now);
+        $insP = $dbTrans->prepare($insQ);
+        $insR = $dbTrans->execute($insP, $ptArgs);
         if ($insR) {
-            $this->last_paycard_transaction_id = $dbTrans->insert_id();
+            $this->last_paycard_transaction_id = $dbTrans->insertID();
         } else {
             PaycardLib::paycard_reset();
             // internal error, nothing sent (ok to retry)
@@ -928,7 +566,6 @@ class GoEMerchant extends BasicCCModule
 
     private function send_void()
     {
-        global $CORE_LOCAL;
         // initialize
         $dbTrans = PaycardLib::paycard_db();
         if (!$dbTrans) {
@@ -940,26 +577,26 @@ class GoEMerchant extends BasicCCModule
         // prepare data for the void request
         $today = date('Ymd'); // numeric date only, it goes in an 'int' field as part of the primary key
         $now = date('Y-m-d H:i:s'); // new timestamp
-        $cashierNo = $CORE_LOCAL->get("CashierNo");
-        $laneNo = $CORE_LOCAL->get("laneno");
-        $transNo = $CORE_LOCAL->get("transno");
-        $transID = $CORE_LOCAL->get("paycard_id");
-        $amount = $CORE_LOCAL->get("paycard_amount");
+        $cashierNo = CoreLocal::get("CashierNo");
+        $laneNo = CoreLocal::get("laneno");
+        $transNo = CoreLocal::get("transno");
+        $transID = CoreLocal::get("paycard_id");
+        $amount = CoreLocal::get("paycard_amount");
         $amountText = number_format(abs($amount), 2, '.', '');
         $mode = 'void';
-        $manual = ($CORE_LOCAL->get("paycard_manual") ? 1 : 0);
-        $this->trans_pan['pan'] = $CORE_LOCAL->get("paycard_PAN");
+        $manual = (CoreLocal::get("paycard_manual") ? 1 : 0);
+        $this->trans_pan['pan'] = CoreLocal::get("paycard_PAN");
         $cardPAN = $this->trans_pan['pan'];
         $cardPANmasked = PaycardLib::paycard_maskPAN($cardPAN,0,4);
-        $cardIssuer = $CORE_LOCAL->get("paycard_issuer");
-        $cardExM = substr($CORE_LOCAL->get("paycard_exp"),0,2);
-        $cardExY = substr($CORE_LOCAL->get("paycard_exp"),2,2);
-        $cardName = $CORE_LOCAL->get("paycard_name");
+        $cardIssuer = CoreLocal::get("paycard_issuer");
+        $cardExM = substr(CoreLocal::get("paycard_exp"),0,2);
+        $cardExY = substr(CoreLocal::get("paycard_exp"),2,2);
+        $cardName = CoreLocal::get("paycard_name");
         $refNum = $this->refnum($transID);
         $live = 1;
 
         $this->voidTrans = $transID;
-        $this->voidRef = $CORE_LOCAL->get("paycard_trans");
+        $this->voidRef = CoreLocal::get("paycard_trans");
         $temp = explode("-",$this->voidRef);
         $laneNo = $temp[1];
         $transNo = $temp[2];
@@ -967,7 +604,7 @@ class GoEMerchant extends BasicCCModule
         $merchantID = GOEMERCH_ID;
         $password = GOEMERCH_PASSWD;
         $gatewayID = GOEMERCH_GATEWAY_ID;
-        if ($CORE_LOCAL->get("training") == 1) {
+        if (CoreLocal::get("training") == 1) {
             $merchantID = "1264";
             $password = "password";
             $cardPAN = "4111111111111111";
@@ -991,7 +628,7 @@ class GoEMerchant extends BasicCCModule
                     AND transNo=' . $transNo . '
                     AND transID=' . $transID;
         if (!$dbTrans->table_exists('PaycardTransactions')) {
-            $sql = "SELECT refNum,xTransactionID FROM efsnetResponse WHERE ".$dbTrans->identifier_escape('date')."='".$today."'" .
+            $sql = "SELECT refNum,xTransactionID FROM efsnetResponse WHERE ".$dbTrans->identifierEscape('date')."='".$today."'" .
                 " AND cashierNo=".$cashierNo." AND laneNo=".$laneNo." AND transNo=".$transNo." AND transID=".$transID;
         }
         $result = PaycardLib::paycard_db_query($sql, $dbTrans);
@@ -1023,7 +660,7 @@ class GoEMerchant extends BasicCCModule
                     AND transID=" . $transID;
         $initR = $dbTrans->query($initQ);
         if ($initR) {
-            $this->last_paycard_transaction_id = $dbTrans->insert_id();
+            $this->last_paycard_transaction_id = $dbTrans->insertID();
         } else {
             return $this->setErrorMsg(PaycardLib::PAYCARD_ERR_NOSEND); 
         }
@@ -1052,10 +689,9 @@ class GoEMerchant extends BasicCCModule
     // field. requires uniqueness, doesn't seem to cycle daily
     public function refnum($transID)
     {
-        global $CORE_LOCAL;
-        $transNo   = (int)$CORE_LOCAL->get("transno");
-        $cashierNo = (int)$CORE_LOCAL->get("CashierNo");
-        $laneNo    = (int)$CORE_LOCAL->get("laneno");    
+        $transNo   = (int)CoreLocal::get("transno");
+        $cashierNo = (int)CoreLocal::get("CashierNo");
+        $laneNo    = (int)CoreLocal::get("laneno");    
 
         // assemble string
         $ref = "";
@@ -1080,8 +716,6 @@ class GoEMerchant extends BasicCCModule
 
     public function lookupTransaction($ref, $local, $mode)
     {
-        global $CORE_LOCAL;
-
         $merchantID = GOEMERCH_ID;
         $password = GOEMERCH_PASSWD;
         $gatewayID = GOEMERCH_GATEWAY_ID;
@@ -1126,7 +760,7 @@ class GoEMerchant extends BasicCCModule
             'cancel_dest' => MiscLib::base_url() . 'gui-modules/pos2.php',
         );
         $info = new Paycards();
-        $url_stem = $info->plugin_url();
+        $url_stem = $info->pluginUrl();
 
         $xml_resp = new xmlData($curl_result['response']);
         $status = 'UNKNOWN';
@@ -1171,44 +805,53 @@ class GoEMerchant extends BasicCCModule
                 // actual processor result and finish
                 // the transaction correctly
                 $db = Database::tDataConnect(); 
-                $upQ = sprintf("UPDATE PaycardTransactions SET
-                                xResponseCode=%d
-                                xResultCode=%d,
-                                xResultMessage='%s',
-                                xTransactionID='%s',
-                                commErr=0,
-                                httpCode=200,
-                                validResponse=%d,
-                                WHERE refNum='%s'
-                                    AND transID=%d",
-                                $responseCode,
-                                $resultCode,
-                                $db->escape($rMsg),
-                                $db->escape($xTransID),
-                                $db->escape($apprNumber),
-                                $normalized,
-                                $db->escape($ref),
-                                $CORE_LOCAL->get('paycard_id')
+                $upP = $db->prepare("
+                    UPDATE PaycardTransactions 
+                    SET xResponseCode=?,
+                        xResultCode=?,
+                        xResultMessage=?,
+                        xTransactionID=?,
+                        xApprovalNumber=?,
+                        commErr=0,
+                        httpCode=200,
+                        validResponse=?
+                    WHERE refNum=?
+                        AND transID=?");
+                $args = array(
+                    $responseCode,
+                    $resultCode,
+                    $rMsg,
+                    $xTransID,
+                    $apprNumber,
+                    $normalized,
+                    $ref,
+                    CoreLocal::get('paycard_id'),
                 );
-                $upR = $db->query($upQ);
-                $upQ = sprintf("UPDATE efsnetResponse SET
-                                xResponseCode=%d,
-                                xResultCode=%d, 
-                                xResultMessage='%s',
-                                xTransactionID='%s',
-                                xApprovalNumber='%s',
-                                commErr=0,
-                                httpCode=200
-                                WHERE refNum='%s'
-                                AND transID=%d",
-                                $responseCode,
-                                $resultCode,
-                                $db->escape($rMsg),
-                                $db->escape($xTransID),
-                                $db->escape($apprNumber),
-                                $db->escape($ref),
-                                $CORE_LOCAL->get('paycard_id'));
-                $upR = $db->query($upQ);
+                $upR = $db->execute($upP, $args);
+
+                $upP = $db->prepare("
+                    UPDATE efsnetResponse SET
+                        xResponseCode=?,
+                        xResultCode=?, 
+                        xResultMessage=?,
+                        xTransactionID=?,
+                        xApprovalNumber=?,
+                        commErr=0,
+                        httpCode=200
+                    WHERE refNum=?
+                        AND transID=?");
+                $args = array(
+                    $responseCode,
+                    $resultCode,
+                    $rMsg,
+                    $xTransID,
+                    $apprNumber,
+                    $ref,
+                    CoreLocal::get('paycard_id')
+                );
+                if ($db->table_exists('efsnetResponse')) {
+                    $upR = $db->execute($upP, $args);
+                }
 
                 if ($status == 'APPROVED') {
                     PaycardLib::paycard_wipe_pan();

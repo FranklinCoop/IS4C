@@ -3,14 +3,14 @@
 
     Copyright 2009,2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -21,116 +21,128 @@
 
 *********************************************************************************/
 
-include('../../config.php');
-include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+include(dirname(__FILE__) . '/../../config.php');
+if (!class_exists('FannieAPI.php')) {
+    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
 
 class CreateTagsByDept extends FanniePage {
 
-	protected $title = "Fannie : Department Shelf Tags";
-	protected $header = "Department Shelf Tags";
+    protected $title = "Fannie : Department Shelf Tags";
+    protected $header = "Department Shelf Tags";
 
-	private $msgs = '';
+    public $description = '[Department Shelf Tags] generates a set of shelf tags for given POS
+    department(s).';
+    public $themed = true;
 
-	function preprocess(){
-		global $FANNIE_OP_DB;
-		if (FormLib::get_form_value('deptStart',False) !== False){
-			$start = FormLib::get_form_value('deptStart');
-			$end = FormLib::get_form_value('deptEnd');
-			$pageID = FormLib::get_form_value('sID',0);
-			$dbc = FannieDB::get($FANNIE_OP_DB);
-			$q = $dbc->prepare_statement("select p.upc,p.description,p.normal_price,
-				x.manufacturer,x.distributor,v.sku,v.size,
-				CASE WHEN v.units IS NULL THEN 1 ELSE v.units END as units
-				FROM products as p
-				left join prodExtra as x on p.upc=x.upc
-				left join vendorItems as v ON p.upc=v.upc
-				left join vendors as n on v.vendorID=n.vendorID
-				where p.department BETWEEN ? AND ? AND (
-					x.distributor=n.vendorName
-					or (x.distributor='' and n.vendorName='UNFI')
-					or (x.distributor is null and n.vendorName='UNFI')
-					or (n.vendorName is NULL)
-				)");
-			$r = $dbc->exec_statement($q,array($start,$end));
-            $tag = new ShelfTagModel($dbc);
-			while($w = $dbc->fetch_row($r)){
+    private $msgs = '';
+
+    function preprocess()
+    {
+        global $FANNIE_OP_DB;
+        if (FormLib::get_form_value('deptStart',False) !== false) {
+            $start = FormLib::get_form_value('deptStart');
+            $end = FormLib::get_form_value('deptEnd');
+            $pageID = FormLib::get_form_value('sID',0);
+            $dbc = FannieDB::get($FANNIE_OP_DB);
+            $prodP = $dbc->prepare("
+                SELECT p.upc
+                FROM products AS p
+                WHERE p.department BETWEEN ? AND ?
+            ");
+            $prodR = $dbc->execute($prodP, array($start,$end));
+            $tag = new ShelftagsModel($dbc);
+            $product = new ProductsModel($dbc);
+            while ($row = $dbc->fetch_row($prodR)) {
+                $product->upc($row['upc']);
+                $info = $product->getTagData();
                 $tag->id($pageID);
-                $tag->upc($w['upc']);
-                $tag->description($w['description']);
-                $tag->normal_price($w['normal_price']);
-                $tag->brand($w['manufacturer']);
-                $tag->sku($w['sku']);
-                $tag->size($w['units']);
-                $tag->units($w['size']);
-                $tag->vendor($w['distributor']);
-                $tag->pricePerUnit(PriceLib::pricePerUnit($w['normal_price'], $w['size']));
+                $tag->upc($row['upc']);
+                $tag->setData($info);
                 $tag->save();
-			}
-			$this->msgs = sprintf('<em>Created tags for departments #%d through #%d</em>
-					<br /><a href="ShelfTagIndex.php">Home</a>',
-				$start, $end);
-		}
-		return True;
-	}
+            }
+            $this->msgs = sprintf('<em>Created tags for departments #%d through #%d</em>
+                    <br /><a href="ShelfTagIndex.php">Home</a>',
+                $start, $end);
+        }
 
-	function body_content(){
-		global $FANNIE_OP_DB;
-		$dbc = FannieDB::get($FANNIE_OP_DB);
-		$deptsQ = $dbc->prepare_statement("select dept_no,dept_name from departments order by dept_no");
-		$deptsR = $dbc->exec_statement($deptsQ);
-		$deptsList = "";
+        return true;
+    }
 
-		$deptSubQ = $dbc->prepare_statement("SELECT superID,super_name FROM MasterSuperDepts
-				GROUP BY superID,super_name
-				ORDER BY superID");
-		$deptSubR = $dbc->exec_statement($deptSubQ);
+    function body_content()
+    {
+        $dbc = FannieDB::getReadOnly($this->config->get('OP_DB'));
+        $deptsQ = $dbc->prepare("select dept_no,dept_name from departments order by dept_no");
+        $deptsR = $dbc->execute($deptsQ);
+        $deptsList = "";
 
-		$deptSubList = "";
-		while($deptSubW = $dbc->fetch_array($deptSubR)){
-		  $deptSubList .=" <option value=$deptSubW[0]>$deptSubW[1]</option>";
-		}
-		while ($deptsW = $dbc->fetch_array($deptsR))
-		  $deptsList .= "<option value=$deptsW[0]>$deptsW[0] $deptsW[1]</option>";
+        $qmodel = new ShelfTagQueuesModel($dbc);
+        $deptSubList = $qmodel->toOptions();
 
-		$ret = '';
-		if (!empty($this->msgs)){
-			$ret .= '<blockquote style="border:solid 1px black; padding:5px;
-					margin:5px;">';
-			$ret .= $this->msgs;
-			$ret .= '</blockquote>';
-		}
+        while ($deptsW = $dbc->fetch_array($deptsR))
+          $deptsList .= "<option value=$deptsW[0]>$deptsW[0] $deptsW[1]</option>";
 
-		ob_start();
-		?>
-		<form action="CreateTagsByDept.php" method="get">
-		<table>
-		<tr> 
-			<td align="right"> <p><b>Department Start</b></p>
-			<p><b>End</b></p></td>
-			<td> <p>
-			<select id=deptStartSel onchange="$('#deptStart').val($(this).val());">
-			<?php echo $deptsList ?>
-			</select>
-			<input type=text name=deptStart id=deptStart size=5 value=1 />
-			</p>
-			<p>
-			<select id=deptEndSel onchange="$('#deptEnd').val($(this).val());">
-			<?php echo $deptsList ?>
-			</select>
-			<input type=text name=deptEnd id=deptEnd size=5 value=1 />
-			</p></td>
-		</tr>
-		<tr>
-			<td><p><b>Page:</b> <select name="sID"><?php echo $deptSubList; ?></select></p></td>
-			<td align="right"><input type="submit" value="Create Shelftags" />
-		</tr>
-		</table>
-		</form>
-		<?php
-		return $ret.ob_get_clean();
-	}
+        $ret = '';
+        if (!empty($this->msgs)){
+            $ret .= '<div class="alert alert-success">';
+            $ret .= $this->msgs;
+            $ret .= '</div>';
+        }
+
+        ob_start();
+        ?>
+        <form action="CreateTagsByDept.php" method="get">
+        <div class="row form-group form-horizontal"> 
+            <label class="col-sm-2">Department Start</label>
+            <div class="col-sm-4">
+                <select onchange="$('#deptStart').val($(this).val());"
+                    class="form-control">
+                    <?php echo "$deptsList\n" ?>
+                </select>
+            </div>
+            <div class="col-sm-2">
+                <input type=text name=deptStart id=deptStart class="form-control" value=1 />
+            </div>
+        </div>
+        <div class="row form-group form-horizontal"> 
+            <label class="col-sm-2">Department End</label>
+            <div class="col-sm-4">
+                <select onchange="$('#deptEnd').val($(this).val());"
+                    class="form-control">
+                    <?php echo "$deptsList\n" ?>
+                </select>
+            </div>
+            <div class="col-sm-2">
+                <input type=text name=deptEnd id=deptEnd class="form-control" value=1 />
+            </div>
+        </div>
+        <div class="row form-group form-horizontal">
+            <label class="col-sm-2">Page</label>
+            <div class="col-sm-4">
+                <select name="sID" class="form-control">
+                    <?php echo $deptSubList; ?></select>
+            </div>
+            <div class="col-sm-2">
+                <button type="submit" class="btn btn-default">Create Shelftags</button>
+            </div>
+        </div>
+        </form>
+        <?php
+        return $ret.ob_get_clean();
+    }
+
+    public function helpContent()
+    {
+        return '<p>Create shelf tags for all items in a 
+            POS department range. Tags will be queued for
+            printing under the selected super department.</p>';
+    }
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertNotEquals(0, strlen($this->body_content()));
+    }
 }
 
-FannieDispatch::conditionalExec(false);
+FannieDispatch::conditionalExec();
 
-?>

@@ -21,14 +21,19 @@
 
 *********************************************************************************/
 
-if (!class_exists('LocalTransModel')) {
+namespace COREPOS\pos\lib\models\trans;
+use COREPOS\pos\lib\models\BasicModel;
+
+/*
+if (!class_exists('\\COREPOS\\pos\lib\\models\\trans\\LocalTransModel')) {
     include_once(dirname(__FILE__).'/LocalTransModel.php');
 }
+*/
 
 /**
   @class LocalTransTodayModel
 */
-class LocalTransTodayModel extends LocalTransModel
+class LocalTransTodayModel extends \COREPOS\pos\lib\models\trans\LocalTransModel
 {
 
     protected $name = "localtranstoday";
@@ -45,17 +50,28 @@ class LocalTransTodayModel extends LocalTransModel
         $this->columns['emp_no']['index'] = true;
     }
 
+    public function doc()
+    {
+        return '
+Use:
+Contains today\'s transactions. 
+Truncating this table
+daily will yield better performance on some actions
+that reference the current day\'s info - for example,
+reprinting receipts.
+        ';
+    }
+
     /**
       localtranstoday used to be a view; recreate
       it as a table if needed.
     */
     public function normalize($db_name, $mode=BasicModel::NORMALIZE_MODE_CHECK, $doCreate=False)
     { 
-        global $CORE_LOCAL;
-        if ($db_name == $CORE_LOCAL->get('pDatabase')) {
-            $this->connection = Database::pDataConnect();
-        } else if ($db_name == $CORE_LOCAL->get('tDatabase')) {
-            $this->connection = Database::tDataConnect();
+        if ($db_name == \CoreLocal::get('pDatabase')) {
+            $this->connection = \Database::pDataConnect();
+        } else if ($db_name == \CoreLocal::get('tDatabase')) {
+            $this->connection = \Database::tDataConnect();
         } else {
             echo "Error: Unknown database ($db_name)";
             return false;
@@ -85,7 +101,5 @@ class LocalTransTodayModel extends LocalTransModel
         }
     }
 
-    /* START ACCESSOR FUNCTIONS */
-    /* END ACCESSOR FUNCTIONS */
 }
 

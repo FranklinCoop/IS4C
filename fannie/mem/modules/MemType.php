@@ -3,7 +3,7 @@
 
     Copyright 2010 Whole Foods Co-op, Duluth, MN
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,99 +21,149 @@
 
 *********************************************************************************/
 
-class MemType extends MemberModule {
+class MemType extends \COREPOS\Fannie\API\member\MemberModule {
 
-	function ShowEditForm($memNum, $country="US"){
-		global $FANNIE_URL;
+    public function width()
+    {
+        return parent::META_WIDTH_HALF;
+    }
 
-		$dbc = $this->db();
-		
-		$infoQ = $dbc->prepare_statement("SELECT c.memType,n.memType,n.memDesc,c.discount
-				FROM custdata AS c, 
-				memtype AS n 
-				WHERE c.CardNo=? AND c.personNum=1
-				ORDER BY n.memType");
-		$infoR = $dbc->exec_statement($infoQ,array($memNum));
+    function showEditForm($memNum, $country="US")
+    {
+        $dbc = $this->db();
+        $account = self::getAccount();
+        
+        /**
+          Check parameters setting to decide whether
+          the discount value from custdata should be
+          displayed vs the discount value from memtype
+        */
+        $modeR = $dbc->query("
+            SELECT p.param_value
+            FROM parameters AS p
+            WHERE param_key='useMemTypeTable'
+                AND store_id=0
+                AND lane_id=0");
+        $discount_mode = 'custdata.discount';
+        if ($modeR && $modeW = $dbc->fetch_row($modeR)) {
+            if ($modeW['param_value'] == 1) {
+                $discount_mode = 'memtype.discount';
+            }
+        }
 
-		$ret = "<fieldset class='memOneRow'><legend>Membership Type</legend>";
-		$ret .= "<table class=\"MemFormTable\" 
-			border=\"0\">";
+        $ret = "<div class=\"panel panel-default\">
+            <div class=\"panel-heading\">Membership Type</div>
+            <div class=\"panel-body\">";
 
-		$ret .= "<tr><th>Type</th>";
-		$ret .= '<td><select name="MemType_type">';
-		$disc = 0;
-		while($infoW = $dbc->fetch_row($infoR)){
-			$ret .= sprintf("<option value=%d %s>%s</option>",
-				$infoW[1],
-				($infoW[0]==$infoW[1]?'selected':''),
-				$infoW[2]);
-			$disc = $infoW[3];
-		}
-		$ret .= "</select></td>";
-		
-		$ret .= "<th>Discount</th>";
-		/*
-		$ret .= sprintf('<td><input name="MemType_discount" value="%d"
-				size="4" /></td></tr>',$disc);	
-		*/
-		$ret .= sprintf('<td>%d%%</td></tr>',$disc);
+        $ret .= '<div class="form-group form-inline">';
+        $ret .= '<span class="label primaryBackground">Type</span> ';
+        $ret .= '<select name="MemType_type" class="form-control">';
+        $disc = 0;
+        $mDesc = '';
+        $types = new MemtypeModel($dbc);
+        foreach ($types->find('memtype') as $type) {
+            $ret .= sprintf("<option value=%d %s>%s</option>",
+                $type->memtype(), 
+                ($account['customerTypeID'] == $type->memtype() ? 'selected' : ''),
+                $type->memDesc());
+            if ($account['customerTypeID'] == $type->memtype()) {
+                $mDesc = $type->memDesc();
+                $disc = $type->discount();
+                if ($discount_mode = 'custdata.discount') {
+                    foreach ($account['customers'] as $c) {
+                        if ($c['accountHolder']) {
+                            $disc = $c['discount'];
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        $ret .= "</select> ";
+        $ret .= '<input type="hidden" name="MemType_inactive" value="' . $account['activeStatus'] . '" />';
 
-		$ret .= "</table></fieldset>";
-		return $ret;
-	}
+        if ($discount_mode == 'memtype.discount') {
+            $discountTip = " title=\"The discount for the Member's current Type: " .
+                "{$mDesc}\"";
+        } else {
+            $discountTip = " title=\"The Member's current Discount, " .
+                "regardless of assigned Type, which is: " .
+                "{$mDesc}\"";
+        }
+        
+        $ret .= '<span class="label primaryBackground"' .
+                    $discountTip . '>Discount</span> ';
+        $ret .= sprintf('%d%%',$disc);
+        $ret .= '</div>';
 
-	function SaveFormData($memNum){
-		global $FANNIE_ROOT;
-		$dbc = $this->db();
-		if (!class_exists("CustdataModel"))
-			include($FANNIE_ROOT.'classlib2.0/data/models/CustdataModel.php');
+        $ret .= '</div>';
+        $ret .= '</div>';
 
-		$mtype = FormLib::get_form_value('MemType_type',0);
+        return $ret;
+    }
 
-		// Default values for custdata fields that depend on Member Type.
-		$CUST_FIELDS = array();
-		$CUST_FIELDS['memType'] = $mtype;
-		$CUST_FIELDS['Type'] = 'REG';
-		$CUST_FIELDS['Staff'] = 0;
-		$CUST_FIELDS['Discount'] = 0;
-		$CUST_FIELDS['SSI'] = 0;
+    function saveFormData($memNum)
+    {
+        $dbc = $this->db();
 
-		// Get any special values for this Member Type.
+        $mtype = FormLib::get_form_value('MemType_type',0);
+        $inactive = FormLib::get('MemType_inactive');
+        // cannot alter type of inactive members. Must
+        // re-activate first
+        if ($inactive != '') {
+            return '';
+        }
+
+        // Default values for custdata fields that depend on Member Type.
+        $json = array(
+            'cardNo' => $memNum,
+            'memberStatus' => 'REG',
+            'customerTypeID' => $mtype,
+            'customers' => array(
+                array(
+                    'accountHolder' => 1,
+                    'staff' => 0,
+                    'discount' => 0,
+                    'lowIncomeBenefits' => 0,
+                ),
+            ),
+        );
+        $account = self::getAccount();
+        foreach ($account['customers'] as $c) {
+            if ($c['accountHolder']) {
+                $json['customers'][0]['customerID'] = $c['customerID'];
+            }
+        }
+        $account['customerTypeID'] = $mtype;
+        $account['memberStatus'] = 'REG';
+
+        // Get any special values for this Member Type.
         $mt = $dbc->tableDefinition('memtype');
-		$q = $dbc->prepare_statement("SELECT custdataType,discount,staff,ssi from memtype WHERE memtype=?");
+        $q = $dbc->prepare("SELECT custdataType,discount,staff,ssi from memtype WHERE memtype=?");
         if ($dbc->tableExists('memdefaults') && (!isset($mt['custdataType']) || !isset($mt['discount']) || !isset($mt['staff']) || !isset($mt['ssi']))) {
-            $q = $dbc->prepare_statement("SELECT cd_type as custdataType,discount,staff,SSI as ssi
+            $q = $dbc->prepare("SELECT cd_type as custdataType,discount,staff,SSI as ssi
                     FROM memdefaults WHERE memtype=?");
         }
-		$r = $dbc->exec_statement($q,array($mtype));
-		if ($dbc->num_rows($r) > 0){
-			$w = $dbc->fetch_row($r);
-			$CUST_FIELDS['Type'] = $w['custdataType'];
-			$CUST_FIELDS['Discount'] = $w['discount'];
-			$CUST_FIELDS['Staff'] = $w['staff'];
-			$CUST_FIELDS['SSI'] = $w['ssi'];
-		}
+        $r = $dbc->execute($q,array($mtype));
+        if ($dbc->num_rows($r) > 0){
+            $w = $dbc->fetch_row($r);
+            $json['memberStatus'] = $w['custdataType'];
+            $account['memberStatus'] = $w['custdataType'];
+            $json['customers'][0]['discount'] = $w['discount'];
+            $json['customers'][0]['staff'] = $w['staff'];
+            $json['customers'][0]['lowIncomeBenefits'] = $w['ssi'];
+        }
 
-		// Assign Member Type values to each custdata record for the Membership.
-		$cust = new CustdataModel($dbc);
-		$cust->CardNo($memNum);
-		$error = "";
-		foreach($cust->find() as $obj){
-			$obj->memType($mtype);
-			$obj->Type($CUST_FIELDS['Type']);
-			$obj->Staff($CUST_FIELDS['Staff']);
-			$obj->Discount($CUST_FIELDS['Discount']);
-			$obj->SSI($CUST_FIELDS['SSI']);
-			$upR = $obj->save();
-			if ($upR === False)
-				$error .= $mtype;
-		}
-		
-		if ($error)
-			return "Error: problem saving Member Type<br />";
-		else
-			return "";
-	}
+        $resp = \COREPOS\Fannie\API\member\MemberREST::post($memNum, $json);
+        
+        if ($resp['errors'] > 0) {
+            return "Error: problem saving Member Type<br />";
+        } else {
+            // update current account object so subsequent save
+            // operations don't overwrite changes
+            self::setAccount($account);
+            return "";
+        }
+    }
 }
 
-?>

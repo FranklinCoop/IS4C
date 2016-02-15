@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,39 +32,6 @@ class WfcHtEmpWeeklyNotesModel extends BasicModel
     protected $columns = array(
     'empID' => array('type'=>'INT'),
     'notes' => array('type'=>'TEXT'),
-	);
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function empID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["empID"])) {
-                return $this->instance["empID"];
-            } elseif(isset($this->columns["empID"]["default"])) {
-                return $this->columns["empID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["empID"] = func_get_arg(0);
-        }
-    }
-
-    public function notes()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["notes"])) {
-                return $this->instance["notes"];
-            } elseif(isset($this->columns["notes"]["default"])) {
-                return $this->columns["notes"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["notes"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
+    );
 }
 

@@ -21,121 +21,115 @@
 
 *********************************************************************************/
 
-class DefaultTender extends Parser {
+class DefaultTender extends Parser 
+{
+    public function check($str)
+    {
+        if (!is_numeric(substr($str,-2)) && 
+            is_numeric(substr($str,0,strlen($str)-2))) {
+            return true;
+        } elseif (strlen($str) == 2 && !is_numeric($str)){
+            $dbc = Database::pDataConnect();
+            $res = $dbc->query("SELECT TenderCode FROM tenders WHERE TenderCode='$str'");
+            if ($dbc->num_rows($res) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-	function check($str){
-		if (!is_numeric(substr($str,-2)) && 
-		    is_numeric(substr($str,0,strlen($str)-2)))
-			return True;
-		elseif (strlen($str) == 2 && !is_numeric($str)){
-			$db = Database::pDataConnect();
-			$q = "SELECT TenderCode FROM tenders WHERE TenderCode='$str'";
-			$r = $db->query($q);
-			if ($db->num_rows($r) > 0)
-				return True;
-		}
-		return False;
-	}
-
-	function parse($str){
-		global $CORE_LOCAL;
-
+    private function blocked($str)
+    {
         /**
           If customer card is available, prevent other tenders
           unless specficially allowed (e.g., coupons).
         */
-        if ($CORE_LOCAL->get('PaycardsBlockTenders') == 1) {
+        if (CoreLocal::get('PaycardsBlockTenders') == 1) {
             $tender_code = strtoupper(substr($str, -2));
-            $exceptions = strtoupper($CORE_LOCAL->get('PaycardsBlockExceptions'));
+            $exceptions = strtoupper(CoreLocal::get('PaycardsBlockExceptions'));
             $except_array = preg_split('/[^A-Z]+/', $exceptions, 0, PREG_SPLIT_NO_EMPTY);
-            if ($CORE_LOCAL->get('ccTermState') == 'ready' && !in_array($tender_code, $except_array)) {
-                $CORE_LOCAL->set('boxMsg', _('Tender Customer Card First') 
-                                        . '<br />'
-                                        . _('[enter] to charge card')
-                                        . '<br />'
-                                        . _('[clear] to go back')
-                );
-                $CORE_LOCAL->set('strEntered', 'CCFROMCACHE');
-                $ret = $this->default_json();
+            if (CoreLocal::get('ccTermState') == 'ready' && !in_array($tender_code, $except_array)) {
+                CoreLocal::set('boxMsg', _('Tender customer card before other tenders'));
+                CoreLocal::set('boxMsgButtons', array(
+                    'Charge Card [enter]' => '$(\'#reginput\').val(\'\');submitWrapper();',
+                    'Cancel [clear]' => '$(\'#reginput\').val(\'CL\');submitWrapper();',
+                ));
+                CoreLocal::set('strEntered', 'CCFROMCACHE');
                 $ret['main_frame'] = MiscLib::baseURL() . 'gui-modules/boxMsg2.php';
 
                 return $ret;
             }
         }
 
-		if (strlen($str) > 2){
-			$left = substr($str,0,strlen($str)-2);
-			$right = substr($str,-2);
-			$ret = PrehLib::tender($right,$left);
-			return $ret;
-		}
-		else {
-			$ret = $this->default_json();
+        return false;
+    }
 
-			$base_object = new TenderModule($str, False);
-			$tender_object = 0;
-			$map = $CORE_LOCAL->get("TenderMap");
-			if (is_array($map) && isset($map[$str])){
-				$class = $map[$str];
-				$tender_object = new $class($str, False);
-			}
+    function parse($str)
+    {
+        $ret = $this->default_json();
 
-			$errors = $base_object->ErrorCheck();
-			if ($errors !== True){
-				$ret['output'] = $errors;
-				return $ret;
-			}
+        $block = $this->blocked($str);
+        if ($block !== false) {
+            return $block;
+        }
 
-			if (is_object($tender_object)){
-				$errors = $tender_object->ErrorCheck();
-				if ($errors !== True){
-					$ret['output'] = $errors;
-					return $ret;
-				}
-			}
-		
-			if (is_object($tender_object) && !$tender_object->AllowDefault()){
-				$ret['output'] = $tender_object->DisabledPrompt();
-				return $ret;
-			}
-			elseif(is_object($tender_object) && $tender_object->AllowDefault()){
-                $CORE_LOCAL->set('RepeatAgain', true);
-				$ret['main_frame'] = $tender_object->DefaultPrompt();
-				return $ret;
-			}
-			else if ($base_object->AllowDefault()){
-                $CORE_LOCAL->set('RepeatAgain', true);
-				$ret['main_frame'] = $base_object->DefaultPrompt();
-				return $ret;
-			}
-			else {
-				$ret['output'] = $base_object->DisabledPrompt();
-				return $ret;
-			}
-		}
-	}
+        if (strlen($str) > 2){
+            $left = substr($str,0,strlen($str)-2);
+            $right = substr($str,-2);
+            return PrehLib::tender($right,$left);
+        } else {
+            $base_object = new TenderModule($str, False);
+            $objs = array($base_object);
+            $map = CoreLocal::get("TenderMap");
+            if (is_array($map) && isset($map[$str])){
+                $class = $map[$str];
+                $tender_object = new $class($str, False);
+                $objs[] = $tender_object;
+            }
 
-	function isLast(){
-		return True;
-	}
+            foreach ($objs as $object) {
+                $errors = $object->ErrorCheck();
+                if ($errors !== true){
+                    $ret['output'] = $errors;
+                    return $ret;
+                }
+            }
+            
+            $objs = array_reverse($objs);
 
-	function doc(){
-		return "<table cellspacing=0 cellpadding=3 border=1>
-			<tr>
-				<th>Input</th><th>Result</th>
-			</tr>
-			<tr>
-				<td><b>ANYTHING</b></td>
-				<td>If all else fails, assume the last
-				two letters are a tender code and the
-				rest is an amount</td>
-			</tr>
-			<tr>
-				<td colspan=2><i>This module is last. Cashier training
-				can ignore this completely</i></td>
-			</tr>
-			</table>";
-	}
+            foreach ($objs as $object) {
+                if (!$object->AllowDefault()) {
+                    $ret['output'] = $object->DisabledPrompt();
+                    return $ret;
+                } else {
+                    CoreLocal::set('RepeatAgain', true);
+                    $ret['main_frame'] = $object->DefaultPrompt();
+                    return $ret;
+                }
+            }
+        }
+    }
+
+    function isLast(){
+        return True;
+    }
+
+    function doc(){
+        return "<table cellspacing=0 cellpadding=3 border=1>
+            <tr>
+                <th>Input</th><th>Result</th>
+            </tr>
+            <tr>
+                <td><b>ANYTHING</b></td>
+                <td>If all else fails, assume the last
+                two letters are a tender code and the
+                rest is an amount</td>
+            </tr>
+            <tr>
+                <td colspan=2><i>This module is last. Cashier training
+                can ignore this completely</i></td>
+            </tr>
+            </table>";
+    }
 }
 
-?>

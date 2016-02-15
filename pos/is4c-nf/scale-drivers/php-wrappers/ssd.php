@@ -22,125 +22,82 @@
 
 class ssd extends ScaleDriverWrapper {
 
-	function SavePortConfiguration($portName){
-		$rel = MiscLib::base_url();
+    function ReadFromScale()
+    {
+        $scale_data = $this->getFile('scale');
+        $scan_data = $this->getFile('scanner');
+    
+        $scale_display = '';
+        $scans = array();
+        if ($scale_data !== false && !empty($scale_data)){
+            $scale_display = DisplayLib::scaledisplaymsg($scale_data);
+            if (is_array($scale_display)){
+                if (isset($scale_display['upc']))
+                    $scans[] = $scale_display['upc'];
+                $scale_display = $scale_display['display'];
+            }
+        }
+        if ($scan_data !== False && !empty($scan_data))
+            $scans[] = $scan_data;
 
-		if (!file_exists($rel."scale-drivers/drivers/rs232/ssd.conf")) return;
+        $output = array();
+        if (!empty($scale_display)) $output['scale'] = $scale_display;
+        if (!empty($scans)) $output['scans'] = ltrim($scans[0],'0');
 
-		/* read in config file */
-		$fp = fopen($rel."scale-drivers/drivers/rs232/ssd.conf","r");
-		$lines = array();
-		while(!feof($fp)) $lines[] = fgets($fp);
-		fclose($fp);
+        if (!empty($output)) echo JsonLib::array_to_json($output);
+        else echo "{}";
+    }
 
-		/* replace SerialPort config */
-		$fp = fopen($rel."scale-drivers/drivers/rs232/ssd.conf","w");
-		foreach($lines as $l){
-			if (strstr($l,"SerialPort ") === False) fwrite($fp,$l);
-			else {
-				fwrite($fp,sprintf('SerialPort %s',$portName));
-				fwrite($fp,"\n");
-			}
-		}
-		fclose($fp);
-	}
+    private function getFile($filename)
+    {
+        $file = dirname(__FILE__) . '/../drivers/rs232/' . $filename;
+        if (file_exists($file)) {
+            $scale_data = file_get_contents($file);
+        } else {
+            $scale_data = '';
+        }
+        $fptr = fopen($file, 'w');
+        fclose($fptr);
 
-	function SaveDirectoryConfiguration($absPath){
-		$rel = MiscLib::base_url();
+        return $scale_data;
+    }
 
-		if (!file_exists($rel."scale-drivers/drivers/rs232/ssd.conf")) return;
+    function WriteToScale($str)
+    {
+        switch(strtolower($str)){
+        case 'goodbeep':
+            $this->sendCmd('S334');
+            break;
+        case 'errorbeep':
+            $this->sendCmd('S334');
+            usleep(100);
+            $this->sendCmd('S334');
+            usleep(100);
+            $this->sendCmd('S334');
+            break;
+        case 'twopairs':
+            $this->sendCmd('S334');
+            usleep(100);
+            $this->sendCmd('S334');
+            usleep(300);
+            $this->sendCmd('S334');
+            usleep(100);
+            $this->sendCmd('S334');
+            break;
+        case 'repoll':
+            $this->sendCmd('S14');
+            break;
+        case 'wakeup':
+            $this->sendCmd('S11');
+            $this->sendCmd('S14');
+            break;
+        }
+    }
 
-		/* read in config file */
-		$fp = fopen($rel."scale-drivers/drivers/rs232/ssd.conf","r");
-
-		$lines = array();
-		while(!feof($fp)) $lines[] = fgets($fp);
-		fclose($fp);
-
-		/* replace file location config */
-		$fp = fopen($rel."scale-drivers/drivers/rs232/ssd.conf","w");
-		foreach($lines as $l){
-			if (strstr($l,"ScannerFile ") !== False){
-				fwrite($fp,sprintf('ScannerFile %s',
-					$absPath."scale-drivers/drivers/rs232/scale"));
-				fwrite($fp,"\n");
-			}
-			elseif (strstr($l,"ScaleFile ") !== False){
-				fwrite($fp,sprintf('ScaleFile %s',
-					$absPath."scale-drivers/drivers/rs232/scanner"));
-				fwrite($fp,"\n");
-			}
-			else fwrite($fp,$l);
-		}
-		fclose($fp);
-	}
-
-	function ReadFromScale(){
-		global $CORE_LOCAL;
-		$rel = MiscLib::base_url();
-
-		$scale_data = file_get_contents($rel.'scale-drivers/drivers/rs232/scale');
-		$fp = fopen($rel.'scale-drivers/drivers/rs232/scale','w');
-		fclose($fp);
-
-		$scan_data = file_get_contents($rel.'scale-drivers/drivers/rs232/scanner');
-		$fp = fopen($rel.'scale-drivers/drivers/rs232/scanner','w');
-		fclose($fp);
-	
-		$scale_display = '';
-		$scans = array();
-		if ($scale_data !== False && !empty($scale_data)){
-			$scale_display = DisplayLib::scaledisplaymsg($scale_data);
-			if (is_array($scale_display)){
-				if (isset($scale_display['upc']))
-					$scans[] = $scale_display['upc'];
-				$scale_display = $scale_display['display'];
-			}
-		}
-		if ($scan_data !== False && !empty($scan_data))
-			$scans[] = $scan_data;
-
-		$output = array();
-		if (!empty($scale_display)) $output['scale'] = $scale_display;
-		if (!empty($scans)) $output['scans'] = ltrim($scans[0],'0');
-
-		if (!empty($output)) echo JsonLib::array_to_json($output);
-		else echo "{}";
-	}
-
-	function WriteToScale($str){
-		global $CORE_LOCAL;
-		$port = $CORE_LOCAL->get("scalePort");
-
-		switch(strtolower($str)){
-		case 'goodbeep':
-			system('echo -e "S334\r" > '.$port);
-			break;
-		case 'errorbeep':
-			system('echo -e "S334\r" > '.$port);
-			usleep(100);
-			system('echo -e "S334\r" > '.$port);
-			usleep(100);
-			system('echo -e "S334\r" > '.$port);
-			break;
-		case 'twopairs':
-			system('echo -e "S334\r" > '.$port);
-			usleep(100);
-			system('echo -e "S334\r" > '.$port);
-			usleep(300);
-			system('echo -e "S334\r" > '.$port);
-			usleep(100);
-			system('echo -e "S334\r" > '.$port);
-			break;
-		case 'repoll':
-			system('echo -e "S14\r" > '.$port);
-			break;
-		case 'wakeup':
-			system('echo -e "S11\r" > '.$port);
-			system('echo -e "S14\r" > '.$port);
-			break;
-		}
-	}
+    private function sendCmd($cmd)
+    {
+        $port = CoreLocal::get("scalePort");
+        system('echo -e "' . $cmd . '\r" > '.$port);
+    }
 }
 
-?>

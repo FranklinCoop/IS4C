@@ -26,7 +26,6 @@ class EveryoneSale extends DiscountType
 
     public function priceInfo($row,$quantity=1)
     {
-        global $CORE_LOCAL;
         if (is_array($this->savedInfo)) {
             return $this->savedInfo;
         }
@@ -52,8 +51,8 @@ class EveryoneSale extends DiscountType
         $ret['discount'] = ($ret['regPrice'] - $row['special_price']) * $quantity;
         $ret['memDiscount'] = 0;
 
-        if ($row['line_item_discountable'] == 1 && $CORE_LOCAL->get("itemPD") > 0) {
-            $discount = $row['special_price'] * (($CORE_LOCAL->get("itemPD")/100));
+        if ($row['line_item_discountable'] == 1 && CoreLocal::get("itemPD") > 0) {
+            $discount = $row['special_price'] * ((CoreLocal::get("itemPD")/100));
             $ret["unitPrice"] = $row['special_price'] - $discount;
             $ret["discount"] += ($discount * $quantity);
         }
@@ -69,7 +68,8 @@ class EveryoneSale extends DiscountType
             $chkR = $tdb->query($chkQ);
             $prevSales = 0;
             if ($tdb->num_rows($chkR) > 0) {
-                $prevSales = array_pop($tdb->fetch_row($chkR));
+                $chkW = $tdb->fetchRow($chkR);
+                $prevSales = $chkW[0];
             }
 
             if ($prevSales >= $row['specialquantity']) {
@@ -95,7 +95,6 @@ class EveryoneSale extends DiscountType
 
     public function addDiscountLine()
     {
-        global $CORE_LOCAL;    
         if ($this->savedRow['specialpricemethod'] == 0 && $this->savedInfo['discount'] != 0) {
             TransRecord::adddiscount($this->savedInfo['discount'],
                 $this->savedRow['department']);

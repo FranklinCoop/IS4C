@@ -3,7 +3,7 @@ var CORE_JS_PREFIX = "";
 function runParser(input_str,rel_prefix){
 	CORE_JS_PREFIX = rel_prefix;
 	$.ajax({
-		url: CORE_JS_PREFIX+'ajax-callbacks/ajax-parser.php',
+		url: CORE_JS_PREFIX+'ajax-callbacks/AjaxParser.php',
 		type: 'GET',
 		data: "input="+input_str,
 		dataType: "json",
@@ -13,57 +13,49 @@ function runParser(input_str,rel_prefix){
 	});
 }
 
-function parserError(xml_ro,st,err){
+function parserError()
+{
 }
 
-function parserHandler(data,status_str,xml_ro){
+function customerWindowHtml(selector, content)
+{
+    if (typeof customerWindow !== 'undefined' && $.isWindow(customerWindow)) {
+        customerWindow.$(selector).html(content);
+    }
+}
+
+function parserHandler(data)
+{
 	if (data.main_frame){
-		location = data.main_frame;
+		window.location = data.main_frame;
 		return;
-	}
-	else {
-		if (data.output)
+	} else {
+		if (data.output) {
 			$(data.target).html(data.output);
+            customerWindowHtml(data.target, data.output);
+        }
 	}
 
 	if (data.redraw_footer){
-		/*
-		$.ajax({
-			url: CORE_JS_PREFIX+'ajax-callbacks/ajax-footer.php',
-			type: 'GET',
-			cache: false,
-			success: function(data){
-				$('#footer').html(data);
-			}
-		});
-		*/
 		$('#footer').html(data.redraw_footer);
+        customerWindowHtml('#footer', data.redraw_footer);
 	}
 
 	if (data.scale){
-		/*
-		$.ajax({
-			url: CORE_JS_PREFIX+'ajax-callbacks/ajax-scale.php',
-			type: 'get',
-			data: 'input='+data.scale,
-			cache: false,
-			success: function(res){
-				$('#scaleBottom').html(res);
-			}
-		});
-		*/
 		$('#scaleBottom').html(data.scale);
+        customerWindowHtml('#scaleBottom', data.scale);
 	}
 
 	if (data.term){
 		$('#scaleIconBox').html(data.term);
+        customerWindowHtml('#scaleIconBox', data.term);
 	}
 
 	if (data.receipt){
 		$.ajax({
 			url: CORE_JS_PREFIX+'ajax-callbacks/ajax-end.php',
 			type: 'GET',
-			data: 'receiptType='+data.receipt,
+			data: 'receiptType='+data.receipt+'&ref='+data.trans_num,
 			dataType: 'json',
 			cache: false,
             error: function() {
@@ -85,7 +77,7 @@ function parserHandler(data,status_str,xml_ro){
 	}
 
 	if (data.retry){
-		setTimeout("runParser('"+data.retry+"','"+CORE_JS_PREFIX+"');",150);
+		setTimeout("runParser('"+encodeURI(data.retry)+"','"+CORE_JS_PREFIX+"');",150);
 	}
 }
 
@@ -94,8 +86,6 @@ function ajaxTransactionSync(rel_prefix){
 		url: rel_prefix+'ajax-callbacks/ajax-transaction-sync.php',
 		type: 'GET',
 		cache: false,
-		success: function(data){
-		}
 	});
 
 }

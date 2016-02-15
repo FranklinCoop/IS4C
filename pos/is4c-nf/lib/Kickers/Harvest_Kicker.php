@@ -23,36 +23,36 @@
 
 class Harvest_Kicker extends Kicker {
 
-	function doKick(){
-		global $CORE_LOCAL;
-		if($CORE_LOCAL->get('training') == 1) return False;
+    public function doKick($trans_num)
+    {
+        if(CoreLocal::get('training') == 1) return False;
 
-		$db = Database::tDataConnect();
+        $db = Database::tDataConnect();
 
-		$query = "select trans_id from localtemptrans where 
-			(trans_subtype = 'CA' and total <> 0) 
-			OR (trans_subtype = 'XB' and total <> 0)
-			OR (trans_subtype = 'PE' and total <> 0)";
+        $query = "SELECT trans_id 
+                  FROM localtranstoday 
+                  WHERE (
+                    (trans_subtype = 'CA' and total <> 0) 
+                    OR (trans_subtype = 'XB' and total <> 0)
+                    OR (trans_subtype = 'PE' and total <> 0)
+                  ) AND " . $this->refToWhere($trans_num);
 
-		$result = $db->query($query);
-		$num_rows = $db->num_rows($result);
-		$db->close();
+        $result = $db->query($query);
+        $num_rows = $db->num_rows($result);
+        $db->close();
 
-		return ($num_rows > 0) ? True : False;
+        return ($num_rows > 0) ? True : False;
 
-	}
+    }
 
-	function kickOnSignIn(){
-		global $CORE_LOCAL;
-		if($CORE_LOCAL->get('training') == 1) return False;
-		return True;
-	}
+    function kickOnSignIn(){
+        if(CoreLocal::get('training') == 1) return False;
+        return True;
+    }
 
-	function kickOnSignOut(){
-		global $CORE_LOCAL;
-		if($CORE_LOCAL->get('training') == 1) return False;
-		return True;
-	}
+    function kickOnSignOut(){
+        if(CoreLocal::get('training') == 1) return False;
+        return True;
+    }
 }
 
-?>

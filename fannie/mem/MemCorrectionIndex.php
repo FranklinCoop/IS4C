@@ -3,7 +3,7 @@
 
     Copyright 2007 Alberta Cooperative Grocery, Portland, Oregon.
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,31 +21,47 @@
 
 *********************************************************************************/
 // A page to search the member base.
-include('../config.php');
-include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+include(dirname(__FILE__) . '/../config.php');
+if (!class_exists('FannieAPI')) {
+    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+}
 
 class MemCorrectionIndex extends FanniePage {
 
-	protected $title='Fannie - Member Management Module';
-	protected $header='Make Member Corrections';
+    protected $title='Fannie - Member Management Module';
+    protected $header='Make Member Corrections';
 
-	private $msgs = '';
+    public $description = '[Member Correction Menu] lists tools for correcting account imbalances.';
+    public $themed = true;
 
-	function body_content(){
-		ob_start();
-		?>
-		<ul>
-		<li><a href="correction_pages/MemEquityTransferTool.php">Equity Transfer</a></li>
-		<li><a href="correction_pages/MemArTransferTool.php">AR Transfer</a></li>
-		<li><a href="correction_pages/MemArEquitySwapTool.php">AR/Equity Swap</a></li>
-		<li><a href="correction_pages/MemArEquityDumpTool.php">Remove AR/Equity</a></li>
-		<li><a href="correction_pages/PatronageTransferTool.php">Transfer Patronage</a></li>
-		</ul>
-		<?php
-		return $this->msgs.ob_get_clean();
-	}
+    function body_content(){
+        ob_start();
+        ?>
+        <ul>
+        <li><a href="correction_pages/MemEquityTransferTool.php">Equity Transfer</a></li>
+        <li><a href="correction_pages/MemArTransferTool.php">AR Transfer</a></li>
+        <li><a href="correction_pages/MemArEquitySwapTool.php">AR/Equity Swap</a></li>
+        <li><a href="correction_pages/MemArEquityDumpTool.php">Remove AR/Equity</a></li>
+        <li><a href="correction_pages/PatronageTransferTool.php">Transfer Patronage</a></li>
+        </ul>
+        <?php
+        return ob_get_clean();
+    }
+
+    public function helpContent()
+    {
+        return '<p>
+            This is a set of tools for adjusting activity on a member
+            account or moving activity from one member account to
+            another.
+            </p>';
+    }
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertNotEquals(0, strlen($this->body_content()));
+    }
 }
 
-FannieDispatch::conditionalExec(false);
+FannieDispatch::conditionalExec();
 
-?>

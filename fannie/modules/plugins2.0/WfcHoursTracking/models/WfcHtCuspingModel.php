@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ class WfcHtCuspingModel extends BasicModel
     protected $columns = array(
     'empID' => array('type'=>'INT'),
     'cusp' => array('type'=>'VARCHAR(4)'),
-	);
+    );
 
     public function create()
     {
@@ -63,38 +63,5 @@ class WfcHtCuspingModel extends BasicModel
             return false;
         }
     }
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function empID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["empID"])) {
-                return $this->instance["empID"];
-            } elseif(isset($this->columns["empID"]["default"])) {
-                return $this->columns["empID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["empID"] = func_get_arg(0);
-        }
-    }
-
-    public function cusp()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["cusp"])) {
-                return $this->instance["cusp"];
-            } elseif(isset($this->columns["cusp"]["default"])) {
-                return $this->columns["cusp"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["cusp"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
 }
 

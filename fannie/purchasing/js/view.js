@@ -10,6 +10,7 @@ function fetchOrders(){
 		type: 'get',
 		success: function(data){
 			$('#ordersDiv').html(data);
+            $('.tablesorter').tablesorter([[0, 1]]);
 		}
 	});
 }
@@ -31,10 +32,14 @@ function fetchPage(pager) {
 
 function togglePlaced(orderID){
 	var dataStr = 'id='+orderID+'&setPlaced=';
-	if ($('#placedCheckbox').prop('checked'))
+    console.log($('#receiveBtn').length);
+	if ($('#placedCheckbox').prop('checked')) {
 		dataStr += '1';
-	else
+        $('#receiveBtn').show();
+	} else {
 		dataStr += '0';
+        $('#receiveBtn').hide();
+    }
 
 	$.ajax({
 		url: 'ViewPurchaseOrders.php?',
@@ -49,3 +54,49 @@ function togglePlaced(orderID){
 function doExport(orderID){
 	window.location = 'ViewPurchaseOrders.php?id='+orderID+'&export='+$('#exporterSelect').val();
 }
+
+function deleteOrder(orderID)
+{
+    if (confirm('Delete this order?')) {
+        $.ajax({
+            type: 'delete',
+            data: 'id=' + orderID,
+            success: function(result) {
+                location='ViewPurchaseOrders.php?init=pending';
+            }
+        });
+    }
+}
+
+function receiveSKU()
+{
+    var dstr = $('#receive-form').serialize();
+    $.ajax({
+        type: 'get',
+        data: dstr,
+        success: function(resp) {
+            $('#item-area').html(resp);
+            if ($('#item-area input').length > 0) {
+                $('#item-area input[type!=hidden]:first').focus();
+                $('#sku-in').val('');
+            } else {
+                $('#sku-in').focus();
+            }
+        }
+    });
+}
+
+function saveReceive()
+{
+    var dstr = $('#item-area :input').serialize();
+    console.log(dstr);
+    $.ajax({
+        type: 'post',
+        data: dstr,
+        success: function (resp) {
+            $('#item-area').html('');
+            $('#sku-in').focus();
+        }
+    });
+}
+

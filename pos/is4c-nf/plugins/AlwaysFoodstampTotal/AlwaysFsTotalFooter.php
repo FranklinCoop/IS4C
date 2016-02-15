@@ -21,41 +21,54 @@
 
 *********************************************************************************/
 
-class AlwaysFsTotalFooter extends FooterBox {
+class AlwaysFsTotalFooter extends FooterBox 
+{
 
-	public $display_css = "font-weight:bold;font-size:150%;";
+    public $display_css = "font-weight:bold;font-size:150%;";
 
-	function header_content(){
-		global $CORE_LOCAL;
-		if ( $CORE_LOCAL->get("ttlflag") == 1 and $CORE_LOCAL->get("End") != 1 ) {
-			$this->header_css_class = 'errorColoredArea';
-			return _("Amount Due");
-		}
-		elseif ($CORE_LOCAL->get("ttlflag") == 1  and $CORE_LOCAL->get("End") == 1 ) {
-			$this->header_css_class = 'coloredArea';
-			return _("Change");
-		}	
-		else {
-			$this->header_css_class = 'totalArea';
-			return _("Total");
-		}
-	}
+    private function isAmountDue()
+    {
+        if (CoreLocal::get("ttlflag") == 1 and CoreLocal::get("End") != 1) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 
-	function display_content(){
-		global $CORE_LOCAL;
-		if ( $CORE_LOCAL->get("ttlflag") == 1 and $CORE_LOCAL->get("End") != 1 ) {
-			$this->display_css_class = 'errorColoredText';
-			return number_format($CORE_LOCAL->get("runningTotal"),2);
-		}
-		elseif ($CORE_LOCAL->get("ttlflag") == 1  and $CORE_LOCAL->get("End") == 1 ) {
-			$this->display_css_class = 'coloredText';
-			return number_format($CORE_LOCAL->get("runningTotal"),2);
-		}	
-		else {
-			$this->display_css_class = 'totalLine';
-			return number_format((double)$CORE_LOCAL->get("runningTotal"),2);
-		}
-	}
+    private function isChange()
+    {
+        if (CoreLocal::get("ttlflag") == 1 and CoreLocal::get("End") == 1) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    function header_content()
+    {
+        if ($this->isAmountDue()) {
+            $this->header_css_class = 'errorColoredArea';
+            return _("Amount Due");
+        } elseif ($thiw->isChange()) {
+            $this->header_css_class = 'coloredArea';
+            return _("Change");
+        } else {
+            $this->header_css_class = 'totalArea';
+            return _("Total");
+        }
+    }
+
+    function display_content()
+    {
+        if ($this->isAmountDue()) {
+            $this->display_css_class = 'errorColoredText';
+            return number_format(CoreLocal::get("runningTotal"),2);
+        } elseif ($thiw->isChange()) {
+            $this->display_css_class = 'coloredText';
+            return number_format(CoreLocal::get("runningTotal"),2);
+        } else {
+            $this->display_css_class = 'totalLine';
+            return number_format((double)CoreLocal::get("runningTotal"),2);
+        }
+    }
 }
 
-?>

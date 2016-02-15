@@ -3,14 +3,14 @@
 
     Copyright 2011 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
-    Fannie is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    Fannie is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -34,9 +34,16 @@
 
 */
 
-include('../config.php');
-include($FANNIE_ROOT.'src/SQLManager.php');
-include($FANNIE_ROOT.'src/cron_msg.php');
+include(dirname(__FILE__) . '/../config.php');
+if (!class_exists('FannieAPI')) {
+    include($FANNIE_ROOT . 'classlib2.0/FannieAPI.php');
+}
+if (!function_exists('cron_msg')) {
+    include($FANNIE_ROOT.'src/cron_msg.php');
+}
+if (!isset($FANNIE_EQUITY_DEPARTMENTS) || empty($FANNIE_EQUITY_DEPARTMENTS)) {
+    return;
+}
 
 set_time_limit(0);
 
@@ -44,20 +51,20 @@ $ret = preg_match_all("/[0-9]+/",$FANNIE_EQUITY_DEPARTMENTS,$depts);
 $depts = array_pop($depts);
 $dlist = "(";
 foreach ($depts as $d){
-	$dlist .= $d.",";	
+    $dlist .= $d.",";   
 }
 $dlist = substr($dlist,0,strlen($dlist)-1).")";
 
 $sql = new SQLManager($FANNIE_SERVER,$FANNIE_SERVER_DBMS,$FANNIE_TRANS_DB,
-		$FANNIE_SERVER_USER,$FANNIE_SERVER_PW);
+        $FANNIE_SERVER_USER,$FANNIE_SERVER_PW);
 
 $query = "INSERT INTO stockpurchases
-	SELECT card_no,
-	CASE WHEN department IN $dlist THEN total ELSE 0 END as stockPayments,
-	tdate,trans_num,department
-	FROM dlog_15 WHERE "
-	.$sql->datediff($sql->now(),'tdate')." = 1
-	AND department IN $dlist";	
+    SELECT card_no,
+    CASE WHEN department IN $dlist THEN total ELSE 0 END as stockPayments,
+    tdate,trans_num,department
+    FROM dlog_15 WHERE "
+    .$sql->datediff($sql->now(),'tdate')." = 1
+    AND department IN $dlist";  
 $sql->query($query);
 
 // rebuild summary table
@@ -67,4 +74,3 @@ $sql->query('INSERT INTO equity_history_sum
         FROM stockpurchases
         GROUP BY card_no');
 
-?>

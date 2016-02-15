@@ -3,7 +3,7 @@
 
     Copyright 2014 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,6 +21,9 @@
 
 *********************************************************************************/
 
+namespace COREPOS\Fannie\API 
+{
+
 /**
   @class FannieReportTool
 
@@ -30,7 +33,7 @@
   in the standard, tabular format can be 
   discovered automatically.
 */
-class FannieReportTool extends FanniePage 
+class FannieReportTool extends \FanniePage 
 {
 
     public $required = True;
@@ -42,12 +45,16 @@ class FannieReportTool extends FanniePage
     Base class for hybrid report/tool pages
     ";
 
+    public $page_set = 'Reports';
+
     /**
       Assign report to a "set" of reports
     */
     public $report_set = '';
 
     public $discoverable = true;
+
+}
 
 }
 

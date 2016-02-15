@@ -3,7 +3,7 @@
 
     Copyright 2013 Whole Foods Co-op
 
-    This file is part of Fannie.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@ class WfcHtStartYearMonthModel extends BasicModel
     'empID' => array('type'=>'INT'),
     'year' => array('type'=>'INT'),
     'month' => array('type'=>'INT'),
-	);
+    );
 
     public function create()
     {
@@ -56,53 +56,5 @@ class WfcHtStartYearMonthModel extends BasicModel
             return false;
         }
     }
-
-    /* START ACCESSOR FUNCTIONS */
-
-    public function empID()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["empID"])) {
-                return $this->instance["empID"];
-            } elseif(isset($this->columns["empID"]["default"])) {
-                return $this->columns["empID"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["empID"] = func_get_arg(0);
-        }
-    }
-
-    public function year()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["year"])) {
-                return $this->instance["year"];
-            } elseif(isset($this->columns["year"]["default"])) {
-                return $this->columns["year"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["year"] = func_get_arg(0);
-        }
-    }
-
-    public function month()
-    {
-        if(func_num_args() == 0) {
-            if(isset($this->instance["month"])) {
-                return $this->instance["month"];
-            } elseif(isset($this->columns["month"]["default"])) {
-                return $this->columns["month"]["default"];
-            } else {
-                return null;
-            }
-        } else {
-            $this->instance["month"] = func_get_arg(0);
-        }
-    }
-    /* END ACCESSOR FUNCTIONS */
 }
 

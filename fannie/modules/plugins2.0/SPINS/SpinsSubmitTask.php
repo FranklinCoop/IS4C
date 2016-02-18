@@ -111,7 +111,12 @@ class SpinsSubmitTask extends FannieTask
                     AND tdate BETWEEN ? AND ?
                   GROUP BY d.upc, p.description";
 
-        $filename = date('mdY', $end) . '.csv';
+        $filenameprefix = '';
+        if (isset($FANNIE_PLUGIN_SETTINGS['SpinsFileNamePrefix'])) {
+            $filenameprefix = $FANNIE_PLUGIN_SETTINGS['SpinsFileNamePrefix'];
+        }
+
+        $filename = $filenameprefix . date('mdY', $end) . '.csv';
         $outfile = sys_get_temp_dir()."/".$filename;
         $fp = fopen($outfile,"w");
 

@@ -37,4 +37,4 @@ composer.lock
 !pos/is4c-nf/scale-drivers/drivers/NewMagellan/.paket/paket.bootstrapper.exe
 README
 pos/is4c-nf/scale-drivers/drivers/NewMagellan/ports.conf
-*.orig
+pos/is4c-nf/log/*.log

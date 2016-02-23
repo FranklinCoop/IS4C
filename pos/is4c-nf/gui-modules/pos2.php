@@ -231,7 +231,6 @@ class pos2 extends BasicCorePage
             $('#reginput').val('');
             clearTimeout(screenLockVar);
             runParser(str,'<?php echo $this->page_url; ?>');
-            enableScreenLock();
             return false;
         }
         function parseWrapper(str){
@@ -243,7 +242,9 @@ class pos2 extends BasicCorePage
             screenLockVar = setTimeout('lockScreen()', <?php printf('%d', CoreLocal::get("timeout")); ?>);
         }
         function lockScreen(){
-            location = '<?php echo $this->page_url; ?>gui-modules/login3.php';
+            //I'm putting this in to the prase chain so that I can change the lock behavior in a plugin.
+            $('#reginput').val('');
+            runParser('LOCK','<?php echo $this->page_url; ?>');
         }
         function receiptFetch(r_type, ref){
             $.ajax({
@@ -299,9 +300,12 @@ class pos2 extends BasicCorePage
             return true;
         }
 		
+
+        //This is to reset the timeout when a key is hit
+        //Without it if the cashier starts typing just as the timer expires the screen will
+        //lock lossing whatever the entered.
 		function keyDown(e) {
 			clearTimeout(screenLockVar);
-			enableScreenLock();
 		}
 
 		$(document).ready(function() {

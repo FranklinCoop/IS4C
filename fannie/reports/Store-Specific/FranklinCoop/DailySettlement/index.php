@@ -20,34 +20,5 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
-
-include('../../../../config.php');
-$header = "Daily Settlement Report";
-$page_title = "Fannie : Daily Settlement";
-include($FANNIE_ROOT.'src/header.html');
-include($FANNIE_ROOT.'src/mysql_connect.php');
-$options = "<option value=-1 selected>All</option>";
-$prep = $dbc->prepare_statement("SELECT superID,super_name FROM superDeptNames 
-		WHERE superID > 0");
-$res = $dbc->exec_statement($prep);
-while($row = $dbc->fetch_row($res))
-	$options .= sprintf("<option value=%d>%s</option>",$row[0],$row[1]);
-?>
-<script src="../../../../src/CalendarControl.js"
-        type="text/javascript"></script>
-
-<form name='addBatch' action = 'DailySettlementReport.php' method='POST'>
-<table><tr><td>Start Date</td><td>End Date</td></tr>
-<tr>
-     <td><input name="startDate" onfocus="this.value='';showCalendarControl(this);" type="text"></td>
-     <td><input name="endDate" onfocus="this.value='';showCalendarControl(this);" type="text"></td>
-</tr><tr>
-     <td><input type =submit name=submit value ="Get Report"></td></tr>
-</table>
-<!-- <a href=DailySettlementReport.php>Per-department sales by hour</a> -->
-
-</body>
-</html>
-<?php
-include($FANNIE_ROOT.'src/footer.html');
+header('Location: FCCSettlementReport.php');
 ?>

@@ -55,7 +55,7 @@ class SpinsSubmitLoopTask extends FannieTask
             $iso_week = 52;
             $year--;
         }
-        $upload = false;
+        $upload = true;
 
         /**
           Handle additional args

@@ -205,7 +205,7 @@ class BaseItemModule extends ItemModule
                 'size' => '',
                 'unitofmeasure' => '',
                 'modified' => '',
-                'ledesc' => '',
+                'ldesc' => '',
                 'manufacturer' => '',
                 'distributor' => '',
                 'default_vendor_id' => 0,
@@ -369,8 +369,11 @@ class BaseItemModule extends ItemModule
 
         $nav_tabs = '<ul id="store-tabs" class="nav nav-tabs small" role="tablist">';
         $ret .= '{{nav_tabs}}<div class="tab-content">';
-        $active_tab = true;
         foreach ($items as $store_id => $rowItem) {
+            $active_tab = false;
+            if (FannieConfig::config('STORE_MODE') !== 'HQ' || $store_id == FannieConfig::config('STORE_ID')) {
+                $active_tab = true;
+            }
             $tabID = 'store-tab-' . $store_id;
             $store_description = 'n/a';
             if (isset($stores[$store_id])) {
@@ -603,7 +606,9 @@ HTML;
             $jsVendorID = $rowItem['default_vendor_id'] > 0 ? $rowItem['default_vendor_id'] : 'no-vendor';
             $ret .= '<select name="subdept[]" id="subdept{{store_id}}" 
                 class="form-control chosen-select syncable-input">';
-            $ret .= isset($subs[$rowItem['department']]) ? $subs[$rowItem['department']] : '<option value="0">None</option>';
+            $ret .= sprintf('<option %s value="0">None</option>',
+                ($rowItem['subdept'] == 0 ? 'selected':''));
+            $ret .= isset($subs[$rowItem['department']]) ? $subs[$rowItem['department']] : '';
             $ret .= '</select>';
             $ret .= '</td>
                 <th class="small text-right">SKU</th>
@@ -703,8 +708,8 @@ HTML;
                 <tr>
                     <th class="small text-right">Case Size</th>
                     <td class="col-sm-1">
-                        <input type="text" name="caseSize" class="form-control input-sm"
-                            id="product-case-size"
+                        <input type="text" name="caseSize" 
+                            class="form-control input-sm product-case-size"
                             value="' . $rowItem['caseSize'] . '" 
                             onchange="$(\'#vunits' . $jsVendorID . '\').val(this.value);" 
                             ' . ($jsVendorID == 'no-vendor' || !$active_tab ? 'disabled' : '') . ' />
@@ -756,7 +761,6 @@ HTML;
             $ret .= '</div>';
 
             $ret = str_replace('{{store_id}}', $store_id, $ret);
-            $active_tab = false;
             if (FannieConfig::config('STORE_MODE') != 'HQ') {
                 break;
             }
@@ -810,24 +814,23 @@ HTML;
                             url: 'modules/BaseItemModule.php',
                             data: 'dept_defaults='+$('#department'+store_id).val(),
                             dataType: 'json',
-                            cache: false,
-                            success: function(data){
-                                if (data.tax)
-                                    $('#tax'+store_id).val(data.tax);
-                                if (data.fs)
-                                    $('#FS'+store_id).prop('checked',true);
-                                else{
-                                    $('#FS'+store_id).prop('checked', false);
-                                }
-                                if (data.nodisc && !data.line) {
-                                    $('#discount-select'+store_id).val(0);
-                                } else if (!data.nodisc && data.line) {
-                                    $('#discount-select'+store_id).val(1);
-                                } else if (!data.nodisc && !data.line) {
-                                    $('#discount-select'+store_id).val(2);
-                                } else {
-                                    $('#discount-select'+store_id).val(3);
-                                }
+                            cache: false
+                        }).done(function(data){
+                            if (data.tax)
+                                $('#tax'+store_id).val(data.tax);
+                            if (data.fs)
+                                $('#FS'+store_id).prop('checked',true);
+                            else{
+                                $('#FS'+store_id).prop('checked', false);
+                            }
+                            if (data.nodisc && !data.line) {
+                                $('#discount-select'+store_id).val(0);
+                            } else if (!data.nodisc && data.line) {
+                                $('#discount-select'+store_id).val(1);
+                            } else if (!data.nodisc && !data.line) {
+                                $('#discount-select'+store_id).val(2);
+                            } else {
+                                $('#discount-select'+store_id).val(3);
                             }
                         });
                     }
@@ -840,16 +843,15 @@ HTML;
                 url: '<?php echo $FANNIE_URL; ?>item/modules/BaseItemModule.php',
                 data: 'vendorChanged='+newVal,
                 dataType: 'json',
-                cache: false,
-                success: function(resp) {
-                    if (!resp.error) {
-                        $('#local-origin-id').val(resp.localID);
-                        $('.product-case-size').prop('disabled', false);
-                        $('#product-sku-field').prop('disabled', false);
-                    } else {
-                        $('.product-case-size').prop('disabled', true);
-                        $('#product-sku-field').prop('disabled', true);
-                    }
+                cache: false
+            }).done(function(resp) {
+                if (!resp.error) {
+                    $('#local-origin-id').val(resp.localID);
+                    $('.tab-pane.active .product-case-size').prop('disabled', false);
+                    $('#product-sku-field').prop('disabled', false);
+                } else {
+                    $('.tab-pane.active .product-case-size').prop('disabled', true);
+                    $('#product-sku-field').prop('disabled', true);
                 }
             });
         }
@@ -892,29 +894,27 @@ HTML;
                 $.ajax({
                     url: '<?php echo $FANNIE_URL; ?>item/modules/BaseItemModule.php',
                     data: data,
-                    dataType: 'json',
-                    error: function() {
-                        $('#newVendorAlert').html('Communication error');
-                    },
-                    success: function(resp){
-                        if (resp.vendorID) {
-                            v_dialog.dialog("close");
-                            $('.vendor_field').each(function(){
-                                var v_field = $(this);
-                                if (v_field.hasClass('chosen-select')) {
-                                    var newopt = $('<option/>').attr('id', resp.vendorID).html(resp.vendorName);
-                                    v_field.append(newopt);
-                                }
-                                v_field.val(resp.vendorName);
-                                if (v_field.hasClass('chosen-select')) {
-                                    v_field.trigger('chosen:updated');
-                                }
-                            });
-                        } else if (resp.error) {
-                            $('#newVendorAlert').html(resp.error);
-                        } else {
-                            $('#newVendorAlert').html('Invalid response');
-                        }
+                    dataType: 'json'
+                }).fail(function() {
+                    $('#newVendorAlert').html('Communication error');
+                }).done(function(resp){
+                    if (resp.vendorID) {
+                        v_dialog.dialog("close");
+                        $('.vendor_field').each(function(){
+                            var v_field = $(this);
+                            if (v_field.hasClass('chosen-select')) {
+                                var newopt = $('<option/>').attr('id', resp.vendorID).html(resp.vendorName);
+                                v_field.append(newopt);
+                            }
+                            v_field.val(resp.vendorName);
+                            if (v_field.hasClass('chosen-select')) {
+                                v_field.trigger('chosen:updated');
+                            }
+                        });
+                    } else if (resp.error) {
+                        $('#newVendorAlert').html(resp.error);
+                    } else {
+                        $('#newVendorAlert').html('Invalid response');
                     }
                 });
             }
@@ -1120,11 +1120,11 @@ HTML;
             }
             $desc = $this->formNoEx('descript', array());
             if (isset($desc[$i])) {
-                $model->description(str_replace("'", '', $desc[$i]));
+                $model->description($desc[$i]);
             }
             $brand = $this->formNoEx('manufacturer', array());
             if (isset($brand[$i])) {
-                $model->brand(str_replace("'", '', $brand[$i]));
+                $model->brand($brand[$i]);
             }
             $model->pricemethod(0);
             $model->groupprice(0.00);

@@ -35,7 +35,7 @@ static public function get()
     $shiftCutoff = date('Y-m-d 00:00:00');
     $excl = " AND emp_no <> 9999 ";
 
-    $DESIRED_TENDERS = CoreLocal::get("TRDesiredTenders");
+    $DESIRED_TENDERS = is_array(CoreLocal::get("TRDesiredTenders")) ? CoreLocal::get('TRDesiredTenders') : array();
 
     $db_a = Database::mDataConnect();
 
@@ -88,8 +88,8 @@ static public function get()
     $receipt .= "\n\n";
 
     foreach(array_keys($DESIRED_TENDERS) as $tender_code){ 
-        $query = "select tdate from TenderTapeGeneric where emp_no=".CoreLocal::get("CashierNo").
-            " and tender_code = '".$tender_code."' order by tdate";
+        $query = "select datetime from dtransactions where emp_no=".CoreLocal::get("CashierNo").
+            " and tender_code = '".$tender_code."' AND trans_status NOT IN ('X', 'Z') order by tdate";
         $result = $db_a->query($query);
         $num_rows = $db_a->num_rows($result);
         if ($num_rows <= 0) continue;
@@ -106,9 +106,19 @@ static public function get()
         $receipt .= $ref;
         if ($itemize == 1) $receipt .=    ReceiptLib::centerString("------------------------------------------------------");
 
-        $query = "select tdate,register_no,trans_no,tender_code,tender
-                   from TenderTapeGeneric where register_no=".CoreLocal::get("laneno").
-            " and tender_code = '".$tender_code."' order by tdate";
+        $query = "SELECT datetime AS tdate,
+                    register_no,
+                    trans_no,
+                    CASE
+                        WHEN trans_subtype='CA' AND total >= 0 THEN total
+                        WHEN trans_subtype='CA' AND total < 0 THEN 0
+                        ELSE -1*total
+                    END AS tender
+                  FROM dtransactions 
+                  WHERE emp_no=".CoreLocal::get("CashierNo")."
+                    AND tender_code = '".$tender_code."' 
+                    AND trans_status NOT IN ('X','Z')
+                  ORDER BY datetime";
         $result = $db_a->query($query);
         $num_rows = $db_a->num_rows($result);
         
@@ -157,7 +167,7 @@ function trTotal($k, $label,$i=False)
     }
 
     if (is_array($k)) $k = "'" . implode("','", $k) . "'";
-    elseif (!is_numeric($k)) { 
+    if (!is_numeric($k)) { 
         if ($k[0] == '#') {
             $k = substr($k,1);
             $q = 'card_no';

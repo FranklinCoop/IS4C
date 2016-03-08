@@ -35,6 +35,8 @@ fannie/INSTALL
 vendor
 composer.lock
 !pos/is4c-nf/scale-drivers/drivers/NewMagellan/.paket/paket.bootstrapper.exe
+TestPage
+saveTestInfo.php
 README
 pos/is4c-nf/scale-drivers/drivers/NewMagellan/ports.conf
 pos/is4c-nf/log/*.log

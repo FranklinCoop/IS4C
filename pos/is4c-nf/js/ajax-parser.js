@@ -7,10 +7,8 @@ function runParser(input_str,rel_prefix){
 		type: 'GET',
 		data: "input="+input_str,
 		dataType: "json",
-		cache: false,
-		error: parserError,
-		success: parserHandler
-	});
+		cache: false
+	}).done(parserHandler).fail(parserError);
 }
 
 function parserError()
@@ -53,27 +51,22 @@ function parserHandler(data)
 
 	if (data.receipt){
 		$.ajax({
-			url: CORE_JS_PREFIX+'ajax-callbacks/ajax-end.php',
+			url: CORE_JS_PREFIX+'ajax-callbacks/AjaxEnd.php',
 			type: 'GET',
 			data: 'receiptType='+data.receipt+'&ref='+data.trans_num,
 			dataType: 'json',
-			cache: false,
-            error: function() {
+			cache: false
+		}).done(function(data) {
+            if (data.error) {
                 var icon = $('#receipticon').attr('src');
                 var newicon = icon.replace(/(.*graphics)\/.*/, "$1/deadreceipt.gif");
                 $('#receipticon').attr('src', newicon);
-            },
-			success: function(data){
-				if (data.sync){
-					ajaxTransactionSync(CORE_JS_PREFIX);
-				}
-                if (data.error) {
-                    var icon = $('#receipticon').attr('src');
-                    var newicon = icon.replace(/(.*graphics)\/.*/, "$1/deadreceipt.gif");
-                    $('#receipticon').attr('src', newicon);
-                }
-			}
-		});
+            }
+        }).fail(function() {
+            var icon = $('#receipticon').attr('src');
+            var newicon = icon.replace(/(.*graphics)\/.*/, "$1/deadreceipt.gif");
+            $('#receipticon').attr('src', newicon);
+        });
 	}
 
 	if (data.retry){
@@ -81,11 +74,3 @@ function parserHandler(data)
 	}
 }
 
-function ajaxTransactionSync(rel_prefix){
-	$.ajax({
-		url: rel_prefix+'ajax-callbacks/ajax-transaction-sync.php',
-		type: 'GET',
-		cache: false,
-	});
-
-}

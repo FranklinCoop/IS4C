@@ -1160,17 +1160,12 @@ class InstallUtilities extends LibraryClass
         '\\COREPOS\\pos\\lib\\models\\trans\\SuspendedModel',
         '\\COREPOS\\pos\\lib\\models\\trans\\TaxRatesModel',
         '\\COREPOS\\pos\\lib\\models\\trans\\CouponAppliedModel',
-        '\\COREPOS\\pos\\lib\\models\\trans\\EfsnetRequestModel',
-        '\\COREPOS\\pos\\lib\\models\\trans\\EfsnetRequestModModel',
-        '\\COREPOS\\pos\\lib\\models\\trans\\EfsnetResponseModel',
-        '\\COREPOS\\pos\\lib\\models\\trans\\EfsnetTokensModel',
         '\\COREPOS\\pos\\lib\\models\\trans\\PaycardTransactionsModel',
         '\\COREPOS\\pos\\lib\\models\\trans\\CapturedSignatureModel',
         '\\COREPOS\\pos\\lib\\models\\trans\\EmvReceiptModel',
         // placeholder,
         '__LTT__',
         // Views
-        '\\COREPOS\\pos\\lib\\models\\trans\\CcReceiptViewModel',
         '\\COREPOS\\pos\\lib\\models\\trans\\MemDiscountAddModel',
         '\\COREPOS\\pos\\lib\\models\\trans\\MemDiscountRemoveModel',
         '\\COREPOS\\pos\\lib\\models\\trans\\StaffDiscountAddModel',
@@ -1398,14 +1393,8 @@ class InstallUtilities extends LibraryClass
         $models = array(
             '\COREPOS\pos\lib\models\trans\DTransactionsModel',
             '\COREPOS\pos\lib\models\trans\SuspendedModel',
-            '\COREPOS\pos\lib\models\trans\EfsnetRequestModel',
-            '\COREPOS\pos\lib\models\trans\EfsnetRequestModModel',
-            '\COREPOS\pos\lib\models\trans\EfsnetResponseModel',
-            '\COREPOS\pos\lib\models\trans\EfsnetTokensModel',
             '\COREPOS\pos\lib\models\trans\PaycardTransactionsModel',
             '\COREPOS\pos\lib\models\trans\CapturedSignatureModel',
-            // Views
-            '\COREPOS\pos\lib\models\trans\CcReceiptViewModel',
         );
         foreach ($models as $class) {
             $obj = new $class($db);
@@ -1413,7 +1402,7 @@ class InstallUtilities extends LibraryClass
         }
 
         $errors = self::createDlog($db, $name, $errors);
-        $errors = self::createTTG($db, $name, $errors);
+        //$errors = self::createTTG($db, $name, $errors);
 
         return $errors;
     }
@@ -1466,6 +1455,7 @@ class InstallUtilities extends LibraryClass
         return $errors;
     }
 
+    /**
     private static function createTTG($db, $name, $errors)
     {
         $ttG = "
@@ -1493,5 +1483,6 @@ class InstallUtilities extends LibraryClass
 
         return $errors;
     }
+    */
 }
 

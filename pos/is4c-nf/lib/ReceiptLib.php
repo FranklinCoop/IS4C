@@ -748,6 +748,7 @@ static public function receiptFromBuilders($reprint=False,$trans_num='')
         $class_name = $record['tag'].'ReceiptFormat';
         if (!class_exists($class_name)) continue;
         $obj = new $class_name();
+        $obj->setPrintHandler(self::$PRINT_OBJ);
 
         $line = $obj->format($record);
 
@@ -998,21 +999,15 @@ static private function getTypeMap()
     return $type_map;
 }
 
-static private function memberFooter($receipt)
+static private function memberFooter($receipt, $ref)
 {
-    $thanks = _('thank you');
-    if (trim(CoreLocal::get("memberID")) != CoreLocal::get("defaultNonMem")) {
-        $thanks .= _(' - owner ') . trim(CoreLocal::get('memberID'));
+    $mod = CoreLocal::get('ReceiptThankYou');
+    if ($mod === '' || !class_exists($mod)) {
+        $mod = 'DefaultReceiptThanks';
     }
-    if (CoreLocal::get("newReceipt")>=1){
-        $receipt['any'] .= self::$PRINT_OBJ->TextStyle(True,False,True);
-        $receipt['any'] .= self::$PRINT_OBJ->centerString($thanks, true);
-        $receipt['any'] .= self::$PRINT_OBJ->TextStyle(True);
-        $receipt['any'] .= "\n\n";
-    } else {
-        $receipt['any'] .= self::$PRINT_OBJ->centerString($thanks);
-        $receipt['any'] .= "\n";
-    }
+    $obj = new $mod();
+    $obj->setPrintHandler(self::$PRINT_OBJ);
+    $receipt['any'] .= $obj->message($ref);
 
     return $receipt;
 }
@@ -1048,6 +1043,7 @@ static private function messageModFooters($receipt, $where, $ref, $reprint)
     foreach(self::messageMods() as $class){
         if (!class_exists($class)) continue;
         $obj = new $class();
+        $obj->setPrintHandler(self::$PRINT_OBJ);
         $modQ .= $obj->select_condition().' AS '.$dbc->identifierEscape($class).',';
         $select_mods[$class] = $obj;
     }
@@ -1146,6 +1142,7 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
                 $savingsMode = 'DefaultReceiptSavings';
             }
             $savings = new $savingsMode();
+            $savings->setPrintHandler(self::$PRINT_OBJ);
             $receipt['any'] .= $savings->savingsMessage($ref);
 
             /**
@@ -1159,7 +1156,7 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
             }
             $receipt['any'] .= "\n";
     
-            $receipt = self::memberFooter($receipt);
+            $receipt = self::memberFooter($receipt, $ref);
             $receipt = self::receiptFooters($receipt, $ref);
             $receipt = self::messageModFooters($receipt, $where, $ref, $reprint);
 
@@ -1304,6 +1301,7 @@ static public function memReceiptMessages($card_no)
         $class_name = $row['modifier_module'];
         if (!empty($class_name) && class_exists($class_name)) {
             $obj = new $class_name();
+            $obj->setPrintHandler(self::$PRINT_OBJ);
             $msg_text = $obj->message($row['msg_text']);
             if (is_array($msg_text)) {
                 if (isset($msg_text['any'])) {

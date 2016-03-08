@@ -293,6 +293,9 @@ class FannieAPI
             case '\COREPOS\Fannie\API\item\FannieSignage':
                 $directories[] = dirname(__FILE__) . '/item/signage/';
                 break;
+            case '\COREPOS\Fannie\API\monitor\Monitor':
+                $directories[] = dirname(__FILE__) . '/monitor/';
+                break;
             case 'FanniePage':
                 $directories[] = dirname(__FILE__).'/../admin/';
                 $directories[] = dirname(__FILE__).'/../batches/';
@@ -422,15 +425,8 @@ class FannieAPI
 }
 
 FannieAPI::init();
-if (function_exists('spl_autoload_register')) {
-    spl_autoload_register(array('FannieAPI','loadClass'), true, true);
-    if (file_exists(dirname(__FILE__) . '/../../vendor/autoload.php')) {
-        include_once(dirname(__FILE__) . '/../../vendor/autoload.php');
-    }
-} else {
-    function __autoload($name)
-    {
-        FannieAPI::loadClass($name);
-    }
+spl_autoload_register(array('FannieAPI','loadClass'), true, true);
+if (file_exists(dirname(__FILE__) . '/../../vendor/autoload.php')) {
+    include_once(dirname(__FILE__) . '/../../vendor/autoload.php');
 }
 

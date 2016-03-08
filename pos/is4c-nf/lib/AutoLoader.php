@@ -144,6 +144,7 @@ class AutoLoader extends LibraryClass
         'DefaultReceiptSort'        => '/ReceiptBuilding/ReceiptSort',
         'DefaultReceiptTag'         => '/ReceiptBuilding/ReceiptTag',
         'DefaultReceiptSavings'     => '/ReceiptBuilding/ReceiptSavings',
+        'DefaultReceiptThanks'      => '/ReceiptBuilding/ThankYou',
         'ReceiptMessage'            => '/ReceiptBuilding/Messages',
         'CustomerReceiptMessage'    => '/ReceiptBuilding/custMessages',
         'VariableWeightReWrite'     => '/Scanning/VariableWeightReWrites',
@@ -307,15 +308,7 @@ class AutoLoader extends LibraryClass
     }
 }
 
-if (function_exists('spl_autoload_register')){
-    spl_autoload_register(array('AutoLoader','loadClass'), true, true);
-}
-else {
-    function __autoload($name){
-        AutoLoader::loadClass($name);
-    }
-}
-
+spl_autoload_register(array('AutoLoader','loadClass'), true, true);
 // add composer classes if present
 if (file_exists(dirname(__FILE__) . '/../../../vendor/autoload.php')) {
     include_once(dirname(__FILE__) . '/../../../vendor/autoload.php');

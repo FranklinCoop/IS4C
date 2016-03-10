@@ -106,21 +106,6 @@ class pos2 extends BasicCorePage
         <?php
     }
 
-        //This is to reset the timeout when a key is hit
-        //Without it if the cashier starts typing just as the timer expires the screen will
-        //lock lossing whatever the entered.
-		function keyDown(e) {
-			clearTimeout(screenLockVar);
-		}
-
-		$(document).ready(function() {
-			$(document).keydown(keyDown);
-		});
-		
-		</script>
-		<?php
-	}
-
     function body_content()
     {
         $lines = DisplayLib::screenLines();

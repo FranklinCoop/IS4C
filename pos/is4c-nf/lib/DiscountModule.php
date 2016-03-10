@@ -1,30 +1,22 @@
 <?php
 /*******************************************************************************
-
     Copyright 2013 Whole Foods Co-op
-
     This file is part of IT CORE.
-
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
-
     IT CORE is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
-
     You should have received a copy of the GNU General Public License
     in the file license.txt along with IT CORE; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
 *********************************************************************************/
-
 /**
   @class DiscountModule
   Calculate a per-transaction discount
-
   This module is called in Database::getsubtotals()
   and the value it calculates will be stored in
   session as 'transDiscount'. The default version
@@ -35,7 +27,6 @@ class DiscountModule
 {
     protected $my_discount = 0;
     public $name = 'custdata';
-
     /**
       Add or update a discount module in the
       current transaction. Automatically 
@@ -50,7 +41,6 @@ class DiscountModule
         if (!is_array($current_discounts)) {
             $current_discounts = array();
         }
-
         /**
           Examine current discounts to see if this
           one has already applied
@@ -63,7 +53,6 @@ class DiscountModule
                 break;
             }
         }
-
         if ($changed) {
             /**
               Add object to the list of active discounts
@@ -81,7 +70,6 @@ class DiscountModule
                     $new_effective_discount += $obj->percentage();
                 }
             }
-
             /**
               When discount changes:
               1. Update the session value
@@ -96,13 +84,11 @@ class DiscountModule
                     PrehLib::ttl();
                 }
             }
-
             // serialize/unserialize before saving to avoid
             // auto-session errors w/ undefined classes
             CoreLocal::set('CurrentDiscounts', serialize($current_discounts));
         }
     }
-
     /**
       Reset all discounts
     */
@@ -110,7 +96,6 @@ class DiscountModule
     {
         CoreLocal::set('CurrentDiscounts', serialize(array()));
     }
-
     /**
       Add a log record w/ upc DISCLINEITEM for
       * Each discount in stacking mode
@@ -150,13 +135,25 @@ class DiscountModule
             }
         }
     }
-
     public function __construct($percent, $name='custdata')
     {
         $this->my_discount = $percent;
         $this->name = $name;
     }
-
+    /**
+      Calculate the discount based on current
+      transaction state
+      @return double discount amount
+      Note return value should be positive unless
+      you're doing something odd
+    */
+    public function calculate($discountable_total=0)
+    {
+        if ($discountable_total == 0) {
+            $discountable_total = CoreLocal::get('discountableTotal');
+        }
+        return MiscLib::truncate2(($this->my_discount/100.00) * $discountable_total);
+    }
     /**
       Decide what percent discount to apply to this
       transaction.
@@ -167,4 +164,3 @@ class DiscountModule
         return $this->my_discount;
     }
 }
-

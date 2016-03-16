@@ -50,10 +50,19 @@ class SyncKioskTask extends FannieTask
 		$syncAgent->syncKiosk();
     }
 	
-    public function cronMsg($str)
+    public function cronMsg($str, $severity=6)
     {
         $info = new ReflectionClass($this);
-        return date('r').': '.$info->getName().': '.$str."\n";
+        $msg = date('r').': '.$info->getName().': '.$str."\n";
+
+        $this->logger->log($severity, $info->getName() . ': ' . $str); 
+
+        // raise message into stderr
+        if ($severity <= $this->error_threshold) {
+            file_put_contents('php://stderr', $msg, FILE_APPEND);
+        }
+
+        return '';
     }
 }
 

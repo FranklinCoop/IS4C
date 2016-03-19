@@ -30,10 +30,9 @@ class PaidOutDept extends SpecialDept
         if (CoreLocal::get('msgrepeat') == 0) { // invert has not happened yet
             CoreLocal::set('strEntered', (100*$amount * -1).'DP'.$deptID);
             CoreLocal::set('msgrepeat', 1);
-           // $json['main_frame'] = MiscLib::base_url().'gui-modules/boxMsg2.php?autoconfirm=1';
+            //$json['main_frame'] = MiscLib::base_url().'gui-modules/boxMsg2.php?autoconfirm=1';
             $json['main_frame'] = MiscLib::base_url().'gui-modules/PaidOutComment.php';
-            CoreLocal::set("refundComment",CoreLocal::get("strEntered"));
-        }
+        } 
 
         //if (CoreLocal::get("refundComment") == ""){
             

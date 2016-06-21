@@ -40,26 +40,15 @@ class HarvestNewTenderReport extends TenderReport
  */
 static public function get()
 {
-    $DESIRED_TENDERS = CoreLocal::get("TRDesiredTenders");
+    $DESIRED_TENDERS = is_array(CoreLocal::get("TRDesiredTenders")) ? CoreLocal::get('TRDesiredTenders') : array();
 
-    // $DESIRED_TENDERS = array(
-    //              "CK"=>"CHECK TENDERS",
-    //              "GD"=>"GIFT CARD TENDERS",
-    //              "TC"=>"GIFT CERT TENDERS",
-    //              "MI"=>"STORE CHARGE TENDERS",
-    //              "EF"=>"EBT CARD TENDERS",
-    //              "CP"=>"COUPONS TENDERED",
-    //              "IC"=>"INSTORE COUPONS TENDERED",
-    //              "AR"=>"AR PAYMENTS",
-    //              "EQ"=>"EQUITY SALES"
-    //          );
-    $DESIRED_TENDERS += array(
+    $DESIRED_TENDERS = array_merge($DESIRED_TENDERS, array(
         "CP"=>"COUPONS TENDERED", 
         "FS"=>"EBT CARD TENDERS", 
         "CK"=>"CHECK TENDERS", 
         "AR"=>"ACCOUNTANT ONLY", 
         "EQ"=>"EQUITY"
-    );
+    ));
 
     $db_a = Database::mDataConnect();
 

@@ -139,6 +139,7 @@ class BasicModel
     public function setConnection($c)
     {
         $this->connection = $c;
+        $this->record_changed = true;
     }
 
     /** check for potential changes **/
@@ -203,6 +204,9 @@ class BasicModel
         if (!isset($this->columns[$name])) {
             foreach ($this->columns as $col => $info) {
                 if (isset($info['replaces']) && $info['replaces'] == $name) {
+                    $name = $col;
+                    break;
+                } elseif (strtolower($col) == strtolower($name)) {
                     $name = $col;
                     break;
                 }
@@ -390,6 +394,11 @@ class BasicModel
         } else {
             return false;
         }
+    }
+
+    private function isIncrement($col)
+    {
+        return (isset($col['increment']) && $col['increment']);
     }
 
     protected function hasIncrement()
@@ -1021,6 +1030,7 @@ class BasicModel
         return $recase_columns;
     }
 
+
     private function normalizeColumnAttributes($db_name, $mode=BasicModel::NORMALIZE_MODE_CHECK)
     {
         $current = $this->connection->detailedDefinition($this->name);
@@ -1035,17 +1045,17 @@ class BasicModel
                             ($mode==BasicModel::NORMALIZE_MODE_CHECK)?"Need to change":"Changing", 
                             $col_name, $current[$col_name]['type'], $type);
                     $rebuild = true;
-                } else if (isset($this->columns[$col_name]['default']) && trim($this->columns[$col_name]['default'],"'") != $current[$col_name]['default']) {
+                } elseif (!$this->isIncrement($this->columns[$col_name]) && isset($this->columns[$col_name]['default']) && trim($this->columns[$col_name]['default'],"'") != $current[$col_name]['default']) {
                     printf("%s column %s default value from %s to %s\n", 
                             ($mode==BasicModel::NORMALIZE_MODE_CHECK)?"Need to change":"Changing", 
                             $col_name, $current[$col_name]['default'], $this->columns[$col_name]['default']);
                     $rebuild = true;
-                } else if (isset($this->columns[$col_name]['increment']) && $this->columns[$col_name]['increment'] && $current[$col_name]['increment'] === false) {
+                } elseif ($this->isIncrement($this->columns[$col_name]) && $current[$col_name]['increment'] === false) {
                     printf("%s for column %s\n", 
                             ($mode==BasicModel::NORMALIZE_MODE_CHECK)?"Need to set increment":"Setting increment", 
                             $col_name);
                     $rebuild = true;
-                } else if (isset($this->columns[$col_name]['primary_key']) && $this->columns[$col_name]['primary_key'] && $current[$col_name]['primary_key'] === false) {
+                } elseif ($this->isPrimaryKey($this->columns[$col_name]) && $current[$col_name]['primary_key'] === false) {
                     $redo_pk = true;
                 }
                 if ($rebuild) {
@@ -1120,13 +1130,16 @@ class BasicModel
         }
         $sql .= ' ADD PRIMARY KEY(';
         foreach ($this->columns as $col_name => $info) {
-            if ($this->isPrimaryKey($col_name)) {
+            if ($this->isPrimaryKey($this->columns[$col_name])) {
                 $sql .= $this->connection->identifierEscape($col_name) . ',';
             }
         }
         $sql = substr($sql, 0, strlen($sql)-1);
         $sql .= ')';
         echo "\tSQL Details: $sql\n";
+        if ($mode == BasicModel::NORMALIZE_MODE_APPLY) {
+            $newPK = $this->connection->query($sql);
+        }
 
         return 'PRIMARY KEY';
     }
@@ -1202,21 +1215,26 @@ class $name extends " . $this->new_model_namespace . ($as_view ? 'ViewModel' : '
       @param $selected [PK value] marks one of the tags
         as selected.
     */
-    public function toOptions($selected=0)
+    public function toOptions($selected=0, $id_as_label=false)
     {
         if (count($this->unique) != 1) {
             return '';
         }
         $id_col = $this->unique[0];
-        $label_cols = array_keys($this->columns);
-        foreach ($label_cols as $col) {
-            if ($col != $id_col) {
-                $label_col = $col;
-                break;
+        if ($id_as_label) {
+            $label_col = $id_col;
+        } else {
+            // use first non-ID column for the label
+            $label_col = array_keys($this->columns);
+            foreach ($label_col as $col) {
+                if ($col != $id_col) {
+                    $label_col = $col;
+                    break;
+                }
             }
         }
         $ret = array_reduce($this->find($label_col), 
-            function ($ret, $obj) use ($selected) {
+            function ($ret, $obj) use ($selected, $id_col, $label_col) {
                 return $ret . sprintf('<option %s value="%d">%s</option>',
                         $selected == $obj->$id_col() ? 'selected' : '',
                         $obj->$id_col(),

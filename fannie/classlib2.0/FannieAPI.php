@@ -260,7 +260,7 @@ class FannieAPI
         [optional, default false]
       @return [array] of [string] class names
     */
-    static public function listModules($base_class, $include_base=false)
+    static public function listModules($base_class, $include_base=false, $debug=false)
     {
         $directories = array();
         $directories[] = dirname(__FILE__).'/../modules/plugins2.0/';
@@ -292,6 +292,9 @@ class FannieAPI
                 break;
             case '\COREPOS\Fannie\API\item\FannieSignage':
                 $directories[] = dirname(__FILE__) . '/item/signage/';
+                break;
+            case '\COREPOS\Fannie\API\monitor\Monitor':
+                $directories[] = dirname(__FILE__) . '/monitor/';
                 break;
             case 'FanniePage':
                 $directories[] = dirname(__FILE__).'/../admin/';
@@ -333,10 +336,11 @@ class FannieAPI
             array()
         );
 
-        $ret = array();
-        if (count($files) > 1607) {
-            var_dump($files);
+        if ($debug) {
+            return $files;
         }
+
+        $ret = array();
         foreach($files as $file) {
             $class = substr(basename($file),0,strlen(basename($file))-4);
             // matched base class
@@ -422,15 +426,8 @@ class FannieAPI
 }
 
 FannieAPI::init();
-if (function_exists('spl_autoload_register')) {
-    spl_autoload_register(array('FannieAPI','loadClass'), true, true);
-    if (file_exists(dirname(__FILE__) . '/../../vendor/autoload.php')) {
-        include_once(dirname(__FILE__) . '/../../vendor/autoload.php');
-    }
-} else {
-    function __autoload($name)
-    {
-        FannieAPI::loadClass($name);
-    }
+spl_autoload_register(array('FannieAPI','loadClass'), true, true);
+if (file_exists(dirname(__FILE__) . '/../../vendor/autoload.php')) {
+    include_once(dirname(__FILE__) . '/../../vendor/autoload.php');
 }
 

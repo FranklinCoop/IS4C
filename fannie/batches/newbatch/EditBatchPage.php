@@ -28,7 +28,6 @@ if (!class_exists('FannieAPI')) {
 if (!function_exists('checkLogin')) {
     include_once($FANNIE_ROOT . 'auth/login.php');
 }
-if (!function_exists("updateProductAllLanes")) include($FANNIE_ROOT.'item/laneUpdates.php');
 
 class EditBatchPage extends FannieRESTfulPage 
 {
@@ -36,6 +35,7 @@ class EditBatchPage extends FannieRESTfulPage
     protected $auth_classes = array('batches','batches_audited');
     protected $title = 'Sales Batches Tool';
     protected $header = 'Sales Batches Tool';
+    protected $enable_linea = true;
 
     public $description = '[Sales Batches] is the primary tool for creating, editing, and managing 
     sale and price change batches.';
@@ -167,7 +167,7 @@ class EditBatchPage extends FannieRESTfulPage
         }
 
         $overlap = $this->checkOverlap($id, $upc);
-        if ($overlap !== false) {
+        if ($this->config->get('STORE_MODE') != 'HQ' && $overlap !== false) {
             $error = 'Item already in concurrent batch: '
                 . '<a style="color:blue;" href="EditBatchPage.php?id=' . $overlap['batchID'] . '">'
                 . $overlap['batchName'] . '</a> ('
@@ -493,7 +493,7 @@ class EditBatchPage extends FannieRESTfulPage
                 $json['msg'] = 'Error taking item ' . $upc . ' off sale';
             }
             
-            updateProductAllLanes($upc);
+            COREPOS\Fannie\API\data\ItemSync::sync($upc);
         } else {
             $likecode = substr($upc,2);
             if ($this->unsaleLikeCode($likecode) === false) {
@@ -851,16 +851,18 @@ class EditBatchPage extends FannieRESTfulPage
             . date('Y-m-d', strtotime($model->endDate())) . '<br />';
         if ($this->config->get('STORE_MODE') === 'HQ') {
             $stores = new StoresModel($dbc);
+            $stores->hasOwnItems(1);
             $mapP = $dbc->prepare('SELECT storeID FROM StoreBatchMap WHERE storeID=? AND batchID=?');
             foreach ($stores->find('storeID') as $s) {
                 $mapR = $dbc->execute($mapP, array($s->storeID(), $id));
                 $checked = ($mapR && $dbc->numRows($mapR)) ? 'checked' : '';
+                $disabled = $typeModel->allowSingleStore() ? '' : 'disabled';
                 $ret .= sprintf('<label>
-                    <input type="checkbox" onchange="batchEdit.toggleStore(%d, %d);" %s />
+                    <input type="checkbox" onchange="batchEdit.toggleStore(%d, %d);" %s %s />
                     %s
                     </label> | ',
                     $s->storeID(), $id,
-                    $checked, $s->description());
+                    $disabled, $checked, $s->description());
             }
             $ret .= '<br />';
         }
@@ -1271,8 +1273,21 @@ class EditBatchPage extends FannieRESTfulPage
     
         $ret .= "<input type=hidden id=buttonimgpath value=\"{$FANNIE_URL}src/img/buttons/\" />";
         $this->add_onload_command('$(\'#addItemUPC\').focus()');
+        $this->addOnloadCommand("enableLinea('#addItemUPC');\n");
+
+        if ($this->enable_linea) {
+            echo '<script type="text/javascript">';
+            echo $this->lineaJS();
+            echo '</script>';
+        }
 
         return $ret;
+    }
+
+    public function postFlight()
+    {
+        // intentionally blank so Linea device javascript
+        // isn't appended to AJAX responses
     }
 
     public function helpContent()

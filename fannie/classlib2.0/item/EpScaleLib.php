@@ -42,6 +42,10 @@ class EpScaleLib
         $scale_fields .= 'DNO' . $scale_model->epDeptNo() . chr(253);
         $scale_fields .= 'SAD' . $scale_model->epScaleAddress() . chr(253);
 
+        if (isset($item_info['Label'])) {
+            $item_info['Label'] = ServiceScaleLib::labelTranslate($item_info['Label'], $scale_model->scaleType());
+        }
+
         if ($item_info['RecordType'] == 'WriteOneItem') {
             return self::getAddItemLine($item_info) . $scale_fields;
         } else {
@@ -82,7 +86,7 @@ class EpScaleLib
         $line .= 'PNO' . $item_info['PLU'] . chr(253);
         $line .= 'UPC' . '002' . str_pad($item_info['PLU'],4,'0',STR_PAD_LEFT) . '000000' . chr(253);
         $desc = (isset($item_info['Description'])) ? $item_info['Description'] : '';
-        $line .= self::wrapDescription($desc, 22);
+        $line .= self::wrapDescription($desc, 26);
         $line .= 'DS1' . '0' . chr(253);
         if (!strstr($line, 'DN2')) {
             $line .= 'DN2' . chr(253);
@@ -148,6 +152,7 @@ class EpScaleLib
                     case 'PLU':
                         $line .= 'PNO' . $item_info[$key] . chr(253);
                         $line .= 'UPC' . '002' . str_pad($item_info[$key],4,'0',STR_PAD_LEFT) . '000000' . chr(253);
+                        $line .= 'INO' . $item_info[$key] . chr(253);
                         break;
                     case 'Description':
                         if (strstr($item_info[$key], "\n")) {
@@ -155,7 +160,7 @@ class EpScaleLib
                             $line .= 'DN1' . $line1 . chr(253);
                             $line .= 'DN2' . $line2 . chr(253);
                         } elseif (strlen($item_info[$key]) > 22) {
-                            $line .= self::wrapDescription($item_info[$key], 22);
+                            $line .= self::wrapDescription($item_info[$key], 26);
                         } else {
                             $line .= 'DN1' . $item_info[$key] . chr(253);
                         }
@@ -164,7 +169,7 @@ class EpScaleLib
                         $line .= 'CCL' . $item_info[$key] . chr(253);
                     case 'Label':
                         /** disabled 11Nov2015 - doesn't syncing seems broken **/
-                        //$line .= 'FL1' . $item_info[$key] . chr(253);
+                        $line .= 'LF1' . $item_info[$key] . chr(253);
                         break;
                     case 'Tare':
                         $line .= 'UTA' . floor(100*$item_info[$key]) .'0' . chr(253);
@@ -199,7 +204,7 @@ class EpScaleLib
     {
         $desc = wordwrap($desc, $length, "\n", true); 
         $lines = explode("\n", $desc);
-        $keys = array_filter(array_keys($lines), function($i) use ($limit) { return $i<$limit; });
+        $keys = array_filter(array_keys($lines), function($i) use ($limit) { return strlen($i)<$limit; });
         return array_reduce($keys, function($carry, $key) use ($lines) {
             return $carry . 'DN' . ($key+1) . $lines[$key] . chr(253)
                 . 'DS' . ($key+1) . '0' . chr(253);

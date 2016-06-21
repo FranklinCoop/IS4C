@@ -38,3 +38,5 @@ composer.lock
 README
 pos/is4c-nf/scale-drivers/drivers/NewMagellan/ports.conf
 pos/is4c-nf/log/*.log
+TestPage
+saveTestInfo.php

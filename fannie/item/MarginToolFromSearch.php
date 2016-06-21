@@ -318,7 +318,7 @@ class MarginToolFromSearch extends FannieRESTfulPage
                                 FROM products AS p LEFT JOIN vendorItems AS v ON p.upc=v.upc
                                 LEFT JOIN vendors AS n ON v.vendorID=n.vendorID
                                 WHERE p.upc=? ORDER BY v.vendorID');
-            $tag = new ShelfTagModel($dbc);
+            $tag = new ShelftagsModel($dbc);
             for($i=0; $i<count($this->upcs);$i++) {
                 $upc = $this->upcs[$i];
                 if (!isset($this->newprices[$i])) {
@@ -347,7 +347,7 @@ class MarginToolFromSearch extends FannieRESTfulPage
             }
         }
 
-        echo $FANNIE_URL . 'newbatch/BatchManagementTool.php?startAt=' . $id;
+        echo $FANNIE_URL . 'batches/newbatch/BatchManagementTool.php?startAt=' . $id;
 
         return false;
     }
@@ -571,10 +571,9 @@ function createBatch() {
     $.ajax({
         url: 'MarginToolFromSearch.php',
         type: 'post',
-        data: dstr,
-        success: function(resp) {
-            location = resp;
-        }
+        data: dstr
+    }).done(function(resp) {
+        location = resp;
     });
 }
 function reCalc(upc, price, cost, deptID, superID) {
@@ -614,10 +613,9 @@ function reCalc(upc, price, cost, deptID, superID) {
     $.ajax({
         url: 'MarginToolFromSearch.php',
         type: 'post',
-        data: 'upcs='+upcs+'&deptID='+deptID+'&newprices='+prices,
-        success: function(resp) {
-            $('#dmargin'+deptID).html(resp+"%");
-        }
+        data: 'upcs='+upcs+'&deptID='+deptID+'&newprices='+prices
+    }).done(function(resp) {
+        $('#dmargin'+deptID).html(resp+"%");
     });
 
     // get all prices for items in the superdepartment
@@ -634,10 +632,9 @@ function reCalc(upc, price, cost, deptID, superID) {
     $.ajax({
         url: 'MarginToolFromSearch.php',
         type: 'post',
-        data: 'upcs='+upcs+'&superID='+superID+'&newprices='+prices,
-        success: function(resp) {
-            $('#smargin'+superID).html(resp+"%");
-        }
+        data: 'upcs='+upcs+'&superID='+superID+'&newprices='+prices
+    }).done(function(resp) {
+        $('#smargin'+superID).html(resp+"%");
     });
 }
         <?php

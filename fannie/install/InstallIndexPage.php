@@ -186,7 +186,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
     {
         return array_reduce(
             array_filter($arr, function($i) { return $i['error'] != 0; }),
-            function ($carry, $item) { return $carry . $item . '<br />'; }
+            function ($carry, $item) { return $carry . $item['details'] . '<br />'; }
         );
     }
 
@@ -680,7 +680,6 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'SuspensionHistoryModel',
         'TaxRatesModel',
         'TendersModel',
-        'UsageStatsModel',
         'VendorsModel',
         'VendorContactModel',
         'VendorDeliveriesModel',
@@ -739,10 +738,6 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'ArEomSummaryModel',
         'CapturedSignatureModel',
         'CashPerformDayModel',
-        'EfsnetRequestModel',
-        'EfsnetRequestModModel',
-        'EfsnetResponseModel',
-        'EfsnetTokensModel',
         'EquityHistorySumModel',
         'PaycardTransactionsModel',
         'SpecialOrdersModel',
@@ -758,7 +753,6 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'DLog90ViewModel',
         'ArHistoryTodayModel', // requires dlog
         'ArHistoryTodaySumModel', //requires dlog
-        'CcReceiptViewModel',
         'StockSumTodayModel', // requires dlog
         'SuspendedTodayModel',
         'TenderTapeGenericModel', // requires dlog

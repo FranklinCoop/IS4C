@@ -42,6 +42,16 @@ class FannieTask
 
     public $schedulable = true;
 
+    /**
+      Normally the start and stop time of a task is
+      automatically logged. This can be helpful to
+      verify a task a) actually ran and b) completed
+      without crashing. However for tasks that run
+      very frequently this can generate excess log
+      noise.
+    */
+    public $log_start_stop = true;
+
     protected $error_threshold  = 99;
 
     const TASK_NO_ERROR         = 0;
@@ -204,8 +214,8 @@ if (php_sapi_name() === 'cli' && basename($_SERVER['PHP_SELF']) == basename(__FI
 
     $config = FannieConfig::factory();
     $logger = new FannieLogger();
-    FannieDispatch::setLogger($logger);
-    FannieDispatch::setErrorHandlers();
+    COREPOS\common\ErrorHandler::setLogger($logger);
+    COREPOS\common\ErrorHandler::setErrorHandlers();
 
     // prepopulate autoloader
     $preload = FannieAPI::listModules('FannieTask');
@@ -238,8 +248,12 @@ if (php_sapi_name() === 'cli' && basename($_SERVER['PHP_SELF']) == basename(__FI
         $obj->setArguments($parsed['arguments']);
     }
 
-    $logger->info('Starting task: ' . $class);
+    if ($obj->log_start_stop) {
+        $logger->info('Starting task: ' . $class);
+    }
     $obj->run();
-    $logger->info('Finished task: ' . $class);
+    if ($obj->log_start_stop) {
+        $logger->info('Finished task: ' . $class);
+    }
 }
 

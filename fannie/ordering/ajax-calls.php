@@ -486,8 +486,12 @@ function addUPC($orderID,$memNum,$upc,$num_cases=1)
             discounttype,
             description,
             discount,
-            default_vendor_id
-        FROM products WHERE upc=?");
+            default_vendor_id,
+            r.priceRuleTypeID
+        FROM products AS p
+            LEFT JOIN PriceRules AS r ON p.price_rule_id=r.priceRuleID
+        WHERE upc=?
+        ");
     $pdR = $dbc->execute($pdP, array($upc));
     $qtyReq = False;
     if ($dbc->num_rows($pdR) > 0) {
@@ -521,6 +525,9 @@ function addUPC($orderID,$memNum,$upc,$num_cases=1)
             $ins_array['total'] = $pdW['normal_price']*$caseSize*$num_cases;
             $ins_array['regPrice'] = $pdW['normal_price']*$caseSize*$num_cases;
             $ins_array['unitPrice'] = $pdW['normal_price'];
+            if ($pdW['priceRuleTypeID'] == 6 || $pdW['priceRuleTypeID'] == 7 || $pdW['priceRuleTypeID'] == 8) {
+                $pdW['discount'] = 0;
+            }
             if ($pdW['discount'] != 0 && $pdW['discounttype'] == 1) {
                 /**
                   Only apply sale pricing from non-closeout batches
@@ -1084,15 +1091,24 @@ function getCustomerForm($orderID,$memNum="0")
 
     $ret .= '<td valign="top">';
     $ret .= '<b>Status</b>: ';
-    $ret .= sprintf('<select id="orderStatus" onchange="updateStatus(%d, this.value);">', $orderID);
-    foreach($status as $k => $v) {
-        $ret .= sprintf('<option %s value="%d">%s</option>',
-                    ($k == $order_status ? 'selected' : ''),
-                    $k, $v);
+    if ($canEdit) {
+        $ret .= sprintf('<select id="orderStatus" onchange="updateStatus(%d, this.value);">', $orderID);
+        foreach($status as $k => $v) {
+            $ret .= sprintf('<option %s value="%d">%s</option>',
+                        ($k == $order_status ? 'selected' : ''),
+                        $k, $v);
+        }
+        $ret .= '</select>';
+    } else {
+        foreach ($status as $k=>$v) {
+            if ($k == $order_status) {
+                $ret .= $v;
+            }
+        }
     }
-    $ret .= '</select><p />';
+    $ret .= '<p />';
     $ret .= '<b>Store</b>: ';
-    $ret .= sprintf('<select onchange="updateStore(%d, this.value);">', $orderID);
+    $ret .= sprintf('<select id="oStoreID" onchange="updateStore(%d, this.value);">', $orderID);
     $stores = new StoresModel($dbc);
     $ret .= '<option value="0">Choose...</option>';
     $ret .= $stores->toOptions($orderModel->storeID());

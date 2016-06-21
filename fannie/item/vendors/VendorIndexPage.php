@@ -49,7 +49,7 @@ class VendorIndexPage extends FannieRESTfulPage
     {
         $this->addRoute(
             'get<id><autoAdd>',
-            'get<new><name>',
+            'post<new><name>',
             'get<info>',
             'post<info>',
             'post<delivery>',
@@ -68,7 +68,7 @@ class VendorIndexPage extends FannieRESTfulPage
         return 'VendorIndexPage.php?vid=' . $this->id;
     }
 
-    protected function get_new_name_handler()
+    protected function post_new_name_handler()
     {
         echo $this->newVendor($this->name);
 
@@ -258,8 +258,6 @@ class VendorIndexPage extends FannieRESTfulPage
         $dbc = FannieDB::get($this->config->get('OP_DB'));
         $ret = "";
 
-        $nameQ = $dbc->prepare("SELECT vendorName FROM vendors WHERE vendorID=?");
-        $nameR = $dbc->execute($nameQ,array($id));
         $model = new VendorsModel($dbc);
         $model->vendorID($id);
         $model->load();
@@ -513,7 +511,12 @@ class VendorIndexPage extends FannieRESTfulPage
         </select>
         </p>
         <p id="contentarea">
-        <?php if ($vid) { echo $this->getVendorInfo($vid); } ?>
+        <?php 
+        if ($vid) { 
+            echo $this->getVendorInfo($vid); 
+            $this->addOnloadCommand("\$('.delivery').change(vendorEditor.saveDelivery);\n");
+        } 
+        ?>
         </p>
         <?php
 
@@ -592,7 +595,7 @@ class VendorIndexPage extends FannieRESTfulPage
 
         $this->name = 'TEST';
         ob_start();
-        $this->get_new_name_handler();
+        $this->post_new_name_handler();
         $this->get_info_handler();
         ob_end_clean();
     }

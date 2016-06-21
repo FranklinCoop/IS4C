@@ -785,10 +785,28 @@ class SQLManager
                 $row[$i] = $this->sanitizeValue($row[$i], $type);
                 $args[] = $row[$i];
                 $big_args[] = $row[$i];
-                $big_values .= '?,';
+                $big_values .= '?';
+                  /**
+                  Since we can be dealing with very large strings here, it
+                  could be more memory efficient to avoid adding the last
+                  comma just to remove it again with a substr() call.
+                */
+                if ($i < $numFields-1) {
+                    $big_values .= ',';
+                }
             }
             $arg_sets[] = $args;
-            $big_values = substr($big_values, 0, strlen($big_values)-1) . '),';
+            /**
+              If the limit's exceeded and the data won't be
+              sent as one giant query there's no need to continue
+              building components of that query.
+            */
+            if (count($arg_sets) < 500) {
+                $big_values .= '),';
+            } else {
+                $big_values = '';
+                $big_args = array();
+            }
         }
         $big_values = substr($big_values, 0, strlen($big_values)-1);
         $prep .= str_repeat('?,', count($arg_sets[0]));
@@ -836,23 +854,30 @@ class SQLManager
         return $ret;
     }
 
+    private function isIntegerType($type)
+    {
+        foreach (array('INT', 'LONG', 'SHORT') as $str) {
+            if (strstr(strtoupper($type), $str)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function sanitizeValue($val, $type)
     {
         $unquoted = array("money"=>1,"real"=>1,"numeric"=>1,
-            "float4"=>1,"float8"=>1,"bit"=>1);
-        $strings = array("varchar"=>1,"nvarchar"=>1,"string"=>1,
-            "char"=>1, 'var_string'=>1);
+            "float4"=>1,"float8"=>1,"bit"=>1,"double"=>1,"newdecimal"=>1);
         $dates = array("datetime"=>1);
 
-        if ($val == "" && strstr(strtoupper($type),"INT")) {
+        if ($val == "" && $this->isIntegerType($type)) {
             $val = 0;    
         } elseif ($val == "" && isset($unquoted[$type])) {
             $val = 0;    
         }
         if (isset($dates[$type])) {
             $val = $this->cleanDateTime($val);
-        } elseif (isset($strings[$type])) {
-            $val = str_replace("'","''",$val);
         }
 
         return $val;
@@ -1579,9 +1604,7 @@ class SQLManager
 
     /**
       Assign a query log
-      @param [mixed] $log
-        - an [object] implementing the PSR3 log interface
-        - a [string] filename
+      @param [mixed] [object] implementing the PSR3 log interface
     */
     public function setQueryLog($log)
     {
@@ -1599,16 +1622,6 @@ class SQLManager
             $this->QUERY_LOG->debug($str);
 
             return true;
-        } elseif (is_string($this->QUERY_LOG)) {
-            $fptr = @fopen($this->QUERY_LOG, 'a');
-            if ($fptr) {
-                fwrite($fptr, date('r') . ': ' . $str);
-                fclose($fptr);
-
-                return true;
-            } else {
-                return false;
-            }
         }
 
         return false;

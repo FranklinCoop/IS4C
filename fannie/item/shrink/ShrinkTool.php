@@ -32,6 +32,7 @@ class ShrinkTool extends FannieRESTfulPage
     protected $title = 'Enter Shrink';
     public $themed = true;
     public $description = '[Shrink Entry] adds items to shrink counts. Duplicates lane functionality to allow backend entry.';
+    public $enable_linea = true;
 
     public function preprocess()
     {
@@ -64,6 +65,9 @@ class ShrinkTool extends FannieRESTfulPage
         $record['numflag'] = $this->reason;
         $record['charflag'] = strlen(FormLib::get('type')) > 0 ? strtoupper(substr(FormLib::get('type'), 0, 1)) : '';
         $record['trans_status'] = 'Z';
+        if (FormLib::get('store', false) !== false) {
+            $record['store_id'] = FormLib::get('store');
+        }
 
         $info = DTrans::parameterize($record, 'datetime', $dbc->now());
         $query = 'INSERT INTO dtransactions
@@ -94,6 +98,7 @@ class ShrinkTool extends FannieRESTfulPage
 
         $product = new ProductsModel($dbc);
         $product->upc($upc);
+        $product->store_id($this->config->get('STORE_ID'));
         if (!$product->load()) {
             $this->add_onload_command("showBootstrapAlert('#alert-area', 'danger', 'Item not found');\n");
             $this->__route_stem = 'get';
@@ -174,6 +179,12 @@ class ShrinkTool extends FannieRESTfulPage
                     </select>
                 </div>
             </div>
+            <div class="row form-group">
+                <label class="col-sm-3 text-right">Store</label>
+                <div class="col-sm-9">
+                    {{store_select}}
+                </div>
+            </div>
         </div> <!-- end right column col-sm-6 -->
     </div> <!-- end row containing two col-sm-6 columns -->
     <div class="row form-group">
@@ -192,6 +203,8 @@ HTML;
         $ret = str_replace('{{price}}', $this->price, $ret);
         $ret = str_replace('{{cost}}', $this->cost, $ret);
         $ret = str_replace('{{shrink_opts}}', $shrink_opts, $ret);
+        $stores = FormLib::storePicker('store', false);
+        $ret = str_replace('{{store_select}}', $stores['html'], $ret);
         $ret = str_replace('{{PHP_SELF}}', $_SERVER['PHP_SELF'], $ret);
 
         return $ret;
@@ -204,6 +217,7 @@ HTML;
         $ws = $FANNIE_URL . 'ws/';
         $this->add_onload_command("bindAutoComplete('#upc-field', '$ws', 'item');\n");
         $this->add_onload_command("\$('#upc-field').focus();");
+        $this->addOnloadCommand("enableLinea('#upc-field');\n");
 
         return '<form action="' . $_SERVER['PHP_SELF'] . '" method="get">
             <div id="alert-area"></div>

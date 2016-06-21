@@ -28,7 +28,6 @@ if (!class_exists('FannieAPI')) {
 if (!function_exists('checkLogin')) {
     include_once($FANNIE_ROOT . 'auth/login.php');
 }
-if (!function_exists("updateProductAllLanes")) include($FANNIE_ROOT.'item/laneUpdates.php');
 
 class BatchListPage extends FannieRESTfulPage 
 {
@@ -241,9 +240,9 @@ class BatchListPage extends FannieRESTfulPage
             $ret .= "<option value=$id>$desc</option>";
         }
         $ret .= "</select></div>";
-        $ret .= '<div class="col-sm-2"><input class="form-control" type=text id=newBatchName name="newName" /></div>';
-        $ret .= '<div class="col-sm-2"><input class="form-control date-field" type=text id=newBatchStartDate name="newStart" /></div>';
-        $ret .= '<div class="col-sm-2"><input class="form-control date-field" type=text id=newBatchEndDate name="newEnd" /></div>';
+        $ret .= '<div class="col-sm-2"><input class="form-control" type=text placeholder="Batch Name" id=newBatchName name="newName" /></div>';
+        $ret .= '<div class="col-sm-2"><input class="form-control date-field" placeholder="Start Date" type=text id=newBatchStartDate name="newStart" /></div>';
+        $ret .= '<div class="col-sm-2"><input class="form-control date-field" placeholder="End Date" type=text id=newBatchEndDate name="newEnd" /></div>';
         $ret .= '<div class="col-sm-2"><select class="form-control" id=newBatchOwner name="newOwner">';
         $ret .= '<option value=""></option>';
         foreach ($owners as $o) {
@@ -416,7 +415,7 @@ class BatchListPage extends FannieRESTfulPage
                 </a>
                 </td>";
             $ret .= "<td bgcolor=$colors[$c]><a href=\"\" class=\"btn btn-danger btn-xs\"
-                onclick=\"deleteBatch({$id},'" . str_replace("'", '', $fetchW['batchName']) . "'); return false;\">"
+                onclick=\"deleteBatch({$id},'" . htmlspecialchars($fetchW['batchName']) . "'); return false;\">"
                 . \COREPOS\Fannie\API\lib\FannieUI::deleteIcon() . '</a></td>';
             $ret .= "<td bgcolor=$colors[$c]><a href=\"batchReport.php?batchID={$id}\">Report</a></td>";
             $ret .= "</tr>";

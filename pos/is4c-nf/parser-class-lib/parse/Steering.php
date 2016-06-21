@@ -78,8 +78,10 @@ class Steering extends Parser
                 return true;
 
             case "PV":
-                CoreLocal::set("pvsearch","$pvsearch");
                 $this->ret['main_frame'] = $my_url."gui-modules/productlist.php";
+                if (isset($pvsearch) && $pvsearch != '') {
+                    $this->ret['main_frame'] .= "?search=" . $pvsearch;
+                }
                 return true;
 
             case "MSTG":

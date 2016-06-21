@@ -93,6 +93,9 @@ class NewMagellan extends ScaleDriverWrapper {
         case 'repoll':
             UdpComm::udpSend('rePoll');
             break;
+        case 'reboot':
+            UdpComm::udpSend('reBoot');
+            break;
         case 'wakeup':
             UdpComm::udpSend('wakeup');
             break;

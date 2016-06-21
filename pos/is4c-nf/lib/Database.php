@@ -101,6 +101,27 @@ static public function mDataConnect()
     return $sql;
 }
 
+/**
+  Get the name of the primary server database
+  This is only relevant in multi-store setups where the lane
+  is shipping data to a temporary holding database to be
+  relayed to the master HQ server later. Most operations can
+  work off this holding database but a few may need to reference
+  the some overarching, all-location data.
+
+  @return database name w/ . separator or an empty string if
+    no alternate is defined.
+*/
+static public function mAltName()
+{
+    $ret = CoreLocal::get('mAlternative');
+    if ($ret) {
+        return $ret . '.';
+    } else {
+        return '';
+    }
+}
+
 // ----------getsubtotals()----------
 
 // getsubtotals() updates the values held in our session variables.
@@ -351,7 +372,7 @@ static public function gettransno($CashierNo)
         // on some installs localtranstoday might be
         // a view pointed at localtrans_today
         $cleanQ = 'DELETE FROM localtranstoday WHERE datetime < ' . $connection->curdate();
-        if ($connection->isView('localtranstoday')) {
+        if (CoreLocal::get('NoCompat') != 1 && $connection->isView('localtranstoday')) {
             $cleanQ = str_replace('localtranstoday', 'localtrans_today', $cleanQ);
         }
         $connection->query($cleanQ);
@@ -389,13 +410,10 @@ static public function testremote()
   The following tables are copied:
    - dtransactions
    - suspended
-   - efsnetRequest
-   - efsnetResponse
-   - efsnetRequestMod
-   - efsnetTokens
+   - PaycardTransactions
    - CapturedSignature
 
-  On success the local tables are truncated. The efsnet tables
+  On success the local tables are truncated. The Paycards tables
   are copied in the uploadCCdata() function but that gets called 
   automatically.
 
@@ -573,9 +591,9 @@ static public function uploadCCdata()
     // test for success
     $ret = true;
 
-    $tables = array('PaycardTransactions', 'CapturedSignature', 'efsnetRequest', 'efsnetRequestMod', 'efsnetResponse', 'efsnetTokens');
+    $tables = array('PaycardTransactions', 'CapturedSignature');
     foreach ($tables as $table) {
-        if ($sql->tableExists($table)) {
+        if (CoreLocal::get('NoCompat') == 1 || $sql->tableExists($table)) {
             $cols = self::getMatchingColumns($sql, $table);
             $success = $sql->transfer(CoreLocal::get('tDatabase'),
                 "SELECT {$cols} FROM {$table}",
@@ -776,11 +794,11 @@ static public function rotateTempData()
 
     $connection->query("insert into localtrans select * from localtemptrans");
     // localtranstoday converted from view to table
-    if (!$connection->isView('localtranstoday')) {
+    if (CoreLocal::get('NoCompat') == 1 || !$connection->isView('localtranstoday')) {
         $connection->query("insert into localtranstoday select * from localtemptrans");
     }
     // legacy table when localtranstoday is still a view
-    if ($connection->table_exists('localtrans_today')) {
+    if (CoreLocal::get('NoCompat') != 1 && $connection->table_exists('localtrans_today')) {
         $connection->query("insert into localtrans_today select * from localtemptrans");
     }
 

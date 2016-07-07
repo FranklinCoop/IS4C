@@ -284,8 +284,6 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
             }
             System.Console.WriteLine();
 
-            System.Console.WriteLine('ASCII Message:');
-            Systme.Console.WriteLine();
             System.Console.WriteLine(enc.GetString(buffer));
 
             System.Console.WriteLine("LRC "+(CheckLRC(buffer)?"Valid":"Invalid"));

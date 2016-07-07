@@ -159,8 +159,12 @@ public class SPH_IngenicoRBA_USB : SPH_IngenicoRBA_Common
             nack[i] = 0;
             ack[i] = 0;
         }
-
+        #if MONO
+        usb_port = new USBWrapper_Posix();
+        #else
         usb_port = new USBWrapper_HidSharp();
+        #endif
+
         while(usb_fs == null){
             usb_fs = usb_port.GetUSBHandle(usb_devicefile,usb_report_size);
             if (usb_fs == null){
@@ -179,10 +183,12 @@ public class SPH_IngenicoRBA_USB : SPH_IngenicoRBA_Common
     public override void Read()
     { 
         // needs changes for mono. Async probably still doesn't work.
+        // Just had to move the AsyncRead() under the messages to get it to run in Linux.
+        // No idea why windows would want to activate the device after you are trying to read from it. ~RO
         GetHandle();
-        AsyncRead();
         WriteMessageToDevice(OnlineMessage());
         WriteMessageToDevice(SwipeCardScreen());
+        AsyncRead();
     }
 
     public override void WriteMessageToDevice(byte[] msg)

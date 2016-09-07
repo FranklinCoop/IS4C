@@ -59,12 +59,26 @@ if (FormLib::get('date') !== '') {
    $stamp = strtotime($repDate);
    if ($stamp) $dstr = date("Y-m-d",$stamp);
 }
-$store = FormLib::get('store', 0);
+$store = FormLib::get('store', false);
+if ($store === false) {
+    $clientIP = filter_input(INPUT_SERVER, 'REMOTE_ADDR');
+    foreach ($FANNIE_STORE_NETS as $storeID => $range) {
+        if (
+            class_exists('\\Symfony\\Component\\HttpFoundation\\IpUtils')
+            && \Symfony\Component\HttpFoundation\IpUtils::checkIp($clientIP, $range)
+            ) {
+            $store = $storeID;
+        }
+    }
+    if ($store === false) {
+        $store = 0;
+    }
+}
 $dates = array($dstr.' 00:00:00',$dstr.' 23:59:59');
 $store_dates = array($dstr.' 00:00:00',$dstr.' 23:59:59', $store);
 
 if ($excel === false) {
-    echo "<br /><a href=index.php?date=$repDate&excel=yes>Click here for Excel version</a>";
+    echo "<br /><a href=index.php?date=$repDate&store=$store&excel=yes>Click here for Excel version</a>";
 }
 
 echo '<br>Report run ' . $today. ' for ' . $repDate."<br />";
@@ -103,7 +117,7 @@ echo WfcLib::tablify($tenders,array(1,0,2,3),array("Account","Type","Amount","Co
          array(WfcLib::ALIGN_LEFT,WfcLib::ALIGN_LEFT,WfcLib::ALIGN_RIGHT|WfcLib::TYPE_MONEY,WfcLib::ALIGN_RIGHT),2);
 
 if ($store != 50) {
-    echo '<br /><a href="../../../Paycards/PcDailyReport.php?date='. $dstr . '">Integrated CC Supplement</a><br />';
+    echo '<br /><a href="../../../Paycards/PcDailyReport.php?date='. $dstr . '&store=' . $store . '">Integrated CC Supplement</a><br />';
 
     $couponQ = "
         SELECT SUM(-d.total) AS ttl,
@@ -362,7 +376,7 @@ $transinfo = array("Member"=>array(0,0.0,0.0,0.0,0.0),
            "Non Member"=>array(0,0.0,0.0,0.0,0.0),
            "Staff Member"=>array(0,0.0,0.0,0.0,0.0),
            "Staff NonMem"=>array(0,0.0,0.0,0.0,0.0));
-while($row = $dbc->fetch_array($transR)){
+while($row = $dbc->fetchRow($transR)){
     if (!isset($transinfo[$row[2]])) continue;
     $transinfo[$row[2]][0] += 1;
     $transinfo[$row[2]][1] += $row[1];

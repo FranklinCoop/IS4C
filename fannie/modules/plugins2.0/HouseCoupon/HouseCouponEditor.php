@@ -233,9 +233,14 @@ class HouseCouponEditor extends FanniePage
         $ret .= '</p>';
         $ret .= '</form>';
         $ret .= '<table class="table">';
-        $ret .= '<tr><th>ID</th><th>Name</th><th>Value</th><th>Expires</th></tr>';
+        $ret .= '<tr><th>ID</th><th>Name</th><th>Value</th>';
+        $ret .= '<th>Begins</th><th>Expires</th></tr>';
         $model = new HouseCouponsModel($dbc);
         foreach($model->find('coupID') as $obj) {
+            if (strstr($obj->startDate(), ' ')) {
+                $tmp = explode(' ', $obj->startDate());
+                $obj->startDate($tmp[0]);
+            }
             if (strstr($obj->endDate(), ' ')) {
                 $tmp = explode(' ', $obj->endDate());
                 $obj->endDate($tmp[0]);
@@ -252,7 +257,7 @@ class HouseCouponEditor extends FanniePage
                 $report_dates = array(date('Y-m-01'), date('Y-m-t'));
             }
             $ret .= sprintf('<tr><td>#%d <a href="HouseCouponEditor.php?edit_id=%d">Edit</a></td>
-                    <td>%s</td><td>%.2f%s</td><td>%s</td>
+                    <td>%s</td><td>%.2f%s</td><td>%s</td><td>%s</td>
                     <td>
                         <a href="%sws/barcode-pdf/?upc=%s&name=%s"
                         class="btn btn-default">Print Barcode</a>
@@ -262,7 +267,8 @@ class HouseCouponEditor extends FanniePage
                         class="btn btn-default %s">Member Baskets</a>
                     </tr>',
                     $obj->coupID(),$obj->coupID(),$obj->description(),
-                    $obj->discountValue(), $obj->discountType(), $obj->endDate(),
+                    $obj->discountValue(), $obj->discountType(),
+                    $obj->startDate(), $obj->endDate(),
                     $FANNIE_URL,
                     ('499999' . str_pad($obj->coupID(), 5, '0', STR_PAD_LEFT)),
                     urlencode($obj->description()),
@@ -411,10 +417,12 @@ class HouseCouponEditor extends FanniePage
             'MD'=>'Capped Discount (Department)',
             'F'=>'Flat Discount',
             'PI'=>'Per-Item Discount',
+            'PS'=>'Per-Set Discount',
             'BG'=>'BOGO (Buy one get one)',
             '%'=>'Percent Discount (End of transaction)',
             '%B' => 'Percent Discount (Coupon discount OR member discount)',
             '%D'=>'Percent Discount (Department)',
+            '%S'=>'Percent Discount (Department excludes sale items)',
             'PD'=>'Percent Discount (Anytime)',
             'AD'=>'All Discount (Department)',
         );
@@ -445,7 +453,7 @@ class HouseCouponEditor extends FanniePage
             $ret .= '<label class="control-label">Add UPC</label>
                 <input type=text class="form-control add-item-field" name=new_upc /> ';
         } 
-        if ($mType == "D" || $mType == "D+" || $mType == 'C' || $mType == 'C+' || $dType == '%D' || $mType == 'MX') {
+        if ($mType == "D" || $mType == "D+" || $mType == 'C' || $mType == 'C+' || $dType == '%D' || $dType == 'S' || $mType == 'MX') {
             $ret .= '
                 <label class="control-label">Add Dept</label>
                 <select class="form-control add-item-field" name=new_dept>
@@ -520,7 +528,7 @@ class HouseCouponEditor extends FanniePage
                     LEFT JOIN products AS p ON p.upc=h.upc AND h.type='DISCOUNT'
                     LEFT JOIN departments AS d ON h.upc=d.dept_no AND h.type='QUALIFIER'
                 WHERE h.coupID=?";
-        } elseif ($hc->minType() == "D" || $hc->minType() == "D+" || $hc->minType() == 'C' || $hc->minType() == 'C+' || $hc->discountType() == '%D') {
+        } elseif ($hc->minType() == "D" || $hc->minType() == "D+" || $hc->minType() == 'C' || $hc->minType() == 'C+' || $hc->discountType() == '%D' || $hc->discountType() == 'S') {
             $query = '
                 SELECT h.upc,
                     COALESCE(d.dept_name, \'Unknown department\') AS description,

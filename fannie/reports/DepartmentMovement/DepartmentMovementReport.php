@@ -205,7 +205,7 @@ class DepartmentMovementReport extends FannieReportPage
         $prep = $dbc->prepare($query);
         $result = $dbc->execute($prep,$args);
         $ret = array();
-        while ($row = $dbc->fetch_array($result)) {
+        while ($row = $dbc->fetchRow($result)) {
             $record = array();
             if ($groupby == "Date") {
                 $record[] = $row[1]."/".$row[2]."/".$row[0];
@@ -260,19 +260,19 @@ class DepartmentMovementReport extends FannieReportPage
     private function upcFooter($data)
     {
         $this->report_headers = array('UPC','Brand','Description','Rings','Qty','$',
-            'Dept#','Department','Subdept','Vendor');
+            'Dept#','Department','Super#','Vendor');
         $this->sort_column = 4;
         $this->sort_direction = 1;
         $sumQty = 0.0;
         $sumSales = 0.0;
         $sumRings = 0.0;
         foreach($data as $row) {
-            $sumRings += $row[2];
-            $sumQty += $row[3];
-            $sumSales += $row[4];
+            $sumRings += $row[3];
+            $sumQty += $row[4];
+            $sumSales += $row[5];
         }
 
-        return array('Total',null,$sumRings,$sumQty,$sumSales,'',null,null,null);
+        return array('Total',null,null,$sumRings,$sumQty,$sumSales,'',null,null,null);
     }
 
     private function nonUpcHeaders()

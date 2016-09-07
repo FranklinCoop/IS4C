@@ -21,11 +21,19 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib;
+use COREPOS\pos\lib\CoreState;
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\FooterBoxes\FooterBox;
+use \CoreLocal;
+
 /**
   @class DisplayLib
   Functions for drawing display elements
 */
-class DisplayLib extends LibraryClass {
+class DisplayLib 
+{
 
 /**
   Get the standard footer with total and
@@ -50,7 +58,7 @@ static public function printfooter($readOnly=False)
         );
     }
     
-    $modchain = array_map(function($class){ return new $class(); }, $FOOTER_MODULES);
+    $modchain = array_map(function($class){ return FooterBox::factory($class); }, $FOOTER_MODULES);
 
     if (!$readOnly) {
         CoreLocal::set("runningTotal",CoreLocal::get("amtdue"));
@@ -116,6 +124,9 @@ static public function printfooter($readOnly=False)
     }
     $ret .= "</tr>";
     $ret .= "</table>";
+    if (CoreLocal::get('Debug_JS')) {
+        $ret .= '<div id="jsErrorLog"></div>';
+    }
 
     return $ret;
 }
@@ -148,6 +159,7 @@ static public function plainmsg($strmsg)
   This function will include the header
   printheaderb(). 
 */
+    // @hintable
 static public function msgbox($strmsg, $icon, $noBeep=false, $buttons=array()) 
 {
     $ret = self::printheaderb();
@@ -204,6 +216,7 @@ static public function msgbox($strmsg, $icon, $noBeep=false, $buttons=array())
 
   An alias for msgbox().
 */
+    // @hintable
 static public function xboxMsg($strmsg, $buttons=array()) 
 {
     return self::msgbox($strmsg, MiscLib::base_url()."graphics/crossD.gif", false, $buttons);
@@ -219,6 +232,7 @@ static public function xboxMsg($strmsg, $buttons=array())
 
   An alias for msgbox().
 */
+    // @hintable
 static public function boxMsg($strmsg, $header="", $noBeep=false, $buttons=array()) 
 {
     $default = CoreLocal::get('alertBar');
@@ -319,6 +333,7 @@ static private function itemOnClick($trans_id)
    (or touchscreen).
   @return An HTML string
 */
+    // @hintable
 static public function printItem($fields, $trans_id=-1) 
 {
     $onclick = self::itemOnClick($trans_id);
@@ -360,6 +375,7 @@ static public function printItem($fields, $trans_id=-1)
   - 000000 => totalLine
   - 800080 => fsLine
 */
+    // @hintable
 static public function printItemColor($color, $fields, $trans_id=-1) 
 {
     $onclick = self::itemOnClick($trans_id);
@@ -417,6 +433,7 @@ private static function colorToCSS($color, $text=true)
   - 000000 => totalArea
   - 800080 => fsArea
 */
+    // @hintable
 static public function printItemColorHilite($color, $fields)
 {
     $total = self::displayableText($fields[2], true, true);
@@ -660,7 +677,7 @@ static public function drawItems($top_item, $rows, $highlight)
     $query = "select count(*) as count from localtemptrans";
     $dbc = Database::tDataConnect();
     $result = $dbc->query($query);
-    $row = $dbc->fetch_array($result);
+    $row = $dbc->fetchRow($result);
     $rowCount = $row["count"];
 
     if ($rowCount == 0) {
@@ -813,6 +830,7 @@ static public function screenDisplay($min, $max)
     return $ret;
 }
 
+    // @hintable
 static private function screenDisplayColor($row)
 {
     if ($row['trans_status'] == 'V' || $row['trans_type'] == 'T' || $row['trans_status'] == 'R' || $row['trans_status'] == 'M' || $row['voided'] == 17 || $row['trans_status'] == 'J') {
@@ -829,6 +847,7 @@ static private function screenDisplayColor($row)
     }
 }
 
+    // @hintable
 static private function screenDisplayDescription($row)
 {
     if ($row['voided'] == 5 || $row['voided'] == 11 || $row['voided'] == 17 || $row['trans_type'] == 'T') {
@@ -838,6 +857,7 @@ static private function screenDisplayDescription($row)
     }
 }
 
+    // @hintable
 static private function screenDisplayComment($row)
 {
     if ($row['discounttype'] == 3 && $row['trans_status'] == 'V') {
@@ -877,6 +897,7 @@ static private function screenDisplayComment($row)
     }
 }
 
+    // @hintable
 static private function screenDisplayTotal($row)
 {
     if ($row['voided'] == 3 || $row['voided'] == 5 || $row['voided'] == 7 || $row['voided'] == 11 || $row['voided'] == 17) {
@@ -888,6 +909,7 @@ static private function screenDisplayTotal($row)
     }
 }
 
+    // @hintable
 static private function screenDisplayStatus($row)
 {
     if ($row['trans_status'] == 'V') {

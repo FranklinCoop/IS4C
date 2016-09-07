@@ -21,17 +21,20 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib;
+
 /**
   @class JsonLib
   Functions for JSON support in PHP < 5.3
 */
-class JsonLib extends LibraryClass {
+class JsonLib {
 
 /**
   Convert an array to a JSON string
   @param $arr an array of values
   @return A JSON string representing the array
 */
+    // @hintable
 static public function arrayToJson($arr)
 {
     $ret = "[";

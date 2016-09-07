@@ -21,6 +21,14 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\Scanning\SpecialUPCs;
+use COREPOS\pos\lib\Scanning\SpecialUPC;
+use \CoreLocal;
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\DisplayLib;
+use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\TransRecord;
+
 class DatabarCoupon extends SpecialUPC 
 {
 
@@ -33,6 +41,7 @@ class DatabarCoupon extends SpecialUPC
         return false;
     }
 
+    // @hintable
     public function handle($upc,$json)
     {
         $pos = 0;
@@ -393,6 +402,7 @@ class DatabarCoupon extends SpecialUPC
 
        return true/false based on whether requirement is met
     */
+    // @hintable
     private function validateRequirement(&$req, &$json)
     {
         $dbc = Database::tDataConnect();
@@ -440,6 +450,7 @@ class DatabarCoupon extends SpecialUPC
         return true; // requirement validated
     }
 
+    // @hintable
     private function validateTransactionTotal(&$req, &$json)
     {
         $dbc = Database::tDataConnect();
@@ -460,6 +471,7 @@ class DatabarCoupon extends SpecialUPC
         return true;
     }
 
+    // @hintable
     private function validateQty($qty, $couponqtty, &$req, &$json)
     {
         $available_qty = $qty - ($couponqtty * $req['value']);

@@ -21,6 +21,9 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib;
+use COREPOS\pos\lib\Database;
+
 /**
   @class MemberLookup
 */
@@ -96,6 +99,7 @@ class MemberLookup {
         return $this->listToArray($dbc, $result);
     }
 
+    // @hintable
     protected function listToArray($dbc, $result)
     {
         $ret = $this->default_value();

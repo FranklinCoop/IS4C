@@ -21,6 +21,9 @@
 
 *********************************************************************************/
 
+use COREPOS\pos\lib\gui\NoInputCorePage;
+use COREPOS\pos\lib\Database;
+
 include_once(dirname(__FILE__).'/../../lib/AutoLoader.php');
 
 class VirtCoupDisplay extends NoInputCorePage 
@@ -143,7 +146,7 @@ class VirtCoupDisplay extends NoInputCorePage
 
             $selectFlag = (isset($selectFlag)?$selectFlag:0);
             for ($i = 0; $i < $num_rows; $i++) {
-                $row = $db->fetch_array($result);
+                $row = $db->fetchRow($result);
                 if( $i == 0 && $selectFlag == 0) {
                     $selected = "selected";
                 } else {
@@ -161,6 +164,5 @@ class VirtCoupDisplay extends NoInputCorePage
     } // END body_content() FUNCTION
 }
 
-if (basename($_SERVER['PHP_SELF']) == basename(__FILE__))
-    new VirtCoupDisplay();
+AutoLoader::dispatch();
 

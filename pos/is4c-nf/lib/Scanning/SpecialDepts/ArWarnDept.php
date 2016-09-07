@@ -21,11 +21,17 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\Scanning\SpecialDepts;
+use COREPOS\pos\lib\Scanning\SpecialDept;
+use COREPOS\pos\lib\MiscLib;
+use \CoreLocal;
+
 class ArWarnDept extends SpecialDept 
 {
 
     public $help_summary = 'Require cashier confirmation on AR sale';
 
+    // @hintable
     public function handle($deptID,$amount,$json)
     {
         if (CoreLocal::get('msgrepeat') == 0) {

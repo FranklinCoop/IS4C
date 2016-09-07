@@ -28,7 +28,7 @@ if (!class_exists('FannieAPI')) {
     include_once(dirname(__FILE__).'/../../classlib2.0/FannieAPI.php');
 }
 
-class ItemMarginModule extends ItemModule 
+class ItemMarginModule extends \COREPOS\Fannie\API\item\ItemModule 
 {
     public function showEditForm($upc, $display_mode=1, $expand_mode=1)
     {
@@ -189,6 +189,7 @@ class ItemMarginModule extends ItemModule
                     if ($old_rule > 1) {
                         $rule->priceRuleID($old_rule);
                         $prod->price_rule_id($old_rule); // just in case
+                        $rule->save();
                     } else {
                         $new_rule_id = $rule->save();
                         $prod->price_rule_id($new_rule_id);

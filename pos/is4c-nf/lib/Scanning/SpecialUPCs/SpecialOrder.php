@@ -21,6 +21,13 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\Scanning\SpecialUPCs;
+use COREPOS\pos\lib\Scanning\SpecialUPC;
+use \CoreLocal;
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\DisplayLib;
+use COREPOS\pos\lib\TransRecord;
+
 /**
    @class SpecialOrder
    WFC Electronic Special Orders
@@ -50,6 +57,7 @@ class SpecialOrder extends SpecialUPC
         return false;
     }
 
+    // @hintable
     public function handle($upc,$json)
     {
         $orderID = substr($upc,5,6);
@@ -66,10 +74,11 @@ class SpecialOrder extends SpecialUPC
         }
 
         $db = Database::mDataConnect();
+        $mAlt = Database::mAltName();
         $query = sprintf("SELECT upc,description,department,
                 quantity,unitPrice,total,regPrice,d.dept_tax,d.dept_fs,
                 ItemQtty,p.discountable
-                FROM PendingSpecialOrder as p LEFT JOIN
+                FROM {$mAlt}PendingSpecialOrder as p LEFT JOIN
                 is4c_op.departments AS d ON p.department=d.dept_no
                 WHERE order_id=%d AND trans_id=%d",
                 $orderID,$transID);
@@ -85,7 +94,7 @@ class SpecialOrder extends SpecialUPC
             return $json;
         }
 
-        $row = $db->fetch_array($result);
+        $row = $db->fetchRow($result);
         TransRecord::addRecord(array(
             'upc' => $row['upc'],
             'description' => $row['description'],

@@ -21,6 +21,14 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib;
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\DiscountModule;
+use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\ReceiptLib;
+use \AutoLoader;
+use \CoreLocal;
+
 /* --COMMENTS - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     * 10Apr2013 Andy Theuninck Filter backslash out of comments
@@ -32,7 +40,7 @@
   @class TransRecord
   Defines functions for adding records to the transaction
 */
-class TransRecord extends LibraryClass 
+class TransRecord 
 {
 
 /*------------------------------------------------------------------------------
@@ -239,6 +247,7 @@ private static $default_record = array(
   @param $named_params [keyed array]
   @return [none]
 */
+    // @hintable
 static public function addRecord($named_params)
 {
     // start with default values
@@ -282,6 +291,16 @@ static public function addRecord($named_params)
         $new_record['numflag'],
         $new_record['charflag']
     );
+
+    $actions = CoreLocal::get('ItemActions');
+    if (!is_array($actions)) {
+        $actions = AutoLoader::listModules('COREPOS\\pos\\lib\\ItemAction');
+        CoreLocal::set('ItemActions', $actions);
+    }
+    foreach ($actions as $class) {
+        $obj = new $class();
+        $obj->callback($new_record);
+    }
 }
 
 /**
@@ -589,18 +608,21 @@ static public function addcdnotify()
   @param $strupc coupon UPC
   @param $intdepartment associated POS department
   @param $dbltotal coupon amount (should be negative)
-  @param $foodstamp mark coupon foodstamp-able
-  @param $tax mark coupon as taxable
+  @param $statusFlags array of optional status flags. Supported keys:
+    - tax
+    - foodstamp
+    - discountable
 
   Marking a coupon as taxable will *reduce* the taxable
   total by the coupon amount. This is not desirable in 
   all tax jurisdictions. The ini setting 'CouponsAreTaxable'
   controls whether the tax parameter is used.
 */
-static public function addCoupon($strupc, $intdepartment, $dbltotal, $foodstamp=0, $tax=0) 
+    // @hintable
+static public function addCoupon($strupc, $intdepartment, $dbltotal, $statusFlags=array())
 {
     if (CoreLocal::get('CouponsAreTaxable') !== 0) {
-        $tax = 0;
+        $statusFlags['tax'] = 0;
     }
 
     self::addRecord(array(
@@ -615,8 +637,9 @@ static public function addCoupon($strupc, $intdepartment, $dbltotal, $foodstamp=
         'unitPrice' => $dbltotal,
         'total' => $dbltotal,
         'regPrice' => $dbltotal,
-        'tax' => $tax,
-        'foodstamp' => $foodstamp,
+        'tax' => isset($statusFlags['tax']) ? $statusFlags['tax'] : 0,
+        'foodstamp' => isset($statusFlags['foodstamp']) ? $statusFlags['foodstamp'] : 0,
+        'discountable' => isset($statusFlags['discountable']) ? $statusFlags['discountable'] : 0,
     ));
 }
 
@@ -746,6 +769,7 @@ static public function addCashDrop($amt)
   total and regPrice (respectively). The other values go in the
   correspondingly named columns.
 */
+    // @hintable
 static public function addLogRecord($opts)
 {
     if (!is_array($opts)) {
@@ -774,6 +798,7 @@ static public function addLogRecord($opts)
     ));
 }
 
+    // @hintable
 static public function add_log_record($opts)
 {
     self::addLogRecord($opts);

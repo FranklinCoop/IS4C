@@ -120,6 +120,9 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             $b->discountType(0);
             $b->priority(0);
             $batchID = $b->save();
+            if ($this->config->get('STORE_MODE') === 'HQ') {
+                StoreBatchMapModel::initBatch($batchID);
+            }
         } else { 
             $bidW = $dbc->fetchRow($bidR);
             $batchID = $bidW['batchID'];
@@ -218,12 +221,25 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             $background = "white";
             if (isset($batchUPCs[$row['upc']])) {
                 $background = 'selection';
-            } elseif ($row['variable_pricing'] == 0) {
-                $background = ( ($row['normal_price']+0.10 < $row['rawSRP'])
-                    && ($row['normal_price'] < $row['srp']) ) ?'red':'green';
+            } elseif ($row['variable_pricing'] == 0 && $row['normal_price'] < 10.00) {
+                $background = ( 
+                    ($row['normal_price']+0.10 < $row['rawSRP'])
+                    && ($row['srp']-.14 > $row['normal_price'])
+                ) ?'red':'green';
                 if ($row['normal_price']-.10 > $row['rawSRP']) {
-                    $background = ($row['normal_price']-.10 > $row['rawSRP']
-                        && ($row['normal_price'] > $row['srp']) )?'yellow':'green';
+                    $background = (
+                        ($row['normal_price']-.10 > $row['rawSRP']) 
+                        && ($row['normal_price']-.14 > $row['srp']) 
+                        && ($row['rawSRP'] < $row['srp']+.10)  
+                    )?'yellow':'green';
+                }
+            } elseif ($row['variable_pricing'] == 0 && $row['normal_price'] >= 10.00) {
+                $background = ($row['normal_price'] < $row['rawSRP']
+                    && $row['srp'] > $row['normal_price']) ?'red':'green';
+                if ($row['normal_price']-0.49 > $row['rawSRP']) {
+                    $background = ($row['normal_price']-0.49 > $row['rawSRP']
+                        && ($row['normal_price'] > $row['srp'])
+                        && ($row['rawSRP'] < $row['srp']+.10) )?'yellow':'green';
                 }
             }
             if (isset($batchUPCs[$row['upc']])) {

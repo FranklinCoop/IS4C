@@ -88,6 +88,7 @@ class NonMovementReport extends FannieReportPage {
         $deptStart = FormLib::get_form_value('deptStart',0);
         $deptEnd = FormLib::get_form_value('deptEnd',0);
         $deptMulti = FormLib::get('departments', array());
+        $subs = FormLib::get('subdepts', array());
 
         $tempName = "TempNoMove";
         $dlog = DTransactionsModel::selectDlog($date1,$date2);
@@ -118,6 +119,10 @@ class NonMovementReport extends FannieReportPage {
         if ($buyer != -1) {
             list($conditional, $args) = DTrans::departmentClause($deptStart, $deptEnd, $deptMulti, $args, 'p');
             $where .= $conditional;
+        }
+        if (count($subs) > 0) {
+            list($inStr, $args) = $dbc->safeInClause($subs, $args);
+            $where .= " AND p.subdept IN ($inStr) ";
         }
 
         $query = "
@@ -190,7 +195,7 @@ class NonMovementReport extends FannieReportPage {
         $deptsQ = $dbc->prepare("select dept_no,dept_name from departments order by dept_no");
         $deptsR = $dbc->execute($deptsQ);
         $deptsList = "";
-        while ($deptsW = $dbc->fetch_array($deptsR))
+        while ($deptsW = $dbc->fetchRow($deptsR))
             $deptsList .= "<option value=$deptsW[0]>$deptsW[0] $deptsW[1]</option>";
         ob_start();
 ?>

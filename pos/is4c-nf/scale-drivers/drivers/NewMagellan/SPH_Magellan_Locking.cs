@@ -90,7 +90,7 @@ public class SPH_Magellan_Locking : SerialPortHandler {
             Thread.Sleep(300);
             Beeps(2);
         }
-        else if (msg == "rePoll"){
+        else if (msg == "rePoll" || msg == "wakeup"){
             got_weight = false;
             safeWrite("S14\r");
         }
@@ -108,6 +108,7 @@ public class SPH_Magellan_Locking : SerialPortHandler {
     override public void Read()
     {
         string buffer = "";
+        System.Console.WriteLine("SPH_Magellan_Locking is deprecated; use SPH_Magellan_Scale or SPH_Magellan_Classic");
         if (this.verbose_mode > 0)
             System.Console.WriteLine("Reading serial data");
         safeWrite("S14\r");

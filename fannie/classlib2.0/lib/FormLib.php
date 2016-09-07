@@ -151,6 +151,7 @@ class FormLib extends \COREPOS\common\FormLib
 
     public static function date_range_picker($one='date1',$two='date2',$week_start=1)
     {
+        $week_start = (!FannieConfig::config('FANNIE_WEEK_START')) ? 1 :  FannieConfig::config('FANNIE_WEEK_START');
         return self::dateRangePicker($one, $two, $week_start);
     }
 
@@ -167,8 +168,11 @@ class FormLib extends \COREPOS\common\FormLib
         $op_db = FannieConfig::config('OP_DB');
         $dbc = FannieDB::getReadOnly($op_db);
 
+        $clientIP = filter_input(INPUT_SERVER, 'REMOTE_ADDR');
+        $ranges = FannieConfig::config('STORE_NETS');
+
         $stores = new StoresModel($dbc);
-        $current = FormLib::get($field_name, 0);
+        $current = FormLib::get($field_name, false);
         $ret = '<select name="' . $field_name . '" class="form-control">';
         if ($all) {
             $labels = array(0 => _('All Stores'));
@@ -177,8 +181,19 @@ class FormLib extends \COREPOS\common\FormLib
             $labels = array();
         }
         foreach($stores->find('storeID') as $store) {
+            $selected = '';
+            if ($store->storeID() == $current) {
+                $selected = 'selected';
+            } elseif (
+                $current === false
+                && isset($ranges[$store->storeID()]) 
+                && class_exists('\\Symfony\\Component\\HttpFoundation\\IpUtils')
+                && \Symfony\Component\HttpFoundation\IpUtils::checkIp($clientIP, $ranges[$store->storeID()])
+                ) {
+                $selected = 'selected';
+            }
             $ret .= sprintf('<option %s value="%d">%s</option>',
-                    ($store->storeID() == $current ? 'selected' : ''),
+                    $selected,
                     $store->storeID(),
                     $store->description()
             );
@@ -203,7 +218,16 @@ class FormLib extends \COREPOS\common\FormLib
 <form method="get" class="form-horizontal">
 <div class="row">
     <div class="col-sm-6">
-        <?php echo self::standardDepartmentFields('buyer'); ?>
+        <?php echo self::standardDepartmentFields('buyer');  ?>
+        <div class="form-group">
+            <label class="col-sm-4 control-label">Store</label>
+            <div class="col-sm-8">
+            <?php
+            $stores = FormLib::storePicker();
+            echo $stores['html'];
+            ?>
+            </div>
+        </div>
         <div id="date-dept-form-left-col"></div> 
     </div>
     <?php echo self::standardDateFields(); ?>
@@ -525,6 +549,7 @@ HTML;
         $end_date = self::getDate('date2', date('Y-m-d'));
         $dlog = DTransactionsModel::selectDlog($start_date, $end_date);
         $lookupType = self::get('lookup-type', 'dept');
+        $store = self::get('store', 0);
 
         $query = '
             FROM ' . $dlog . ' AS t 
@@ -555,6 +580,8 @@ HTML;
         $query .= ' WHERE t.tdate BETWEEN ? AND ? ';
         $args[] = $start_date . ' 00:00:00';
         $args[] = $end_date . ' 23:59:59';
+        $query .= ' AND ' . DTrans::isStoreID($store, 't') . ' ';
+        $args[] = $store;
 
         switch ($lookupType) {
             case 'dept':

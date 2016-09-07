@@ -21,6 +21,9 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\ReceiptBuilding\ThankYou;
+use \CoreLocal;
+
 /**
   @class DefaultReceiptThanks
   Prints thank you line(s)
@@ -29,6 +32,7 @@ class DefaultReceiptThanks
 {
     protected $print_handler;
 
+    // @hintable
     public function setPrintHandler($ph)
     {
         $this->print_handler = $ph;
@@ -49,6 +53,8 @@ class DefaultReceiptThanks
         $ret .= $this->print_handler->centerString($thanks, true);
         $ret .= $this->print_handler->TextStyle(true);
         $ret .= "\n\n";
+
+        return $ret;
     }
 }
 

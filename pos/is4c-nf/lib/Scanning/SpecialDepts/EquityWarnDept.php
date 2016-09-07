@@ -21,10 +21,16 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\Scanning\SpecialDepts;
+use COREPOS\pos\lib\Scanning\SpecialDept;
+use COREPOS\pos\lib\MiscLib;
+use \CoreLocal;
+
 class EquityWarnDept extends SpecialDept 
 {
     public $help_summary = 'Require cashier confirmation on equity sale';
 
+    // @hintable
     public function handle($deptID,$amount,$json)
     {
         if (CoreLocal::get("memberID") == "0" || CoreLocal::get("memberID") == CoreLocal::get("defaultNonMem")) {

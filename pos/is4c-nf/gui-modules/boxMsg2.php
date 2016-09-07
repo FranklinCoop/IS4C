@@ -21,6 +21,9 @@
 
 *********************************************************************************/
 
+use COREPOS\pos\lib\gui\BasicCorePage;
+use COREPOS\pos\lib\DisplayLib;
+use COREPOS\pos\lib\MiscLib;
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
 class boxMsg2 extends BasicCorePage 
@@ -28,6 +31,11 @@ class boxMsg2 extends BasicCorePage
     function head_content(){
         ?>
         <script type="text/javascript" src="js/boxMsg2.js"></script>
+        <script type="text/javascript">
+            function submitWrapper() {
+                boxMsg2.submitWrapper('../');
+            }
+        </script>
         <?php
         $this->noscan_parsewrapper_js();
     }
@@ -79,12 +87,10 @@ class boxMsg2 extends BasicCorePage
         
         CoreLocal::set("boxMsg",'');
         CoreLocal::set("boxMsgButtons", array());
-        CoreLocal::set("msgrepeat",2);
         if (!isset($_REQUEST['quiet']))
             MiscLib::errorBeep();
     } // END body_content() FUNCTION
 }
 
-if (basename(__FILE__) == basename($_SERVER['PHP_SELF']))
-    new boxMsg2();
+AutoLoader::dispatch();
 

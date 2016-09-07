@@ -38,26 +38,26 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
     protected $preview_opts = array(
         'upc' => array(
             'display_name' => 'UPC',
-            'default' => 7,
+            'default' => 8,
             'required' => true
         ),
         'price' => array(
             'display_name' => 'Sale Price',
-            'default' => 24,
+            'default' => 26,
             'required' => true
         ),
         'abt' => array(
             'display_name' => 'A/B/TPR',
-            'default' => 5,
+            'default' => 6,
             'required' => true
         ),
         'sku' => array(
             'display_name' => 'SKU',
-            'default' => 8,
+            'default' => 9,
         ),
         'mult' => array(
             'display_name' => 'Line Notes',
-            'default' => 13,
+            'default' => 15,
         ),
     );
 
@@ -137,9 +137,10 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
         list($upcP, $skuP, $insP) = $this->prepStatements($dbc);
 
         $rm_checks = (FormLib::get_form_value('rm_cds') != '') ? True : False;
+        $col_max = max($indexes);
         foreach ($linedata as $data) {
             if (!is_array($data)) continue;
-            if (count($data) < 14) continue;
+            if (count($data) < $col_max) continue;
 
             $upc = str_replace("-","",$data[$indexes['upc']]);
             $upc = str_replace(" ","",$upc);

@@ -21,6 +21,15 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\Scanning\SpecialUPCs;
+use COREPOS\pos\lib\Scanning\SpecialUPC;
+use \CoreLocal;
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\DiscountModule;
+use COREPOS\pos\lib\DisplayLib;
+use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\TransRecord;
+
 /**
   @class HouseCoupon
   WFC style custom store coupons
@@ -49,6 +58,7 @@ class HouseCoupon extends SpecialUPC
         return false;
     }
 
+    // @hintable
     public function handle($upc, $json)
     {
         $coupID = ltrim(substr($upc, -5), "0");
@@ -82,7 +92,6 @@ class HouseCoupon extends SpecialUPC
     private function lookupCoupon($id)
     {
         $dbc = Database::pDataConnect();
-        $hctable = $dbc->tableDefinition('houseCoupons');
         $infoQ = "SELECT endDate," 
                     . $dbc->identifierEscape('limit') . ",
                     discountType, 
@@ -95,19 +104,28 @@ class HouseCoupon extends SpecialUPC
                         WHEN endDate IS NULL THEN 0 
                         ELSE ". $dbc->datediff('endDate', $dbc->now()) . " 
                     END AS expired";
-        // new(ish) columns 16apr14
-        if (isset($hctable['description'])) {
-            $infoQ .= ', description';
-        } else {
-            $infoQ .= ', \'\' AS description';
-        }
-        if (isset($hctable['startDate'])) {
-            $infoQ .= ", CASE 
+        if (CoreLocal::get('NoCompat') == 1) {
+            $infoQ .= ", description, 
+                        CASE 
                           WHEN startDate IS NULL THEN 0 
                           ELSE ". $dbc->datediff('startDate', $dbc->now()) . " 
                         END as preStart";
         } else {
-            $infoQ .= ', 0 AS preStart';
+            // new(ish) columns 16apr14
+            $hctable = $dbc->tableDefinition('houseCoupons');
+            if (isset($hctable['description'])) {
+                $infoQ .= ', description';
+            } else {
+                $infoQ .= ', \'\' AS description';
+            }
+            if (isset($hctable['startDate'])) {
+                $infoQ .= ", CASE 
+                              WHEN startDate IS NULL THEN 0 
+                              ELSE ". $dbc->datediff('startDate', $dbc->now()) . " 
+                            END as preStart";
+            } else {
+                $infoQ .= ', 0 AS preStart';
+            }
         }
         $infoQ .= " FROM  houseCoupons 
                     WHERE coupID=" . ((int)$id);
@@ -339,6 +357,7 @@ class HouseCoupon extends SpecialUPC
         if ($infoW["memberOnly"] == 1 && CoreLocal::get("standalone")==0 
             && CoreLocal::get('memberID') != CoreLocal::get('visitingMem')) {
             $mDB = Database::mDataConnect();
+            $mAlt = Database::mAltName();
 
             // Lookup usage of this coupon by this member
             // Subquery is to combine today (dlog)
@@ -370,7 +389,7 @@ class HouseCoupon extends SpecialUPC
                      GROUP BY s.upc, s.card_no";
 
             $mRes = $mDB->query("SELECT quantity 
-                               FROM houseCouponThisMonth
+                               FROM {$mAlt}houseCouponThisMonth
                                WHERE card_no=" . CoreLocal::get("memberID") . " and
                                upc='$upc'");
             if ($mDB->num_rows($mRes) > 0) {
@@ -510,10 +529,33 @@ class HouseCoupon extends SpecialUPC
                 $valQ = "
                     SELECT 
                        SUM(CASE WHEN ItemQtty IS NULL THEN 0 ELSE ItemQtty END) AS qty
-                    " . $this->baseSQL($transDB, $coupID, 'upc'); 
+                    " . $this->baseSQL($transDB, $coupID, 'upc') . "
+                    and h.type in ('BOTH', 'DISCOUNT')";
                 $valR = $transDB->query($valQ);
                 $row = $transDB->fetch_row($valR);
                 $value = $row['qty'] * $value;
+                break;
+            case 'PS': // per set of items
+                $value = $infoW["discountValue"];
+
+                $qualQ = "
+                    SELECT 
+                       SUM(CASE WHEN ItemQtty IS NULL THEN 0 ELSE ItemQtty END) AS qty
+                    " . $this->baseSQL($transDB, $coupID, 'upc') . "
+                    and h.type in ('BOTH', 'QUALIFIER')";
+                $qualR = $transDB->query($qualQ);
+                $qualW = $transDB->fetch_row($qualR);
+
+                $discQ = "
+                    SELECT 
+                       SUM(CASE WHEN ItemQtty IS NULL THEN 0 ELSE ItemQtty END) AS qty
+                    " . $this->baseSQL($transDB, $coupID, 'upc') . "
+                    and h.type in ('BOTH', 'DISCOUNT')";
+                $discR = $transDB->query($discQ);
+                $discW = $transDB->fetch_row($discR);
+
+                $sets = ($qualW['qty'] > $discW['qty']) ? $discW['qty'] : $qualW['qty'];
+                $value = $sets * $value;
                 break;
             case "F": // completely flat; no scaling for weight
                 $value = $infoW["discountValue"];
@@ -541,6 +583,15 @@ class HouseCoupon extends SpecialUPC
                 $valQ = "select sum(total) 
                     " . $this->baseSQL($transDB, $coupID, 'department') . "
                     and h.type in ('BOTH', 'DISCOUNT')";
+                $valR = $transDB->query($valQ);
+                $row = $transDB->fetch_row($valR);
+                $value = $row[0] * $infoW["discountValue"];
+                break;
+            case "%S": // percent discount on all items in give department(s)
+                        // excluding sale items
+                $valQ = "select sum(total) 
+                    " . $this->baseSQL($transDB, $coupID, 'department') . "
+                    and h.type in ('BOTH', 'DISCOUNT') AND l.discounttype = 0";
                 $valR = $transDB->query($valQ);
                 $row = $transDB->fetch_row($valR);
                 $value = $row[0] * $infoW["discountValue"];
@@ -598,6 +649,7 @@ class HouseCoupon extends SpecialUPC
     /**
       This FROM/WHERE is super repetitive
     */
+    // @hintable
     private function baseSQL($dbc, $coupID, $mode='upc')
     {
         $ret = '

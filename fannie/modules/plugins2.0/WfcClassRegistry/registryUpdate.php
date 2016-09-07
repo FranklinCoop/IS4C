@@ -47,6 +47,13 @@ if (basename(__FILE__) == basename($_SERVER['PHP_SELF'])) {
     if ($_POST['field'] === 'editFirst') {
         $item->first_name($_POST['value']);
         $item->modified($timeStamp);
+        
+        $prep = $dbc->prepare('SELECT first_name FROM wfcuRegistry WHERE upc=? AND first_name IS NOT NULL;');
+        $result = $dbc->execute($prep, array($_POST['upc']));
+        $countRows = 0;
+        while($row = $dbc->fetch_row($result)) {
+            $countRows++;
+        }
     } elseif ($_POST['field'] === 'editLast') {
         $item->last_name($_POST['value']);
         $item->modified($timeStamp);
@@ -81,4 +88,3 @@ if (basename(__FILE__) == basename($_SERVER['PHP_SELF'])) {
     echo json_encode($ret);
 
 }
-

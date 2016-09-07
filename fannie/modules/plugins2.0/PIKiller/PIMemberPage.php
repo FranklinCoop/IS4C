@@ -155,6 +155,7 @@ class PIMemberPage extends PIKillerPage {
             $default = new MemtypeModel($dbc);
             $default->memtype($json['customerTypeID']);
             $default->load();
+            $json['memberStatus'] = $default->custdataType();
             $account_holder['discount'] = $default->discount();
             $account_holder['staff'] = $default->staff();
             $account_holder['chargeAllowed'] = $json['chargeLimit'] == 0 ? 0 : 1;
@@ -218,6 +219,18 @@ class PIMemberPage extends PIKillerPage {
         $cards->card_no($this->card_no);
         $cards->load();
         $cards->pushToLanes();
+
+        $prep = $dbc->prepare('
+            SELECT webServiceUrl FROM Stores WHERE hasOwnItems=1 AND storeID<>?
+            ');
+        $res = $dbc->execute($prep, array(\FannieConfig::config('STORE_ID')));
+        $client = new \Datto\JsonRpc\Http\Client($row['webServiceUrl']);
+        while ($row = $dbc->fetchRow($res)) {
+            $client = new \Datto\JsonRpc\Http\Client($row['webServiceUrl']);
+            $client->query(time(), 'COREPOS\\Fannie\\API\\webservices\\FannieMemberLaneSync', array('id'=>$this->card_no));
+            $client->send();
+        }
+
         header('Location: PIMemberPage.php?id='.$this->card_no);
 
         return false;

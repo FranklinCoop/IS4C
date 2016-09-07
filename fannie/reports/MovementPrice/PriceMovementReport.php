@@ -66,8 +66,10 @@ class PriceMovementReport extends FannieReportPage
         $deptStart = FormLib::get('deptStart');
         $deptEnd = FormLib::get('deptEnd');
         $deptMulti = FormLib::get('departments', array());
+        $subs = FormLib::get('subdepts', array());
     
         $buyer = FormLib::get('buyer', '');
+        $store = FormLib::get('store', 0);
 
         // args/parameters differ with super
         // vs regular department
@@ -85,6 +87,10 @@ class PriceMovementReport extends FannieReportPage
             list($conditional, $args) = DTrans::departmentClause($deptStart, $deptEnd, $deptMulti, $args);
             $where .= $conditional;
         }
+        if (count($subs) > 0) {
+            list($inStr, $args) = $dbc->safeInClause($subs, $args);
+            $where .= " AND p.subdept IN ($inStr) ";
+        }
 
         $dlog = DTransactionsModel::selectDlog($date1, $date2);
 
@@ -93,7 +99,11 @@ class PriceMovementReport extends FannieReportPage
                 p.brand,
                 p.description,"
                 . DTrans::sumQuantity('d') . " AS qty,
-                CASE WHEN memDiscount <> 0 AND memType <> 0 THEN unitPrice - memDiscount ELSE unitPrice END as price,
+                CASE 
+                    WHEN unitPrice=0.01 THEN total 
+                    WHEN memDiscount <> 0 AND memType <> 0 THEN unitPrice - memDiscount 
+                    ELSE unitPrice 
+                END as price,
                 d.department, 
                 t.dept_name, 
                 SUM(total) AS total
@@ -109,8 +119,10 @@ class PriceMovementReport extends FannieReportPage
         $query .= "
             WHERE tdate BETWEEN ? AND ?
                 AND $where
+                AND " . DTrans::isStoreID($store, 'd') . "
             GROUP BY d.upc,p.description,price,d.department,t.dept_name
             ORDER BY d.upc";
+        $args[] = $store;
 
         $prep = $dbc->prepare($query);
         $result = $dbc->execute($query, $args);

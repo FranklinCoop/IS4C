@@ -21,19 +21,15 @@
 
 *********************************************************************************/
 
+use COREPOS\pos\lib\LocalStorage\LaneCache;
+use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\plugins\Plugin;
+
 if (!defined('CONF_LOADED')) {
     include_once(dirname(__FILE__).'/LocalStorage/conf.php');
 }
-
-/**
-  @class LibraryClass
-  Class for defining library functions.
-  All methods should be static.
-
-  This exists to make documented hierarchy
-  more sensible.
-*/
-class LibraryClass {
+if (!class_exists('COREPOS\\pos\\lib\\LocalStorage\\LaneCache', false)) {
+    include(dirname(__FILE__) . '/LocalStorage/LaneCache.php');
 }
 
 /**
@@ -41,7 +37,7 @@ class LibraryClass {
   Map available modules and register automatic
   class loading
 */
-class AutoLoader extends LibraryClass 
+class AutoLoader 
 {
 
     /**
@@ -54,61 +50,46 @@ class AutoLoader extends LibraryClass
         $map = CoreLocal::get("ClassLookup");
         if (!is_array($map)) {
             // attempt to build map before giving up
-            self::loadMap();
-            $map = CoreLocal::get("ClassLookup");
+            $map = self::loadMap();
             if (!is_array($map)) {
                 return;
             }
         }
 
-        if (isset($map[$name]) && !file_exists($map[$name])) {
-            // file is missing. 
-            // rebuild map to see if the class is
-            // gone or the file just moved
-            self::loadMap();
-            $map = CoreLocal::get("ClassLookup");
-            if (!is_array($map)) {
-                return;
-            }
-        } elseif (!isset($map[$name]) && strpos($name, '\\') > 0) {
+        if (!isset($map[$name]) && strpos($name, '\\') > 0) {
             $pieces = explode('\\', $name);
+            if ($name[0] == '\\') { // some old PHP5.3 versions leave the leading backslash
+                $name = substr($name, 1);
+            }
             $sep = DIRECTORY_SEPARATOR;
-            if (count($pieces) > 2 && $pieces[0] == 'COREPOS' && $pieces[1] == 'common') {
-                $path = dirname(__FILE__) . $sep . '..' . $sep . '..' . $sep . '..' . $sep . 'common' . $sep;
-                $path .= self::arrayToPath(array_slice($pieces, 2));
-                if (file_exists($path)) {
-                    $map[$name] = $path;
-                }
-            } elseif (count($pieces) > 2 && $pieces[0] == 'COREPOS' && $pieces[1] == 'pos') {
-                $path = dirname(__FILE__) . $sep . '..' . $sep;
-                $path .= self::arrayToPath(array_slice($pieces, 2));
-                if (file_exists($path)) {
-                    $map[$name] = $path;
-                }
+            $our_path = false;
+            if (strpos($name, 'COREPOS\\pos\\') === 0) {
+                $our_path = __DIR__ . $sep . '..' . $sep . strtr(substr($name, 12), '\\', $sep) . '.php';
+            } elseif (strpos($name, 'COREPOS\\common\\') === 0) {
+                $our_path = __DIR__ . $sep . '..' . $sep . '..' . $sep . '..' . $sep . 'common' . $sep
+                    . strtr(substr($name, 15), '\\', $sep) . '.php';
+            }
+            if ($our_path) {
+                $map[$name] = $our_path;
+                CoreLocal::set('ClassLookup', $map);
             }
         } elseif (!isset($map[$name])) {
             // class is unknown
             // rebuild map to see if the definition
             // file has been added
-            self::loadMap();
-            $map = CoreLocal::get("ClassLookup");
+            $map = self::loadMap();
             if (!is_array($map)) {
                 return;
             }
         }
 
-        if (isset($map[$name]) && !class_exists($name,false)
-           && file_exists($map[$name])) {
-
-            include_once($map[$name]);
+        if (isset($map[$name]) && !class_exists($name,false)) {
+            $included = include_once($map[$name]);
+            if ($included === false) {
+                unset($map[$name]);
+                CoreLocal::set('ClassLookup', $map);
+            }
         }
-    }
-
-    private static function arrayToPath($arr)
-    {
-        $ret = array_reduce($arr, function($carry, $item){ return $carry . $item . DIRECTORY_SEPARATOR; });
-
-        return substr($ret, 0, strlen($ret)-1) . '.php';
     }
 
     /**
@@ -120,40 +101,41 @@ class AutoLoader extends LibraryClass
         $class_map = array();
         $search_path = realpath(dirname(__FILE__).'/../');
         self::recursiveLoader($search_path, $class_map);
-        CoreLocal::set("ClassLookup",$class_map);
+        CoreLocal::set('ClassLookup', $class_map);
+
+        return $class_map;
     }
 
     static private $class_paths = array(
-        'DiscountType'      => '/Scanning/DiscountTypes',
-        'FooterBox'         => '/FooterBoxes',
-        'Kicker'            => '/Kickers',
-        'Parser'            => '/../parser-class-lib/parse',
-        'PreParser'         => '/../parser-class-lib/preparse',
-        'PriceMethod'       => '/Scanning/PriceMethods',
-        'SpecialUPC'        => '/Scanning/SpecialUPCs',
-        'SpecialDept'       => '/Scanning/SpecialDepts',
-        'TenderModule'      => '/Tenders',
-        'ProductSearch'     => '/Search/Products',
-        'PrintHandler'      => '/PrintHandlers',
-        'TotalAction'       => '/TotalActions',
-        'TenderReport'      => '/ReceiptBuilding/TenderReports',
+        'COREPOS\pos\lib\Scanning\DiscountType' => '/Scanning/DiscountTypes',
+        'COREPOS\pos\lib\FooterBoxes\FooterBox' => '/FooterBoxes',
+        'COREPOS\pos\lib\Kickers\Kicker' => '/Kickers',
+        'COREPOS\\pos\\parser\\Parser' => '/../parser/parse',
+        'COREPOS\\pos\\parser\\PreParser' => '/../parser/preparse',
+        'COREPOS\pos\lib\Scanning\PriceMethod' => '/Scanning/PriceMethods',
+        'COREPOS\pos\lib\Scanning\SpecialUPC' => '/Scanning/SpecialUPCs',
+        'COREPOS\pos\lib\Scanning\SpecialDept' => '/Scanning/SpecialDepts',
+        'COREPOS\pos\lib\Tenders\TenderModule' => '/Tenders',
+        'COREPOS\pos\lib\Search\Products\ProductSearch' => '/Search/Products',
+        'COREPOS\pos\lib\PrintHandlers\PrintHandler' => '/PrintHandlers',
+        'COREPOS\pos\lib\TotalActions\TotalAction'       => '/TotalActions',
+        'COREPOS\pos\lib\ReceiptBuilding\TenderReports\TenderReport' => '/ReceiptBuilding/TenderReports',
         'BasicModel'        => '/models',
         'COREPOS\pos\lib\models\BasicModel' => '/models',
-        'DefaultReceiptDataFetch'   => '/ReceiptBuilding/ReceiptDataFetch',
-        'DefaultReceiptFilter'      => '/ReceiptBuilding/ReceiptFilter',
-        'DefaultReceiptSort'        => '/ReceiptBuilding/ReceiptSort',
-        'DefaultReceiptTag'         => '/ReceiptBuilding/ReceiptTag',
-        'DefaultReceiptSavings'     => '/ReceiptBuilding/ReceiptSavings',
-        'DefaultReceiptThanks'      => '/ReceiptBuilding/ThankYou',
-        'ReceiptMessage'            => '/ReceiptBuilding/Messages',
-        'CustomerReceiptMessage'    => '/ReceiptBuilding/custMessages',
-        'VariableWeightReWrite'     => '/Scanning/VariableWeightReWrites',
+        'COREPOS\pos\lib\ReceiptBuilding\DataFetch\DefaultReceiptDataFetch' => '/ReceiptBuilding/DataFetch',
+        'COREPOS\pos\lib\ReceiptBuilding\Filter\DefaultReceiptFilter' => '/ReceiptBuilding/Filter',
+        'COREPOS\pos\lib\ReceiptBuilding\Sort\DefaultReceiptSort' => '/ReceiptBuilding/Sort',
+        'COREPOS\pos\lib\ReceiptBuilding\Tag\DefaultReceiptTag' => '/ReceiptBuilding/Tag',
+        'COREPOS\pos\lib\ReceiptBuilding\Savings\DefaultReceiptSavings' => '/ReceiptBuilding/Savings',
+        'COREPOS\pos\lib\ReceiptBuilding\ThankYou\DefaultReceiptThanks' => '/ReceiptBuilding/ThankYou',
+        'COREPOS\pos\lib\ReceiptBuilding\Messages\ReceiptMessage' => '/ReceiptBuilding/Messages',
+        'COREPOS\pos\lib\ReceiptBuilding\CustMessages\CustomerReceiptMessage' => '/ReceiptBuilding/CustMessages',
+        'COREPOS\pos\lib\Scanning\VariableWeightReWrite' => '/Scanning/VariableWeightReWrites',
     );
 
     private static $base_classes = array(
-        'DiscountModule'    => '/DiscountModule.php',
-        'MemberLookup'      => '/MemberLookup.php',
-        'ItemNotFound'      => '/ItemNotFound.php',
+        'COREPOS\\pos\\lib\\MemberLookup' => '/MemberLookup.php',
+        'COREPOS\\pos\\lib\\ItemNotFound' => '/ItemNotFound.php',
     );
 
     /**
@@ -193,14 +175,14 @@ class AutoLoader extends LibraryClass
 
             if (strstr($file,'plugins')) {
                 $parent = Plugin::memberOf($file);
-                if ($base_class !== 'Plugin' && $parent && !Plugin::isEnabled($parent)) {
+                if ($base_class !== 'COREPOS\\pos\\plugins\\Plugin' && $parent && !Plugin::isEnabled($parent)) {
                     continue;
                 }
             }
 
             ob_start();
             $ns_class = self::fileToFullClass($file);
-            if (class_exists($ns_class)) {
+            if (!class_exists($name, false) && class_exists($ns_class)) {
                 $name = $ns_class;
             } elseif (!class_exists($name)) { 
                 ob_end_clean();
@@ -208,6 +190,8 @@ class AutoLoader extends LibraryClass
             }
 
             if (is_subclass_of($name,$base_class)) {
+                $ret[] = $name;
+            } elseif ($ns_class === $base_class && $include_base) {
                 $ret[] = $name;
             }
 
@@ -225,7 +209,7 @@ class AutoLoader extends LibraryClass
         }
     }
 
-    static private function fileToFullClass($file)
+    static public function fileToFullClass($file)
     {
         $file = realpath($file);
         if (substr($file, -4) == '.php') {
@@ -246,6 +230,7 @@ class AutoLoader extends LibraryClass
       @param $map array of class name => file
       @return $map (by reference)
     */
+    // @hintable
     static private function recursiveLoader($path,&$map=array())
     {
         if(!is_dir($path)) {
@@ -255,13 +240,21 @@ class AutoLoader extends LibraryClass
         // skip searching these directories
         // to improve overall performance
         $exclude = array(
+            'ajax',
+            'ajax-callbacks',
             'css',
             'graphics',
             'gui-modules',
+            'install',
             'js',
+            'Kickers',
             'locale',
             'log',
-            'NewMagellan',
+            'scale-drivers',
+            'models',
+            'noauto',
+            'PrintHandlers',
+            'ReceiptBuilding',
             'test',
         );
 
@@ -269,12 +262,12 @@ class AutoLoader extends LibraryClass
         while($dir && ($file=readdir($dir)) !== false) {
             if ($file[0] == ".") continue;
 
-            $fullname = realpath($path."/".$file);
+            $fullname = $path . DIRECTORY_SEPARATOR . $file;
             if (is_dir($fullname) && !in_array($file, $exclude)) {
                 self::recursiveLoader($fullname, $map);
             } else if (substr($file,-4) == '.php') {
                 $class = substr($file,0,strlen($file)-4);
-                $map[$class] = $fullname;
+                $map[$class] = realpath($fullname);
             }
         }
         closedir($dir);
@@ -313,6 +306,9 @@ spl_autoload_register(array('AutoLoader','loadClass'), true, true);
 if (file_exists(dirname(__FILE__) . '/../../../vendor/autoload.php')) {
     include_once(dirname(__FILE__) . '/../../../vendor/autoload.php');
 }
+
+COREPOS\common\ErrorHandler::setLogger(new \COREPOS\pos\lib\LaneLogger());
+COREPOS\common\ErrorHandler::setErrorHandlers();
 
 /** 
   Internationalization 

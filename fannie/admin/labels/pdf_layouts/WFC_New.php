@@ -67,6 +67,8 @@ $num = 1; // count tags
 $x = $left;
 $y = $top;
 //cycle through result array of query
+
+/*
 for ($ocount=0;$ocount<$offset;$ocount++){
     // move right by tag width
     $x += $width;
@@ -83,13 +85,13 @@ for ($ocount=0;$ocount<$offset;$ocount++){
 
     $num++;
 }
-
+*/
 
 foreach($data as $row){
-
+/*
     if (strlen(ltrim($row['upc'], '0')) <= 4) continue;
     elseif (substr($row['upc'], -6) == '000000') continue;
-
+*/
    // extract & format data
    $price = $row['normal_price'];
    $desc = strtoupper(substr($row['description'],0,27));

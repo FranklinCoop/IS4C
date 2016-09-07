@@ -21,9 +21,15 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\Scanning\DiscountTypes;
+use COREPOS\pos\lib\Scanning\DiscountType;
+use COREPOS\pos\lib\TransRecord;
+use \CoreLocal;
+
 class NormalPricing extends DiscountType 
 {
 
+    // @hintable
     public function priceInfo($row,$quantity=1)
     {
         $ret = array();

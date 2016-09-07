@@ -28,6 +28,10 @@ include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
     include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 }
+if (FannieConfig::config('SO_UI') === 'bootstrap') {
+    header('Location: NewSpecialOrdersPage.php');
+    return;
+}
 if (!function_exists('checkLogin')) {
     include($FANNIE_ROOT.'auth/login.php');
 }
@@ -94,6 +98,13 @@ $status = array(
     5 => "Arrived"
 );
 
+$stores = array(
+    0 => 'All',
+    1 => 'Hillside',
+    2 => 'Denfeld',
+);
+$myStore = COREPOS\Fannie\API\lib\Store::getIdByIp();
+
 $assignments = array();
 $q = "SELECT superID,super_name FROM MasterSuperDepts
     GROUP BY superID,super_name ORDER BY superID";
@@ -113,10 +124,18 @@ while($w = $dbc->fetch_row($r)){
 $f1 = (isset($_REQUEST['f1']) && $_REQUEST['f1'] !== '')?(int)$_REQUEST['f1']:'';
 $f2 = (isset($_REQUEST['f2']) && $_REQUEST['f2'] !== '')?$_REQUEST['f2']:'';
 $f3 = (isset($_REQUEST['f3']) && $_REQUEST['f3'] !== '')?$_REQUEST['f3']:'';
+$f4 = (isset($_REQUEST['f4']) && $_REQUEST['f4'] !== '')?$_REQUEST['f4']:$myStore;
 
 $filterstring = "";
 if ($f1 !== ''){
     $filterstring = sprintf("WHERE statusFlag=%d",$f1);
+}
+if ($f4) {
+    if (empty($filterstring)) {
+        $filterstring .= sprintf(' WHERE o.storeID=%d ', $f4);
+    } else {
+        $filterstring .= sprintf(' AND o.storeID=%d ', $f4);
+    }
 }
 
 echo '<a href="index.php">Main Menu</a>';
@@ -156,6 +175,13 @@ foreach($suppliers as $v){
         ($v===$f3?'selected':''),$v);
 }
 echo '</select>';
+echo '&nbsp;';
+echo '<b>Store</b>: <select id="f_4" onchange="refilter();">';
+foreach($stores as $k => $v){
+    printf("<option %s value=\"%s\">%s</option>",
+        ($k==$f4?'selected':''),$k, $v);
+}
+echo '</select>';
 echo '<hr />';
 
 if (isset($_REQUEST['card_no']) && is_numeric($_REQUEST['card_no'])){
@@ -176,10 +202,12 @@ $q = "SELECT min(datetime) as orderDate,p.order_id,sum(total) as value,
     o.subStatus AS sub_status,
     CASE WHEN MAX(p.card_no)=0 THEN MAX(o.lastName) ELSE MAX(c.LastName) END as name,
     MIN(CASE WHEN trans_type='I' THEN charflag ELSE 'ZZZZ' END) as charflag,
-    MAX(p.card_no) AS card_no
+    MAX(p.card_no) AS card_no,
+    MAX(s.description) AS storeName
     FROM {$TRANS}PendingSpecialOrder as p
         LEFT JOIN custdata AS c ON c.CardNo=p.card_no AND personNum=p.voided
         LEFT JOIN {$TRANS}SpecialOrders AS o ON p.order_id=o.specialOrderID
+        LEFT JOIN Stores AS s ON o.storeID=s.storeID
     $filterstring
     GROUP BY p.order_id,statusFlag,subStatus
     HAVING 
@@ -272,6 +300,7 @@ $ret = '<form id="pdfform" action="tagpdf.php" method="get">';
 $ret .= sprintf('<table cellspacing="0" cellpadding="4" border="1">
     <tr>
     <th><a href="" onclick="resort(\'%s\');return false;">Order Date</a></th>
+    <th><a href="" onclick="resort(\'%s\');return false;">Store</a></th>
     <th><a href="" onclick="resort(\'%s\');return false;">Name</a></th>
     <th>Desc</th>
     <th>Supplier</th>
@@ -280,6 +309,7 @@ $ret .= sprintf('<table cellspacing="0" cellpadding="4" border="1">
     <th><a href="" onclick="resort(\'%s\');return false;">Status</a></th>
     <th>Printed</th>',
     base64_encode("min(datetime)"),
+    base64_encode("MAX(s.description)"),
     base64_encode("CASE WHEN MAX(p.card_no)=0 THEN MAX(o.lastName) ELSE MAX(c.LastName) END"),
     base64_encode("sum(total)"),
     base64_encode("count(*)-1"),
@@ -294,6 +324,7 @@ foreach($orders as $w){
     if (!isset($valid_ids[$w['order_id']])) continue;
 
     $ret .= sprintf('<tr class="%s"><td><a href="view.php?orderID=%d&k=%s">%s</a></td>
+        <td>%s</td>
         <td><a href="" onclick="applyMemNum(%d);return false;">%s</a></td>
         <td style="font-size:75%%;">%s</td>
         <td style="font-size:75%%;">%s</td>
@@ -301,6 +332,7 @@ foreach($orders as $w){
         ($w['charflag']=='P'?'arrived':'notarrived'),
         $w['order_id'],$key,
         array_shift(explode(' ',$w['orderDate'])),
+        $w['storeName'],
         $w['card_no'],$w['name'],
         (isset($items[$w['order_id']])?$items[$w['order_id']]:'&nbsp;'),
         (isset($suppliers[$w['order_id']])?$suppliers[$w['order_id']]:'&nbsp;'),
@@ -329,8 +361,9 @@ function refilter(){
     var f1 = $('#f_1').val();
     var f2 = $('#f_2').val();
     var f3 = $('#f_3').val();
+    var f4 = $('#f_4').val();
 
-    var loc = 'clearinghouse.php?f1='+f1+'&f2='+f2+'&f3='+f3;
+    var loc = 'clearinghouse.php?f1='+f1+'&f2='+f2+'&f3='+f3+'&f4='+f4;
     if ($('#cardno').length!=0)
         loc += '&card_no='+$('#cardno').val();
     if ($('#orderSetting').length!=0)
@@ -350,22 +383,22 @@ function applyMemNum(n){
 }
 function updateStatus(oid,val){
     $.ajax({
-    url: 'ajax-calls.php',
+    url: 'OrderAjax.php',
     type: 'post',
-    data: 'action=UpdateStatus&orderID='+oid+'&val='+val,
+    data: 'id='+oid+'&status='+val,
+    dataType: 'json',
     cache: false,
     success: function(resp){
-        $('#statusdate'+oid).html(resp);    
+        $('#statusdate'+oid).html(resp.tdate);
     }
     });
 }
 function togglePrint(username,oid){
     $.ajax({
-    url: 'ajax-calls.php',
-    type: 'post',
-    data: 'action=UpdatePrint&orderID='+oid+'&user='+username,
-    cache: false,
-    success: function(resp){}
+        url: 'OrderViewPage.php',
+        type: 'post',
+        data: 'orderID='+oid+'&togglePrint=1',
+        cache: false
     });
 }
 </script>

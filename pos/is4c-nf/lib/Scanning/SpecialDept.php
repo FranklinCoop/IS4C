@@ -21,6 +21,9 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\Scanning;
+use \ReflectionClass;
+
 /**
   @class SpecialDept
 
@@ -51,6 +54,7 @@ class SpecialDept
       @param $arr a handler map (array)
       @return handler map (array)
     */
+    // @hintable
     public function register($deptID,$arr)
     {
         if (!is_array($arr)) {
@@ -79,9 +83,32 @@ class SpecialDept
       will be invoked within a Parser object and
       hence uses the same return format.
     */
+    // @hintable
     public function handle($deptID,$amount,$json)
     {
         return $json;
+    }
+
+    private static $builtin = array(
+        'ArWarnDept',
+        'AutoReprintDept',
+        'BottleReturnDept',
+        'EquityEndorseDept',
+        'EquityWarnDept',
+        'PaidOutDept',
+    );
+
+    // @hintable
+    public static function factory($class)
+    {
+        if ($class != '' && in_array($class, self::$builtin)) {
+            $class = 'COREPOS\\pos\\lib\\Scanning\\SpecialDepts\\' . $class;
+            return new $class();
+        } elseif ($class != '' && class_exists($class)) {
+            return new $class();
+        }
+
+        return new self();
     }
 }
 

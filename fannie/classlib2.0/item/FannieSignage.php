@@ -21,7 +21,7 @@
 
 *********************************************************************************/
 
-namespace COREPOS\Fannie\API\item {
+namespace COREPOS\Fannie\API\item;
 
 class FannieSignage 
 {
@@ -440,12 +440,14 @@ class FannieSignage
                     p.start_date AS startDate,
                     p.end_date AS endDate,
                     o.name AS originName,
-                    o.shortName AS originShortName
+                    o.shortName AS originShortName,
+                    CASE WHEN l.signMultiplier IS NULL THEN 1 ELSE l.signMultiplier END AS signMultiplier
                  FROM products AS p
                     LEFT JOIN productUser AS u ON p.upc=u.upc
                     LEFT JOIN vendors AS n ON p.default_vendor_id=n.vendorID
                     LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
+                    LEFT JOIN batchList AS l ON p.batchID=l.batchID AND p.upc=l.upc
                  WHERE p.upc IN (' . $ids . ') ';
         if (\FannieConfig::config('STORE_MODE') == 'HQ') {
             $query .= ' AND p.store_id=? ';
@@ -748,6 +750,8 @@ class FannieSignage
         } elseif (substr($price, -3) == '.25') {
             $ttl = round(4*$price);
             return '4/$' . $ttl;
+        } elseif ($price == 1) {
+            return '5/$5';
         } elseif (substr($price, -3) == '.00' && $price <= 5.00) {
             $mult = 2;
             while (($mult+1)*$price <= 10) {
@@ -756,8 +760,11 @@ class FannieSignage
             return sprintf('%d/$%d', $mult, round($mult*$price));
         } elseif (substr($price, 0, 1) == '$') {
             return $price;
-        } elseif (strstr($price, '/')) {
+        } elseif (strstr($price, '/') || strstr($price, '%')) {
             return $price;
+        } elseif ($price < 1) {
+            // weird contortions because floating-point rounding
+            return substr(sprintf('%.2f', $price),-2) . chr(0xA2);
         } else {
             return sprintf('$%.2f', $price);
         }
@@ -776,7 +783,7 @@ class FannieSignage
 
     protected static function formatOffString($price, $multiplier, $regPrice)
     {
-        if ($regPrice == 0) {
+        if ($regPrice == 0 || $multiplier == -4) {
             return sprintf('%.2f', $price);
         } elseif ($multiplier == -1) {
             $off = self::dollarsOff($price, $regPrice);
@@ -844,6 +851,11 @@ class FannieSignage
 
     protected function formatSize($size, $item)
     {
+        $plu = ltrim($item['upc'], '0');
+        if (strlen($plu) < 5 && strlen($plu) > 0 && $item['scale']) {
+            return 'PLU# ' . ltrim($item['upc'], '0'); // show PLU #s on by-weight
+        }
+
         $size = trim(strtolower($size));
         if ($size == '0' || $size == '00' || $size == '') {
             return '';
@@ -853,9 +865,6 @@ class FannieSignage
         }
         if (substr($size, 0, 1) == '.') {
             $size = '0' . $size; // add leading zero on decimal qty
-        }
-        if (strlen(ltrim($item['upc'], '0')) < 5 && $item['scale']) {
-            $size = 'PLU# ' . ltrim($item['upc'], '0'); // show PLU #s on by-weight
         }
 
         return $size;
@@ -947,11 +956,5 @@ class FannieSignage
 
         return $pdf;
     }
-}
-
-}
-
-namespace {
-    class FannieSignage extends \COREPOS\Fannie\API\item\FannieSignage {}
 }
 

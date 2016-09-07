@@ -72,7 +72,7 @@ those same items revert to normal pricing.
     {
         $batchInfoQ = $this->connection->prepare("SELECT batchType,discountType FROM batches WHERE batchID = ?");
         $batchInfoR = $this->connection->execute($batchInfoQ,array($id));
-        $batchInfoW = $this->connection->fetch_array($batchInfoR);
+        $batchInfoW = $this->connection->fetchRow($batchInfoR);
 
         $forceQ = "";
         $forceLCQ = "";
@@ -80,11 +80,13 @@ those same items revert to normal pricing.
         $b_def = $this->connection->tableDefinition($this->name);
         $p_def = $this->connection->tableDefinition('products');
         $has_limit = (isset($b_def['transLimit']) && isset($p_def['special_limit'])) ? true : false;
+        $isHQ = FannieConfig::config('STORE_MODE') == 'HQ' ? true : false;
         if ($batchInfoW['discountType'] != 0) { // item is going on sale
             $forceQ="
                 UPDATE products AS p
                     INNER JOIN batchList AS l ON p.upc=l.upc
                     INNER JOIN batches AS b ON l.batchID=b.batchID
+                    " . ($isHQ ? ' INNER JOIN StoreBatchMap AS m ON b.batchID=m.batchID and p.store_id=m.storeID ' : '') . "
                 SET p.start_date = b.startDate, 
                     p.end_date=b.endDate,
                     p.special_price=l.salePrice,
@@ -108,6 +110,7 @@ those same items revert to normal pricing.
                     INNER JOIN upcLike AS v ON v.upc=p.upc
                     INNER JOIN batchList as l ON l.upc=concat('LC',convert(v.likecode,char))
                     INNER JOIN batches AS b ON b.batchID=l.batchID
+                    " . ($isHQ ? ' INNER JOIN StoreBatchMap AS m ON b.batchID=m.batchID and p.store_id=m.storeID ' : '') . "
                 SET p.special_price = l.salePrice,
                     p.end_date = b.endDate,
                     p.start_date=b.startDate,
@@ -174,7 +177,8 @@ those same items revert to normal pricing.
         } else { // normal price is changing
             $forceQ = "
                 UPDATE products AS p
-                      INNER JOIN batchList AS l ON l.upc=p.upc
+                    INNER JOIN batchList AS l ON l.upc=p.upc
+                    " . ($isHQ ? ' INNER JOIN StoreBatchMap AS m ON l.batchID=m.batchID and p.store_id=m.storeID ' : '') . "
                 SET p.normal_price = l.salePrice,
                     p.modified = now()
                 WHERE l.upc not like 'LC%'
@@ -192,6 +196,7 @@ those same items revert to normal pricing.
                 UPDATE products AS p
                     INNER JOIN upcLike AS v ON v.upc=p.upc 
                     INNER JOIN batchList as b on b.upc=concat('LC',convert(v.likecode,char))
+                    " . ($isHQ ? ' INNER JOIN StoreBatchMap AS m ON b.batchID=m.batchID and p.store_id=m.storeID ' : '') . "
                 SET p.normal_price = b.salePrice,
                     p.modified=now()
                 WHERE b.upc LIKE 'LC%'
@@ -363,7 +368,8 @@ those same items revert to normal pricing.
                 p.end_date
             FROM products AS p
                 INNER JOIN batchList AS b ON p.upc=b.upc
-            WHERE b.batchID=?');
+            WHERE b.batchID=?
+                AND p.store_id=?');
         $lcColumnsP = $this->connection->prepare('
             SELECT p.upc,
                 p.normal_price,
@@ -381,20 +387,24 @@ those same items revert to normal pricing.
                 INNER JOIN upcLike AS u ON p.upc=u.upc
                 INNER JOIN batchList AS b 
                     ON b.upc = ' . $this->connection->concat("'LC'", $this->connection->convert('u.likeCode', 'CHAR'), '') . '
-            WHERE b.batchID=?');
+            WHERE b.batchID=?
+                AND p.store_id=?');
 
         /**
           Get changed columns for each product record
         */
         $upcs = array();
-        $columnsR = $this->connection->execute($columnsP, array($id));
+        $columnsR = $this->connection->execute($columnsP, array($id, FannieConfig::config('STORE_ID')));
         while ($w = $this->connection->fetch_row($columnsR)) {
             $upcs[$w['upc']] = $w;
         }
-        $columnsR = $this->connection->execute($lcColumnsP, array($id));
+        $columnsR = $this->connection->execute($lcColumnsP, array($id, FannieConfig::config('STORE_ID')));
         while ($w = $this->connection->fetch_row($columnsR)) {
             $upcs[$w['upc']] = $w;
         }
+
+        $update = new ProdUpdateModel($this->connection);
+        $update->logManyUpdates(array_keys($upcs), $updateType);
 
         $updateQ = '
             UPDATE products AS p SET
@@ -448,8 +458,17 @@ those same items revert to normal pricing.
             }
         }
 
-        $update = new ProdUpdateModel($this->connection);
-        $update->logManyUpdates(array_keys($upcs), $updateType);
+        if (FannieConfig::config('STORE_MODE') === 'HQ' && class_exists('\\Datto\\JsonRpc\\Http\\Client')) {
+            $prep = $this->connection->prepare('
+                SELECT webServiceUrl FROM Stores WHERE hasOwnItems=1 AND storeID<>?
+                ');
+            $res = $this->connection->execute($prep, array(\FannieConfig::config('STORE_ID')));
+            while ($row = $this->connection->fetchRow($res)) {
+                $client = new \Datto\JsonRpc\Http\Client($row['webServiceUrl']);
+                $client->query(time(), 'COREPOS\\Fannie\\API\\webservices\\FannieItemLaneSync', array('upc'=>array_keys($upcs), 'fast'=>true));
+                $client->send();
+            }
+        }
     }
 
     /**

@@ -21,14 +21,27 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib;
+use COREPOS\pos\lib\DisplayLib;
+use COREPOS\pos\lib\TransRecord;
+
 /**
   @class ItemNotFound
   Deal with a UPC entry that doesn't
   exist in products or match a SpecialUPC
   handler
 */
-class ItemNotFound extends LibraryClass 
+class ItemNotFound 
 {
+    public static function factory($class)
+    {
+        if ($class !== '' && $class !== 'ItemNotFound' && class_exists($class)) {
+            return new $class();
+        }
+
+        return new ItemNotFound();
+    }
+
     /**
       React to missing item
       @param $upc [string] UPC value
@@ -39,6 +52,7 @@ class ItemNotFound extends LibraryClass
       same format as Parser since this module interacts
       with input parsing. 
     */
+    // @hintable
     public function handle($upc, $json)
     {
         $opts = array('upc'=>$upc,'description'=>'BADSCAN');

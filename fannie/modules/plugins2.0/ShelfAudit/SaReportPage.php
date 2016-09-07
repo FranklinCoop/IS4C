@@ -39,6 +39,7 @@ class SaReportPage extends FanniePage {
     protected $header = '';
 
     private $status = '';
+    private $store = false;
     private $sql_actions = '';
     private $scans = array();
 
@@ -70,54 +71,31 @@ class SaReportPage extends FanniePage {
         } else if (FormLib::get('change')=='yes') {
         }
 
-        if (FormLib::get_form_value('view') == 'dept'){
+        if (FormLib::get_form_value('view') == 'section'){
+            $order='s.section,d.dept_no,s.datetime';
+        } elseif(FormLib::get_form_value('excel') == 'yes'){
+            $order='salesCode, d.dept_no, s.datetime';
+        } else {
             $order='d.dept_no,s.section,s.datetime';
         }
-        elseif(FormLib::get_form_value('excel') == 'yes'){
-            $order='salesCode, d.dept_no, s.datetime';
-        } 
-        else {
-            $order='s.section,d.dept_no,s.datetime';
-        }
     
-        /* omitting wedge-specific temp tables Andy 29Mar2013
-        $t=true;
-        
-        $q='START TRANSACTION';
-        $r=mysql_query($q, $link);
-        $t=&$r;
-        
-        $q='CREATE TEMPORARY TABLE `shelfaudit`.`tLastModified` (`upc` VARCHAR(13) NOT NULL, 
-            `modified` DATETIME NOT NULL, KEY `upc_modified` (`upc`,`modified`)) 
-            ENGINE = MYISAM';
-        $r=mysql_query($q, $link);
-        $t=&$r;
-                    
-        $q='SELECT `upc`, `datetime` FROM `shelfaudit`.`hbc_inventory` WHERE CLEAR!=1';
-        $r=mysql_query($q, $link);
-        $t=&$r;
-                    
-        $scans=array();
-        
-        while ($row=mysql_fetch_assoc($r)) {
-            array_push($scans, array($row['upc'], $row['datetime']));
+        $this->store = FormLib::get('store', false);
+        if ($this->store === false ) {
+            $this->store = COREPOS\Fannie\API\lib\Store::getIdByIp();
         }
-            
-        foreach ($scans as $scan) {
-            $q='INSERT INTO `shelfaudit`.`tLastModified` 
-                SELECT \''.$scan[0].'\', MAX(`modified`) 
-                FROM `wedgepos`.`itemTableLog` WHERE `upc`=\''.$scan[0].'\'';
-            $r=mysql_query($q, $link);
-            $t=&$r;
+        if ($this->config->get('STORE_MODE') !== 'HQ') {
+            $store = 0;
         }
-        */
-            
         $q= $dbc->prepare('SELECT
             s.id,
             s.datetime,
             s.upc,
             s.quantity,
-            s.section,
+            CASE
+                WHEN s.section=0 THEN \'Backstock\'
+                WHEN s.section=1 THEN \'Floor\'
+                ELSE \'Unknown\'
+            END AS section,
             CASE 
                 WHEN p.description IS NULL AND v.description IS NULL THEN \'Not in POS\' 
                 WHEN p.description IS NULL AND v.description IS NOT NULL THEN v.description
@@ -156,8 +134,9 @@ class SaReportPage extends FanniePage {
             $FANNIE_OP_DB.$dbc->sep().'vendors AS z
             ON p.default_vendor_id=z.vendorID
             WHERE clear!=1
+                AND s.storeID=?
             ORDER BY '.$order);
-        $r=$dbc->execute($q);
+        $r=$dbc->execute($q, array($this->store));
         $upcs = array();
         if ($r) {
             $this->status = 'Good - Connected';
@@ -165,9 +144,10 @@ class SaReportPage extends FanniePage {
             if ($num_rows>0) {
                 $this->scans=array();
                 while ($row = $dbc->fetchRow($r)){
-                    if (!isset($upcs[$row['upc']])) {
+                    $key = $row['upc'] . '-' . $row['section'];
+                    if (!isset($upcs[$key])) {
                         $this->scans[] = $row;
-                        $upcs[$row['upc']] = true;
+                        $upcs[$key] = true;
                     }
                 }
             } else {
@@ -305,14 +285,17 @@ table.shelf-audit tr:hover {
 
     function body_content(){
         ob_start();
+        $stores = FormLib::storePicker();
+        $stores['html'] = str_replace('<select', '<select onchange="location=\'?store=\'+this.value;" ', $stores['html']);
         ?>
         <div id="bdiv">
             <p><a href="#" onclick="window.open('SaScanningPage.php','scan','width=320, height=200, location=no, menubar=no, status=no, toolbar=no, scrollbars=no, resizable=no');">Enter a new scan</a></p>
             <p><a href="SaHandheldPage.php">Alternate Scan Page</a></p>
             <p><?php echo($this->sql_actions); ?></p>
             <p><?php echo($this->status); ?></p>
-            <p><a href="?view=dept">view by pos department</a> <a href="SaReportPage.php">view by scanned section</a></p>
-            <p><a href="?excel=yes">download as csv</a></p>
+            <p><a href="SaReportPage.php">view by pos department</a> <a href="SaReportPage.php?view=section">view by scanned section</a></p>
+            <p><?php echo $stores['html']; ?></p>
+            <p><a href="?excel=yes&store=<?php echo $this->store; ?>">download as csv</a></p>
         <?php
         if ($this->scans) {
             $clear = '<div><a href="SaReportPage.php?clear=yes">Clear Old</a></div>';
@@ -332,7 +315,7 @@ table.shelf-audit tr:hover {
                 $counter_total=$row['quantity']*$row['normal_retail'];
                 
                 if ($counter=='d') { $caption=$row['dept_name'].' Department'; }
-                else { $caption='Section #'.$row['section']; }
+                else { $caption='Section: '.$row['section']; }
                 
                 $table .= '
         <table class="table shelf-audit">
@@ -372,7 +355,7 @@ table.shelf-audit tr:hover {
                 else { $counter_number=$row['section']; }
                 
                 if ($counter=='d') { $caption=$row['dept_name'].' Department'; }
-                else { $caption='Section #'.$row['section']; }
+                else { $caption='Section: '.$row['section']; }
                                 
                 $table .= '
             </tbody>

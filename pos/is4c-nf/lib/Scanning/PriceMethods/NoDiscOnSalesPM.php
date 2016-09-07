@@ -21,6 +21,11 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\Scanning\PriceMethods;
+use COREPOS\pos\lib\Scanning\PriceMethod;
+use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\TransRecord;
+
 /** 
    @class NoDiscOnSalePM
 
@@ -32,6 +37,7 @@
 
 class NoDiscOnSalesPM extends PriceMethod {
 
+    // @hintable
     function addItem($row,$quantity,$priceObj){
         if ($quantity == 0) return false;
 

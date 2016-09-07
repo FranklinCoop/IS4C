@@ -35,10 +35,10 @@ class Signage4UpL extends \COREPOS\Fannie\API\item\FannieSignage
     protected $font = 'Arial';
     protected $alt_font = 'Arial';
 
-    protected $width = 136.52;
+    protected $width = 139;
     protected $height = 108;
     protected $top = 30;
-    protected $left = 15;
+    protected $left = 16;
 
     public function drawPDF()
     {
@@ -65,7 +65,7 @@ class Signage4UpL extends \COREPOS\Fannie\API\item\FannieSignage
 
             $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($row*$this->height));
             $pdf->SetFont($this->font, 'B', $this->SMALL_FONT);
-            $pdf->Cell($effective_width, 10, $item['brand'], 0, 1, 'C');
+            $pdf->Cell($effective_width, 10, strtoupper($item['brand']), 0, 1, 'C');
             $pdf->SetX($this->left + ($this->width*$column));
             $pdf->SetFont($this->font, '', $this->MED_FONT);
             $item['description'] = str_replace("\r", '', $item['description']);

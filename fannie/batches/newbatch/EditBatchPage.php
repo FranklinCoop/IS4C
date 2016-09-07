@@ -35,10 +35,10 @@ class EditBatchPage extends FannieRESTfulPage
     protected $auth_classes = array('batches','batches_audited');
     protected $title = 'Sales Batches Tool';
     protected $header = 'Sales Batches Tool';
+    protected $enable_linea = true;
 
     public $description = '[Sales Batches] is the primary tool for creating, editing, and managing 
     sale and price change batches.';
-    public $themed = true;
 
     private $audited = 1;
     private $con = null;
@@ -80,29 +80,28 @@ class EditBatchPage extends FannieRESTfulPage
 
     protected function get_id_paste_handler()
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
         $uid = getUID($this->current_user);
         $uid = ltrim($uid,'0');
-        $bid = $this->id;
 
-        $q = $dbc->prepare("
+        $prep = $dbc->prepare("
             SELECT listID 
             FROM batchList AS l 
                 INNER JOIN batchCutPaste as b ON b.upc=l.upc AND b.batchID=l.batchID
             WHERE b.uid=?"
         );
-        $r = $dbc->execute($q,array($uid));
+        $res = $dbc->execute($prep,array($uid));
         $upP = $dbc->prepare('UPDATE batchList SET batchID=? WHERE listID=?');
         $count = 0;
-        while ($w = $dbc->fetch_row($r)) {
-            $dbc->execute($upP,array($bid,$w['listID']));
+        while ($row = $dbc->fetchRow($res)) {
+            $dbc->execute($upP,array($this->id,$row['listID']));
             $count++;
         }
         $delP = $dbc->prepare("DELETE FROM batchCutPaste WHERE uid=?");
         $dbc->execute($delP,$uid);
 
-        $this->add_onload_command("showBootstrapAlert('#inputarea', 'success', 'Pasted $count items');\n");
+        $this->addOnloadCommand("showBootstrapAlert('#inputarea', 'success', 'Pasted $count items');\n");
 
         return true;
     }
@@ -134,9 +133,8 @@ class EditBatchPage extends FannieRESTfulPage
             date('Y-m-d', strtotime($batch->endDate())),
         );
         $overlapR = $dbc->execute($overlapP, $args);
-        if ($batch->discountType() > 0 && $dbc->num_rows($overlapR) > 0) {
-            $row = $dbc->fetch_row($overlapR);
-            return $row;
+        if ($batch->discountType() > 0 && $dbc->numRows($overlapR) > 0) {
+            return $dbc->fetchRow($overlapR);
         } else {
             return false;
         }
@@ -144,9 +142,8 @@ class EditBatchPage extends FannieRESTfulPage
 
     protected function post_id_addUPC_handler()
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
-        $id = $this->id;
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
         $upc = trim($this->addUPC);
         $upc = BarcodeLib::padUPC($upc);
 
@@ -160,13 +157,13 @@ class EditBatchPage extends FannieRESTfulPage
         /**
           Nothing submitted; don't do anything
         */
-        if ($this->addUPC === '') {
+        if ($upc === '') {
             echo json_encode($json);
             return false;
         }
 
-        $overlap = $this->checkOverlap($id, $upc);
-        if ($overlap !== false) {
+        $overlap = $this->checkOverlap($this->id, $upc);
+        if ($this->config->get('STORE_MODE') != 'HQ' && $overlap !== false) {
             $error = 'Item already in concurrent batch: '
                 . '<a style="color:blue;" href="EditBatchPage.php?id=' . $overlap['batchID'] . '">'
                 . $overlap['batchName'] . '</a> ('
@@ -184,7 +181,7 @@ class EditBatchPage extends FannieRESTfulPage
                 $json['error'] = 1;
                 $json['msg'] = 'Item not found: ' . $upc;
             } else {
-                $json['content'] = $this->addItemPriceInput($upc, false, $product->description(), $product->normal_price());
+                $json['content'] = $this->addItemPriceInput($upc, $product->description(), $product->normal_price());
                 $json['field'] = '#add-item-price';
             }
         }
@@ -195,8 +192,8 @@ class EditBatchPage extends FannieRESTfulPage
 
     protected function post_id_addLC_handler()
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
 
         $json = array(
             'error' => 0,
@@ -222,13 +219,12 @@ class EditBatchPage extends FannieRESTfulPage
             WHERE l.likeCode=?
             ORDER BY p.normal_price
         ');
-        $infoR = $dbc->execute($infoP, array($this->addLC));
-        if ($dbc->num_rows($infoR) == 0) {
+        $infoW = $dbc->getRow($infoP, array($this->addLC));
+        if ($infoW === false) {
             $json['error'] = 1;
             $json['msg'] = 'Like code #' . $this->addLC . ' not found';
         } else {
-            $infoW = $dbc->fetch_row($infoR);
-            $json['content'] = $this->addItemPriceInput('LC' . $this->addLC, false, $infoW['likeCodeDesc'], $infoW['normal_price']);
+            $json['content'] = $this->addItemPriceInput('LC' . $this->addLC, $infoW['likeCodeDesc'], $infoW['normal_price']);
             $json['field'] = '#add-item-price';
         }
 
@@ -239,8 +235,8 @@ class EditBatchPage extends FannieRESTfulPage
 
     protected function post_id_upc_price_handler()
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
         $price = trim($this->price);
 
         $json = array(
@@ -248,7 +244,7 @@ class EditBatchPage extends FannieRESTfulPage
             'added' => 0,
         );
         
-        if ($price != "") {
+        if ($price != '') {
             $model = new BatchListModel($dbc);
             $model->upc($this->upc);
             $model->batchID($this->id);
@@ -258,7 +254,7 @@ class EditBatchPage extends FannieRESTfulPage
             $model->pricemethod(0);
             $model->save();
 
-            if (FormLib::get_form_value('audited') == '1') {
+            if (FormLib::get('audited') == '1') {
                 \COREPOS\Fannie\API\lib\AuditLib::batchNotification(
                     $this->id, 
                     $this->upc, 
@@ -275,8 +271,8 @@ class EditBatchPage extends FannieRESTfulPage
 
     protected function post_id_autotag_handler()
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
 
         $bid = $this->id;
         $delQ = $dbc->prepare("DELETE FROM batchBarcodes where batchID=?");
@@ -313,7 +309,7 @@ class EditBatchPage extends FannieRESTfulPage
             (upc,description,normal_price,brand,sku,size,units,vendor,batchID)
             VALUES (?,?,?,?,?,?,?,?,?)");
         $tag_count = 0;
-        while ($selW = $dbc->fetch_row($selR)) {
+        while ($selW = $dbc->fetchRow($selR)) {
             if ($upc != $selW['upc']){
                 $dbc->execute($insP,array(
                     $selW['upc'], $selW['description'],
@@ -335,8 +331,8 @@ class EditBatchPage extends FannieRESTfulPage
 
     protected function post_id_force_handler()
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
         $model = new BatchesModel($dbc);
         $model->forceStartBatch($this->id);
         $json = array('error'=>0, 'msg'=>'Batch #' . $this->id . ' has been applied');
@@ -347,8 +343,8 @@ class EditBatchPage extends FannieRESTfulPage
 
     protected function post_id_unsale_handler()
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
         $model = new BatchesModel($dbc);
         $model->forceStopBatch($this->id);
 
@@ -360,8 +356,8 @@ class EditBatchPage extends FannieRESTfulPage
 
     protected function post_id_limit_handler()
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
 
         $batches = new BatchesModel($dbc);
         $batches->batchID($this->id);
@@ -373,8 +369,8 @@ class EditBatchPage extends FannieRESTfulPage
 
     protected function post_id_upc_uid_cut_handler()
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
 
         $delP = $dbc->prepare('
             DELETE
@@ -401,8 +397,8 @@ class EditBatchPage extends FannieRESTfulPage
 
     protected function post_id_upc_price_qty_handler()
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
         $json = array('error'=>0, 'msg'=>'');
 
         if (!is_numeric($this->qty) || $this->qty < 1 || $this->qty != round($this->qty)) {
@@ -434,7 +430,7 @@ class EditBatchPage extends FannieRESTfulPage
         $upQ = $dbc->prepare("update batchBarcodes set normal_price=? where upc=? and batchID=?");
         $upR = $dbc->execute($upQ,array($this->price,$this->upc,$this->id));
 
-        if (FormLib::get_form_value('audited') == '1') {
+        if (FormLib::get('audited') == '1') {
             \COREPOS\Fannie\API\lib\AuditLib::batchNotification(
                 $this->id, 
                 $this->upc, 
@@ -641,52 +637,44 @@ class EditBatchPage extends FannieRESTfulPage
 
     private function addItemUPCInput($newtags=false)
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
-        $ret = "<form class=\"form-inline\" onsubmit=\"batchEdit.advanceToPrice(); return false;\" id=\"add-item-form\">";
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->OP_DB);
+        $model = new LikeCodesModel($dbc);
+        $lcOpts = $model->toOptions(-1);
 
-        $ret .= '<span class="add-by-upc-fields">';
-        $ret .= "<label class=\"control-label\">UPC</label>
-            <input type=text maxlength=13 name=\"addUPC\" id=addItemUPC 
-            class=\"form-control\" /> ";
-        $ret .= '</span>';
-
-        $ret .= '<span class="add-by-lc-fields collapse">';
-        $ret .= "<label class=\"control-label\">Like code</label><input type=text id=addItemLC 
-            name=\"addLC\" size=4 value=1 class=\"form-control\" disabled /> ";
-        $ret .= "<select id=lcselect onchange=\"\$('#addItemLC').val(this.value);\" class=\"form-control\" disabled>";
-        $lcQ = $dbc->prepare("select likecode,likecodeDesc from likeCodes order by likecode");
-        $lcR = $dbc->execute($lcQ);
-        while ($lcW = $dbc->fetch_array($lcR)) {
-            $ret .= "<option value=$lcW[0]>$lcW[0] $lcW[1]</option>";
-        }
-        $ret .= "</select>";
-        $ret .= '</span>';
-
-        $ret .= "<button type=submit value=Add class=\"btn btn-default\">Add</button>";
-        /* No shelf tag creation
-        $ret .= "<input type=checkbox id=addItemTag name=\"tag\" ";
-         if ($newtags) {
-            $ret .= " checked";
-        }
-        $ret .= " /> <label for=\"addItemTag\">New shelf tag</label>";
-        */
-        $ret .= " <input type=checkbox id=addItemLikeCode onchange=\"batchEdit.toggleUpcLcInput();\" /> 
-            <label for=\"addItemLikeCode\" class=\"control-label\">Likecode</label>";
-        $ret .= "</form>";
-        
-        return $ret;
+        return <<<HTML
+<form class="form-inline" onsubmit="batchEdit.advanceToPrice(); return false;" id="add-item-form">
+    <span class="add-by-upc-fields">
+        <label class=\"control-label\">UPC</label>
+        <input type=text maxlength=13 name="addUPC" id=addItemUPC 
+            class="form-control" /> 
+    </span>
+    <span class="add-by-lc-fields collapse">
+        <label class="control-label">Like code</label>
+        <input type=text id=addItemLC name="addLC" size=4 value=1 class="form-control" disabled /> 
+        <select id=lcselect onchange="\$('#addItemLC').val(this.value);" class="form-control" disabled>
+        {$lcOpts}
+        </select>
+    </span>
+    <button type=submit value=Add class="btn btn-default">Add</button>
+    <input type=checkbox id=addItemLikeCode onchange="batchEdit.toggleUpcLcInput();" /> 
+    <label for="addItemLikeCode" class="control-label">Likecode</label>
+</form>
+HTML;
     }
 
-    private function addItemPriceInput($upc, $newtags=false, $description, $price)
+    private function addItemPriceInput($upc, $description, $price)
     {
-        $ret = "<form onsubmit=\"batchEdit.addItemPrice('$upc'); return false;\" id=\"add-price-form\" class=\"form-inline\">";
-        $ret .= "<label>ID</label>: $upc <label>Description</label>: $description <label>Normal price</label>: $price ";
-        $ret .= "<label>Sale price</label><input class=\"form-control\" type=text id=add-item-price name=price size=5 /> ";
-        $ret .= "<button type=submit value=Add class=\"btn btn-default\">Add</button>";
-        $ret .= "</form>";
-        
-        return $ret;
+        return <<<HTML
+<form onsubmit="batchEdit.addItemPrice('{$upc}'); return false;" id="add-price-form" class="form-inline">
+    <label>ID</label>: {$upc} 
+    <label>Description</label>: {$description} 
+    <label>Normal price</label>: {$price} 
+    <label>Sale price</label>
+    <input class="form-control" type=text id=add-item-price name=price size=5 /> 
+    <button type=submit value=Add class="btn btn-default">Add</button>
+</form>
+HTML;
     }
 
     protected function showBatchDisplay($id, $order='natural')
@@ -723,10 +711,10 @@ class EditBatchPage extends FannieRESTfulPage
                 $orderby = 'ORDER BY b.salePrice DESC';
                 break;
             case 'loc_a':
-                $orderby = 'ORDER BY m.super_name,y.subsection,y.shelf_set,y.shelf';
+                $orderby = 'ORDER BY locationName';
                 break;
             case 'loc_d':
-                $orderby = 'ORDER BY m.super_name DESC,y.subsection DESC,y.shelf_set DESC,y.shelf DESC';
+                $orderby = 'ORDER BY locationName';
                 break;
             case 'brand_a':
                 $orderby = 'ORDER BY p.brand ASC';
@@ -780,17 +768,15 @@ class EditBatchPage extends FannieRESTfulPage
                 CASE WHEN c.upc IS NULL then 0 ELSE 1 END as isCut,
                 b.quantity,
                 b.pricemethod,
-                m.super_name, 
-                y.subsection, 
-                y.shelf_set, 
-                y.shelf,
-                p.brand
+                p.brand,
+                NULL AS locationName
             FROM batchList AS b 
                 " . DTrans::joinProducts('b') . "
                 LEFT JOIN likeCodes AS l ON b.upc = CONCAT('LC',CONVERT(l.likeCode,CHAR))
                 LEFT JOIN batchCutPaste AS c ON b.upc=c.upc AND b.batchID=c.batchID
                 LEFT JOIN prodPhysicalLocation AS y ON b.upc=y.upc
-                LEFT JOIN superDeptNames AS m ON y.section=m.superID
+                LEFT JOIN FloorSections AS s ON y.section=s.floorSectionID
+                LEFT JOIN FloorSectionsListView as f on b.upc=f.upc
             WHERE b.batchID = ? 
             $orderby";
         $fetchArgs[] = $id;
@@ -810,13 +796,10 @@ class EditBatchPage extends FannieRESTfulPage
                     where b.batchID = ? $orderby";
         }
 
-        $sections = array();
-        if ($dbc->tableExists('FloorSections')) {
-            $floor = new FloorSectionsModel($dbc);
-            foreach ($floor->find() as $f) {
-                $sections[$f->floorSectionID()] = $f->name();
-            }
-            $fetchQ = str_replace('y.subsection', 'y.floorSectionID', $fetchQ);
+        if ($dbc->tableExists('FloorSectionsListView')) {
+            $fetchQ = str_replace('NULL AS locationName', 'f.sections AS locationName', $fetchQ);
+        } elseif ($dbc->tableExists('FloorSections')) {
+            $fetchQ = str_replace('NULL AS locationName', 's.name AS locationName', $fetchQ);
         }
 
         $fetchP = $dbc->prepare($fetchQ);
@@ -850,16 +833,18 @@ class EditBatchPage extends FannieRESTfulPage
             . date('Y-m-d', strtotime($model->endDate())) . '<br />';
         if ($this->config->get('STORE_MODE') === 'HQ') {
             $stores = new StoresModel($dbc);
+            $stores->hasOwnItems(1);
             $mapP = $dbc->prepare('SELECT storeID FROM StoreBatchMap WHERE storeID=? AND batchID=?');
             foreach ($stores->find('storeID') as $s) {
                 $mapR = $dbc->execute($mapP, array($s->storeID(), $id));
                 $checked = ($mapR && $dbc->numRows($mapR)) ? 'checked' : '';
+                $disabled = $typeModel->allowSingleStore() ? '' : 'disabled';
                 $ret .= sprintf('<label>
-                    <input type="checkbox" onchange="batchEdit.toggleStore(%d, %d);" %s />
+                    <input type="checkbox" onchange="batchEdit.toggleStore(%d, %d);" %s %s />
                     %s
                     </label> | ',
                     $s->storeID(), $id,
-                    $checked, $s->description());
+                    $disabled, $checked, $s->description());
             }
             $ret .= '<br />';
         }
@@ -930,7 +915,7 @@ class EditBatchPage extends FannieRESTfulPage
             $ret .= "<th><a href=\"EditBatchPage.php?id=$id&sort=sale_a\">$saleHeader</a></th>";
         }
         $ret .= "<th colspan=\"3\">&nbsp;</th>";
-        if ($orderby != 'ORDER BY m.super_name,y.subsection,y.shelf_set,y.shelf') {
+        if ($orderby != 'ORDER BY locationName') {
             $ret .= "<th><a href=\"EditBatchPage.php?id=$id&sort=loc_a\">Location</a></th>";
         } else {
             $ret .= "<th><a href=\"EditBatchPage.php?id=$id&sort=loc_d\">Location</a></th>";
@@ -939,7 +924,7 @@ class EditBatchPage extends FannieRESTfulPage
 
         $colors = array('#ffffff','#ffffcc');
         $cur = 0;
-        while ($fetchW = $dbc->fetch_array($fetchR)) {
+        while ($fetchW = $dbc->fetchRow($fetchR)) {
             $cur = ($cur + 1) % 2;
             $ret .= "<tr>";
             $fetchW['upc'] = rtrim($fetchW['upc']);
@@ -1009,13 +994,8 @@ class EditBatchPage extends FannieRESTfulPage
             }
 
             $loc = 'n/a';
-            if (!empty($fetchW['subsection'])) {
-                $loc = substr($fetchW['super_name'],0,4);
-                $loc .= $fetchW['subsection'].', ';
-                $loc .= 'Unit '.$fetchW['shelf_set'].', ';
-                $loc .= 'Shelf '.$fetchW['shelf'];
-            } elseif (!empty($fetchW['floorSectionID'])) {
-                $loc = $sections[$fetchW['floorSectionID']];
+            if (!empty($fetchW['locationName'])) {
+                $loc = $fetchW['locationName'];
             }
             $ret .= "<td bgcolor=$colors[$cur]>".$loc.'</td>';
             $ret .= '<input type="hidden" class="batch-hidden-upc" value="' . $fetchW['upc'] . '" />';
@@ -1085,7 +1065,7 @@ class EditBatchPage extends FannieRESTfulPage
         $cur = 0;
         $FANNIE_URL = $this->config->get('URL');
         $ret = '';
-        while ($fetchW = $dbc->fetch_array($result)) {
+        while ($fetchW = $dbc->fetchRow($result)) {
             $cur = ($cur + 1) % 2;
             $ret .= "<tr>";
             $fetchW[0] = rtrim($fetchW[0]);
@@ -1243,35 +1223,43 @@ class EditBatchPage extends FannieRESTfulPage
 
     public function get_id_view()
     {
-        global $FANNIE_URL;
         $this->add_script('edit.js?20160105');
         $this->add_css_file('index.css');
-        $sort = FormLib::get('sort', 'natural');
-        ob_start();
-        ?>
-        <div id="inputarea">
-        <?php echo $this->addItemUPCInput(); ?>
-        </div>
-        <div class="progress collapse" id="progress-bar">
-            <div class="progress-bar progress-bar-striped active" 
-                role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" 
-                style="width: 100%" title="Working">
-                <span class="sr-only">Working</span>
-            </div>
-        </div>
-        <div id="displayarea">
-        <?php echo $this->showBatchDisplay($this->id, $sort); ?>
-        </div>
-        <input type=hidden id=uid value="<?php echo $this->current_user; ?>" />
-        <input type=hidden id=isAudited value="<?php echo $this->audited; ?>" />
-        <input type="hidden" id="batchID" value="<?php echo $this->id; ?>" />
-        <?php
-        $ret = ob_get_clean();
-    
-        $ret .= "<input type=hidden id=buttonimgpath value=\"{$FANNIE_URL}src/img/buttons/\" />";
         $this->add_onload_command('$(\'#addItemUPC\').focus()');
+        $this->addOnloadCommand("enableLinea('#addItemUPC');\n");
 
-        return $ret;
+        $url = $this->config->get('URL');
+        $sort = FormLib::get('sort', 'natural');
+        $inputForm = $this->addItemUPCInput();
+        $batchList = $this->showBatchDisplay($this->id, $sort);
+        $linea = $this->enable_linea ? '<script type="text/javascript">' . $this->lineaJS() . '</script>' : '';
+
+        return <<<HTML
+<div id="inputarea">
+{$inputForm}
+</div>
+<div class="progress collapse" id="progress-bar">
+    <div class="progress-bar progress-bar-striped active" 
+        role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" 
+        style="width: 100%" title="Working">
+        <span class="sr-only">Working</span>
+    </div>
+</div>
+<div id="displayarea">
+{$batchList}
+</div>
+<input type=hidden id=uid value="{$this->current_user}" />
+<input type=hidden id=isAudited value="{$this->audited}" />
+<input type="hidden" id="batchID" value="{$this->id}" />
+<input type=hidden id=buttonimgpath value="{$url}src/img/buttons/" />
+{$linea}
+HTML;
+    }
+
+    // intentionally blank so Linea device javascript
+    // isn't appended to AJAX responses
+    public function postFlight()
+    {
     }
 
     public function helpContent()

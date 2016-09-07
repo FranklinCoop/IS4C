@@ -44,8 +44,24 @@ class BatchReport extends FannieReportPage
         $dbc->selectDB($this->config->get('OP_DB'));
         $bStart = FormLib::get_form_value('date1','');
         $bEnd = FormLib::get_form_value('date2','');
-        $store = FormLib::get('store', 0);
+        $store = FormLib::get('store', false);
         $model = new BatchesModel($dbc);
+
+        if ($store === false && is_array($this->config->get('STORE_NETS'))) {
+            $clientIP = filter_input(INPUT_SERVER, 'REMOTE_ADDR');
+            $ranges = $this->config->get('STORE_NETS');
+            foreach ($ranges as $storeID => $range) {
+                if (
+                    class_exists('\\Symfony\\Component\\HttpFoundation\\IpUtils')
+                    && \Symfony\Component\HttpFoundation\IpUtils::checkIp($clientIP, $range)
+                    ) {
+                    $store = $storeID;
+                }
+            }
+            if ($store === false) {
+                $store = 0;
+            }
+        }
 
         /**
           Assemble argument array and appropriate string
@@ -73,15 +89,13 @@ class BatchReport extends FannieReportPage
             SELECT d.upc, 
                 p.brand,
                 p.description, 
-                l.floorSectionID,
-                f.name AS location,
+                lv.sections AS location,
                 SUM(d.total) AS sales, "
                 . DTrans::sumQuantity('d') . " AS quantity, 
                 SUM(CASE WHEN trans_status IN('','0','R') THEN 1 WHEN trans_status='V' THEN -1 ELSE 0 END) as rings
             FROM $dlog AS d "
                 . DTrans::joinProducts('d', 'p', 'INNER') . "
-            LEFT JOIN prodPhysicalLocation AS l ON l.upc=p.upc
-            LEFT JOIN FloorSections as f ON f.floorSectionID=l.floorSectionID
+            LEFT JOIN FloorSectionsListView as lv on d.upc=lv.upc
             WHERE d.tdate BETWEEN ? AND ?
                 AND d.upc IN ($in_sql)
                 AND " . DTrans::isStoreID($store, 'd') . "
@@ -129,7 +143,7 @@ class BatchReport extends FannieReportPage
             $sumSales += $row[3];
         }
 
-        return array('Total',null,null,$sumSales,$sumQty);
+        return array('Total',null,null,$sumSales,$sumQty, '', '');
     }
 
     private function getBatches($dbc, $filter1, $filter2)

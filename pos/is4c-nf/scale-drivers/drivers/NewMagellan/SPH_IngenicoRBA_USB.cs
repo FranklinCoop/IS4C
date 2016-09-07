@@ -238,7 +238,7 @@ public class SPH_IngenicoRBA_USB : SPH_IngenicoRBA_Common
             if (input.Length > 3 && input[2] == 0x6) { // ACK 0x1 0x1 0x6
                 last_message = null;
                 System.Console.WriteLine("ACK : DEVICE");
-                if(sendUpdate==true) {WriteMessageToDevice(ShowCardButtonsMessage());}
+                //if(sendUpdate==true) {WriteMessageToDevice(ShowCardButtonsMessage());}
             } else if (input.Length > 3 && input[2] == 0x15) { // NACK 0x1 0x1 0x15
                 System.Console.WriteLine("NACK : DEVICE");
                 // resend message?
@@ -319,7 +319,7 @@ public class SPH_IngenicoRBA_USB : SPH_IngenicoRBA_Common
         /**
          * Widen message by one byte to add LRC
          */
-        System.Console.WriteLine("OUT BYTES:");
+        //System.Console.WriteLine("OUT BYTES:");
 
         byte[] msg = new byte[b.Length+1];
         for (int i=0; i < b.Length; i++) {

@@ -21,6 +21,14 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\Scanning\SpecialUPCs;
+use COREPOS\pos\lib\Scanning\SpecialUPC;
+use \CoreLocal;
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\DisplayLib;
+use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\TransRecord;
+
 /**
   @class CouponCode
   Handle standard manufacturer coupons
@@ -241,7 +249,7 @@ class CouponCode extends SpecialUPC
         $available = array();
         $emp_no=$transno=$dept=$foodstamp=$tax=$discountable=-1;
         $act_qty = 0;
-        while($row = $dbc->fetch_array($result)) {
+        while($row = $dbc->fetchRow($result)) {
             if ($row["itemQtty"] - $row["couponQtty"] > 0) {
                 $trans_id = $row["trans_id"];
                 $available[$trans_id] = array(0,0);

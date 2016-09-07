@@ -53,15 +53,11 @@ class PriceDiscrepancyPage extends FannieRESTfulPage {
                 AND inUse=1 
                 AND (p.normal_price - (SELECT normal_price FROM products WHERE store_id=2 AND upc=p.upc) ) != 0
                 AND department NOT BETWEEN 508 AND 998
-                AND department NOT BETWEEN 250 AND 259
                 AND department NOT BETWEEN 225 AND 234
-                AND department NOT BETWEEN 1 AND 25
                 AND department NOT BETWEEN 61 AND 78
-                AND department != 46
                 AND department != 150
                 AND department != 208
                 AND department != 235
-                AND department != 240
                 AND department != 500
                 AND (p.inUse - (SELECT inUse FROM products WHERE store_id=2 AND upc=p.upc) ) = 0
         ;");
@@ -103,7 +99,7 @@ class PriceDiscrepancyPage extends FannieRESTfulPage {
             $thisPrice = $row['dprice'];
             $ret .= '<td><button class="btn btn-active" type="button" onclick="editPrice(this,\''. $key .'\',\''. $thisPrice . '\',\'1\'); return false; window.location.reload();">' . $row['dprice'] . '</button></td>';
             
-            $ret .= '<td><a href="http://key/git/fannie/item/ItemEditorPage.php?searchupc=' . $key . '" target="_blank">' . $key . '</a></td>';
+            $ret .= '<td><a href="../ItemEditorPage.php?searchupc=' . $key . '" target="_blank">' . $key . '</a></td>';
             $ret .= '<td><a href="http://key/scancoord/TrackChangeNew.php?upc=' . $key . '" target="_blank">See Changes</a></td>';
         }
         $ret .= '</table>';

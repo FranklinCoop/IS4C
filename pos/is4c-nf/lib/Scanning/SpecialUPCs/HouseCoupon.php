@@ -21,6 +21,15 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib\Scanning\SpecialUPCs;
+use COREPOS\pos\lib\Scanning\SpecialUPC;
+use \CoreLocal;
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\DiscountModule;
+use COREPOS\pos\lib\DisplayLib;
+use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\TransRecord;
+
 /**
   @class HouseCoupon
   WFC style custom store coupons
@@ -550,6 +559,15 @@ class HouseCoupon extends SpecialUPC
                 $valQ = "select sum(total) 
                     " . $this->baseSQL($transDB, $coupID, 'department') . "
                     and h.type in ('BOTH', 'DISCOUNT')";
+                $valR = $transDB->query($valQ);
+                $row = $transDB->fetch_row($valR);
+                $value = $row[0] * $infoW["discountValue"];
+                break;
+            case "%S": // percent discount on all items in give department(s)
+                        // excluding sale items
+                $valQ = "select sum(total) 
+                    " . $this->baseSQL($transDB, $coupID, 'department') . "
+                    and h.type in ('BOTH', 'DISCOUNT') AND l.discounttype = 0";
                 $valR = $transDB->query($valQ);
                 $row = $transDB->fetch_row($valR);
                 $value = $row[0] * $infoW["discountValue"];

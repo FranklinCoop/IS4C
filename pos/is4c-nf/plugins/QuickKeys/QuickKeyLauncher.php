@@ -21,6 +21,10 @@
 
 *********************************************************************************/
 
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\DisplayLib;
+use COREPOS\pos\parser\Parser;
+
 class QuickKeyLauncher extends Parser 
 {
 
@@ -85,7 +89,7 @@ class QuickKeyLauncher extends Parser
             }
         }
         if (count($my_keys) == 0) {
-            include(dirname(__FILE__) . '/quickkeys/keys/' . $number . '.php');
+            include(dirname(__FILE__) . '/quickkeys/noauto/' . $number . '.php');
         }
 
         return $my_keys;

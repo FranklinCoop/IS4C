@@ -21,6 +21,13 @@
 
 *********************************************************************************/
 
+namespace COREPOS\pos\lib;
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\DiscountModule;
+use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\ReceiptLib;
+use \CoreLocal;
+
 /* --COMMENTS - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     * 10Apr2013 Andy Theuninck Filter backslash out of comments
@@ -32,7 +39,7 @@
   @class TransRecord
   Defines functions for adding records to the transaction
 */
-class TransRecord extends LibraryClass 
+class TransRecord 
 {
 
 /*------------------------------------------------------------------------------

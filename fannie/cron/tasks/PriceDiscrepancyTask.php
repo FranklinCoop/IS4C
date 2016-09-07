@@ -81,13 +81,16 @@ class PriceDiscrepancyTask extends FannieTask
         }
 
         $ret .= "\n";
-        //  Replace this link with the link to the Fannie Page once it exists.
-        $ret .= 'To make Corrections, visit ';
-        $ret .= 'http://key/git/fannie/item/PriceDiscrepancyScanner/PriceDiscrepancyPage.php';
-        $ret = wordwrap($ret, 10, '\n');
-        $ret = str_replace('\n', '', $ret);
-        mail('it@wholefoods.coop', count($item) . ' Price Discrepancies found in POS', $ret, 'From: automail@wholefoods.coop');
         
+        if($item) {
+            //  Replace this link with the link to the Fannie Page once it exists.
+            $ret .= 'To make Corrections, visit ';
+            $link = 'http://' . $this->config->get('HTTP_HOST') . $this->config->get('URL')
+                . 'fannie/item/PriceDiscrepancyScanner/PriceDiscrepancyPage.php';
+            $ret = wordwrap($ret, 10, '\n');
+            $ret = str_replace('\n', '', $ret);
+            mail($this->config->get('ADMIN_EMAIL'), count($item) . ' Price Discrepancies found in POS', $ret, 'From: ' . $this->config->get('ADMIN_EMAIL'));
+        }
     }
 }
 

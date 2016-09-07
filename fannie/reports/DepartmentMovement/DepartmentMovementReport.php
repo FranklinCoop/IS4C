@@ -205,7 +205,7 @@ class DepartmentMovementReport extends FannieReportPage
         $prep = $dbc->prepare($query);
         $result = $dbc->execute($prep,$args);
         $ret = array();
-        while ($row = $dbc->fetch_array($result)) {
+        while ($row = $dbc->fetchRow($result)) {
             $record = array();
             if ($groupby == "Date") {
                 $record[] = $row[1]."/".$row[2]."/".$row[0];
@@ -260,7 +260,7 @@ class DepartmentMovementReport extends FannieReportPage
     private function upcFooter($data)
     {
         $this->report_headers = array('UPC','Brand','Description','Rings','Qty','$',
-            'Dept#','Department','Subdept','Vendor');
+            'Dept#','Department','Super#','Vendor');
         $this->sort_column = 4;
         $this->sort_direction = 1;
         $sumQty = 0.0;

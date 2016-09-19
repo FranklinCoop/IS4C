@@ -29,6 +29,7 @@
   provides meta-information about the plugin like settings
   and enable/disable hooks
 */
+use COREPOS\pos\plugins\Plugin;
 class SingleTransactionSignOn extends Plugin 
 {
 

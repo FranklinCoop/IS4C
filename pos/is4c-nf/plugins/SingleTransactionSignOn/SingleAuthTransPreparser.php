@@ -20,7 +20,9 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
-
+namespace COREPOS\pos\parser\preparse;
+use \CoreLocal;
+use COREPOS\pos\parser\PreParser;;
 class SingleAuthTransPreparser extends PreParser {
     
     function check($str){

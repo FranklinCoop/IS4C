@@ -80,7 +80,7 @@ those same items revert to normal pricing.
         $b_def = $this->connection->tableDefinition($this->name);
         $p_def = $this->connection->tableDefinition('products');
         $has_limit = (isset($b_def['transLimit']) && isset($p_def['special_limit'])) ? true : false;
-        $isHQ = FannieConfig::get('STORE_MODE') == 'HQ' ? true : false;
+        $isHQ = FannieConfig::config('STORE_MODE') == 'HQ' ? true : false;
         if ($batchInfoW['discountType'] != 0) { // item is going on sale
             $forceQ="
                 UPDATE products AS p
@@ -196,7 +196,7 @@ those same items revert to normal pricing.
                 UPDATE products AS p
                     INNER JOIN upcLike AS v ON v.upc=p.upc 
                     INNER JOIN batchList as b on b.upc=concat('LC',convert(v.likecode,char))
-                    " . ($inHQ ? ' INNER JOIN StoreBatchMap AS m ON b.batchID=m.batchID and p.store_id=m.storeID ' : '') . "
+                    " . ($isHQ ? ' INNER JOIN StoreBatchMap AS m ON b.batchID=m.batchID and p.store_id=m.storeID ' : '') . "
                 SET p.normal_price = b.salePrice,
                     p.modified=now()
                 WHERE b.upc LIKE 'LC%'

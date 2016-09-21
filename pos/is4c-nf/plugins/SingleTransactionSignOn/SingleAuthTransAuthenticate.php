@@ -20,12 +20,14 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
-
+namespace COREPOS\pos\lib;
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\CoreState;
 /**
   @class Authenticate
   Functions for user authentication
 */
-class SingleAuthTransAuthenticate extends LibraryClass 
+class SingleAuthTransAuthenticate
 {
  
 

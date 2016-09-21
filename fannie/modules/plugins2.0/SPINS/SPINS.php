@@ -39,10 +39,8 @@ class SPINS extends \COREPOS\Fannie\API\FanniePlugin
             'description'=>'SPINS often uses non-standard week numbering. The offset
             should be the difference between an ISO week number and the SPINS week
             number for a given date.'),
-    'SpinsFileNamePrefix' => array('default'=>'', 'label'=>'File Name Prefix',
-            'description'=>'Some stores with more then one location need to add indentifing
-            prefixes to the file name submited.'),
-
+    'SpinsPrefix' => array('default'=>'', 'label'=>'Filename prefix',
+            'description'=>'Prefix attached to files submitted to SPINS'), 
     );
 
     public $plugin_description = 'Plugin for submitting SPINS data';

@@ -20,7 +20,7 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
-
+use COREPOS\pos\lib\gui\NoInputCorePage;
 use COREPOS\pos\lib\FormLib;
 include_once(dirname(__FILE__).'/../../lib/AutoLoader.php');
 

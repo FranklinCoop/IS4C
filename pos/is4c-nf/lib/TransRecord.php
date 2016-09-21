@@ -26,6 +26,7 @@ use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DiscountModule;
 use COREPOS\pos\lib\MiscLib;
 use COREPOS\pos\lib\ReceiptLib;
+use \AutoLoader;
 use \CoreLocal;
 
 /* --COMMENTS - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -246,6 +247,7 @@ private static $default_record = array(
   @param $named_params [keyed array]
   @return [none]
 */
+    // @hintable
 static public function addRecord($named_params)
 {
     // start with default values
@@ -289,6 +291,16 @@ static public function addRecord($named_params)
         $new_record['numflag'],
         $new_record['charflag']
     );
+
+    $actions = CoreLocal::get('ItemActions');
+    if (!is_array($actions)) {
+        $actions = AutoLoader::listModules('COREPOS\\pos\\lib\\ItemAction');
+        CoreLocal::set('ItemActions', $actions);
+    }
+    foreach ($actions as $class) {
+        $obj = new $class();
+        $obj->callback($new_record);
+    }
 }
 
 /**
@@ -606,6 +618,7 @@ static public function addcdnotify()
   all tax jurisdictions. The ini setting 'CouponsAreTaxable'
   controls whether the tax parameter is used.
 */
+    // @hintable
 static public function addCoupon($strupc, $intdepartment, $dbltotal, $statusFlags=array())
 {
     if (CoreLocal::get('CouponsAreTaxable') !== 0) {
@@ -756,6 +769,7 @@ static public function addCashDrop($amt)
   total and regPrice (respectively). The other values go in the
   correspondingly named columns.
 */
+    // @hintable
 static public function addLogRecord($opts)
 {
     if (!is_array($opts)) {
@@ -784,6 +798,7 @@ static public function addLogRecord($opts)
     ));
 }
 
+    // @hintable
 static public function add_log_record($opts)
 {
     self::addLogRecord($opts);

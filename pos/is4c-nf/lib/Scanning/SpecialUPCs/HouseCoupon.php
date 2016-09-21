@@ -58,6 +58,7 @@ class HouseCoupon extends SpecialUPC
         return false;
     }
 
+    // @hintable
     public function handle($upc, $json)
     {
         $coupID = ltrim(substr($upc, -5), "0");
@@ -528,10 +529,33 @@ class HouseCoupon extends SpecialUPC
                 $valQ = "
                     SELECT 
                        SUM(CASE WHEN ItemQtty IS NULL THEN 0 ELSE ItemQtty END) AS qty
-                    " . $this->baseSQL($transDB, $coupID, 'upc'); 
+                    " . $this->baseSQL($transDB, $coupID, 'upc') . "
+                    and h.type in ('BOTH', 'DISCOUNT')";
                 $valR = $transDB->query($valQ);
                 $row = $transDB->fetch_row($valR);
                 $value = $row['qty'] * $value;
+                break;
+            case 'PS': // per set of items
+                $value = $infoW["discountValue"];
+
+                $qualQ = "
+                    SELECT 
+                       SUM(CASE WHEN ItemQtty IS NULL THEN 0 ELSE ItemQtty END) AS qty
+                    " . $this->baseSQL($transDB, $coupID, 'upc') . "
+                    and h.type in ('BOTH', 'QUALIFIER')";
+                $qualR = $transDB->query($qualQ);
+                $qualW = $transDB->fetch_row($qualR);
+
+                $discQ = "
+                    SELECT 
+                       SUM(CASE WHEN ItemQtty IS NULL THEN 0 ELSE ItemQtty END) AS qty
+                    " . $this->baseSQL($transDB, $coupID, 'upc') . "
+                    and h.type in ('BOTH', 'DISCOUNT')";
+                $discR = $transDB->query($discQ);
+                $discW = $transDB->fetch_row($discR);
+
+                $sets = ($qualW['qty'] > $discW['qty']) ? $discW['qty'] : $qualW['qty'];
+                $value = $sets * $value;
                 break;
             case "F": // completely flat; no scaling for weight
                 $value = $infoW["discountValue"];
@@ -625,6 +649,7 @@ class HouseCoupon extends SpecialUPC
     /**
       This FROM/WHERE is super repetitive
     */
+    // @hintable
     private function baseSQL($dbc, $coupID, $mode='upc')
     {
         $ret = '

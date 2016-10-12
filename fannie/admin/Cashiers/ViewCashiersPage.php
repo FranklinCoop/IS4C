@@ -123,7 +123,7 @@ function deleteEmp(emp_no,filter){
         $ret .= "<table class=\"table\"><tr>";
         $ret .= "<th><a href=ViewCashiersPage.php?filter=$filter&order=num>#</th>";
         $ret .= "<th><a href=ViewCashiersPage.php?filter=$filter&order=name>Name</th>";
-        $ret .= "<th><a href=ViewCashiersPage.php?filter=$filter&order=pass>Password</th>";
+        //$ret .= "<th><a href=ViewCashiersPage.php?filter=$filter&order=pass>Password</th>";
         $ret .= "<th><a href=ViewCashiersPage.php?filter=$filter&order=fes>Privileges</th>";
         $ret .= "<th>&nbsp;</th><th>&nbsp;</th></tr>";
 
@@ -131,10 +131,10 @@ function deleteEmp(emp_no,filter){
         $employees = new EmployeesModel($dbc);
         $employees->EmpActive($filter);
         foreach($employees->find($orderby) as $emp){
-            $ret .= sprintf("<tr><td>%d</td><td>%s</td><td>%d</td><td>%s</td>",
+            $ret .= sprintf("<tr><td>%d</td><td>%s</td><td>%s</td>",
                     $emp->emp_no(),
                     $emp->FirstName().' '.$emp->LastName(),
-                    $emp->CashierPassword(),
+                    //$emp->CashierPassword(),
                     ($emp->frontendsecurity()<=20?'Regular':'Manager'));
             $ret .= sprintf("<td><a href=\"CashierEditor.php?emp_no=%d\">%s</a></td>
                 <td><a href=\"\" onclick=\"deleteEmp(%d,%d); return false;\">%s</a></td></tr>",

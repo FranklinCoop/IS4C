@@ -120,7 +120,7 @@ class CashierEditor extends FanniePage {
         </div>
         <div class="form-group">
             <label>Password</label>
-            <input type="text" name="passwd" value="<?php echo $employee->CashierPassword(); ?>"
+            <input type="password" name="passwd" value="<?php echo $employee->CashierPassword(); ?>"
                 class="form-control" required />
         </div>
         <div class="form-group">

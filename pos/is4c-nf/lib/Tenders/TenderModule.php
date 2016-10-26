@@ -269,7 +269,7 @@ class TenderModule
     protected function frankingPrompt()
     {
         if (CoreLocal::get("enableFranking") != 1) {
-            return parent::defaultPrompt();
+            return self::defaultPrompt();
         }
 
         CoreLocal::set('RepeatAgain', false);

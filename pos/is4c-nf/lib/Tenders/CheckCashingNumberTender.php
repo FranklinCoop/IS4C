@@ -52,9 +52,9 @@ class CheckCashingNumberTender extends TenderModule
                     WHERE CardNo=%d", 
                     CoreLocal::get('memberID'));
             $res = $dbc->query($query);
-            if ($dbc->$num_rows($res) > 0) {
+            if ($dbc->num_rows($res) > 0) {
                 $row = $dbc->fetchRow($res);
-                if ($row("WriteChecks") == 0) {
+                if ($row["WriteChecks"] == 0) {
                     return DisplayLib::xboxMsg(
                     _("Not autherized for check cashing. Please see customer service."),
                     $clearButton

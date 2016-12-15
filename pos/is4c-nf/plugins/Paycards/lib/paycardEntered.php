@@ -53,6 +53,8 @@ class paycardEntered extends Parser
         } elseif ((is_numeric($str) && strlen($str) >= 16) || (is_numeric(substr($str,2)) && strlen($str) >= 18)) {
             $this->manual = true;
             return true;
+        } elseif (substr($str,0,6) == "23.0MB") {
+            return true;
         }
 
         return false;

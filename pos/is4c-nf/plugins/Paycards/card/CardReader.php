@@ -73,7 +73,7 @@ class CardReader
         array('min'=>5077080, 'max'=>5077089, 'issuer'=>"EBT (WI)",  'accepted'=>'ebt'),
         array('min'=>5053490, 'max'=>5053499, 'issuer'=>"EBT (WY)",  'accepted'=>'ebt'),
     );
-    
+
     private $bin19s = array(
         array('min'=>7019208, 'max'=>7019208,  'issuer'=>"Co-op Gift", 'accepted'=>true), // NCGA gift cards
         array('min'=>7018525, 'max'=>7018525,  'issuer'=>"Valutec Gift", 'accepted'=>false), // valutec test cards (linked to test merchant/terminal ID)
@@ -126,12 +126,12 @@ class CardReader
        and USVI is US Virgin Islands. A few states list both
        a state BIN number and a federal BIN number. In these
        cases there's an asterisk after the postal abbreviation.
-       Maine listed both a state and federal BIN but they're 
+       Maine listed both a state and federal BIN but they're
        identical so I don't know how to distinguish. The PAN
-       length is not listed for Wyoming. I guessed 16 since 
+       length is not listed for Wyoming. I guessed 16 since
        that's most common.
     */
-    public function cardInfo($pan) 
+    public function cardInfo($pan)
     {
         $len = strlen($pan);
         $iin = (int)substr($pan,0,7);
@@ -163,7 +163,7 @@ class CardReader
     /**
       Check whether a given card is accepted
       @param $pan the card number
-      @return 
+      @return
        - 1 if accepted
        - 0 if not accepted
     */
@@ -178,7 +178,7 @@ class CardReader
       @param $pan the card number
       @return a paycard type constant
     */
-    public function type($pan) 
+    public function type($pan)
     {
         $info = $this->cardInfo($pan);
         return $info['type'];
@@ -192,11 +192,11 @@ class CardReader
       Issuers include "Visa", "American Express", "MasterCard",
       and "Discover". Unrecognized cards will return "Unknown".
     */
-    public function issuer($pan) 
+    public function issuer($pan)
     {
         $info = $this->cardInfo($pan);
         return $info['issuer'];
-    } 
+    }
 
     private function getTracks($data)
     {
@@ -205,6 +205,12 @@ class CardReader
         $tr2 = false;
         $tr3 = false;
 
+        //isc250 doesn't contain any of the track headers we expect.
+        if (substr($data,0,5) == '23.0M') {
+          $data = str_replace('23.0M','%', $data);
+          $data = str_replace('@@','?;', $data);
+
+        }
         // track types are identified by start-sentinel values, but all track types end in '?'
         $tracks = explode('?', $data);
         foreach( $tracks as $track) {
@@ -229,7 +235,13 @@ class CardReader
             // ignore tracks with unrecognized start sentinels
             // readers often put E? or something similar if they have trouble reading,
             // even when they also provide entire usable tracks
+
         } // foreach magstripe track
+
+        //isc250 doesn't contain any of the track headers we expect.
+        if (substr($data,0,5) == '23.0M') {
+
+        }
 
         return array($tr1, $tr2, $tr3);
     }
@@ -295,11 +307,11 @@ class CardReader
 
       Not all values will be found in every track.
       Keys with no data will be set to False.
-      
+
       If the data is really malformed, the return
       will be an error code instead of an array.
     */
-    public function magstripe($data) 
+    public function magstripe($data)
     {
         // initialize
         try {
@@ -307,12 +319,12 @@ class CardReader
             $pan = false;
             $exp = false;
             $name = false;
-            
+
             // if we have track1, parse it
             if ($tr1) {
                 list($pan, $exp, $name) = $this->parseTrack1($tr1);
             }
-            
+
             // if we have track2, parse it
             if ($tr2) {
                 list($pan, $exp, $name) = $this->parseTrack2($tr2, $tr1);
@@ -326,11 +338,11 @@ class CardReader
             // basic check for validity
             if (strstr($tr3,"=")) $tr3 = false;
         }
-        
+
         // if we never got what we need (no track1 or track2), fail
         if (!$pan || !$exp)
             return -4;
-        
+
         // ok
         $output = array();
         $output['pan'] = $pan;
@@ -343,7 +355,7 @@ class CardReader
     }
 
     // return a card number with digits replaced by *s, except for some number of leading or tailing digits as requested
-    public function maskPAN($pan,$first,$last) 
+    public function maskPAN($pan,$first,$last)
     {
         $mask = "";
         // sanity check
@@ -358,8 +370,7 @@ class CardReader
         // append requested digits
         if( $last > 0)
             $mask .= substr($pan, -$last);
-        
+
         return $mask;
     }
 }
-

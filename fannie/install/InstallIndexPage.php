@@ -611,6 +611,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
     private $op_models = array(
         // TABLES
         'AutoCouponsModel',
+        'AutoOrderMapModel',
         'BatchesModel',
         'BatchListModel',
         'BatchCutPasteModel',
@@ -625,6 +626,8 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'CustAvailablePrefsModel',
         'CustPreferencesModel',
         'CustReceiptMessageModel',
+        'CustomerAccountsModel',
+        'CustomersModel',
         'CustomerAccountSuspensionsModel',
         'CustomerNotificationsModel',
         'CustomReceiptModel',
@@ -654,6 +657,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'MemContactModel',
         'MemContactPrefsModel',
         'MetaProductRulesModel',
+        'NarrowTagsModel',
         'OriginsModel',
         'OriginCountryModel',
         'OriginStateProvModel',

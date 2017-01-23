@@ -93,7 +93,7 @@ class requestInfo extends NoInputCorePage
     public function preprocess()
     {
         // get calling class (required)
-        $class = $this->form->tryGet('class');
+        $class = isset($_REQUEST['class']) ? $_REQUEST['class'] : '';
         $class = str_replace('-', '\\', $class);
         $pos_home = MiscLib::base_url().'gui-modules/pos2.php';
         if ($class === '' || !class_exists($class)){

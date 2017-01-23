@@ -176,8 +176,7 @@ class AjaxParser extends AjaxCallback
         return $entered;
     }
 
-    // @hintable
-    public function ajax($input=array())
+    public function ajax(array $input=array())
     {
         if (CoreLocal::get('CashierNo') === '') { // session is missing/invalid
             return array(
@@ -199,7 +198,7 @@ class AjaxParser extends AjaxCallback
 
         if ($entered != "" && $entered != "PAYCARD") {
             $result = $this->runParsers($entered);
-            if ($result && is_array($result)) {
+            if ($result) {
                 $json = $this->runPostParsers($result);
 
                 if (isset($json['udpmsg']) && $json['udpmsg'] !== False && is_object($sdObj)){

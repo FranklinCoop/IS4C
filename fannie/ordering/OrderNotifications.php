@@ -18,7 +18,7 @@ class OrderNotifications
         $order = $this->getOrder($orderID);
         $items = $this->getItems($orderID, $transID);
         $ret = false;
-        if ($items[0]['staff'] && $order->sendEmails()) {
+        if (isset($items[0]) && $items[0]['staff'] && $order->sendEmails()) {
             $formatted = $this->formatItems($items);
             $formatted['store'] = $this->getStore($orderID);
             $addr = $this->getAddress($order);
@@ -73,6 +73,8 @@ class OrderNotifications
                 return preg_replace('/[^0-9]/', '', $order->phone()) . '@tmomail.net';
             case 5:
                 return preg_replace('/[^0-9]/', '', $order->phone()) . '@vzwpix.com';
+            case 6:
+                return preg_replace('/[^0-9]/', '', $order->phone()) . '@msg.fi.google.com';
             default:
                 return false;
         }

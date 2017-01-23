@@ -211,14 +211,14 @@ class FormLib extends \COREPOS\common\FormLib
       Generate a very standard form with date and department fields
       @return [string] html form
     */
-    public static function dateAndDepartmentForm()
+    public static function dateAndDepartmentForm($standardFieldNames=false)
     {
         ob_start();
         ?>
 <form method="get" class="form-horizontal">
 <div class="row">
     <div class="col-sm-6">
-        <?php echo self::standardDepartmentFields('buyer');  ?>
+        <?php echo $standardFieldNames ? self::standardDepartmentFields('super-dept', 'departments', 'dept-start', 'dept-end') : self::standardDepartmentFields('buyer');  ?>
         <div class="form-group">
             <label class="col-sm-4 control-label">Store</label>
             <div class="col-sm-8">
@@ -368,7 +368,12 @@ class FormLib extends \COREPOS\common\FormLib
           Precalculate options for superdept and dept selects
         */
         $dbc = FannieDB::getReadOnly(FannieConfig::config('OP_DB'));
-        $superR = $dbc->query('SELECT superID, super_name FROM superDeptNames');
+        $def = $dbc->tableDefinition('superDeptNames');
+        $superQ = 'SELECT superID, super_name FROM superDeptNames';
+        if (isset($def['deleted'])) {
+            $superQ .= ' WHERE deleted=0 ';
+        }
+        $superR = $dbc->query($superQ);
         $super_opts = '';
         while ($w = $dbc->fetchRow($superR)) {
             $super_opts .= sprintf('<option value="%d">%s</option>',

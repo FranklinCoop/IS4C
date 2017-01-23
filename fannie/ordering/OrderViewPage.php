@@ -573,6 +573,7 @@ class OrderViewPage extends FannieRESTfulPage
             3 => 'Text (Sprint)',
             4 => 'Text (T-Mobile)',
             5 => 'Text (Verizon)',
+            6 => 'Text (Google Fi)',
         );
         $contactHtml = '';
         foreach ($contactOpts as $id=>$val) {
@@ -805,7 +806,7 @@ class OrderViewPage extends FannieRESTfulPage
         }
         
         echo <<<HTML
-<form> 
+<form onkeydown="return event.keyCode != 13;">
 <div class="form-inline">
     <div class="input-group">
         <span class="input-group-addon">UPC</span> 
@@ -861,7 +862,7 @@ HTML;
             v.sku,ItemQtty,regPrice,o.discounttype,o.charflag,o.mixMatch,
             o.trans_id,o.unitPrice,o.memType,o.staff
             FROM {$TRANS}PendingSpecialOrder as o
-                LEFT JOIN vendors AS n ON o.mixMatch=n.vendorName
+                LEFT JOIN vendors AS n ON LEFT(n.vendorName, LENGTH(o.mixMatch)) = o.mixMatch
                 LEFT JOIN vendorItems as v on o.upc=v.upc AND n.vendorID=v.vendorID
             WHERE order_id=? AND trans_type='I' 
             ORDER BY trans_id DESC");
@@ -976,9 +977,9 @@ HTML;
 
         $prep = $dbc->prepare("SELECT o.upc,o.description,total,quantity,department,
             v.sku,ItemQtty,regPrice,o.discounttype,o.charflag,o.mixMatch,
-            o.trans_id,o.unitPrice,o.memType,o.staff
+            o.trans_id,o.unitPrice,o.memType,o.staff,o.discountable
             FROM {$TRANS}PendingSpecialOrder as o
-                LEFT JOIN vendors AS n ON o.mixMatch=n.vendorName
+                LEFT JOIN vendors AS n ON LEFT(n.vendorName, LENGTH(o.mixMatch)) = o.mixMatch
                 LEFT JOIN vendorItems as v on o.upc=v.upc AND n.vendorID=v.vendorID
             WHERE order_id=? AND trans_type='I' 
             ORDER BY trans_id DESC");
@@ -1003,6 +1004,8 @@ HTML;
                 } else {
                     $pricing = "% Discount";
                 }
+            } elseif ($w['discountable'] == 0) {
+                $pricing = _('Basics');
             }
             $ret .= sprintf('<tr>
                     <td>%s</td>
@@ -1161,6 +1164,9 @@ HTML;
     protected function get_orderID_view()
     {
         $orderID = (int)$this->orderID;
+        if ($orderID === 0) {
+            return '<div class="alert alert-danger">Invalid order. <a href="OrderViewPage.php">Create new order</a>?</div>';
+        }
         $refer = filter_input(INPUT_SERVER, 'HTTP_REFERER');
         $return_path = ($refer && strstr($refer,'fannie/ordering/NewSpecialOrdersPage.php')) ? $refer : '';
         if (!empty($return_path)) {

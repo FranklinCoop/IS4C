@@ -210,6 +210,44 @@ messages from POS?',
             'description' => 'Password for use with encrypted Mercury processing',
             'default' => '',
         ),
+        'DataWireAppID' => array(
+            'label' => 'DataWire Application ID',
+            'description' => 'Application ID for First Data Datawire connections',
+            'default' => '',
+        ),
+        'DataWireAuthKey1' => array(
+            'label' => 'DataWire authorization key #1',
+            'description' => '1st authorization key for First Data Datawire Connections',
+            'default' => '',
+        ),
+        'DataWireAuthKey2' => array(
+            'label' => 'DataWire authorization key #2',
+            'description' => '2nd authorization key for First Data Datawire Connections',
+            'default' => '',
+        ),
+        'DataWireClientRef' => array(
+            'label' => 'DataWire client reference',
+            'description' => 'Client referince required for First Data Datawire connections',
+            'deafult' => '',
+        ),
+        'DataWireServiceID' => array(
+            'label' => 'DataWire Service ID',
+            'description' => 'Service ID for First Data Datawire connections',
+            'default' => '',
+        ),
+        'DataWireDID' => array(
+            'label' => 'DataWire DID',
+            'description' => 'Datawire DID for FirstData, do not set this setting, it will be generated.',
+            'default' => '',
+        ),
+        'DataWireURL1' => array(
+            'label' => 'DataWire 1st URL',
+            'description' => 'Datawire URL 1 for sending transactions to First Data via Datawire. Do not set it will be generated',
+            'default' => '',
+        ),
+        'DataWireURL2' => array(
+            'label' => 'DataWire 2nd URL',
+            'description' => 'Datawire URL 2 for sending transactions to First Data via Datawire. Do not set it will be generated')
     );
 
     public function plugin_transaction_reset()

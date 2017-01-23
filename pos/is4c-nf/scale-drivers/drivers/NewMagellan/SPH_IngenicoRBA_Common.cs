@@ -22,7 +22,7 @@
 
 /*************************************************************
  * SPH_Ingenico_i6550
- *     SerialPortHandler implementation for the Ingenico 
+ *     SerialPortHandler implementation for the Ingenico
  *     signature capture devices using Retail Base
  *     Application (RBA). Tested with i6550, should work
  *     with i6580, i6770, and i6780 as well. Two other devices,
@@ -73,7 +73,7 @@ public class Signature {
         return true;
     }
 
-    // helpful example provided @ 
+    // helpful example provided @
     // http://combustibleknowledge.com/2009/08/29/3-byte-ascii-format-deciphered/
     public string BuildImage(string path){
         List<Point> points = new List<Point>();
@@ -213,14 +213,14 @@ public class Signature {
   the following:
   - method Read() that gets ACK, NACK, and message bytes
     from the device. The subclass is responsible for sending
-    its own ACKs and NACKs. The message bytes starting with 
+    its own ACKs and NACKs. The message bytes starting with
     STX and ending with ETX followed by LRC should be passed
     to the HandleMessageFromDevice() method.
   - method WriteMessageToDevice() is responsible for sending
     an array of bytes to the device. This method must add an
     LRC byte at the end as the parameter does not include it
 */
-public class SPH_IngenicoRBA_Common : SerialPortHandler 
+public class SPH_IngenicoRBA_Common : SerialPortHandler
 {
     protected byte[] last_message;
     /** not used with on-demand implementation
@@ -300,14 +300,14 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
             case 1: // moved this intial card swipe screen until after the device lets us know it is online ~RO
                 //WriteMessageToDevice(SwipeCardScreen());
                 break;     // online response from device
-            
+
             case 4: break;     // set payment response from device
 
             case 7: //I added this function because this is how the Ingenico Ultilites start a terminal. ~RO
                 WriteMessageToDevice(OnlineMessage());
                 break;
 
-            case 11:    
+            case 11:
                 // status response from device
                 int status = ((buffer[4]-0x30)*10) + (buffer[5]-0x30);
                 if (status == 11) { // signature ready
@@ -327,7 +327,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
                     break;
                 }
                 string card_msg = enc.GetString(buffer);
-                card_msg = card_msg.Substring(1, card_msg.Length - 3); // trim STX, ETX, LRC 
+                card_msg = card_msg.Substring(1, card_msg.Length - 3); // trim STX, ETX, LRC
                 card_msg = card_msg.Replace(new String((char)0x1c, 1), "@@");
                 PushOutput("PANCACHE:" + card_msg);
                 if (this.verbose_mode > 0) {
@@ -385,7 +385,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
                     }
                     break;
 
-                case 29:    
+                case 29:
                     // get variable response from device
                     status = buffer[4] - 0x30;
                     int var_code = 0;
@@ -418,7 +418,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
                     }
                     break;
 
-                case 50:    
+                case 50:
                     // auth request from device
                     ParseAuthMessage(buffer);
                     break;
@@ -454,7 +454,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
 
         } else if (!getting_signature && msg == "termSig") {
             WriteMessageToDevice(SigRequestMessage());
-            getting_signature = true;    
+            getting_signature = true;
             last_message = null;
             WriteMessageToDevice(StatusRequestMessage());
         } else if (!auto_state_change && !getting_signature && (msg == "termGetType" || msg == "termGetTypeWithFS")) {
@@ -541,7 +541,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
         msg[3] = 0x2e;
 
         msg[4] = 0x3; // ETX
-        
+
         return msg;
     }
 
@@ -555,7 +555,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
         msg[3] = 0x2e;
 
         msg[4] = 0x3; // ETX
-        
+
         return msg;
     }
 
@@ -576,9 +576,9 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
 
         msg[4] = 0x30; // unconditional force
         msg[5] = p[0];
-        
+
         msg[6] = 0x3; // ETX
-        
+
         return msg;
     }
     */
@@ -611,7 +611,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
     {
         string display = "Please sign";
         byte[] m = new System.Text.ASCIIEncoding().GetBytes(display);
-        byte[] msg = new byte[4 + m.Length + 1]; 
+        byte[] msg = new byte[4 + m.Length + 1];
 
         msg[0] = 0x2; // STX
 
@@ -667,7 +667,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
         System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
 
         byte[] valbytes = enc.GetBytes(var_value);
-        byte[] msg = new byte[12 + valbytes.Length + 1]; 
+        byte[] msg = new byte[12 + valbytes.Length + 1];
 
         msg[0] = 0x2; // STX
         msg[1] = 0x32; // set var code
@@ -940,7 +940,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
         msg[5] = 0x2a;
 
         msg[6] = 0x31;
-        msg[7] = 0x1c; 
+        msg[7] = 0x1c;
 
         int pos = 8;
         foreach (byte b in pan) {
@@ -948,9 +948,9 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
             pos++;
         }
 
-        msg[pos] = 0x1c; 
+        msg[pos] = 0x1c;
         pos++;
-        
+
         foreach (byte b in form) {
             msg[pos] = b;
             pos++;
@@ -1012,10 +1012,10 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
         //string[] buttons = new string[5] {"BBTNA,S","BBTNB,S","BBTNC,S","BBTND,S","BBTND,S"};
         //byte[] encode = enc.GetBytes(buttons[0]);
         sendUpdate = false;
- 
+
 
         //70.BBTNA
-        //37 30 2e 42 42 54 4e 41 2c 53 
+        //37 30 2e 42 42 54 4e 41 2c 53
 
         byte[] msg = new byte[12];
 
@@ -1125,7 +1125,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
     protected void ParseSigBlockMessage(int status, byte[] msg)
     {
         System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
-        
+
         if (status == 2) {
             byte[] var_data = new byte[msg.Length-14];
             for (int i=0;i<var_data.Length;i++) {
@@ -1162,11 +1162,11 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
     protected void ParseAuthMessage(byte[] msg)
     {
         System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
-        
+
         // skipping 0 (stx), 1-3 (message #)
-    
+
         /** don't need any of these values for anything
-        string aquirer = enc.GetString(new byte[6]{msg[4],msg[5],msg[6],msg[7],msg[8],msg[9]});    
+        string aquirer = enc.GetString(new byte[6]{msg[4],msg[5],msg[6],msg[7],msg[8],msg[9]});
 
         string merch_id = enc.GetString(new byte[12]{msg[10],msg[11],msg[12],msg[13],
                             msg[14],msg[15],msg[16],msg[17],
@@ -1190,7 +1190,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
                             msg[51],msg[52],msg[53],msg[54]});
 
         // skipping 55 (constant 0)
-        
+
         pos_trans_no = enc.GetString(new byte[4]{msg[56],msg[57],msg[58],msg[59]});
         */
 
@@ -1237,7 +1237,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
             Array.Copy(pin_bytes,38,ec,0,5);
             pin_enc_counter = enc.GetString(ec);
         }
-        
+
         pos++; // should be at next 0x1c;
 
         int amount = 0;
@@ -1252,7 +1252,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
         }
         else if (data_source == 0x44 || data_source == 0x54){
             // track 2
-            stripe = ";"+stripe+"?";    
+            stripe = ";"+stripe+"?";
         }
         stripe = "T"+amount+"?"+stripe;
         if (pin_bytes.Length == 23){

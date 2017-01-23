@@ -56,7 +56,7 @@ class CheckCashingNumberTender extends TenderModule
                 $row = $dbc->fetchRow($res);
                 if ($row["WriteChecks"] == 0) {
                     return DisplayLib::xboxMsg(
-                    _("Not autherized for check cashing. Please see customer service."),
+                    _("Not authorized for check cashing. Please see customer service."),
                     $clearButton
                     );
                 }

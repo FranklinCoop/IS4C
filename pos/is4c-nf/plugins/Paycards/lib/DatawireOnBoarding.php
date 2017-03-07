@@ -69,9 +69,9 @@ class DatawireOnBoarding
     //    "Cache-Control" => "no-cache"
     //);
     $AppID = $this->conf->get('DataWireAppID');
-    $AuthKey1 = $this->conf->get('DataWireAuthKey1');
-    $AuthKey2 = $this->conf->get('DataWireAuthKey2');
-    $ClientRef = $this->conf->get('DataWireClientRef');
+    $AuthKey1 = $this->conf->get('RapidConnectGID').$this->conf->get('RapidConnectMID');
+    $AuthKey2 = $this->conf->get('RapidConnedTID');
+    $ClientRef = "0000001V".$this->conf->get('RapidConnectID');
     $ServiceID = $this->conf->get('DataWireServiceID');
 
     $url = "https://stg.dw.us.fdcnet.biz/sd/srsxml.rc";

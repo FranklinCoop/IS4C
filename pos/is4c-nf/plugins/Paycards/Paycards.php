@@ -48,6 +48,7 @@ class Paycards extends Plugin {
             'First Data' => 'FirstData',
             'Authorize.net' => 'AuthorizeDotNet',
             'Valutec' => 'Valutec',
+            'Rapid Connect' => 'RapidConnect',
             ),
         ),
         'PaycardsTerminalID' => array(
@@ -215,20 +216,25 @@ messages from POS?',
             'description' => 'Application ID for First Data Datawire connections',
             'default' => '',
         ),
-        'DataWireAuthKey1' => array(
-            'label' => 'DataWire authorization key #1',
-            'description' => '1st authorization key for First Data Datawire Connections',
+        'RapidConnectID' => array(
+            'label' => 'First Data Rapidconnect Project ID',
+            'description' => 'Also known as TPP ID Given to you when you have an integration project with First Data',
             'default' => '',
         ),
-        'DataWireAuthKey2' => array(
-            'label' => 'DataWire authorization key #2',
-            'description' => '2nd authorization key for First Data Datawire Connections',
+        'RapidConnectMID' => array(
+            'label' => 'First Data RapidConnect MID',
+            'description' => 'Merchant ID for First Data RapidConnect',
             'default' => '',
         ),
-        'DataWireClientRef' => array(
-            'label' => 'DataWire client reference',
-            'description' => 'Client referince required for First Data Datawire connections',
+        'RapidConnectGID' => array(
+            'label' => 'First Data RapidConnect GID',
+            'description' => 'Group ID for First Data RapidConnect',
             'deafult' => '',
+        ),
+        'RapidConnedTID' => array(
+            'label' => 'First Data RapidConnect TID',
+            'description' => 'RapidConnet Terminal ID',
+            'default' => '',
         ),
         'DataWireServiceID' => array(
             'label' => 'DataWire Service ID',
@@ -247,7 +253,13 @@ messages from POS?',
         ),
         'DataWireURL2' => array(
             'label' => 'DataWire 2nd URL',
-            'description' => 'Datawire URL 2 for sending transactions to First Data via Datawire. Do not set it will be generated')
+            'description' => 'Datawire URL 2 for sending transactions to First Data via Datawire. Do not set it will be generated',
+        ),
+        'RapidConnectSTAN' => array(
+            'label' => 'First Data RapidConnect STAN',
+            'description' => 'Rotates between 1-999999 should not need to be set.',
+            'default' => '1',
+        )
     );
 
     public function plugin_transaction_reset()

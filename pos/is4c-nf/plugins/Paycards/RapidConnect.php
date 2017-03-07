@@ -101,7 +101,7 @@ class RapidConnect extends BasicCCModule
     protected function handleResponseAuth($authResult)
     {
         
-        $log = '/Users/rowan/Projects/IS4C/pos/is4c-nf/log/rc_dev.log';
+        $log = realpath(dirname(__FILE__).'/../../log/rc_dev.log');//'/Users/rowan/Projects/IS4C/pos/is4c-nf/log/rc_dev.log';
         $fp = @fopen($log,'a');
         foreach ($authResult as $result) {
             fwrite($fp,"".$result."\n");
@@ -170,7 +170,7 @@ class RapidConnect extends BasicCCModule
         }
 
             //REMOVE LATER DEBUG LOGGING
-            $log = '/Users/rowan/Projects/IS4C/pos/is4c-nf/log/rc_dev.log';
+            $log = realpath(dirname(__FILE__).'/../../log/rc_dev.log');
             $fp = @fopen($log,'a');
             fwrite($fp,"Rapid Connect Response:\nRaw Payload: ".$rcResponse."\n");
             
@@ -395,7 +395,7 @@ class RapidConnect extends BasicCCModule
         $headers = $this->dataWireHeaders($dwXML);
 
         //debuging stuff because I can't figure out how to write to the logs.
-        $log = '/Users/rowan/Projects/IS4C/pos/is4c-nf/log/rc_dev.log';
+        $log = realpath(dirname(__FILE__).'/../../log/rc_dev.log');//'/Users/rowan/Projects/IS4C/pos/is4c-nf/log/rc_dev.log';
         $fp = @fopen($log,'a');
         fwrite($fp, "\n".$rcXML."\n");
         foreach ($headers as $header) {

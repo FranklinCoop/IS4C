@@ -27,11 +27,11 @@ use COREPOS\pos\lib\MiscLib;
 use COREPOS\pos\lib\CoreState;
 use COREPOS\pos\lib\Database;
 
-if (!class_exists('AutoLoader')) include(dirname(__FILE__).'/../../../lib/AutoLoader.php');
-AutoLoader::loadMap();
+//if (!class_exists('AutoLoader')) include(dirname(__FILE__).'/../../../lib/AutoLoader.php');
+//AutoLoader::loadMap();
 
-$test = new DatawireOnBoarding();
-$test->discoveryRequest();
+//$test = new DatawireOnBoarding();
+//$test->discoveryRequest();
 
 class DatawireOnBoarding
 {

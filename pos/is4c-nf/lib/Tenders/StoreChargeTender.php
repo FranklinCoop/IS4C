@@ -40,10 +40,10 @@ class StoreChargeTender extends TenderModule
     */
     public function errorCheck()
     {
-        $charge_ok = \COREPOS\pos\lib\MemberLib::chargeOk();
+        $chargeOk = \COREPOS\pos\lib\MemberLib::chargeOk();
     
         $buttons = array('[clear]' => 'parseWrapper(\'CL\');');
-        if ($charge_ok == 0) {
+        if ($chargeOk == 0) {
             return DisplayLib::boxMsg(
                 _("member") . ' ' . CoreLocal::get("memberID") . '<br />' .
                 _("is not authorized") . '<br />' ._("to make charges"),
@@ -67,7 +67,7 @@ class StoreChargeTender extends TenderModule
                 _("is only \$") . $memChargeCommitted,
                 $buttons
             );
-        } elseif(MiscLib::truncate2(CoreLocal::get("amtdue")) < MiscLib::truncate2($this->amount)) {
+        } elseif (abs(MiscLib::truncate2(CoreLocal::get("amtdue"))) < abs(MiscLib::truncate2($this->amount))) {
             return DisplayLib::xboxMsg(
                 _("charge tender exceeds purchase amount"),
                 $buttons

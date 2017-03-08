@@ -43,10 +43,12 @@ class ProdLocationEditor extends FannieRESTfulPage
         $this->__routes[] = 'get<start>';
         $this->__routes[] = 'get<batch>';
         $this->__routes[] = 'post<batch><save>';
+        $this->__routes[] = 'post<list><save>';
         $this->__routes[] = 'post<upc><save>';
         $this->__routes[] = 'get<start>';
         $this->__routes[] = 'get<searchupc>';
         $this->__routes[] = 'post<newLocation>';
+        $this->__routes[] = 'get<list>';
         return parent::preprocess();
     }
     
@@ -144,6 +146,43 @@ class ProdLocationEditor extends FannieRESTfulPage
 
         foreach ($item as $upc => $section) {
             $args = array($upc, $section );
+            $prep = $dbc->prepare('
+                INSERT INTO FloorSectionProductMap (upc, floorSectionID) values (?, ?);
+            ');
+            $dbc->execute($prep, $args);    
+        }
+        if (mysql_errno() > 0) {
+            echo mysql_errno() . ": " . mysql_error(). "<br>";
+        } else {
+            $ret .= '<div class="alert alert-success">Update Successful</div>';
+        }        
+        
+        $ret .= '<br><br><a class="btn btn-default" href="javascript:history.back()">Back</a><br><br>';
+        $ret .= '<a class="btn btn-default" href="ProdLocationEditor.php">Return</a><br><br>';
+        
+        return $ret;
+    }
+    
+    function post_list_save_view()
+    {
+        
+        global $FANNIE_OP_DB;
+        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $store_id = $_POST['store_id'];
+        $start = $_GET['start'];
+        $end = $_GET['end'];
+        $ret = '';
+        $item = array();
+        foreach ($_POST as $upc => $section) {
+            $upc = str_pad($upc, 13, '0', STR_PAD_LEFT);
+            if ($section > 0) $item[$upc] = $section;
+        }
+
+        foreach ($item as $upc => $section) {
+            $prepZ = ("DELETE from FloorSectionProductMap where upc = ?");
+            $dbc->execute($prepZ,$upc);
+            
+            $args = array($upc,$section);
             $prep = $dbc->prepare('
                 INSERT INTO FloorSectionProductMap (upc, floorSectionID) values (?, ?);
             ');
@@ -278,6 +317,143 @@ class ProdLocationEditor extends FannieRESTfulPage
             
                 
         return $ret;
+    }
+    
+    function get_list_view()
+    {
+        
+        global $FANNIE_OP_DB;
+        $dbc = FannieDB::get($FANNIE_OP_DB);
+        
+        $ret = "";
+        $ret .= '
+            <form method="get" class="form-inline">
+                <textarea class="form-control" style="width:170px" name="upcs"></textarea>
+                <input type="hidden" name="list" value="1">
+                <button type="submit" class="btn btn-default btn-xs">Submit</button>
+            </form>
+        ';
+        
+        if ($_GET['upcs']) {
+            $upcs = $_GET['upcs'];
+            $plus = array();
+            $chunks = explode("\r\n", $upcs);
+            foreach ($chunks as $key => $str) {
+                $plus[] = str_pad($str, 13, '0', STR_PAD_LEFT);
+            }
+        }
+        
+        list($inClause,$args) = $dbc->safeInClause($plus);
+        $qString = 'select 
+                p.upc, 
+                p.description as pdesc, 
+                p.department,
+                pu.description as pudesc,
+                p.brand,
+                d.dept_name,
+                fslv.sections
+            from products as p 
+                left join FloorSectionProductMap as pp on pp.upc=p.upc 
+                left join FloorSectionsListView AS fslv ON fslv.upc=p.upc
+                left join productUser as pu on pu.upc=p.upc
+                left join departments as d on d.dept_no=p.department
+            WHERE p.upc IN ('.$inClause.')
+            order by p.department;';
+            
+        $query = $dbc->prepare($qString);
+        $result = $dbc->execute($query, $args);
+        $item = array();
+        while($row = $dbc->fetch_row($result)) {
+            $item[$row['upc']]['upc'] = $row['upc'];
+            $item[$row['upc']]['dept'] = $row['department'];
+            $item[$row['upc']]['desc'] = $row['pdesc'];
+            $item[$row['upc']]['brand'] = $row['brand'];
+            $item[$row['upc']]['dept_name'] = $row['dept_name'];
+            $item[$row['upc']]['curSections'] = $row['sections'];
+        }
+        if ($dbc->error()) {
+            echo '<div class="alert alert-danger">' . $dbc->error() . '</div>'; 
+        } 
+        
+        //  Find suggestions for each item's location based on department.
+        foreach ($item as $key => $row) {
+            $item[$key]['sugDept'] = self::getLocation($item[$key]['dept']);
+        }
+
+        $query = $dbc->prepare('SELECT
+                floorSectionID,
+                name
+            FROM FloorSections
+            ORDER BY name;');
+        $result = $dbc->execute($query);
+        $floor_section = array();
+        while($row = $dbc->fetch_row($result)) {
+            $floor_section[$row['floorSectionID']] = $row['name'];
+        }
+        if (mysql_errno() > 0) {
+            echo mysql_errno() . ": " . mysql_error(). "<br>";
+        }    
+        
+        
+        $ret .= '<table class="table">
+            <thead>
+                <th>UPC</th>
+                <th>Brand</th>
+                <th>Description</th>
+                <th>Dept. No.</th>
+                <th>Department</th>
+                <th>Current Location(s)</th>
+                <th>
+                    Location 
+                    <div class="input-group">
+                        <span class="input-group-addon">Change All</span>
+                            <select class="form-control input-sm" onchange="updateAll(this.value, \'.locationSelect\');">
+                    
+                        ';
+        foreach ($floor_section as $fs_key => $fs_value) {
+            if ($fs_key == $item[$key]['sugDept']) {
+                $ret .= '<option value="' . $fs_key . '" name="' . $key . '" selected>' . $fs_value . '</option>';
+            } else {
+                $ret .= '<option value="' . $fs_key . '" name="' . $key . '">' . $fs_value . '</option>';
+            }
+        }   
+        $ret .= '
+                    </select></div>
+                </th>
+            </thead>
+            <form method="post">
+                <input type="hidden" name="save" value="1">
+            ';
+        foreach ($item as $key => $row) {
+            $ret .= '
+                <tr><td><a href="ItemEditorPage.php?searchupc=' . $key . '" target="">' . $key . '</a></td>
+                <td>' . $row['brand'] . '</td>
+                <td>' . $row['desc'] . '</td>
+                <td>' . $row['dept'] . '</td>
+                <td>' . $row['dept_name'] . '</td>
+                <td>' . $row['curSections'] . '</td>
+                <td><Span class="collapse"> </span>
+                    <select class="locationSelect form-control input-sm" name="' . $key . '" value="" />
+                        <option value="0">* no location selected *</option>';
+                
+                foreach ($floor_section as $fs_key => $fs_value) {
+                    if ($fs_key == $item[$key]['sugDept']) {
+                        $ret .= '<option value="' . $fs_key . '" name="' . $key . '" selected>' . $fs_value . '</option>';
+                    } else {
+                        $ret .= '<option value="' . $fs_key . '" name="' . $key . '">' . $fs_value . '</option>';
+                    }
+                }
+                        
+                $ret .= '</select></tr>';
+        }
+            
+        $ret .= '<tr><td><input type="submit" class="btn btn-default" value="Update Locations"></td>
+            <td><a class="btn btn-default" href="ProdLocationEditor.php">Back</a><br><br></td></table>
+            </form>';   
+            
+                
+        return $ret;
+          
     }
     
     function get_batch_view()
@@ -453,14 +629,46 @@ class ProdLocationEditor extends FannieRESTfulPage
         return '
             <div class="container pull-left">
             <form class="form-inline" method="get">
-                <input type="submit" class="btn btn-default" style="width: 300px" name="searchupc" value="Update Locations by UPC"><br><br>
-            </form>
-            <form class="form-inline" method="get">
-                <input type="submit" class="btn btn-default" style="width: 300px" name="batch" value="Update Locations by BATCH"><br><br>
+                <input type="submit" class="btn btn-default" style="width: 300px" name="searchupc" value="Single UPC Update"><br><br>
+                <input type="submit" class="btn btn-default" style="width: 300px" name="list" value="List of UPCs Update"><br><br>
+                <input type="submit" class="btn btn-default" style="width: 300px" name="batch" value="Locations by BATCH"><br><br>
             </form>
             </div>
         ';
     }
+    
+    private function arrayToOpts($arr, $selected=-999, $id_label=false)
+    {
+        $opts = '';
+        foreach ($arr as $num => $name) {
+            if ($id_label === true) {
+                $name = $num . ' ' . $name;
+            }
+            $opts .= sprintf('<option %s value="%d">%s</option>',
+                                ($num == $selected ? 'selected' : ''),
+                                $num, $name);
+        }
+
+        return $opts;
+    }
+    
+   public function javascript_content()
+   {
+       ob_start();
+       ?>
+function toggleAll(elem, selector) {
+    if (elem.checked) {
+        $(selector).prop('checked', true);
+    } else {
+        $(selector).prop('checked', false);
+    }
+}
+function updateAll(val, selector) {
+    $(selector).val(val);
+}
+       <?php
+       return ob_get_clean();
+   }
 
     public function helpContent()
     {

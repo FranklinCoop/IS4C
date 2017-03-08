@@ -350,7 +350,7 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
             $rowItem['distributor'] = $this->getVendorName($rowItem['default_vendor_id']);
 
             /* find previous and next items in department */
-            list($prevUPC, $nextUPC) = $this->prevNextItem($rowItem['department'], $upc);
+            list($prevUPC, $nextUPC) = $this->prevNextItem($upc, $rowItem['department']);
 
             $lcP = $dbc->prepare('SELECT likeCode FROM upcLike WHERE upc=?');
             $likeCode = $dbc->getValue($lcP,array($upc));
@@ -433,7 +433,7 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
             $jsVendorID = $rowItem['default_vendor_id'] > 0 ? $rowItem['default_vendor_id'] : 'no-vendor';
             $vFieldsDisabled = $jsVendorID == 'no-vendor' || !$active_tab ? 'disabled' : '';
             $limit = 30 - strlen(isset($rowItem['description'])?$rowItem['description']:'');
-            $cost = sprintf('%.2f', $rowItem['cost']);
+            $cost = sprintf('%.3f', $rowItem['cost']);
             $price = sprintf('%.2f', $rowItem['normal_price']);
             $ret .= <<<HTML
 <tr>
@@ -1075,7 +1075,7 @@ HTML;
         try {
             $sku = $this->form->vendorSKU;
             $caseSize = $this->form->caseSize;
-            if (!empty($sku)) {
+            if (!empty($sku) && $sku != $upc) {
                 /**
                   If a SKU is provided, update any
                   old record that used the UPC as a
@@ -1087,15 +1087,8 @@ HTML;
                     WHERE sku=?
                         AND upc=?
                         AND vendorID=?');
-                $existsR = $dbc->execute($existsP, array($sku, $upc, $vendorID));
+                $existsR = $dbc->execute($existsP, array($upc, $upc, $vendorID));
                 if ($dbc->numRows($existsR) > 0 && $sku != $upc) {
-                    $delP = $dbc->prepare('
-                        DELETE FROM vendorItems
-                        WHERE sku =?
-                            AND upc=?
-                            AND vendorID=?');
-                    $dbc->execute($delP, array($upc, $upc, $vendorID));
-                } else {
                     $fixSkuP = $dbc->prepare('
                         UPDATE vendorItems
                         SET sku=?

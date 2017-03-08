@@ -45,6 +45,33 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
 
     protected $class_lib = 'ObfLibV2';
 
+    protected $PLAN_SALES = array(
+        '1,6' => 48125.67,      // Hillside Produce
+        '2,10' => 11037.90,     // Hillside Deli
+        '2,11' => 30002.96,
+        '2,16' => 12231.91,
+        '3,1' => 24806.33,      // Hillside Grocery
+        '3,4' => 61459.93,
+        '3,5' => 23038.55,
+        '3,7' => 98.48,
+        '3,8' => 17579.95,
+        '3,9' => 3313.16,
+        '3,13' => 14085.38,
+        '3,17' => 25413.22,
+        '7,6' => 16406.47,      // Denfeld Produce
+        '8,10' => 4049.92,      // Denfeld Deli
+        '8,11' => 12211.43,
+        '8,16' => 4768.70,
+        '9,1' => 8281.40,       // Denfeld Grocery
+        '9,4' => 24726.33,
+        '9,5' => 9070.20,
+        '9,7' => 45.52,
+        '9,8' => 5975.21,
+        '9,9' => 1310.53,
+        '9,13' => 4589.22,
+        '9,17' => 8823.08,
+    );
+
     public function preprocess()
     {
         return FannieReportPage::preprocess();
@@ -62,7 +89,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
         $labor = new ObfLaborModelV2($dbc);
         $labor->obfWeekID($week->obfWeekID());
 
-        $store = FormLib::get('store');
+        $store = FormLib::get('store', 1);
         
         /**
            Timestamps for the start and end of
@@ -72,12 +99,11 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
         $end_ts = mktime(0, 0, 0, date('n', $start_ts), date('j', $start_ts)+6, date('Y', $start_ts));
         list($year, $month) = $this->findYearMonth($start_ts, $end_ts);
 
-        /**
-          Use the entire month from the previous calendar year
-          as the time period for year-over-year comparisons
-        */
-        $start_ly = mktime(0, 0, 0, $month, 1, $year-1);
-        $end_ly = mktime(0, 0, 0, $month, date('t', $start_ly), $year-1);
+        $start_ly = mktime(0, 0, 0, date('n',$start_ts), date('j', $start_ts), $year-1);
+        while (date('N', $start_ly) != 1) {
+            $start_ly = mktime(0,0,0, date('n', $start_ly), date('j', $start_ly)+1, date('Y', $start_ly));
+        }
+        $end_ly = mktime(0, 0, 0, date('n', $start_ly), date('j', $start_ly)+6, date('Y', $start_ly));
 
         $future = $end_ts >= strtotime(date('Y-m-d')) ? true: false;
 
@@ -99,6 +125,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
                 'end_ts' => $end_ts,
                 'start_ly' => $start_ly,
                 'end_ly' => $end_ly,
+                'averageWeek' => false,
             );
             $this->updateSalesCache($week, array($num_cached, $ly_cached), $dateInfo);
         }
@@ -137,7 +164,8 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
               Go through sales records for the category
             */
             while ($row = $dbc->fetch_row($salesR)) {
-                $proj = ($row['lastYearSales'] * $row['growthTarget']) + $row['lastYearSales'];
+                $projIndex = $category->obfCategoryID() . ',' . $row['superID'];
+                $proj = $this->PLAN_SALES[$projIndex];
                 $trend1 = $this->calculateTrend($dbc, $category->obfCategoryID(), $row['superID']);
                 $dept_trend += $trend1;
                 $total_sales->trend += $trend1;
@@ -274,6 +302,24 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
                 'meta_foreground' => 'black',
             );
 
+            /*
+            $data[] = array(
+                'Labor % of Sales',
+                '',
+                '',
+                '',
+                '',
+                sprintf('%.2f%%', $labor->wages() / $sum[0] * 100),
+                '',
+                '',
+                '',
+                '',
+                'meta' => FannieReportPage::META_COLOR,
+                'meta_background' => $this->colors[0],
+                'meta_foreground' => 'black',
+            );
+            */
+
             $data[] = array('meta'=>FannieReportPage::META_REPEAT_HEADERS);
 
             if (count($this->colors) > 1) {
@@ -346,6 +392,24 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
                 'meta_background' => $this->colors[0],
                 'meta_foreground' => 'black',
             );
+
+            /*
+            $data[] = array(
+                'Labor % of Sales',
+                '',
+                '',
+                '',
+                '',
+                sprintf('%.2f%%', $labor->wages() / $total_sales->thisYear * 100),
+                '',
+                '',
+                '',
+                '',
+                'meta' => FannieReportPage::META_COLOR,
+                'meta_background' => $this->colors[0],
+                'meta_foreground' => 'black',
+            );
+            */
 
             $data[] = array('meta'=>FannieReportPage::META_REPEAT_HEADERS);
 
@@ -513,6 +577,24 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
                 'meta_foreground' => 'black',
             );
 
+            /*
+            $data[] = array(
+                'Labor % of Sales',
+                '',
+                '',
+                '',
+                '',
+                sprintf('%.2f%%', $labor->wages() / ($total_sales->thisYear + $otherStore['actual']) * 100),
+                '',
+                '',
+                '',
+                '',
+                'meta' => FannieReportPage::META_COLOR,
+                'meta_background' => $this->colors[0],
+                'meta_foreground' => 'black',
+            );
+            */
+
             $total_hours->actual += $labor->hours();
             $total_hours->projected += $proj_hours;
             $total_hours->trend += $trend_hours;
@@ -543,6 +625,8 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
             'meta_background' => $this->colors[0],
             'meta_foreground' => 'black',
         );
+
+        $data[] = $this->discountsThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly);
 
         $data[] = array(
             'Hours',
@@ -583,10 +667,55 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
         }
 
         $data[] = array('meta'=>FannieReportPage::META_REPEAT_HEADERS);
-        $data[] = $this->ownershipThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly);
+        $data[] = $this->ownershipThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly, false);
         $data[] = $this->ownershipThisYear($dbc, $end_ts);
 
         return $data;
+    }
+
+    private function discountsThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly)
+    {
+        $date1 = date('Y-m-d', $start_ts);
+        $date2 = date('Y-m-d', $end_ts);
+        $date3 = date('Y-m-d', $start_ly);
+        $date4 = date('Y-m-d', $end_ly);
+
+        $dlog = DTransactionsModel::selectDlog($date1, $date2);
+        $dlogLY = DTransactionsModel::selectDlog($date3, $date4);
+        $opdb = $this->config->get('OP_DB') . $dbc->sep();
+
+        $discountQ = "
+            SELECT SUM(d.total)
+            FROM __DLOG__ AS d
+                LEFT JOIN {$opdb}houseCoupons AS h ON RIGHT(d.upc,5) = h.coupID
+            WHERE d.tdate BETWEEN ? AND ?
+                AND (
+                    (d.upc='DISCOUNT' AND d.memType=5)
+                    OR
+                    (d.upc LIKE '00499999%' AND h.memberOnly=1)
+                )
+        ";
+
+        $discountP = $dbc->prepare(str_replace('__DLOG__', $dlog, $discountQ));
+        $total = $dbc->getValue($discountP, array($date1 . ' 00:00:00', $date2 . ' 23:59:59'));
+        $discountP = $dbc->prepare(str_replace('__DLOG__', $dlogLY, $discountQ));
+        $totalLY = $dbc->getValue($discountP, array($date3 . ' 00:00:00', $date4 . ' 23:59:59'));
+
+        return array(
+            'Owner Discounts',
+            sprintf('%.0f', $totalLY),
+            '',
+            '',
+            '',
+            sprintf('%.0f', $total),
+            sprintf('%.2f%%', $this->percentGrowth($total, $totalLY)),
+            '',
+            '',
+            '',
+            'meta' => FannieReportPage::META_COLOR,
+            'meta_background' => $this->colors[0],
+            'meta_foreground' => 'black',
+        );
     }
 
     private function getOtherStore($storeID, $weekID)
@@ -621,7 +750,11 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
             $info['lastYear'] += $row['lastYear'];
             $info['trans'] = $row['trans'];
             $info['lyTrans'] = $row['lyTrans'];
-            $info['plan'] += $row['plan'];
+            foreach ($this->PLAN_SALES as $planID => $plan) {
+                if (strpos($planID, $row['catID'] . ',') === 0) {
+                    $info['plan'] += $plan;
+                }
+            }
             $cat->obfCategoryID($row['catID']);
             $cat->load();
             $plan[$row['catID']] = $this->projectHours($cat->salesPerLaborHourTarget(), $row['plan'], $row['plan']);

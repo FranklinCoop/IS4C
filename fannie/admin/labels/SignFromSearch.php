@@ -112,6 +112,7 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
             $upc = FormLib::get('update_upc');
             $brand = FormLib::get('update_brand', array());
             $desc = FormLib::get('update_desc', array());
+            $ignore = FormLib::get('ignore_desc', array());
             $origin = FormLib::get('update_origin', array());
             $custom = FormLib::get('custom_origin', array());
             $knownOrigins = $this->signage_obj->getOrigins();
@@ -119,8 +120,8 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
                 if (isset($brand[$i])) {
                     $this->signage_obj->addOverride($upc[$i], 'brand', $brand[$i]);
                 }
-                if (isset($desc[$i])) {
-                    //$this->signage_obj->addOverride($upc[$i], 'description', $desc[$i]);
+                if ($ignore[$i] == 0 && isset($desc[$i])) {
+                    $this->signage_obj->addOverride($upc[$i], 'description', $desc[$i]);
                 }
                 if (isset($custom[$i]) && !empty($custom[$i])) {
                     $this->signage_obj->addOverride($upc[$i], 'originName', $custom[$i]);
@@ -128,6 +129,7 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
                     $this->signage_obj->addOverride($upc[$i], 'originName', $knownOrigins[$origin[$i]]);
                 }
             }
+            $this->signage_obj->setRepeats(FormLib::get('repeats', 1));
         }
 
         return $this->drawPdf();
@@ -139,6 +141,7 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
             foreach (FormLib::get('exclude', array()) as $e) {
                 $this->signage_obj->addExclude($e);
             }
+            $this->signage_obj->setInUseFilter(FormLib::get('store', 0));
             $this->signage_obj->drawPDF();
             return false;
         } else {
@@ -180,8 +183,30 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
             }
             echo '</form></body></html>';
             return false;
+        } elseif (is_array(FormLib::get('update_upc'))) {
+            $upc = FormLib::get('update_upc');
+            $brand = FormLib::get('update_brand', array());
+            $desc = FormLib::get('update_desc', array());
+            $ignore = FormLib::get('ignore_desc', array());
+            $origin = FormLib::get('update_origin', array());
+            $custom = FormLib::get('custom_origin', array());
+            $knownOrigins = $this->signage_obj->getOrigins();
+            for ($i=0; $i<count($upc); $i++) {
+                if (isset($brand[$i])) {
+                    $this->signage_obj->addOverride($upc[$i], 'brand', $brand[$i]);
+                }
+                if ($ignore[$i] == 0 && isset($desc[$i])) {
+                    $this->signage_obj->addOverride($upc[$i], 'description', $desc[$i]);
+                }
+                if (isset($custom[$i]) && !empty($custom[$i])) {
+                    $this->signage_obj->addOverride($upc[$i], 'originName', $custom[$i]);
+                } elseif (isset($origin[$i]) && isset($knownOrigins[$origin[$i]])) {
+                    $this->signage_obj->addOverride($upc[$i], 'originName', $knownOrigins[$origin[$i]]);
+                }
+            }
+            $this->signage_obj->setRepeats(FormLib::get('repeats', 1));
         }
-        
+ 
         return $this->drawPdf();
     }
 
@@ -278,6 +303,20 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
             }
         }
         $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;';
+
+        $stores = new StoresModel($this->connection);
+        $stores->hasOwnItems(1);
+        $ret .= '<select class="form-control" name="store">
+                <option value="0">Any Store</option>';
+        foreach ($stores->find() as $s) {
+            $ret .= sprintf('<option value="%d">%s</option>',
+                $s->storeID(), $s->description());
+        }
+        $ret .= '</select>';
+        $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;';
+        $ret .= '<input type="number" title="Number of copies" name="repeats" class="form-control" value="1" />';
+
+        $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;';
         $ret .= '<button type="submit" name="pdf" value="Print" 
                     class="btn btn-default">Print</button>';
         $ret .= '</div>';
@@ -285,13 +324,14 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
 
         $ret .= $this->signage_obj->listItems();
 
+        /*
         $ret .= '<p><button type="submit" name="update" id="updateBtn" value="Save Text"
                     class="btn btn-default">Save Text</button></p>';
+        */
 
         $this->add_onload_command('$(".FannieSignageField").keydown(function(event) {
             if (event.which == 13) {
                 event.preventDefault();
-                $("#updateBtn").click();
             }
         });');
 

@@ -282,6 +282,8 @@ return <<<HTML
             <p><button class="btn btn-default btn-xs" type="submit" 
                 onclick="goToSigns();">Tags/Signs</button></p>
             <p><button class="btn btn-default btn-xs" type="submit" 
+                onclick="goToManualSigns();">Manual Signs</button></p>
+            <p><button class="btn btn-default btn-xs" type="submit" 
                 onclick="goToMargins();">Margins</button></p>
             <p><button class="btn btn-default btn-xs" type="submit" 
                 onclick="goToCoupons();">Store Coupons</button></p>
@@ -297,8 +299,12 @@ return <<<HTML
                     Movement</option>
                 <option value="{$url}reports/Trends/TrendsReport.php?date1={$today}&date2={$today}&lookup-type=u">
                     Trends</option>
+                <option value="{$url}reports/from-search/ProductPerStore/ProductPerStoreReport.php">
+                    Per-Store Summary</option>
                 <option value="{$url}reports/from-search/PercentageOfSales/PercentageOfSalesReport.php">
-                    %% of Sales</option>
+                    % of Sales</option>
+                <option value="{$url}reports/from-search/PreviousPromos/PreviousPromosReport.php">
+                    Previous Promos</option>
             </select>
             <p><button class="btn btn-default btn-xs" type="submit" 
                 onclick="goToReport();">Get Report</button></p>

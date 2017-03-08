@@ -39,6 +39,13 @@ class SpecialDept
     */
     public $help_summary = 'Documentation Needed!';
 
+    protected $session;
+
+    public function __construct($session)
+    {
+        $this->session = $session;
+    }
+
     /**
       More extensive help text, if needed
     */
@@ -96,16 +103,16 @@ class SpecialDept
         'PaidOutDept',
     );
 
-    public static function factory($class)
+    public static function factory($class, $session)
     {
         if ($class != '' && in_array($class, self::$builtin)) {
             $class = 'COREPOS\\pos\\lib\\Scanning\\SpecialDepts\\' . $class;
-            return new $class();
+            return new $class($session);
         } elseif ($class != '' && class_exists($class)) {
-            return new $class();
+            return new $class($session);
         }
 
-        return new self();
+        return new self($session);
     }
 }
 

@@ -554,7 +554,13 @@ HTML;
         $end_date = self::getDate('date2', date('Y-m-d'));
         $dlog = DTransactionsModel::selectDlog($start_date, $end_date);
         $lookupType = self::get('lookup-type', 'dept');
-        $store = self::get('store', 0);
+        $store = self::get('store', false);
+        if ($store === false) {
+            $store = COREPOS\Fannie\API\lib\Store::getIdByIp();
+            if ($store === false) {
+                $store = 0;
+            }
+        }
 
         $query = '
             FROM ' . $dlog . ' AS t 
@@ -563,6 +569,7 @@ HTML;
                 LEFT JOIN MasterSuperDepts AS m ON t.department=m.dept_ID 
                 LEFT JOIN subdepts AS b ON p.subdept=b.subdept_no
                 LEFT JOIN vendors AS v ON p.default_vendor_id=v.vendorID
+                LEFT JOIN vendorItems AS i ON p.upc=i.upc AND p.default_vendor_id=i.vendorID
                 LEFT JOIN prodExtra AS x ON t.upc=x.upc ';
         $args = array();
         switch ($lookupType) {
@@ -681,7 +688,7 @@ HTML;
                     FROM products AS p
                         LEFT JOIN prodExtra AS x ON p.upc=x.upc
                         LEFT JOIN vendors AS v ON x.distributor=v.vendorName
-                    WHERE (p.default_vendor_id=? OR v.vendorID=?
+                    WHERE (p.default_vendor_id=? OR v.vendorID=?)
                     GROUP BY p.department');
                 $optimizeR = $dbc->execute($optimizeP, array($vID, $vID));
                 $dept_in = '';

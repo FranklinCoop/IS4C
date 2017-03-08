@@ -22,7 +22,7 @@
 
 /*************************************************************
  * SPH_Ingenico_i6550
- *     SerialPortHandler implementation for the Ingenico
+ *     SerialPortHandler implementation for the Ingenico 
  *     signature capture devices using Retail Base
  *     Application (RBA). Tested with i6550, should work
  *     with i6580, i6770, and i6780 as well. Two other devices,
@@ -73,7 +73,7 @@ public class Signature {
         return true;
     }
 
-    // helpful example provided @
+    // helpful example provided @ 
     // http://combustibleknowledge.com/2009/08/29/3-byte-ascii-format-deciphered/
     public string BuildImage(string path){
         List<Point> points = new List<Point>();
@@ -213,14 +213,14 @@ public class Signature {
   the following:
   - method Read() that gets ACK, NACK, and message bytes
     from the device. The subclass is responsible for sending
-    its own ACKs and NACKs. The message bytes starting with
+    its own ACKs and NACKs. The message bytes starting with 
     STX and ending with ETX followed by LRC should be passed
     to the HandleMessageFromDevice() method.
   - method WriteMessageToDevice() is responsible for sending
     an array of bytes to the device. This method must add an
     LRC byte at the end as the parameter does not include it
 */
-public class SPH_IngenicoRBA_Common : SerialPortHandler
+public class SPH_IngenicoRBA_Common : SerialPortHandler 
 {
     protected byte[] last_message;
     /** not used with on-demand implementation
@@ -233,8 +233,6 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
     private string masked_pan = "";
 
     private static String MAGELLAN_OUTPUT_DIR = "ss-output/";
-    public bool sendUpdate = false;
-
 
     // spacing matters on these
     protected const string EBT_CA = "1 0 4  0  14 10000 1 1 1 0      0 132 0 1 0 D 0 0 406";
@@ -297,10 +295,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
 
         int code = ((buffer[1]-0x30)*10) + (buffer[2]-0x30);
         switch (code) {
-            case 1: // moved this intial card swipe screen until after the device lets us know it is online ~RO
-                //WriteMessageToDevice(SwipeCardScreen());
-                break;     // online response from device
-
+            case 1: break;     // online response from device
             case 4: break;     // set payment response from device
 
             case 7: //I added this function because this is how the Ingenico Ultilites start a terminal. ~RO
@@ -321,36 +316,38 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
                 break;
 
             case 23:
+            case 87:
                 // get card info repsponse
                 if (buffer[4] != 0x30) { // invalid status
                     HandleMsg("termReset");
                     break;
                 }
                 string card_msg = enc.GetString(buffer);
-                card_msg = card_msg.Substring(1, card_msg.Length - 3); // trim STX, ETX, LRC
-                card_msg = card_msg.Replace(new String((char)0x1c, 1), "@@");
-                PushOutput("PANCACHE:" + card_msg);
-                if (this.verbose_mode > 0) {
-                    System.Console.WriteLine(card_msg);
-                }
-                if (card_msg.Contains("%") && card_msg.Contains("^")) {
-                    string[] parts = card_msg.Split(new char[]{'%'}, 2);
-                    parts = parts[1].Split(new char[]{'^'}, 2);
-                    masked_pan = parts[0].Substring(1);
-                } else if (card_msg.Contains(";") && card_msg.Contains("=")) {
-                    string[] parts = card_msg.Split(new char[]{';'}, 2);
-                    parts = parts[1].Split(new char[]{'='}, 2);
-                    masked_pan = parts[0];
-                } else if (card_msg.Contains("@@") && card_msg.Contains("^")) {
-                    card_msg = card_msg.Replace("@@", "%");
-                    string[] parts = card_msg.Split(new char[]{'%'}, 2);
-                    parts = parts[1].Split(new char[]{'^'}, 2);
-                    masked_pan = parts[0].Substring(1);
-                }
-                if (auto_state_change) {
-                    showPaymentScreen();
-                    //WriteMessageToDevice(GetCardType());
-                    //sendUpdate = true;
+                card_msg = card_msg.Substring(1, card_msg.Length - 3); // trim STX, ETX, LRC 
+                if (card_msg.Length > 5) {
+                    card_msg = card_msg.Replace(new String((char)0x1c, 1), "@@");
+                    PushOutput("PANCACHE:" + card_msg);
+                    if (this.verbose_mode > 0) {
+                        System.Console.WriteLine(card_msg);
+                    }
+                    if (card_msg.Contains("%") && card_msg.Contains("^")) {
+                        string[] parts = card_msg.Split(new char[]{'%'}, 2);
+                        parts = parts[1].Split(new char[]{'^'}, 2);
+                        masked_pan = parts[0].Substring(1);
+                    } else if (card_msg.Contains(";") && card_msg.Contains("=")) {
+                        string[] parts = card_msg.Split(new char[]{';'}, 2);
+                        parts = parts[1].Split(new char[]{'='}, 2);
+                        masked_pan = parts[0];
+                    }
+                    if (auto_state_change) {
+                        WriteMessageToDevice(GetCardType());
+                        Thread.Sleep(2000);
+                        char fs = (char)0x1c;
+                        string buttons = "Bbtna,S"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S";
+                        WriteMessageToDevice(UpdateScreenMessage(buttons));
+                    }
+                } else {
+                    WriteMessageToDevice(SwipeCardScreen());
                 }
                 break;
 
@@ -360,8 +357,9 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
                     // if the buffer is undersized or the status byte
                     // is not ASCII zero, go back the beginning
                     // otherwise see which type was selected
-                    if (buffer.Length < 6 || buffer[4] != 0x30) {
+                    if (buffer.Length < 6 || buffer[4] != 0x30 || buffer[5] == 0x1b) {
                         WriteMessageToDevice(SwipeCardScreen());
+                        PushOutput("TERMCLEARALL");
                     } else if (buffer[5] == 0x41) {
                         PushOutput("TERM:Debit");
                         if (auto_state_change) {
@@ -407,6 +405,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
                         System.Console.WriteLine("ERROR: Mostlikely the masked_pan doesn't match the pan read.");
                         Thread.Sleep(1500);
                         WriteMessageToDevice(SwipeCardScreen());
+                        PushOutput("TERMCLEARALL");
                     } else {
                         string pin_msg = enc.GetString(buffer);
                         // trim STX, command prefix, status byte, ETX, and LRC
@@ -458,15 +457,32 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
             last_message = null;
             WriteMessageToDevice(StatusRequestMessage());
         } else if (!auto_state_change && !getting_signature && (msg == "termGetType" || msg == "termGetTypeWithFS")) {
-            showPaymentScreen();
-            //WriteMessageToDevice(GetCardType());
-            //sendUpdate = true;
+            WriteMessageToDevice(GetCardType());
+            Thread.Sleep(2000);
+            char fs = (char)0x1c;
+            string buttons = "Bbtna,S"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S";
+            WriteMessageToDevice(UpdateScreenMessage(buttons));
         } else if (!auto_state_change && !getting_signature && msg == "termWait") {
             WriteMessageToDevice(TermWaitScreen());
         } else if (!auto_state_change && !getting_signature && msg == "termApproved") {
             WriteMessageToDevice(TermApprovedScreen());
         } else if (!auto_state_change && !getting_signature && msg == "termGetPin") {
             WriteMessageToDevice(PinEntryScreen());
+        } else if (msg == "termReConfig") {
+            WriteMessageToDevice(OfflineMessage());
+            // enable ebt cash
+            WriteMessageToDevice(WriteConfigMessage("11", "3", EBT_CA));
+            // enable ebt food
+            WriteMessageToDevice(WriteConfigMessage("11", "4", EBT_FS));
+            // mute beep volume
+            WriteMessageToDevice(WriteConfigMessage("7", "14", "5"));
+            // new style save/restore state
+            WriteMessageToDevice(WriteConfigMessage("7", "15", "1"));
+            // do not show messages between screens
+            WriteMessageToDevice(WriteConfigMessage("7", "1", "0"));
+            // send reset reply
+            WriteMessageToDevice(WriteConfigMessage("7", "9", "1"));
+            WriteMessageToDevice(OnlineMessage());
         }
 
         if (this.verbose_mode > 0) {
@@ -593,9 +609,9 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
 
         msg[4] = 0x30; // unconditional force
         msg[5] = p[0];
-
+        
         msg[6] = 0x3; // ETX
-
+        
         return msg;
     }
     */
@@ -685,7 +701,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
         System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
 
         byte[] valbytes = enc.GetBytes(var_value);
-        byte[] msg = new byte[12 + valbytes.Length + 1];
+        byte[] msg = new byte[12 + valbytes.Length + 1]; 
 
         msg[0] = 0x2; // STX
         msg[1] = 0x32; // set var code
@@ -849,8 +865,8 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
         byte[] msg = new byte[5 + prompt.Length];
 
         msg[0] = 0x2;
-        msg[1] = 0x32;
-        msg[2] = 0x33;
+        msg[1] = 0x38;
+        msg[2] = 0x37;
         msg[3] = 0x2e;
         int pos = 4;
         foreach (byte b in prompt) {
@@ -985,118 +1001,8 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
         return new byte[6]{ 0x2, 0x33, 0x34, 0x2e, 0x53, 0x3 };
     }
 
-    protected byte[] SetAllowedPaymentTypes() {
-        //09.1111100000000000
-        //30 39 2e 31 31 31 31 31 30 30 30 30 30 30 30 30 30 30 30
-        byte [] msg = new byte[21];
-        msg[0] = 0x2; //STX
-        msg[1] = 0x30; //0
-        msg[2] = 0x39; //9
-        msg[3] = 0x2e; //.
-        msg[4] = 0x31; //1
-        msg[5] = 0x31;
-        msg[6] = 0x31;
-        msg[7] = 0x31;
-        msg[8] = 0x31;
-        msg[9] = 0x30; //0
-        msg[10] = 0x30;
-        msg[11] = 0x30;
-        msg[12] = 0x30;
-        msg[13] = 0x30;
-        msg[14] = 0x30;
-        msg[15] = 0x30;
-        msg[16] = 0x30;
-        msg[17] = 0x30;
-        msg[18] = 0x30;
-        msg[19] = 0x30;
-        msg[20] = 0x3; //ETX
-
-        return msg;
-    }
-
-    private void showPaymentScreen()
-    {
-        WriteMessageToDevice(GetCardType());
-        Thread.Sleep(1500);
-        char fs = (char)0x1c;
-        string buttons = "Bbtna,S"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S";
-        WriteMessageToDevice(UpdateScreenMessage(buttons));
-    }
-
-    protected byte[] ShowCardButtonsMessage() {
-        //this is a speical update screen message to tell an isc250 to show the buttons on the card select screen.
-        //System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
-        //string[] buttons = new string[5] {"BBTNA,S","BBTNB,S","BBTNC,S","BBTND,S","BBTND,S"};
-        //byte[] encode = enc.GetBytes(buttons[0]);
-        sendUpdate = false;
-
-
-        //70.BBTNA
-        //37 30 2e 42 42 54 4e 41 2c 53
-
-        byte[] msg = new byte[12];
-
-        msg[0] = 0x2;
-        msg[1] = 0x37;
-        msg[2] = 0x30;
-        msg[3] = 0x2e;
-        msg[4] = 0x42;
-        msg[5] = 0x42;
-        msg[6] = 0x54;
-        msg[7] = 0x4e;
-        msg[8] = 0x41;
-        msg[9] = 0x2c;
-        msg[10] = 0x53;
-        msg[11] = 0x03;
-
-        /*
-        msg[11] = 0x65;
-        msg[12] = 0x62;
-        msg[13] = 0x69;
-        msg[14] = 0x74;
-        msg[15] = 0x1c;
-        msg[16] = 0x42;
-        msg[17] = 0x42;
-        msg[18] = 0x54;
-        msg[19] = 0x4e;
-        msg[20] = 0x41;
-        msg[21] = 0x2c;
-        msg[22] = 0x53;
-        msg[23] = 0x3;
-        */
-
-        /*
-        int pos = 4;
-        foreach (string s in buttons) {
-            encode = enc.GetBytes(s);
-            foreach (byte b in encode) {
-                msg[pos] = b;
-                pos++;
-            }
-            msg[pos] = 0x1c;
-            pos++;
-        }
-
-        msg[pos] = 0x3;
-        */
-        return msg;
-
-    }
-
-    protected byte[] UnitDataMessage() {
-        byte[] msg = new byte[5];
-        msg[0] = 0x2;
-        msg[1] = 0x30;
-        msg[2] = 0x37;
-        msg[3] = 0x2e;
-        msg[4] = 0x3;
-        return msg;
-    }
-
     protected byte[] UpdateScreenMessage(string update)
     {
-        //System.Console.WriteLine("Screen Update Message:");
-        //System.Console.WriteLine(update);
         System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
         byte[] encode = enc.GetBytes(update);
         byte[] msg = new byte[5 + encode.Length];
@@ -1142,7 +1048,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
     protected void ParseSigBlockMessage(int status, byte[] msg)
     {
         System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
-
+        
         if (status == 2) {
             byte[] var_data = new byte[msg.Length-14];
             for (int i=0;i<var_data.Length;i++) {
@@ -1179,11 +1085,11 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
     protected void ParseAuthMessage(byte[] msg)
     {
         System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
-
+        
         // skipping 0 (stx), 1-3 (message #)
-
+    
         /** don't need any of these values for anything
-        string aquirer = enc.GetString(new byte[6]{msg[4],msg[5],msg[6],msg[7],msg[8],msg[9]});
+        string aquirer = enc.GetString(new byte[6]{msg[4],msg[5],msg[6],msg[7],msg[8],msg[9]});    
 
         string merch_id = enc.GetString(new byte[12]{msg[10],msg[11],msg[12],msg[13],
                             msg[14],msg[15],msg[16],msg[17],
@@ -1207,7 +1113,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
                             msg[51],msg[52],msg[53],msg[54]});
 
         // skipping 55 (constant 0)
-
+        
         pos_trans_no = enc.GetString(new byte[4]{msg[56],msg[57],msg[58],msg[59]});
         */
 
@@ -1254,7 +1160,7 @@ public class SPH_IngenicoRBA_Common : SerialPortHandler
             Array.Copy(pin_bytes,38,ec,0,5);
             pin_enc_counter = enc.GetString(ec);
         }
-
+        
         pos++; // should be at next 0x1c;
 
         int amount = 0;

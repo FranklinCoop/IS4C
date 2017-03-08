@@ -8,7 +8,7 @@ function getResults() {
     $('#resultArea').html('');
     $.ajax({
         url: 'AdvancedItemSearch.php',
-        type: 'get',
+        type: 'post',
         data: 'search=1&' + dstr,
     }).done(function(data) {
         $('.progress').hide();
@@ -73,6 +73,12 @@ function goToList() {
 function goToSigns() {
     if (getItems()) {
         $('#actionForm').attr('action', '../admin/labels/SignFromSearch.php');
+        $('#actionForm').submit();
+    }
+}
+function goToManualSigns() {
+    if (getItems()) {
+        $('#actionForm').attr('action', '../admin/labels/ManualSignsPage.php');
         $('#actionForm').submit();
     }
 }

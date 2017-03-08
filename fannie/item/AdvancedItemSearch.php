@@ -84,23 +84,9 @@ class AdvancedItemSearch extends FannieRESTfulPage
         return parent::preprocess();
     }
 
-    // failover on ajax call
-    // if javascript breaks somewhere and the form
-    // winds up submitted, at least display the results
-    private $post_results = '';
     protected function post_upc_handler()
     {
-        ob_start();
-        $this->get_search_handler();
-        $this->post_results = ob_get_clean();
-
-        return true;
-    }
-
-    // failover on ajax call
-    protected function post_upc_view()
-    {
-        return $this->get_view() . $this->post_results;
+        return $this->get_search_handler();
     }
 
     protected function post_search_handler()
@@ -140,6 +126,13 @@ class AdvancedItemSearch extends FannieRESTfulPage
     {
         if ($form->upcs !== '') {
             $upcs = explode("\n", $form->upcs);
+            $upcs = array_map(function($i) {
+                if (preg_match('/\d-\d+-\d+-\d/', $i)) {
+                    $ret = trim(str_replace('-', '', $i));
+                    return substr($ret, 0, strlen($ret)-1);
+                }
+                return $i;
+            }, $upcs);
             $upcs = array_map(function($i){ return BarcodeLib::padUPC(trim($i)); }, $upcs);
             $search->args = array_merge($search->args, $upcs);
             $search->where .= ' AND p.upc IN (' . str_repeat('?,', count($upcs));
@@ -905,7 +898,7 @@ class AdvancedItemSearch extends FannieRESTfulPage
     private function streamOutput($data) 
     {
         $ret = '';
-        $ret .= '<table class="table search-table">';
+        $ret .= '<table class="table search-table table-striped">';
         $ret .= '<thead><tr>
                 <th><input type="checkbox" onchange="toggleAll(this, \'.upcCheckBox\');" /></th>
                 <th>UPC</th><th>Brand</th><th>Desc</th><th>Super</th><th>Dept</th>

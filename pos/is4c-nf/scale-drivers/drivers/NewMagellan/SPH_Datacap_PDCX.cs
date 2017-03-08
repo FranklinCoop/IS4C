@@ -47,6 +47,8 @@ public class SPH_Datacap_PDCX : SerialPortHandler
     protected short CONNECT_TIMEOUT = 60;
     private bool log_xml = true;
     private RBA_Stub rba = null;
+    private bool pdc_active;
+    private Object pdcLock = new Object();
 
     public SPH_Datacap_PDCX(string p) : base(p)
     { 
@@ -59,6 +61,7 @@ public class SPH_Datacap_PDCX : SerialPortHandler
         if (device_identifier == "INGENICOISC250_MERCURY_E2E") {
             rba = new RBA_Stub("COM"+com_port);
         }
+        pdc_active = false;
     }
 
     /**
@@ -73,7 +76,11 @@ public class SPH_Datacap_PDCX : SerialPortHandler
             ax_control.SetResponseTimeout(CONNECT_TIMEOUT);
             InitPDCX();
         }
-        ax_control.CancelRequest();
+        lock (pdcLock) {
+            if (pdc_active) {
+                ax_control.CancelRequest();
+            }
+        }
         if (rba != null) {
             rba.SetParent(this.parent);
             rba.SetVerbose(this.verbose_mode);
@@ -121,8 +128,13 @@ public class SPH_Datacap_PDCX : SerialPortHandler
                         if (this.verbose_mode > 0) {
                             Console.WriteLine(message);
                         }
-                        ax_control.CancelRequest();
+                        lock (pdcLock) {
+                            pdc_active = true;
+                        }
                         string result = ax_control.ProcessTransaction(message, 1, null, null);
+                        lock (pdcLock) {
+                            pdc_active = false;
+                        }
                         result = WrapHttpResponse(result);
                         if (this.verbose_mode > 0) {
                             Console.WriteLine(result);
@@ -197,12 +209,14 @@ public class SPH_Datacap_PDCX : SerialPortHandler
                 if (rba != null) {
                     rba.stubStop();
                 }
-                ax_control.CancelRequest();
                 initDevice();
                 break;
             case "termManual":
                 break;
             case "termApproved":
+                if (rba != null) {
+                    rba.showApproved();
+                }
                 break;
             case "termSig":
                 if (rba != null) {
@@ -255,7 +269,13 @@ public class SPH_Datacap_PDCX : SerialPortHandler
             + "</Account>"
             + "</Transaction>"
             + "</TStream>";
+        lock (pdcLock) {
+            pdc_active = true;
+        }
         string result = ax_control.ProcessTransaction(xml, 1, null, null);
+        lock (pdcLock) {
+            pdc_active = false;
+        }
         XmlDocument doc = new XmlDocument();
         try {
             doc.LoadXml(result);
@@ -275,7 +295,9 @@ public class SPH_Datacap_PDCX : SerialPortHandler
             string filename = my_location + sep + "ss-output"+ sep + "tmp" + sep + ticks + ".bmp";
             BitmapBPP.Signature sig = new BitmapBPP.Signature(filename, points);
             parent.MsgSend("TERMBMP" + ticks + ".bmp");
-            
+            if (rba != null) {
+                rba.showApproved();
+            }
         } catch (Exception) {
             return null;
         }

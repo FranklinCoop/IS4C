@@ -247,7 +247,7 @@ class BasicCCModule
      This function calls the handleResponse method
      and returns the result of that call.
      */
-    protected function curlSend($data=False,$type='POST',$xml=False, $extraOpts=array(), $autoHandle=true)
+    protected function curlSend($data=False,$type='POST',$xml=False, $extraOpts=array(), $autoHandle=true, $headers=array())
     {
         if($data && $type == 'GET') {
             $this->GATEWAY .= $data;
@@ -275,8 +275,15 @@ class BasicCCModule
             $headers[] = "Content-type: text/xml";
             curl_setopt($curlObj, CURLOPT_HTTPHEADER, $headers);
         } elseif ($xml) {
+            if ($headers == array()) {
+
             curl_setopt($curlObj, CURLOPT_HTTPHEADER,
                 array("Content-type: text/xml"));
+            } else {
+
+              curl_setopt($curlObj, CURLOPT_HTTPHEADER, $headers);
+            }
+
         }
 
         foreach ($extraOpts as $opt => $value) {

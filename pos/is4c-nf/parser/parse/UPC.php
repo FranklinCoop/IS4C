@@ -36,7 +36,7 @@ use COREPOS\pos\parser\Parser;
 use COREPOS\pos\plugins\Plugin;
 use \CoreLocal;
 
-class UPC extends Parser 
+class UPC extends Parser
 {
     /**
       Defines how the UPC was entered.
@@ -65,13 +65,13 @@ class UPC extends Parser
     /**
       The default case is pretty simple. A numeric string
       is checked as a UPC.
-      
+
       The 0XA prefix indicates a scanned value from the scale.
       This prefix was selected because PHP's validation still
       considers the whole string a [hex] number. That helps with
       overall input validation. A complex entry like:
           5*0XA001234567890
-      Is handled correctly because there's a "number" on both 
+      Is handled correctly because there's a "number" on both
       sides of asterisk. The prefix is then stripped off by
       this parser to get the actual UPC value.
 
@@ -83,7 +83,7 @@ class UPC extends Parser
     {
         if (is_numeric($str) && strlen($str) < 16) {
             return true;
-        } elseif ($this->getPrefix($str) !== false) { 
+        } elseif ($this->getPrefix($str) !== false) {
             return true;
         }
 
@@ -93,9 +93,9 @@ class UPC extends Parser
     private function prefixes()
     {
         return array(
-            self::SCANNED_STATUS => self::SCANNED_PREFIX, 
-            self::MACRO_STATUS => self::MACRO_PREFIX, 
-            self::HID_STATUS => self::HID_PREFIX, 
+            self::SCANNED_STATUS => self::SCANNED_PREFIX,
+            self::MACRO_STATUS => self::MACRO_PREFIX,
+            self::HID_STATUS => self::HID_PREFIX,
             self::GS1_STATUS => self::GS1_PREFIX,
         );
     }
@@ -145,7 +145,7 @@ class UPC extends Parser
         return $this->upcscanned($str);
     }
 
-    private function upcscanned($entered) 
+    private function upcscanned($entered)
     {
         $ret = $this->default_json();
 
@@ -219,7 +219,7 @@ class UPC extends Parser
           item. This can indicate a stuck scale.
           The giant if determines whether the item is scalable, that we
           know the weight, and that we know the previous weight (lastWeight)
-        
+
           Pre-weighed items (upc starts with 002) are ignored because they're not
           weighed here. Scalable items that cost one cent are ignored as a special
           case; they're normally entered by keying a quantity multiplier
@@ -267,7 +267,7 @@ class UPC extends Parser
             $this->session->set('tarezero', False);
         }
 
-        /* sanity check - ridiculous price 
+        /* sanity check - ridiculous price
            (can break db column if it doesn't fit
         */
         if (strlen($row["normal_price"]) > 8){
@@ -282,9 +282,9 @@ class UPC extends Parser
 
         $scale = ($row["scale"] == 0) ? 0 : 1;
         $qttyEnforced = $row["qttyEnforced"];
-        /* use scaleprice bit column to indicate 
-           whether values should be interpretted as 
-           UPC or EAN */ 
+        /* use scaleprice bit column to indicate
+           whether values should be interpretted as
+           UPC or EAN */
         $scaleprice = ($row['scaleprice'] == 0) ? $scalepriceUPC : $scalepriceEAN;
 
         /* need a weight with this item
@@ -300,25 +300,25 @@ class UPC extends Parser
                 true,
                 DisplayLib::standardClearButton()
             );
-            
+
             return $ret;
         }
 
         /* quantity required for this item. Send to
            entry page if one wasn't provided */
         if (($qttyEnforced == 1) && ($this->session->get("multiple") == 0) && ($this->session->get("msgrepeat" == 0) || $this->session->get('qttyvalid') == 0)) {
-            $ret['main_frame'] = 
+            $ret['main_frame'] =
                     $myUrl . 'gui-modules/QuantityEntryPage.php'
                     . '?entered-item=' . $this->session->get('strEntered')
                     . '&qty-mode=' . $scale;
             return $ret;
-        } 
+        }
 
         /* got a scale weight, make sure the tare
            is valid */
         if ($scale != 0 && !$scaleStickerItem) {
             $quantity = $this->session->get("weight") - $this->session->get("tare");
-            if ($this->session->get("quantity") != 0) 
+            if ($this->session->get("quantity") != 0)
                 $quantity = $this->session->get("quantity") - $this->session->get("tare");
 
             if ($quantity <= 0) {
@@ -333,7 +333,7 @@ class UPC extends Parser
             $this->session->set("tare",0);
         }
 
-        /* non-scale items need integer quantities */    
+        /* non-scale items need integer quantities */
         if ($row["scale"] == 0 && (int) $this->session->get("quantity") != $this->session->get("quantity") ) {
             $ret['output'] = DisplayLib::boxMsg(
                 _("fractional quantity cannot be accepted for this item"),
@@ -346,7 +346,7 @@ class UPC extends Parser
 
         /*
            END error checking round #1
-        */    
+        */
 
         // wfc uses deposit field to link another upc
         if (isset($row["deposit"]) && $row["deposit"] > 0){
@@ -372,7 +372,7 @@ class UPC extends Parser
         $discountObject = DiscountType::getObject($row['discounttype'], $this->session);
 
         /* add in sticker price and calculate a quantity
-           if the item is stickered, scaled, and on sale. 
+           if the item is stickered, scaled, and on sale.
 
            otherwise, if the item is sticked, scaled, and
            not on sale but has a non-zero price attempt
@@ -396,7 +396,7 @@ class UPC extends Parser
                 if (round($scaleprice, 2) != round($quantity * $row['normal_price'], 2)) {
                     $quantity = 1.0;
                     $row['normal_price'] = $scaleprice;
-                } 
+                }
             } else {
                 $row['normal_price'] = $scaleprice;
             }
@@ -410,7 +410,7 @@ class UPC extends Parser
         $pricemethod = MiscLib::nullwrap($discountObject->isSale() ? $row['specialpricemethod'] : $row["pricemethod"]);
         $priceMethodObject = PriceMethod::getObject($pricemethod, $this->session);
 
-        // prefetch: otherwise object members 
+        // prefetch: otherwise object members
         // pass out of scope in addItem()
         $prefetch = $discountObject->priceInfo($row,$quantity);
         $added = $priceMethodObject->addItem($row, $quantity, $discountObject);
@@ -469,7 +469,7 @@ class UPC extends Parser
         if ($dbc->num_rows($result) <= 0) return;
 
         $row = $dbc->fetchRow($result);
-        
+
         $description = $row["description"];
         $description = str_replace("'", "", $description);
         $description = str_replace(",", "", $description);
@@ -523,10 +523,10 @@ class UPC extends Parser
         // ignore any other fields for now
         if (substr($str,0,2) == "10")
             return substr($str,2,13);
-        
+
         // application identifier not recognized
         // will likely cause no such item error
-        return $str; 
+        return $str;
     }
 
     public function expandUPCE($entered)
@@ -555,7 +555,7 @@ class UPC extends Parser
         /* make sure upc length is 13 */
         $upc = "";
         if ($this->session->get('EanIncludeCheckDigits') != 1) {
-            /** 
+            /**
               If EANs do not include check digits, the value is 13 digits long,
               and the value does not begin with a zero, it most likely
               represented a hand-keyed EAN13 value w/ check digit. In this configuration
@@ -571,11 +571,11 @@ class UPC extends Parser
         return $upc;
     }
 
-    /* extract scale-sticker prices 
-       Mixed check digit settings do not work here. 
+    /* extract scale-sticker prices
+       Mixed check digit settings do not work here.
        Scale UPCs and EANs must uniformly start w/
        002 or 02.
-       @return [array] 
+       @return [array]
         boolean is-scale-sticker
         number UPC-price
         number EAN-price
@@ -656,7 +656,7 @@ class UPC extends Parser
 
     private function duplicateWeight($row, $scaleStickerItem)
     {
-        if ($row['scale'] == 1 
+        if ($row['scale'] == 1
             && $this->session->get("lastWeight") > 0 && $this->session->get("weight") > 0
             && abs($this->session->get("weight") - $this->session->get("lastWeight")) < 0.0005
             && !$scaleStickerItem && abs($row['normal_price']) > 0.01
@@ -678,7 +678,7 @@ class UPC extends Parser
               ( (restrict_start IS NULL AND restrict_end IS NULL) OR
                 ".$dbc->curtime()." BETWEEN restrict_start AND restrict_end
               )
-             ) OR 
+             ) OR
             ( dept_ID='{$row['department']}' AND
               ( ".$dbc->datediff($dbc->now(),'restrict_date')."=0 OR
                 ".$dbc->dayofweek($dbc->now())."=restrict_dow
@@ -713,7 +713,7 @@ class UPC extends Parser
                 return $this->default_json();
             }
         }
-        
+
         $obj = ItemNotFound::factory($this->session->get('ItemNotFound'));
         $ret = $obj->handle($upc, $ret);
 
@@ -729,15 +729,15 @@ class UPC extends Parser
             pricemethod,quantity,specialgroupprice,specialquantity,
             mixmatchcode,idEnforced,tareweight,scaleprice";
         if ($this->session->get('NoCompat') == 1) {
-            $query .= ', 
-                line_item_discountable, 
-                formatted_name, 
+            $query .= ',
+                line_item_discountable,
+                formatted_name,
                 special_limit,
-                CASE 
+                CASE
                     WHEN received_cost <> 0 AND received_cost IS NOT NULL
                         THEN received_cost
-                    WHEN discounttype > 0 AND special_cost <> 0 AND special_cost IS NOT NULL 
-                        THEN special_cost 
+                    WHEN discounttype > 0 AND special_cost <> 0 AND special_cost IS NOT NULL
+                        THEN special_cost
                     ELSE cost END AS cost';
         } else {
             $table = $dbc->tableDefinition('products');
@@ -762,7 +762,7 @@ class UPC extends Parser
             // New column 20Oct16
             if (isset($table['special_cost']) && isset($table['received_cost'])) {
                 $query .= ', CASE WHEN received_cost <> 0 AND received_cost IS NOT NULL THEN received_cost
-                    WHEN discounttype > 0 AND special_cost <> 0 AND special_cost IS NOT NULL 
+                    WHEN discounttype > 0 AND special_cost <> 0 AND special_cost IS NOT NULL
                     THEN special_cost ELSE cost END AS cost';
             } else {
                 $query .= ', cost';
@@ -835,4 +835,3 @@ class UPC extends Parser
             </table>";
     }
 }
-

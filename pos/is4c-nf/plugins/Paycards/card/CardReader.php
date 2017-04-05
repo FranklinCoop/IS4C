@@ -149,7 +149,8 @@ class CardReader
         } elseif ($len == 19) {
             $type = PaycardLib::PAYCARD_TYPE_GIFT;
             list($accepted, $issuer) = $this->identifyBin($this->bin19s, $iin, $ebtAccept);
-        } elseif (substr($pan,0,8) == "02E60080" || substr($pan, 0, 5) == "23.0%" || substr($pan, 0, 5) == "23.0;") {
+        } elseif (substr($pan,0,8) == "02E60080" || substr($pan, 0, 5) == "23.0%" || substr($pan, 0, 5) == "23.0;" 
+            || substr($pan,0,6) == "23.0M%") {
             $type = PaycardLib::PAYCARD_TYPE_ENCRYPTED;
             $accepted = true;
         } elseif (substr($pan,0,2) === '02' && substr($pan,-2) === '03' && strstr($pan, '***')) {
@@ -205,12 +206,6 @@ class CardReader
         $tr2 = false;
         $tr3 = false;
 
-        //isc250 doesn't contain any of the track headers we expect.
-        if (substr($data,0,5) == '23.0M') {
-          $data = str_replace('23.0M','%', $data);
-          $data = str_replace('@@','?;', $data);
-
-        }
         // track types are identified by start-sentinel values, but all track types end in '?'
         $tracks = explode('?', $data);
         foreach( $tracks as $track) {
@@ -237,11 +232,6 @@ class CardReader
             // even when they also provide entire usable tracks
 
         } // foreach magstripe track
-
-        //isc250 doesn't contain any of the track headers we expect.
-        if (substr($data,0,5) == '23.0M') {
-
-        }
 
         return array($tr1, $tr2, $tr3);
     }

@@ -219,7 +219,7 @@ class SigTermCommands extends Parser
         $ret = $this->default_json();
         $ret['scale'] = ''; // redraw righthand column
         if ($str == "CCFROMCACHE") {
-            $ret['retry'] = $this->session->get("CachePanEncBlock");
+            $ret['retry'] = rawurlencode($this->session->get("CachePanEncBlock"));
         }
         if ($this->cbError) {
             $ret['output'] = DisplayLib::boxMsg(

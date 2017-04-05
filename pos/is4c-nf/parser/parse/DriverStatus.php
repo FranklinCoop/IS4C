@@ -46,6 +46,7 @@ class DriverStatus extends Parser
         */
         if (@socket_recvfrom($socket, $buffer, 1024, 0, $host, $port)) {
             $msg = str_replace("\n", '<br>', $buffer);
+            $msg .= "\nPan Block: ".$this->session->get("CachePanEncBlock");
         } else {
             $msg = _('No response to status request');
         }

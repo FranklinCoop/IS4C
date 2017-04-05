@@ -55,8 +55,10 @@ class RapidConnect extends BasicCCModule
     }
 
     function handlesType($type){
-        if ($type == PaycardLib::PAYCARD_TYPE_CREDIT) return True;
-        else return False;
+        if ($type == PaycardLib::PAYCARD_TYPE_ENCRYPTED || $type == PaycardLib::PAYCARD_TYPE_CREDIT) {
+            return True;
+        }
+        else {return False;}
     }
 
     function handleResponse($authResult)
@@ -71,6 +73,12 @@ class RapidConnect extends BasicCCModule
 
     function entered($validate,$json)
     {
+                    //REMOVE LATER DEBUG LOGGING
+            $log = realpath(dirname(__FILE__).'/../../log/rc_dev.log');
+            $fp = @fopen($log,'a');
+            fwrite($fp,"INSIDE RapidCOnnect entered:\nJSON: ".$json."\n");
+            fclose($fp);
+
         $this->trans_pan['pan'] = $this->conf->get("paycard_PAN");
         return $this->pmod->ccEntered($this->trans_pan['pan'], $validate, $json);
     }
@@ -108,15 +116,10 @@ class RapidConnect extends BasicCCModule
         }
         //fwrite($fp,$dwXML."\n");
         fclose($fp);
-        //$innerXml = $this->desoapify("SOAP-ENV:Body",$authResult['response']);
-        $xml = new BetterXmlData($authResult['response']);
-        $xml->xpath->registerNamespace('r', 'http://securetransport.dw/rcservice/xml');
-        $statusCode = $xml->query("//@StatusCode");
-        $dwRetCode = $xml->query('/r:Response/r:TransactionResponse/r:ReturnCode');
 
         //test if DataWire communication has worked.
-        if ($statusCode == 'OK' && $dwRetCode == '000') {
-            $rcResponse = $xml->query('/r:Response/r:TransactionResponse/r:Payload');
+        $rcResponse = $this->handleDatawireResponse($authResult);
+        if ($rcResponse) {
             $rcXmlParse = new BetterXmlData($rcResponse);
             $rcXmlParse->xpath->registerNamespace('g', 'com/firstdata/Merchant/gmfV6.10');
             $responseCode = $rcXmlParse->query('/g:GMF/g:*/g:RespGrp/g:RespCode');
@@ -127,47 +130,51 @@ class RapidConnect extends BasicCCModule
 
             $request = $this->last_request;
 
-        $request = $this->last_request;
-        $this->last_paycard_transaction_id = $request->last_paycard_transaction_id;
-        $response = new PaycardResponse($request, $authResult, PaycardLib::paycard_db());
+            $request = $this->last_request;
+            $this->last_paycard_transaction_id = $request->last_paycard_transaction_id;
+            $response = new PaycardResponse($request, $authResult, PaycardLib::paycard_db());
 
-        $statusMsg = $rcXmlParse->query('/g:GMF/g:*/g:RespGrp/g:AddtlRespData');
-        $responseCode = $this->statusToCode($statusMsg);
-        $response->setResponseCode($responseCode);
-        $resultCode = $responseCode;
-        $response->setResultCode($resultCode);
-        $resultMsg = $statusMsg; // already gathered above
-        $response->setResultMsg($resultMsg);
-        $xTransID = $rcXmlParse->query("/g:GMF/g:*Response/g:CommonGrp/g:RefNum");
-        $response->setTransactionID($xTransID);
-        $apprNumber = $rcXmlParse->query('/g:GMF/g:*/g:RespGrp/g:AuthID');
-        $response->setApprovalNum($apprNumber);
-        // valid credit transactions don't have an approval number
-        $response->setValid(0);
+            $statusMsg = $rcXmlParse->query('/g:GMF/g:*/g:RespGrp/g:AddtlRespData');
+            $responseCode = $this->statusToCode($statusMsg);
+            $response->setResponseCode($responseCode);
+            $resultCode = $responseCode;
+            $response->setResultCode($resultCode);
+            $resultMsg = $statusMsg; // already gathered above
+            $response->setResultMsg($resultMsg);
+            $xTransID = $rcXmlParse->query("/g:GMF/g:*Response/g:CommonGrp/g:RefNum");
+            $response->setTransactionID($xTransID);
+            $apprNumber = $rcXmlParse->query('/g:GMF/g:*/g:RespGrp/g:AuthID');
+            $response->setApprovalNum($apprNumber);
+            // valid credit transactions don't have an approval number
+            $response->setValid(0);
 
-        try {
-            $response->saveResponse();
-        } catch (Exception $ex) { }
+            try {
+                $response->saveResponse();
+            } catch (Exception $ex) { }
 
-        $comm = $this->pmod->commError($authResult);
-        if ($comm !== false) {
-            TransRecord::addcomment('');
-            return $comm;
-        }
+            $comm = $this->pmod->commError($authResult);
+            if ($comm !== false) {
+                TransRecord::addcomment('');
+                return $comm;
+            }
 
-        switch ($responseCode) {
-            case 1: // APPROVED
-                return PaycardLib::PAYCARD_ERR_OK;
-            case 2: // DECLINED
-                $this->conf->set("boxMsg",'Card Declined');
-                break;
-            case 0: // ERROR
-                $texts = $rcXmlParse->query('/g:GMF/g:*/g:RespGrp/g:ErrorData');
-                $this->conf->set("boxMsg","Error: $texts");
-                break;
-            default:
-                $this->conf->set("boxMsg","An unknown error occurred<br />at the gateway");
-        }
+            switch ($responseCode) {
+                case 1: // APPROVED
+                    return PaycardLib::PAYCARD_ERR_OK;
+                case 2: // DECLINED
+                    $this->conf->set("boxMsg",'Card Declined');
+                    break;
+                case 0: // ERROR
+                    $texts = $rcXmlParse->query('/g:GMF/g:*/g:RespGrp/g:ErrorData');
+                    $this->conf->set("boxMsg","Error: $texts");
+                    break;
+                case 4: //Schema Validation Error.
+                    $texts = $rcXmlParse->query('/g:GMF/g:*/g:RespGrp/g:ErrorData');
+                    $this->conf->set("boxMsg","Error: $texts");
+                    break;
+                default:
+                    $this->conf->set("boxMsg","An unknown error occurred<br />at the gateway");
+            }
 
             //REMOVE LATER DEBUG LOGGING
             $log = realpath(dirname(__FILE__).'/../../log/rc_dev.log');
@@ -176,14 +183,6 @@ class RapidConnect extends BasicCCModule
             
             fwrite($fp, "Response Code: ".$responseCode." : ".$message."\n");
             fclose($fp);
-
-        } elseif ($dwRetCode) {
-            $dwError = $this->datawireRetCode($dwRetCode);
-            $this->conf->set("boxMsg",$dwError['errText']);
-        } else {
-            $error = $authResult['curlErr'].': '.$authResult['curlErrText'].' : '.$authResult['curlHTTP']
-                .'\n'.$authResult['response'];
-            $this->conf->set("boxMsg",$error);
         }
         /*
         $request = $this->last_request;
@@ -340,55 +339,18 @@ class RapidConnect extends BasicCCModule
 
         $this->last_request = $request;
 
-        //xml request for rappid connect. needs to be wraped in the datawire xml.
-        $msgXml = '<?xml version="1.0" encoding="UTF-8"?>';
-        $msgXml .= '<GMF xmlns="com/firstdata/Merchant/gmfV6.10">';
-        $msgXml .= "<".$request->type."Request>";
-            $msgXml .= "<CommonGrp>";
-                $msgXml .= "<PymtType>".$request->type."</PymtType>";
-                $msgXml .= "<TxnType>Authorization</TxnType>";
-                $msgXml .= "<LocalDateTime>".date("YmdHis")."</LocalDateTime>";
-                $msgXml .= "<TrnmsnDateTime>".gmdate("YmdHis")."</TrnmsnDateTime>";
-                $msgXml .= "<STAN>".$this->STAN()."</STAN>"; //needs value System Trace Audit Number (STAN) Assigned by us should be unique 6 long
-                $msgXml .= "<RefNum>".mb_substr($request->refNum,0,12)."</RefNum>"; //22 length 12 bytes
-                $msgXml .= "<OrderNum>".mb_substr($request->refNum,0,15)."</OrderNum>"; //length 15 or 8 bytes, numaric unique
-                $msgXml .= "<TPPID>".$this->conf->get('RapidConnectID')."</TPPID>"; //TTPID
-                $msgXml .= "<TermID>00000002</TermID>"; //TID from rapid connect (00000001 default)
-                $msgXml .= "<MerchID>".$this->conf->get('RapidConnectMID')."</MerchID>"; //Merchant ID
-                $msgXml .= "<MerchCatCode>5399</MerchCatCode>";
-                $msgXml .= "<POSEntryMode>901</POSEntryMode>";
-                $msgXml .= "<POSCondCode>00</POSCondCode>";
-                $msgXml .= "<TermCatCode>01</TermCatCode>";
-                $msgXml .= "<TermEntryCapablt>01</TermEntryCapablt>";
-                $msgXml .= "<TxnAmt>".$amount."</TxnAmt>"; //Amount of the transaction.
-                $msgXml .= "<TxnCrncy>840</TxnCrncy>";
-                $msgXml .= "<TermLocInd>0</TermLocInd>";
-                $msgXml .= "<CardCaptCap>1</CardCaptCap>";
-                $msgXml .= "<GroupID>".$this->conf->get('RapidConnectGID')."</GroupID>";
-            $msgXml .= "</CommonGrp>";
-            $msgXml .= "<CardGrp>";
-                $msgXml .= "<Track2Data>".$cardTr2."</Track2Data>";
-                $msgXml .= "<CardType>".$this->conf->get("paycard_issuer")."</CardType>"; //Card Type, looks like we store it as issuer (visa, mastercard, etc)
-            $msgXml .= "</CardGrp>";
-            $msgXml .= "<AddtlAmtGrp>";
-                $msgXml .= "<PartAuthrztnApprvlCapablt>1</PartAuthrztnApprvlCapablt>";
-            $msgXml .= "</AddtlAmtGrp>";
-            //$msgXml .= "<VisaGrp>";
-            //    $msgXml .= "<ACI>Y</ACI>";
-            //    $msgXml .= "<VisaBID>56412</VisaBID>";
-            //    $msgXml .= "<VisaAUAR>000000000000</VisaAUAR>"; //always 000000000000 unless assigned by VISA?
-            //    $msgXml .= "<TaxAmtCapablt>1</TaxAmtCapablt>";
-            //$msgXml .= "</VisaGrp>";
-        $msgXml .= "</".$request->type."Request>";
-        $msgXml .= "</GMF>";
+        //get rapid connect xml packet.
+        $msgXML = $this->authXML($request, $amount, $cardTr2);
 
         $this->GATEWAY = $this->conf->get('DataWireURL1');
 
-        $rcXML = mb_convert_encoding($msgXml, 'utf-8', mb_detect_encoding($string));
+        $rcXML = mb_convert_encoding($msgXML, 'utf-8', mb_detect_encoding($string));
 
         $rcXML = $this->xml_escape($rcXML);
         // if you have not escaped entities use
         //$rcXML = mb_convert_encoding($rcXML, 'HTML-ENTITIES', 'utf-8'); 
+
+        $transArmorToken = $this->sendTransArmorTokenRequest($request);
 
         //XML request for datawire, contains the rappid connect request.
         $dwXML = $this->dataWireXML($rcXML);
@@ -402,6 +364,7 @@ class RapidConnect extends BasicCCModule
             fwrite($fp,$header."\n");
         }
         fwrite($fp,$dwXML."\n");
+        fwrite($fp, "TransArmor Token: ".$transArmorToken."\n");
         fclose($fp);
 
         $extraCurlSetup = array(
@@ -422,6 +385,62 @@ class RapidConnect extends BasicCCModule
     protected function sendVoid()
     {
         throw new Exception('Void not implemented');
+    }
+
+    protected function sendTransArmorTokenRequest($request) {
+        //request a Trans Armor Token from first data
+        //takes the credit request and returns that token or an error.
+        $tatXML = $this->transArmorTokenXML($request);
+        $tatXML = $this->xml_escape($tatXML);
+
+        //XML request for datawire, contains the rappid connect request.
+        $dwXML = $this->dataWireXML($tatXML);
+        $headers = $this->dataWireHeaders($dwXML);
+
+        $data = $this->curlSend($dwXML, 'POST', $this->GATEWAY, array(), $dwXML, $headers);
+
+        $tokenResponse = $this->handleDatawireResponse($data);
+        if ($tokenResponse) {
+            $tokenResponse = $xml->query('/r:Response/r:TransactionResponse/r:Payload');
+            $tokenXML = new BetterXmlData($tokenResponse);
+            $rcXmlParse->xpath->registerNamespace('g', 'com/firstdata/Merchant/gmfV6.10');
+            $responseCode = $rcXmlParse->query('/g:GMF/g:*/g:RespGrp/g:RespCode');
+
+            //REMOVE LATER DEBUG LOGGING
+            $log = realpath(dirname(__FILE__).'/../../log/rc_dev.log');
+            $fp = @fopen($log,'a');
+            fwrite($fp,"Token Response:\nRaw Payload: ".$tokenResponse."\n");
+            
+            //fwrite($fp, "Response Code: ".$responseCode." : ".$message."\n");
+            fclose($fp);
+        } else {return $data;}
+
+
+        return 'Token Should Be Good';
+    }
+
+    protected function handleDatawireResponse($dwPacket) {
+        $xml = new BetterXmlData($dwPacket['response']);
+        $xml->xpath->registerNamespace('r', 'http://securetransport.dw/rcservice/xml');
+        $statusCode = $xml->query("//@StatusCode");
+        $dwRetCode = $xml->query('/r:Response/r:TransactionResponse/r:ReturnCode');
+
+        //test if DataWire communication has worked.
+        if ($statusCode == 'OK' && $dwRetCode == '000') {
+            $rcResponse = $xml->query('/r:Response/r:TransactionResponse/r:Payload');
+            return $rcResponse;
+        } elseif ($dwRetCode) {
+            $dwError = $this->datawireRetCode($dwRetCode);
+            $this->conf->set("boxMsg",$dwError['errText']);
+            return false;
+        } else {
+            $error = $dwPacket['curlErr'].': '.$dwPacket['curlErrText'].' : '.$dwPacket['curlHTTP']
+                .'\n'.$authResult['response'];
+            $this->conf->set("boxMsg",$error);
+            return false;
+        }
+
+        return false;
     }
 
     public function refnum($transID)
@@ -577,6 +596,7 @@ class RapidConnect extends BasicCCModule
             case '001': return "Schema Validation Error"; break;
             case '002': return "Approve for partial amount";  break;
             case '003': return "Approve VIP";  break;
+            case '004': return "Schema Validation Error"; break;
             case '100': return "Do not honor";  break;
             case '101': return "Expired card";  break;
             case '102': return "Suspected fraud";  break;
@@ -623,5 +643,76 @@ class RapidConnect extends BasicCCModule
             default:
                 return array('errText'=>'Error: No retCode', 'retry'=>0); break;
         }
+    }
+
+    protected function authXML($request, $amount, $cardTr2) {
+                //xml request for rappid connect. needs to be wraped in the datawire xml.
+        $msgXml = '<?xml version="1.0" encoding="UTF-8"?>';
+        $msgXml .= '<GMF xmlns="com/firstdata/Merchant/gmfV6.10">';
+        $msgXml .= "<".$request->type."Request>";
+            $msgXml .= "<CommonGrp>";
+                $msgXml .= "<PymtType>".$request->type."</PymtType>";
+                $msgXml .= "<TxnType>Authorization</TxnType>";
+                $msgXml .= "<LocalDateTime>".date("YmdHis")."</LocalDateTime>";
+                $msgXml .= "<TrnmsnDateTime>".gmdate("YmdHis")."</TrnmsnDateTime>";
+                $msgXml .= "<STAN>".$this->STAN()."</STAN>"; //needs value System Trace Audit Number (STAN) Assigned by us should be unique 6 long
+                $msgXml .= "<RefNum>".mb_substr($request->refNum,0,12)."</RefNum>"; //22 length 12 bytes
+                $msgXml .= "<OrderNum>".mb_substr($request->refNum,0,15)."</OrderNum>"; //length 15 or 8 bytes, numaric unique
+                $msgXml .= "<TPPID>".$this->conf->get('RapidConnectID')."</TPPID>"; //TTPID
+                $msgXml .= "<TermID>00000002</TermID>"; //TID from rapid connect (00000001 default)
+                $msgXml .= "<MerchID>".$this->conf->get('RapidConnectMID')."</MerchID>"; //Merchant ID
+                $msgXml .= "<MerchCatCode>5399</MerchCatCode>";
+                $msgXml .= "<POSEntryMode>901</POSEntryMode>";
+                $msgXml .= "<POSCondCode>00</POSCondCode>";
+                $msgXml .= "<TermCatCode>01</TermCatCode>";
+                $msgXml .= "<TermEntryCapablt>01</TermEntryCapablt>";
+                $msgXml .= "<TxnAmt>".str_pad($amount, 10, '0', STR_PAD_LEFT)."</TxnAmt>"; //Amount of the transaction.
+                $msgXml .= "<TxnCrncy>840</TxnCrncy>";
+                $msgXml .= "<TermLocInd>0</TermLocInd>";
+                $msgXml .= "<CardCaptCap>1</CardCaptCap>";
+                $msgXml .= "<GroupID>".$this->conf->get('RapidConnectGID')."</GroupID>";
+            $msgXml .= "</CommonGrp>";
+            $msgXml .= "<CardGrp>";
+                $msgXml .= "<Track2Data>".$cardTr2."</Track2Data>";
+                $msgXml .= "<CardType>".$this->conf->get("paycard_issuer")."</CardType>"; //Card Type, looks like we store it as issuer (visa, mastercard, etc)
+            $msgXml .= "</CardGrp>";
+            $msgXml .= "<AddtlAmtGrp>";
+                $msgXml .= "<PartAuthrztnApprvlCapablt>1</PartAuthrztnApprvlCapablt>";
+            $msgXml .= "</AddtlAmtGrp>";
+            //$msgXml .= "<VisaGrp>";
+            //    $msgXml .= "<ACI>Y</ACI>";
+            //    $msgXml .= "<VisaBID>56412</VisaBID>";
+            //    $msgXml .= "<VisaAUAR>000000000000</VisaAUAR>"; //always 000000000000 unless assigned by VISA?
+            //    $msgXml .= "<TaxAmtCapablt>1</TaxAmtCapablt>";
+            //$msgXml .= "</VisaGrp>";
+        $msgXml .= "</".$request->type."Request>";
+        $msgXml .= "</GMF>";
+        return $msgXml;
+    }
+
+    protected function transArmorTokenXML($request) {
+        $msgXml = '<?xml version="1.0" encoding="UTF-8"?>';
+        $msgXml .= '<GMF xmlns="com/firstdata/Merchant/gmfV6.10">';
+            $msgXml .= '<TransArmorRequest>';
+                $msgXml .= '<CommonGrp>';
+                    $msgXml .= '<PymtType>'.$request->type.'</PymtType>';
+                    $msgXml .= '<TxnType>TATokenRequest</TxnType>';
+                    $msgXml .= '<LocalDateTime>'.date("YmdHis").'</LocalDateTime>';
+                    $msgXml .= '<TrnmsnDateTime>'.gmdate("YmdHis").'</TrnmsnDateTime>';
+                    $msgXml .= '<STAN>'.$this->STAN().'</STAN>';
+                    $msgXml .= '<RefNum>'.mb_substr($request->refNum,0,12).'</RefNum>';
+                    $msgXml .= '<TPPID>'.$this->conf->get('RapidConnectID').'</TPPID>';
+                    $msgXml .= '<TermID>00000002</TermID>';
+                    $msgXml .= '<MerchID>'.$this->conf->get('RapidConnectMID').'</MerchID>';
+                    $msgXml .= '<GroupID>'.$this->conf->get('RapidConnectGID').'</GroupID>';
+                $msgXml .= '</CommonGrp>';
+                $msgXml .= '<TAGrp>';
+                    $msgXml .= '<SctyLvl>Tknizatn</SctyLvl>';
+                    //$msgXml .= '<EncrptBlock>'.'some value'.'</EncrptBlock>';
+                    //$msgXml .= '<TknType>'.'some value'.'</TknType>';
+                $msgXml .= '</TAGrp>';
+            $msgXml .= '</TransArmorRequest>';
+        $msgXml .= '</GMF>';
+        return $msgXml;
     }
 }

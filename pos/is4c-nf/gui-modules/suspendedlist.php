@@ -51,6 +51,7 @@ class suspendedlist extends NoInputCorePage
                     $url = $this->page_url.'gui-modules/memlist.php?idSearch='.$this->session->get('memberID');
                 }
                 $this->change_page($url);
+                return false;
             }
             // pressed clear
             $this->change_page($this->page_url."gui-modules/pos2.php");
@@ -178,6 +179,9 @@ class suspendedlist extends NoInputCorePage
         if ($this->session->get("standalone") == 0){
             $dbc->addConnection($this->session->get("mServer"),$this->session->get("mDBMS"),
                 $this->session->get("mDatabase"),$this->session->get("mUser"),$this->session->get("mPass"));
+            if (CoreLocal::get('CoreCharSet') != '') {
+                $dbc->setCharSet(CoreLocal::get('CoreCharSet'), CoreLocal::get('mDatabase'));
+            }
 
             $cols = Database::getMatchingColumns($dbc, "localtemptrans", "suspended");
             // localtemptrans might not actually be empty; let trans_id

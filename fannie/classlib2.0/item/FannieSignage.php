@@ -227,6 +227,7 @@ class FannieSignage
                     p.numflag,
                     \'\' AS startDate,
                     \'\' AS endDate,
+                    \'\' AS batchName,
                     \'\' AS unitofmeasure,
                     o.originID,
                     o.name AS originName,
@@ -265,6 +266,7 @@ class FannieSignage
                     p.scale,
                     p.numflag,
                     b.startDate,
+                    b.batchName,
                     b.endDate,
                     o.originID,
                     o.name AS originName,
@@ -334,6 +336,7 @@ class FannieSignage
                     o.originID,
                     o.shortName AS originShortName,
                     p.unitofmeasure,
+                    b.batchName,
                     b.batchType
                  FROM batchList AS l
                     ' . DTrans::joinProducts('l', 'p', 'LEFT') . '
@@ -404,6 +407,7 @@ class FannieSignage
                     p.numflag,
                     \'\' AS startDate,
                     \'\' AS endDate,
+                    \'\' AS batchName,
                     p.unitofmeasure,
                     o.originID,
                     o.name AS originName,
@@ -446,6 +450,7 @@ class FannieSignage
                     p.numflag,
                     \'\' AS startDate,
                     \'\' AS endDate,
+                    \'\' AS batchName,
                     p.unitofmeasure,
                     o.originID,
                     o.name AS originName,
@@ -503,6 +508,7 @@ class FannieSignage
                     END AS endDate,
                     p.unitofmeasure,
                     o.originID,
+                    b.batchName,
                     o.name AS originName,
                     o.shortName AS originShortName,
                     CASE WHEN l.signMultiplier IS NULL THEN 1 ELSE l.signMultiplier END AS signMultiplier
@@ -557,6 +563,7 @@ class FannieSignage
                         ELSE b.endDate 
                     END AS endDate,
                     p.unitofmeasure,
+                    b.batchName,
                     o.originID,
                     o.name AS originName,
                     o.shortName AS originShortName
@@ -725,7 +732,7 @@ class FannieSignage
             }
             $ret .= sprintf('<tr>
                             <td><a href="%sitem/ItemEditorPage.php?searchupc=%s" target="_edit%s">%s</a></td>
-                            <input type="hidden" name="update_upc[]" value="%d" />
+                            <input type="hidden" name="update_upc[]" value="%s" />
                             <td>
                                 <span class="collapse">%s</span>
                                 <input class="FannieSignageField form-control" type="text" 
@@ -856,7 +863,10 @@ class FannieSignage
     public function formatPrice($price, $multiplier=1, $regPrice=0)
     {
         if ($multiplier > 1) {
-            $ttl = round($multiplier*$price);
+            // if the multiplier results in a nearly round number, just use the round number
+            // otherwise use two decimal places.
+            // the 2.5 cent threshold corresponds to existing advertisements
+            $ttl = abs(($multiplier*$price) - round($multiplier*$price)) < 0.025 ? round($multiplier*$price) : sprintf('%.2f', $multiplier*$price);
             return $multiplier . '/$' . $ttl;
         } elseif ($multiplier < 0) {
             return self::formatOffString($price, $multiplier, $regPrice);
@@ -1083,6 +1093,17 @@ class FannieSignage
         $pdf->MultiCell($effective_width, $line_height, $text, 0, 'C');
 
         return $pdf;
+    }
+
+    protected function validDate($date)
+    {
+        if ($date == '') {
+            return false;
+        } elseif (substr($date,0,10) == '0000-00-00') {
+            return false;
+        }
+
+        return true;
     }
 }
 

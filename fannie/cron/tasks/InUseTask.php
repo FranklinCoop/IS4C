@@ -94,7 +94,7 @@ class InUseTask extends FannieTask
         }
 
         $reportInUse = $dbc->prepare("                                            
-            SELECT upc, last_sold, store_id                                       
+            SELECT upc, brand, description, last_sold, store_id                                       
                 FROM products AS p                                                
                 INNER JOIN MasterSuperDepts AS s ON s.dept_ID = p.department      
                 INNER JOIN inUseTask AS i ON s.superID = i.superID                
@@ -102,7 +102,7 @@ class InUseTask extends FannieTask
             AND p.inUse = 0;                                                      
         ");                                                                                                                                                 
         $reportUnUse = $dbc->prepare("                                            
-            SELECT upc, last_sold, store_id                                       
+            SELECT upc, brand, description, last_sold, store_id                                       
                 FROM products AS p                                                
                 INNER JOIN MasterSuperDepts AS s ON s.dept_ID = p.department      
                 INNER JOIN inUseTask AS i ON s.superID = i.superID                
@@ -152,11 +152,20 @@ class InUseTask extends FannieTask
         $dbc->execute($updateUse,2);
         
         $data = '';
-        $inUseData = '<table><thead><th>UPC</th><th>Last Sold On</th><th>Store ID</th></thead><tbody><tr>';
-        $unUseData = '<table><thead><th>UPC</th><th>Last Sold On</th><th>Store ID</th></thead><tbody><tr>';
+        $inUseData = '<table><thead><th>UPC</th><th>Brand</th><th>Description</th><th>Last Sold On</th><th>Store ID</th></thead><tbody>';
+        $unUseData = '<table><thead><th>UPC</th><th>Brand</th><th>Description</th><th>Last Sold On</th><th>Store ID</th></thead><tbody>';
         $updateUpcs = array();
+
+        $fields = array('upc','brand','description','last_sold','store_id');
         while ($row = $dbc->fetch_row($resultA)) {
-            $inUseData .= '<td>' . $row['upc'] . '</td><td>' . $row['last_sold'] . '</td><td>' . $row['store_id'] . '</td></tr>';
+            $inUseData .= '<tr>';
+            foreach ($fields as $column) {
+                if ($column == '' || empty($column)) {
+                    $column = '<i>data missing</i>';
+                }
+                $inUseData .= '<td>' . $row[$column] . '</td>';
+            }
+            $inUseData .= '</tr>';
             $updateUpcs[] = $row['upc'];
         }
         $inUseData .= '</tbody></table>';
@@ -164,11 +173,28 @@ class InUseTask extends FannieTask
         while ($row = $dbc->fetch_row($resultB)) {
             if ($row['store_id'] == 1) {
                 if (!in_array($row['upc'],$exempts1)) {
-                    $unUseData .= '<td>' . $row['upc'] . '</td><td>' . $row['last_sold'] . '</td><td>' . $row['store_id'] . '</td></tr>';
+                    $unUseData .= '<tr>';
+                    foreach ($fields as $column) {
+                        if ($column == '' || empty($column)) {
+                            $column = '<i>no data</i>';
+                        }
+                        $unUseData .= '<td>' . $row[$column] . '</td>';
+                    }
+                    $unUseData .= '</tr>';
                     $updateUpcs[] = $row['upc'];
                 }
             } elseif ($row['store_id'] == 2) {
-                if (!in_array($row['upc'],$exempts2)) $unUseData .= '<td>' . $row['upc'] . '</td><td>' . $row['last_sold'] . '</td><td>' . $row['store_id'] . '</td></tr>';
+                if (!in_array($row['upc'],$exempts2)) {
+                    $unUseData .= '<tr>';
+                    foreach ($fields as $column) {
+                        if ($column == '' || empty($column)) {
+                            $column = '<i>no data</i>';
+                        }
+                        $unUseData .= '<td>' . $row[$column] . '</td>';
+                    }             
+                    $unUseData .= '</tr>';   
+                    $updateUpcs[] = $row['upc'];
+                }
             }            
         }
         $unUseData .= '</tbody></table>';
@@ -185,30 +211,43 @@ class InUseTask extends FannieTask
         $end = time();
         $runtime = ($end - $start);
         $runtime = $this->convert_unix_time($runtime);
-
-        $to = $this->config->get('SCANCOORD_EMAIL');
-        $msg = '<html>';
-        $msg .= '<style>table, tr, td { border-collapse: collapse; border: 1px solid black; 
-			padding: 5px; }</style><body>';
-        $msg .= 'In Use Task (Product In-Use Management) completed at '.date('Y-m-d');
-        $msg .= ' [ Runtime: '.$runtime.' ]<br />';
-        $msg .= '<br />';
-        $msg .= 'Items removed from use' . '<br />';
-        $msg .= $unUseData;
-        $msg .= '<br />';
-        $msg .= 'Items added to use' . '<br />';
-        $msg .= $inUseData;
-        $msg .= '<br />';
-        $msg .= '<br />';
-        $msg .= '</body></html>';
         
-        mail($to,'Report: In Use Task',$msg,implode("\r\n",$headers));
+        $to = $this->config->get('SCANCOORD_EMAIL');
+        
+        if (class_exists('PHPMailer')) {
+            $msg .= '<style>table, tr, td { border-collapse: collapse; border: 1px solid black; 
+                padding: 5px; }</style>';
+            $msg .= 'In Use Task (Product In-Use Management) completed at '.date('Y-m-d');
+            $msg .= ' [ Runtime: '.$runtime.' ]<br />';
+            $msg .= '<br />';
+            $msg .= 'Items removed from use' . '<br />';
+            $msg .= $unUseData;
+            $msg .= '<br />';
+            $msg .= 'Items added to use' . '<br />';
+            $msg .= $inUseData;
+            $msg .= '<br />';
+            $msg .= '<br />';
+                
+            $mail = new PHPMailer();
+            $mail->isHTML();
+            $mail->addAddress($to);
+            $mail->From = 'automail@wholefoods.coop';
+            $mail->FromName = 'CORE POS Monitoring';
+            $mail->Subject = 'Report: In Use Task';
+            $mail->Body = $msg;
+            if (!$mail->send()) {
+                $this->logger->error('Error emailing monitoring notification');
+            }
+        } else {
+            $msg = 'The In Use Task $message could not be formatted. [Error] : class PHPMailer could not found.';
+            mail($to,'Report: In Use Task',$msg,implode("\r\n",$headers));
+        }
         
     }
 
     public function convert_unix_time($secs) {
         /*
-		$bit = array(
+        $bit = array(
             'y' => $secs / 31556926 % 12,
             'w' => $secs / 604800 % 52,
             'd' => $secs / 86400 % 7,
@@ -216,8 +255,8 @@ class InUseTask extends FannieTask
             'm' => $secs / 60 % 60,
             's' => $secs % 60
             );
-		*/
-		$bit = array(
+        */
+        $bit = array(
             'h' => $secs / 3600 % 24,
             'm' => $secs / 60 % 60,
             's' => $secs % 60

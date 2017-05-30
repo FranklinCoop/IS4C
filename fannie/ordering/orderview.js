@@ -210,6 +210,7 @@ var orderView = (function($) {
         });
         $('.btn-search').click(mod.searchWindow);
         bindAutoComplete('input.input-vendor', '../ws/', 'vendor');
+        $('select.chosen').chosen();
     };
 
     mod.addUPC = function()

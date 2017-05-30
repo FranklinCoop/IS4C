@@ -1,9 +1,10 @@
 <?php
+
 /*******************************************************************************
 
-    Copyright 2015 Whole Foods Co-op
+    Copyright 2017 Whole Foods Co-op
 
-    This file is part of IT CORE.
+    This file is part of CORE-POS.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -20,8 +21,31 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
+        
 
-$receiptType = isset($_REQUEST['receiptType'])?$_REQUEST['receiptType']:'';
-$receiptNum = isset($_REQUEST['ref']) ? $_REQUEST['ref'] : '';
-header('Location: ../ajax/AjaxEnd.php?receiptType=' . $receiptType . '&ref=' . $receiptNum);
+/**
+  @class VendorAliasesModel
+*/
+class VendorAliasesModel extends BasicModel
+{
+    protected $name = "VendorAliases";
+    protected $preferred_db = 'op';
+
+    protected $columns = array(
+    'vendorAliasID' => array('type'=>'INT', 'increment'=>true, 'index'=>true),
+    'upc' => array('type'=>'VARCHAR(13)', 'primary_key'=>true),
+    'vendorID' => array('type'=>'INT', 'primary_key'=>true),
+    'sku' => array('type'=>'VARCHAR(13)'),
+    'multiplier' => array('type'=>'DOUBLE'),
+    'isPrimary' => array('type'=>'TINYINT', 'default'=>0),
+    );
+
+    public function help()
+    {
+        return '
+VendorAliases maps one or more items in products to a single
+vendor catalog entry.';
+    }
+
+}
 

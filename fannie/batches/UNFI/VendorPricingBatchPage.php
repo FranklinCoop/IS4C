@@ -193,7 +193,8 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             v.vendorDept,
             x.variable_pricing,
             " . $marginCase . " AS margin,
-            CASE WHEN a.sku IS NULL THEN 0 ELSE 1 END as alias
+            CASE WHEN a.sku IS NULL THEN 0 ELSE 1 END as alias,
+            CASE WHEN l.upc IS NULL THEN 0 ELSE 1 END AS likecoded
             FROM products AS p
                 LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
                 LEFT JOIN VendorAliases AS a ON p.upc=a.upc AND p.default_vendor_id=a.vendorID
@@ -201,7 +202,8 @@ class VendorPricingBatchPage extends FannieRESTfulPage
                 LEFT JOIN departments AS d ON p.department=d.dept_no
                 LEFT JOIN vendorDepartments AS s ON v.vendorDept=s.deptID AND v.vendorID=s.vendorID
                 LEFT JOIN VendorSpecificMargins AS g ON p.department=g.deptID AND v.vendorID=g.vendorID
-                LEFT JOIN prodExtra AS x on p.upc=x.upc ";
+                LEFT JOIN prodExtra AS x ON p.upc=x.upc
+                LEFT JOIN upcLike AS l ON v.upc=l.upc ";
         $args = array($vendorID);
         if ($superID != -1){
             $query .= " LEFT JOIN MasterSuperDepts AS m
@@ -261,7 +263,7 @@ class VendorPricingBatchPage extends FannieRESTfulPage
                 $row['srp'] = $alias['srp'] * $alias['multiplier'];
             }
             $background = "white";
-            if (isset($batchUPCs[$row['upc']])) {
+            if (isset($batchUPCs[$row['upc']]) && !$row['likecoded']) {
                 $background = 'selection';
             } elseif ($row['variable_pricing'] == 0 && $row['normal_price'] < 10.00) {
                 $background = (

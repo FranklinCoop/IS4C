@@ -180,10 +180,16 @@ class ViewPurchaseOrders extends FannieRESTfulPage
                 $para .= $row[0] . '<br />';
             } elseif (count($row) > 1) {
                 $ret .= "<tr>\n";
+                $rowEmpty = true;
+                $trow = '';
                 foreach ($row as $entry) {
                     if (trim($entry) !== '') {
-                        $ret .= "<td>{$entry}</td>";
+                        $rowEmpty = false;
                     }
+                    $trow .= '<td>' . trim($entry) . '</td>';
+                }
+                if (!$rowEmpty) {
+                    $ret .= $trow;
                 }
                 $ret .= "</tr>\n";
             }
@@ -278,7 +284,7 @@ class ViewPurchaseOrders extends FannieRESTfulPage
     protected function post_id_setPlaced_handler()
     {
         $this->connection->selectDB($this->config->get('OP_DB'));
-        $model = new PurchaseOrderModel(FannieDB::get($this->connection));
+        $model = new PurchaseOrderModel($this->connection);
         $model->orderID($this->id);
         $model->load();
         $model->placed($this->setPlaced);
@@ -328,11 +334,12 @@ class ViewPurchaseOrders extends FannieRESTfulPage
 
         $month = FormLib::get('month', $month);
         $year = FormLib::get('year', $year);
-        $start = date('Y-m-01 00:00:00', mktime(0, 0, 0, $month, 1, $year));
-        $end = date('Y-m-t 23:59:59', mktime(0, 0, 0, $month, 1, $year));
         if ($month == 'Last 30 days') {
             $start = date('Y-m-d', strtotime('30 days ago'));
             $end = date('Y-m-d 23:59:59');
+        } else {
+            $start = date('Y-m-01 00:00:00', mktime(0, 0, 0, $month, 1, $year));
+            $end = date('Y-m-t 23:59:59', mktime(0, 0, 0, $month, 1, $year));
         }
         $args = array($start, $end);
         
@@ -378,7 +385,7 @@ class ViewPurchaseOrders extends FannieRESTfulPage
             <table class="table table-striped table-bordered tablesorter table-float">';
         $tPlaced = '<div id="placed-pane" class="tab-pane table-responsive ' . ($placed ? 'active' : '') . '">
             <table class="table table-striped table-bordered tablesorter table-float">';
-        $headers .= '<thead style="background: #fff;"><tr>
+        $headers = '<thead style="background: #fff;"><tr>
             <th class="thead">Created</th>
             <th class="thead">Invoice#</th>
             <th class="thead">Store</th>
@@ -599,14 +606,15 @@ class ViewPurchaseOrders extends FannieRESTfulPage
         $sname = $dbc->prepare('SELECT description FROM Stores WHERE storeID=?');
         $sname = $dbc->getValue($sname, array($orderObj->storeID));
 
+        $batchStart = date('Y-m-d', strtotime('+30 days'));
         $batchP = $dbc->prepare("
-            SELECT b.batchName
+            SELECT b.batchName, b.startDate, b.endDate
             FROM batchList AS l
                 INNER JOIN batches AS b ON l.batchID=b.batchID
                 INNER JOIN StoreBatchMap AS m ON l.batchID=m.batchID
             WHERE l.upc=?
                 AND m.storeID=?
-                AND b.startDate <= " . $dbc->curdate() . "
+                AND b.startDate <= ?
                 AND b.endDate >= " . $dbc->curdate() . "
                 AND b.discounttype > 0
         ");
@@ -733,9 +741,15 @@ HTML;
         foreach ($model->find() as $obj) {
             $css = $this->qtyToCss($order->placed(), $obj->quantity(),$obj->receivedQty());
             if (!$order->placed()) {
-                $batchR = $dbc->getValue($batchP, array($obj->internalUPC(), $orderObj->storeID));
-                if ($batchR) {
-                    $css = 'class="info" title="' . $batchR . '"';
+                $batchR = $dbc->execute($batchP, array($obj->internalUPC(), $orderObj->storeID, $batchStart));
+                $title = '';
+                while ($batchW = $dbc->fetchRow($batchR)) {
+                    $title .= $batchW['batchName'] . ' (';
+                    $title .= date('M j', strtotime($batchW['startDate'])) . ' - ';
+                    $title .= date('M j', strtotime($batchW['endDate'])) . ') ';
+                }
+                if ($title) {
+                    $css = 'class="info" title="' . $title . '"';
                 }
             }
             if ($obj->isSpecialOrder()) {
@@ -808,7 +822,7 @@ HTML;
             return '';
         } elseif ($received == 0 && $ordered != 0) {
             return 'class="danger"';
-        } elseif ($received < $quantity) {
+        } elseif ($received < $ordered) {
             return 'class="warning"';
         } else {
             return '';

@@ -59,7 +59,7 @@ class Signage12UpL extends \COREPOS\Fannie\API\item\FannieSignage
         $item['size'] = $this->formatSize($item['size'], $item);
         $pdf->Cell($effective_width, 6, $item['size'], 0, 1, 'C');
 
-        if ($item['signMultiplier'] != -3) {
+        if (!isset($item['signMultiplier']) || $item['signMultiplier'] != -3) {
             $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 41));
             $pdf->SetFont($this->font, '', $this->BIG_FONT);
             $pdf->Cell($effective_width, 12, $price, 0, 1, 'C');
@@ -87,7 +87,11 @@ class Signage12UpL extends \COREPOS\Fannie\API\item\FannieSignage
             $pdf->Cell($effective_width, 20, $text, 0, 1, 'L');
             $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 33));
             $pdf->Cell($effective_width, 20, $item['upc'], 0, 1, 'L');
-        }
+        } else {
+            $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 33));
+            $pdf->Cell($effective_width, 20, $item['upc'], 0, 1, 'L');
+        } 
 
         return $pdf;
     }

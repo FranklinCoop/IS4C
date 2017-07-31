@@ -187,7 +187,7 @@ class InvCountPage extends FannieRESTfulPage
                         <input type="text" pattern="\\d*" class="form-control" 
                             id="count-field" required name="count" />
                     </td><td>
-                        <input type="text" pattern="\\d*" class="form-control" required name="par" value="' . $info['par'] . '" />
+                        <input type="text" pattern="\\d*" class="form-control" required name="par" value="' . ((int)$info['par']) . '" />
                     </td>
                     <td>
                         <button type="submit" class="btn btn-default btn-sm">Save</button>
@@ -298,7 +298,7 @@ class InvCountPage extends FannieRESTfulPage
                 $info['ordered'],
                 $info['sold'],
                 $info['shrunk'],
-                ($info['onHand'] < $ifo['par'] ? 'class="danger" title="Need to order"' : ''),
+                ($info['onHand'] < $info['par'] ? 'class="danger" title="Need to order"' : ''),
                 $info['onHand'],
                 ($info ? $info['par'] : 'n/a'),
                 ($info['par'] > (7*$row['auto_par']) ? 'class="danger" title="Par more than weekly sale"' : ''),

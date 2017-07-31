@@ -31,10 +31,10 @@ class ReceiptTest extends PHPUnit_Framework_TestCase
     public function testMessages()
     {
         $mods = AutoLoader::listModules('COREPOS\\pos\\lib\\ReceiptBuilding\\Messages\\ReceiptMessage', true);
-        $db = Database::tDataConnect();
         $ph = new PrintHandler();
 
         foreach($mods as $message_class) {
+            $db = Database::tDataConnect();
             $obj = new $message_class();
             $obj->setPrintHandler($ph);
 
@@ -42,7 +42,7 @@ class ReceiptTest extends PHPUnit_Framework_TestCase
             $this->assertInternalType('string', $selectStr);
 
             $queryResult = $db->query('SELECT '.$selectStr.' FROM localtemptrans');
-            $this->assertNotEquals(false, $queryResult);
+            $this->assertNotEquals(false, $queryResult, $selectStr . ' creates a failing query, '. $db->error());
 
             $msg = $obj->message(1, '1-1-1', false);
             $this->assertInternalType('string', $msg);

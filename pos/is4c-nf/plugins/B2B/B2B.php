@@ -1,10 +1,9 @@
 <?php
-
 /*******************************************************************************
 
-    Copyright 2017 Whole Foods Co-op
+    Copyright 2014 Whole Foods Co-op
 
-    This file is part of CORE-POS.
+    This file is part of IT CORE.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,26 +20,14 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
-        
 
-/**
-  @class ArHistoryDetailsModel
-*/
-class ArHistoryDetailsModel extends BasicModel
-{
-    protected $name = "ArHistoryDetails";
-    protected $preferred_db = 'trans';
+use COREPOS\pos\plugins\Plugin;
 
-    protected $columns = array(
-    'arHistoryDetailID' => array('type'=>'INT', 'increment'=>true, 'primary_key'=>true),
-    'arHistoryID' => array('type'=>'INT', 'index'=>true),
-    'description' => array('type'=>'VARCHAR(255)'),
-    'amount' => array('type'=>'MONEY'),
+class B2B extends Plugin {
+
+    public $plugin_settings = array(
     );
 
-    public function doc()
-    {
-        return 'ArHistoryDetails contains the details of what occurred on charge transactions.';
-    }
+    public $plugin_description = 'WFC plugin for paying B2B Invoices';
 }
 

@@ -347,7 +347,7 @@ class FannieSignage
                     LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
                  WHERE l.batchID IN (' . $ids . ') ';
-        $query .= ' ORDER BY brand, description';
+        $query .= ' ORDER BY l.batchID, brand, description';
 
         return array('query' => $query, 'args' => $args);
     }
@@ -1024,6 +1024,9 @@ class FannieSignage
             }
             $price .= ' /lb.';
         } elseif (isset($item['signMultiplier'])) {
+            if (!isset($item['nonSalePrice'])) { // Fix for NOTICES if this didn't get supplied
+                $item['nonSalePrice'] = $item['normal_price'];
+            }
             $price = $this->formatPrice($item['normal_price'], $item['signMultiplier'], $item['nonSalePrice']);
         } else {
             $price = $this->formatPrice($item['normal_price']);

@@ -203,7 +203,8 @@ class InventoryTask extends FannieTask
         $salesP = $dbc->prepare('
             SELECT d.upc,
                 d.store_id,
-                ' . DTrans::sumQuantity('d') . ' AS qty
+                ' . DTrans::sumQuantity('d') . ' AS qty,
+                p.scale AS byWeight
             FROM ' . $dlog . ' AS d
                 ' . DTrans::joinProducts('d', 'p', 'INNER') . '
             WHERE p.default_vendor_id > 0
@@ -216,9 +217,10 @@ class InventoryTask extends FannieTask
                 d.store_id
             HAVING qty > 0');
         $sales = $dbc->getRow($salesP, $args);
-        $sales = $sales && $sales['qty'] ? $sales['qty'] : 0;
-
-        return $sales;
+        if ($sales === false) {
+            return 0;
+        }
+        return $sales['byWeight'] ? $sales['qty'] * 1.001 : $sales['qty'];
     }
 }
 

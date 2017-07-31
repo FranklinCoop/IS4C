@@ -1,7 +1,9 @@
 <?php
 
 namespace COREPOS\Fannie\API\item;
-
+use COREPOS\Fannie\API\FanniePlugin;
+use COREPOS\Fannie\API\lib\PriceLib;
+use COREPOS\Fannie\API\lib\Store;
 /**
   @class TagDataSource
   This class exists solely as a parent

@@ -305,50 +305,35 @@ class EditBatchPage extends FannieRESTfulPage
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
 
+        // remove old tags for this batch.
         $bid = $this->id;
         $delQ = $dbc->prepare("DELETE FROM batchBarcodes where batchID=?");
         $dbc->execute($delQ,array($bid));
         
-        $selQ = "
-            SELECT l.upc,
-                p.description,
-                l.salePrice, 
-            case when p.brand is null then v.brand
-            else p.brand end as brand,
-            case when v.sku is null then '' else v.sku end as sku,
-            case when v.size is null then '' else v.size end as size,
-            case when v.units is null then 1 else v.units end as units,
-            case when z.vendorName is null then x.distributor
-            else z.vendorName end as vendor,
-            l.batchID
-            from batchList as l
-                " . DTrans::joinProducts('l', 'p', 'INNER') . "
-                left join prodExtra as x on l.upc=x.upc
-                left join vendorItems as v on l.upc=v.upc AND p.default_vendor_id=v.vendorID
-                left join vendors as z on p.default_vendor_id=z.vendorID
-            WHERE l.batchID=? ";
+        //find the upcs for this batch;
+
+        $selQ = "SELECT l.upc, l.salePrice from batchList l WHERE l.batchID=?";
         $args = array($bid);
         if ($this->config->get('STORE_MODE') == 'HQ') {
             $selQ .= " AND p.store_id=? ";
             $args[] = $this->config->get('STORE_ID');
         }
         $selQ .= " ORDER BY l.upc";
+
         $selP = $dbc->prepare($selQ);
         $selR = $dbc->execute($selP, $args);
         $upc = "";
-        $insP = $dbc->prepare("INSERT INTO batchBarcodes
-            (upc,description,normal_price,brand,sku,size,units,vendor,batchID)
-            VALUES (?,?,?,?,?,?,?,?,?)");
         $tag_count = 0;
         while ($selW = $dbc->fetchRow($selR)) {
             if ($upc != $selW['upc']){
-                $dbc->execute($insP,array(
-                    $selW['upc'], $selW['description'],
-                    $selW['salePrice'], $selW['brand'],
-                    $selW['sku'], $selW['size'],
-                    $selW['units'], $selW['vendor'],
-                    $selW['batchID']
-                ));
+                $source = FannieConfig::config('FANNIE_TAG_DATA_SOURCE');
+                $obj = new $source();
+                $batchBarcodes = new BatchBarcodesModel($dbc);
+                $info = $obj->getTagData($dbc, $selW['upc'], $selW['salePrice']);
+                //$info['batchID'] = $bid;
+                $batchBarcodes->batchID($bid);
+                $batchBarcodes->setData($info);
+                $batchBarcodes->save();
                 $tag_count++;
             }
             $upc = $selW['upc'];

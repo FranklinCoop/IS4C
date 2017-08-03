@@ -29,7 +29,7 @@ namespace COREPOS\Fannie\API\lib;
 class PriceLib 
 {
 
-    public static function pricePerUnit($price,$sizeStr)
+    public static function pricePerUnit($price,$sizeStr,$upc = '')
     {
         $country = \FannieConfig::factory()->get('COUNTRY', 'US');
 
@@ -130,6 +130,56 @@ class PriceLib
         }
 
         return "";
+    }
+    /*
+    this is a kludge but I'm on short notice to get this done
+    there is a mass of spagghti code for the price per unit
+    because there are three places that it is calucalted for tags.
+
+    One here which is the most widely used, one in the Products Model one inthe BatchTagsmodles
+    and one in the tag data sourse.
+
+    I need this to do what I need it to do.
+
+    Idealy at somepoint we should work it out so that price per unit is only calcualted in one spot
+    and can be changed modularly because diffrent states and countries have diffrent laws about how
+    unit cost needs to be reported.
+    */
+    public static function FCC_PricePerUnit($dbc, $upc) {
+        // get the unit info.
+        $queryUnitInfo = "SELECT p.unitStandard, p.size, p.unit FROM prodStandardUnit p WHERE p.upc = ?";
+        $prepUnitInfo = $dbc->prepare($queryUnitInfo);
+        $resUnitInfo = $dbc->execute($prepUnitInfo, array($upc));
+        
+        if (!$resUnitInfo || $dbc->numRows($resUnitInfo) == 0) {
+            return 'missing unit info';
+        }
+        $rowUnitInfo = $dbc->fetchRow($resUnitInfo);
+
+        //look up the unit conversion.
+        $queryConversion = "SELECT c.rate FROM unitConversion c WHERE c.unit_name = ? AND c.unit_std = ?";
+        $args = array($rowUnitInfo['unit'], $rowUnitInfo['unitStandard']);
+        $prepConversion = $dbc->prepare($queryConversion);
+        $resConversion = $dbc->execute($prepConversion, $args);
+        if (!$resConversion || $dbc->numRows($resConversion) == 0) {
+            return 'missing unit info';
+        }
+        $rowConversion = $dbc->fetchRow($resConversion);
+
+        //get the price.
+        $queryPrice = "SELECT p.normal_price FROM products p WHERE p.upc = ?";
+        $prepPrice = $dbc->prepare($queryPrice);
+        $resPrice = $dbc->execute($prepPrice, array($upc));
+        if (!$resPrice || $dbc->numRows($resPrice) == 0) {
+            return 'missing price data';
+        }
+        $rowPrice = $dbc->fetchRow($resPrice);
+        $price = $rowPrice['normal_price'];
+
+        //return the unit price.
+        $pricePerUnit = $price*($rowConversion['rate']/$rowUnitInfo['size']);
+        if ($pricePerUnit == 0) {return "Size: ".$rowUnitInfo['unit'] ."\n Conversion Factor: ". $rowConversion['rate']; }
+        else { return round($pricePerUnit,3); }
     }
 }
 

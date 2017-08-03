@@ -173,7 +173,13 @@ class FannieSignage
                 $row['size'] .= $row['unitofmeasure'];
             }
             if ($row['pricePerUnit'] == '') {
-                $row['pricePerUnit'] = PriceLib::pricePerUnit($row['normal_price'], $row['size']);
+                $pricePerUnit = 0;
+                if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
+                    $pricePerUnit =  COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $row['upc']);
+                } else {
+                    $pricePerUnit = COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($row['normal_price'], $row['size']);
+                }
+                $row['pricePerUnit'] = $pricePerUnit;
             }
             if ($row['sku'] == $row['upc']) {
                 $row['sku'] = '';

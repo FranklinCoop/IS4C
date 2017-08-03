@@ -158,6 +158,14 @@ class genLabels extends FannieRESTfulPage
             } elseif (strlen($row['sku']) > 7) {
                 $row['sku'] = ltrim($row['sku'], '0');
             }
+            
+            $pricePerUnit = 0;
+            if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
+                $pricePerUnit =  COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $row['upc']);
+            } else {
+                $pricePerUnit = COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($row['normal_price'], $row['size']);
+            }
+
             $myrow = array(
             'normal_price' => $row['normal_price'],
             'description' => $row['description'],
@@ -165,7 +173,7 @@ class genLabels extends FannieRESTfulPage
             'units' => $row['units'],
             'size' => $row['size'],
             'sku' => $row['sku'],
-            'pricePerUnit' => COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($row['normal_price'], $row['size']),
+            'pricePerUnit' => $pricePerUnit,
             'upc' => $row['upc'],
             'vendor' => $row['vendor'],
             'scale' => $row['scale'],

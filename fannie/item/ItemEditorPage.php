@@ -454,10 +454,10 @@ HTML;
                         to edit</a>', $url, $self, $upc);
             $this->addOnloadCommand("\$(':input').prop('disabled', true).prop('title','Login to edit');\n");
         } elseif ($isNew) {
-            $ret .= '<button type="submit" name="createBtn" value="1"
+            $ret .= '<button type="submit" name="createBtn" value="'.$upc.'"
                         class="btn btn-default">Create Item</button>';
         } else {
-            $ret .= '<button type="submit" name="updateBtn" value="1"
+            $ret .= '<button type="submit" name="updateBtn" value="'.$upc.'"
                         class="btn btn-default">Update Item</button>';
         }
         $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -604,7 +604,7 @@ HTML;
         $FANNIE_PRODUCT_MODULES = $this->getConfiguredModules();
         $FANNIE_URL = $this->config->get('URL');
 
-        $upc = FormLib::get_form_value('upc','');
+        $upc = FormLib::get_form_value('updateBtn','');
         if ($upc === '' || !is_numeric($upc)) {
             return '<span style="color:red;">Error: bad UPC:</span> '.$upc;
         }

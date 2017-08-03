@@ -58,7 +58,13 @@ class EditShelfTags extends FannieRESTfulPage
             $current_price = $this->connection->getValue($priceP, array($tag->upc()));
             if ($current_price !== false) {
                 $tag->normal_price($current_price);
-                $ppo = \COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($current_price, $tag->size());
+                
+                $ppo = 0;
+                if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
+                    $ppo =  COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $row['upc']);
+                } else {
+                    $ppo = COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($row['normal_price'], $row['size']);
+                }
                 $tag->pricePerUnit($ppo);
                 $tag->save();
             }

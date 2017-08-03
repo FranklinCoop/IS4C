@@ -46,6 +46,10 @@ if (!class_exists('FpdfWithBarcode')) {
    */
 
   function MA_Standard_Small($data,$offset=0){
+    global $FANNIE_OP_DB;
+    //global $FANNIE_COOP_ID;
+    $dbc = FannieDB::get($FANNIE_OP_DB);
+
     $hspace = 1.5;
     $h = 37.36875; //what is this?
     $top = 5.99 + 2.5; //was 12.7 + 2.5
@@ -143,11 +147,18 @@ if (!class_exists('FpdfWithBarcode')) {
             $vendLeft = $left + 13;
             $skuTop = $skuTop + $down;
         }
-      
+        
         /**
         * instantiate variables for printing on barcode from 
         * $testQ query result set
         */
+
+        //get unit and flagging data;
+        $qStdUnit = "SELECT u.unitStandard FROM prodStandardUnit u WHERE u.upc =?";
+        $rStdUnit = $dbc->execute($dbc->prepare($qStdUnit),array($row['upc']));
+        $iStdUnit = $dbc->fetchRow($rStdUnit);
+
+
         if ($row['scale'] == 0) {$price = $row['normal_price'];}
         elseif ($row['scale'] == 1) {$price = $row['normal_price'] . "/lb";}
         $desc = strtoupper(substr($row['description'],0,27));
@@ -155,6 +166,9 @@ if (!class_exists('FpdfWithBarcode')) {
         $pak = $row['units'];
         $size = $row['units'] . "-" . $row['size'];
         $sku = $row['sku'];
+        $num_unit = $row['pricePerUnit'];
+        $alpha_unit = "per ".$iStdUnit['unitStandard'];
+
         $upc = substr($row['upc'],1,12);
         /** 
         * determine check digit using barcode.php function
@@ -219,6 +233,38 @@ if (!class_exists('FpdfWithBarcode')) {
         $genLeft = $genLeft + $LeftShift;
         $vendLeft = $vendLeft + $LeftShift;
         $labelCount++;
+    }
+
+    function getFlags($dbc, $upc)
+    {
+        $query = "
+            SELECT f.description,
+                f.bit_number,
+                (1<<(f.bit_number-1)) & p.numflag AS flagIsSet
+            FROM products AS p, 
+                prodFlags AS f
+            WHERE p.upc=?
+                " . (FannieConfig::config('STORE_MODE') == 'HQ' ? ' AND p.store_id=? ' : '') . "
+                AND f.active=1";
+        $args = array($upc);
+        if (FannieConfig::config('STORE_MODE') == 'HQ') {
+            $args[] = FannieConfig::config('STORE_ID');
+        }
+        $prep = $dbc->prepare($query);
+        $res = $dbc->execute($prep,$args);
+        
+        if ($dbc->numRows($res) == 0){
+            // item does not exist
+            $prep = $dbc->prepare('
+                SELECT f.description,
+                    f.bit_number,
+                    0 AS flagIsSet
+                FROM prodFlags AS f
+                WHERE f.active=1');
+            $res = $dbc->execute($prep);
+        }
+
+        return $res;
     }
       
     /**

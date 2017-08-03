@@ -1,13 +1,12 @@
 <?php
 
 namespace COREPOS\Fannie\API\item\tagdatasource;
-
 /**
   @class TagDataSource
   This class exists solely as a parent
   class that other modules can implement.
 */
-class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
+class DefaultTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
 {
     /** 
       Get shelf tag fields for a given item
@@ -28,7 +27,7 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
     */
     public function getTagData($dbc, $upc, $price=false)
     {
-        $query = '
+      $query = '
             SELECT p.upc,
                 p.description,
                 p.normal_price,
@@ -37,7 +36,7 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
                 p.size AS p_size,
                 p.unitofmeasure,
                 i.sku,
-                p.unitofmeasure,  
+                i.units,  
                 i.size AS vi_size
             FROM products AS p
                 LEFT JOIN prodExtra AS x ON p.upc=x.upc
@@ -45,8 +44,7 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
                 LEFT JOIN vendorItems AS i ON p.upc=i.upc AND v.vendorID=i.vendorID
             WHERE p.upc=?';
         $prep = $dbc->prepare($query);
-        $res = $dbc->execute($prep, array($upc));
-
+        $res = $dbc->execute($prep, array($this->upc()));
 
         $ret = array(
             'upc' => $upc,
@@ -55,7 +53,7 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
             'normal_price' => 0.0,
             'sku' => '',
             'size' => '',
-            'units' => 0,
+            'units' => '',
             'vendor' => '',
             'pricePerUnit' => '',
         );
@@ -63,11 +61,9 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
             return $ret;
         }
 
-
         $row = $dbc->fetchRow($res);
         $ret['description'] = $row['description'];
         $ret['brand'] = $row['brand'];
-        //$ret['normal_price'] = $row['normal_price'];
         $ret['vendor'] = $row['vendor'];
         $ret['sku'] = $row['sku'];
         $ret['units'] = $row['units'];
@@ -86,34 +82,12 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
             $ret['size'] = $row['vi_size'];
         }
 
-        $ret['pricePerUnit'] = $this->getUnitPrice($dbc, $upc);
+        $ret['pricePerUnit'] = \COREPOS\Fannie\API\lib\PriceLib::pricePerUnit(
+            $ret['normal_price'],
+            $ret['size']
+        );
 
         return $ret;
     }
-
-    private function getUnitPrice($dbc, $upc) {
-        // get the unit info.
-        $queryUnitInfo = "SELECT p.unitStandard, p.size, p.unit FROM prodStandardUnit p WHERE p.upc = ?";
-        $prepUnitInfo = $dbc->prepare($queryUnitInfo);
-        $resUnitInfo = $dbc->execute($prepUnitInfo, array($upc));
-        
-        if (!$resUnitInfo || $dbc->numRows($resUnitInfo) == 0) {
-            return 'missing unit info';
-        }
-        $rowUnitInfo = $dbc->fetchRow($resUnitInfo);
-
-        //look up the unit conversion.
-        $queryConversion = "SELECT c.rate FROM unitConversion c WHERE c.unit_name = ? AND c.unit_std = ?";
-        $args = array($rowUnitInfo['unit'], $rowUnitInfo['unitStandard']);
-        $prepConversion = $dbc->prepare($queryConversion);
-        $resConversion = $dbc->execute($prepConversion, $args);
-        if (!$resConversion || $dbc->numRows($resConversion) == 0) {
-            return 'missing unit info';
-        }
-        $rowConversion = $dbc->fetchRow($resConversion);
-
-        //return the unit price.
-        $pricePerUnit = $rowUnitInfo['size'] * $rowConversion['rate'];
-        if ($pricePerUnit == 0) {return "Size: ".$rowUnitInfo['unit'] ."\n Conversion Factor: ". $rowConversion['rate']; }
-        else { return $pricePerUnit; }    }
 }
+

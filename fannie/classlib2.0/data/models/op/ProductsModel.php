@@ -122,73 +122,11 @@ class ProductsModel extends BasicModel
           If a custom data source has been specified, let
           that handle the calculations
         */
-        if (FannieConfig::config('TAG_DATA_SOURCE') !== '' && class_exists(FannieConfig::config('TAG_DATA_SOURCE'))) {
-            $source = FannieConfig::config('TAG_DATA_SOURCE');
+        //if (FannieConfig::config('FANNIE_TAG_DATA_SOURCE') !== '' && class_exists(FannieConfig::config('FANNIE_TAG_DATA_SOURCE'))) {
+            $source = FannieConfig::config('FANNIE_TAG_DATA_SOURCE');
             $obj = new $source();
             return $obj->getTagData($this->connection, $this->upc(), $price);
-        }
-
-        $query = '
-            SELECT p.upc,
-                p.description,
-                p.normal_price,
-                COALESCE(p.brand, x.manufacturer) AS brand,
-                COALESCE(v.vendorName, x.distributor) AS vendor,
-                p.size AS p_size,
-                p.unitofmeasure,
-                i.sku,
-                i.units,  
-                i.size AS vi_size
-            FROM products AS p
-                LEFT JOIN prodExtra AS x ON p.upc=x.upc
-                LEFT JOIN vendors AS v ON p.default_vendor_id=v.vendorID
-                LEFT JOIN vendorItems AS i ON p.upc=i.upc AND v.vendorID=i.vendorID
-            WHERE p.upc=?';
-        $prep = $this->connection->prepare($query);
-        $res = $this->connection->execute($prep, array($this->upc()));
-
-        $ret = array(
-            'upc' => $this->upc(),
-            'description' => $this->description(),
-            'brand' => $this->brand(),
-            'normal_price' => $this->normal_price(),
-            'sku' => '',
-            'size' => '',
-            'units' => '',
-            'vendor' => '',
-            'pricePerUnit' => '',
-        );
-        if (!$res || $this->connection->numRows($res) == 0) {
-            return $ret;
-        }
-
-        $row = $this->connection->fetchRow($res);
-        $ret['description'] = $row['description'];
-        $ret['brand'] = $row['brand'];
-        $ret['vendor'] = $row['vendor'];
-        $ret['sku'] = $row['sku'];
-        $ret['units'] = $row['units'];
-
-        if ($price !== false) {
-            $ret['normal_price'] = $price;
-        } else {
-            $ret['normal_price'] = $row['normal_price'];
-        }
-
-        if (is_numeric($row['p_size']) && !empty($row['p_size']) && !empty($row['unitofmeasure'])) {
-            $ret['size'] = $row['p_size'] . ' ' . $row['unitofmeasure'];
-        } elseif (!empty($row['p_size'])) {
-            $ret['size'] = $row['p_size'];
-        } elseif (!empty($row['vi_size'])) {
-            $ret['size'] = $row['vi_size'];
-        }
-
-        $ret['pricePerUnit'] = \COREPOS\Fannie\API\lib\PriceLib::pricePerUnit(
-            $ret['normal_price'],
-            $ret['size']
-        );
-
-        return $ret;
+        //}
     }
 
     public function doc()

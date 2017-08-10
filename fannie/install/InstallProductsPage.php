@@ -237,12 +237,13 @@ class InstallProductsPage extends \COREPOS\Fannie\API\InstallPage {
         ?>
         <label>Shelf Tag Data Source</label>
         <?php
-        $mods = FannieAPI::listModules('COREPOS\Fannie\API\item\TagDataSource');
-        $source = array('' => 'Default');
-        foreach ($mods as $m) {
-            $source[$m] = $m;
-        }
-        echo installSelectField('FANNIE_TAG_DATA_SOURCE', $FANNIE_TAG_DATA_SOURCE, $source);
+        $mods = FannieAPI::listModules('\COREPOS\Fannie\API\item\TagDataSource');
+        //$source = array('' => 'Default');
+        //$source = array_merge($source, FannieAPI::listModules('\COREPOS\Fannie\API\item\TagDataSource'));
+        //foreach ($mods as $mod) {
+        //    $source[$mod] = $mod;
+        //}
+        echo installSelectField('FANNIE_TAG_DATA_SOURCE', $FANNIE_TAG_DATA_SOURCE, $mods);
 
 
         $printers = array();

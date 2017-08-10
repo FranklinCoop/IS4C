@@ -343,7 +343,7 @@ class MarginToolFromSearch extends FannieRESTfulPage
                 
                 $pricePerUnit = 0;
                 if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
-                    $pricePerUnit =  COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $info['upc']);
+                    $pricePerUnit =  COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $row['upc'],$row['normal_price'], $row['size']);
                 } else {
                     $pricePerUnit = COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($row['normal_price'], $row['size']);
                 }

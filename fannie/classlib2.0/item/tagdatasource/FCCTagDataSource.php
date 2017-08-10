@@ -37,12 +37,13 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
                 p.size AS p_size,
                 p.unitofmeasure,
                 i.sku,
-                p.unitofmeasure,  
-                i.size AS vi_size
+                s.unit AS units,  
+                s.size AS vi_size
             FROM products AS p
                 LEFT JOIN prodExtra AS x ON p.upc=x.upc
                 LEFT JOIN vendors AS v ON p.default_vendor_id=v.vendorID
                 LEFT JOIN vendorItems AS i ON p.upc=i.upc AND v.vendorID=i.vendorID
+                LEFT JOIN prodStandardUnit s ON p.upc=s.upc
             WHERE p.upc=?';
         $prep = $dbc->prepare($query);
         $res = $dbc->execute($prep, array($upc));
@@ -70,7 +71,7 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
         //$ret['normal_price'] = $row['normal_price'];
         $ret['vendor'] = $row['vendor'];
         $ret['sku'] = $row['sku'];
-        $ret['units'] = $row['units'];
+        $ret['units'] = $row['vi_size'];
 
         if ($price !== false) {
             $ret['normal_price'] = $price;
@@ -78,42 +79,11 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
             $ret['normal_price'] = $row['normal_price'];
         }
 
-        if (is_numeric($row['p_size']) && !empty($row['p_size']) && !empty($row['unitofmeasure'])) {
-            $ret['size'] = $row['p_size'] . ' ' . $row['unitofmeasure'];
-        } elseif (!empty($row['p_size'])) {
-            $ret['size'] = $row['p_size'];
-        } elseif (!empty($row['vi_size'])) {
-            $ret['size'] = $row['vi_size'];
-        }
+        $ret['size'] = $row['units'];
 
-        $ret['pricePerUnit'] = $this->getUnitPrice($dbc, $upc);
+        $ret['pricePerUnit'] = \COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $upc, $row['normal_price'], $row['size']);
 
         return $ret;
     }
 
-    private function getUnitPrice($dbc, $upc) {
-        // get the unit info.
-        $queryUnitInfo = "SELECT p.unitStandard, p.size, p.unit FROM prodStandardUnit p WHERE p.upc = ?";
-        $prepUnitInfo = $dbc->prepare($queryUnitInfo);
-        $resUnitInfo = $dbc->execute($prepUnitInfo, array($upc));
-        
-        if (!$resUnitInfo || $dbc->numRows($resUnitInfo) == 0) {
-            return 'missing unit info';
-        }
-        $rowUnitInfo = $dbc->fetchRow($resUnitInfo);
-
-        //look up the unit conversion.
-        $queryConversion = "SELECT c.rate FROM unitConversion c WHERE c.unit_name = ? AND c.unit_std = ?";
-        $args = array($rowUnitInfo['unit'], $rowUnitInfo['unitStandard']);
-        $prepConversion = $dbc->prepare($queryConversion);
-        $resConversion = $dbc->execute($prepConversion, $args);
-        if (!$resConversion || $dbc->numRows($resConversion) == 0) {
-            return 'missing unit info';
-        }
-        $rowConversion = $dbc->fetchRow($resConversion);
-
-        //return the unit price.
-        $pricePerUnit = $rowUnitInfo['size'] * $rowConversion['rate'];
-        if ($pricePerUnit == 0) {return "Size: ".$rowUnitInfo['unit'] ."\n Conversion Factor: ". $rowConversion['rate']; }
-        else { return $pricePerUnit; }    }
 }

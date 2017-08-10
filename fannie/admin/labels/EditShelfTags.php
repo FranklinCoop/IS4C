@@ -61,7 +61,7 @@ class EditShelfTags extends FannieRESTfulPage
                 
                 $ppo = 0;
                 if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
-                    $ppo =  COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $row['upc']);
+                    $ppo =  COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($this->connection, $tag->upc(),$row['normal_price'], $row['size']);
                 } else {
                     $ppo = COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($row['normal_price'], $row['size']);
                 }

@@ -145,7 +145,7 @@ class PriceLib
     and can be changed modularly because diffrent states and countries have diffrent laws about how
     unit cost needs to be reported.
     */
-    public static function FCC_PricePerUnit($dbc, $upc) {
+    public static function FCC_PricePerUnit($dbc, $upc, $price, $sizeStr) {
         // get the unit info.
         $queryUnitInfo = "SELECT p.unitStandard, p.size, p.unit FROM prodStandardUnit p WHERE p.upc = ?";
         $prepUnitInfo = $dbc->prepare($queryUnitInfo);
@@ -162,7 +162,7 @@ class PriceLib
         $prepConversion = $dbc->prepare($queryConversion);
         $resConversion = $dbc->execute($prepConversion, $args);
         if (!$resConversion || $dbc->numRows($resConversion) == 0) {
-            return 'missing unit info';
+            return PriceLib::pricePerUnit($price,$sizeStr,$upc); //defaults to old method if data is missing.
         }
         $rowConversion = $dbc->fetchRow($resConversion);
 
@@ -179,7 +179,7 @@ class PriceLib
         //return the unit price.
         $pricePerUnit = $price*($rowConversion['rate']/$rowUnitInfo['size']);
         if ($pricePerUnit == 0) {return "Size: ".$rowUnitInfo['unit'] ."\n Conversion Factor: ". $rowConversion['rate']; }
-        else { return round($pricePerUnit,3); }
+        else { return round($pricePerUnit,2); }
     }
 }
 

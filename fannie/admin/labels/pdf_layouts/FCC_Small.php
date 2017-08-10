@@ -189,32 +189,22 @@ if (!class_exists('FpdfWithBarcode')) {
                 FROM prodFlags AS f
                 WHERE f.active=1');
             $res = $dbc->execute($prep);
-        }//please use the order  "Local, Organic, NONGMO, Gluten Free
+        }
+
+        //please use the order  "Local, Organic, NONGMO, Gluten Free
         $showLocal = false;
         $showOrganic = false;
         $showNONGMO = false;
         $showGlutenFree = false;
+        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false);
         
         while($info = $dbc->fetchRow($res)){
-            if ($info['flagIsSet']==1) {
-                switch ($info['bit_number']) {
-                    case 1:
-                        $showLocal = true;
-                        break;
-                    case 2;
-                        $showOrganic = true;
-                        break;
-                    case 4:
-                        $showNONGMO = true;
-                        break;
-                    case 6:
-                        $showGlutenFree = true;
-                        break;
-                    default:
-                        break;
-                }
-            }
+                $flags[$info['description']] = $info['flagIsSet'];
        }
+       $showLocal = $flags['Local'];
+       $showOrganic = $flags['Organic'];
+       $showNONGMO = $flags['Non_GMO'];
+       $showGlutenFree = $flags['Gluten Free'];
            /* if ($i==0) $ret .= '<tr>';
             if ($i != 0 && $i % 2 == 0) $ret .= '</tr><tr>';
             $ret .= sprintf('<td><input type="checkbox" id="item-flag-%d" name="flags[]" value="%d" %s /></td>

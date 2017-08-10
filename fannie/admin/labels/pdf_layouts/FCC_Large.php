@@ -200,31 +200,16 @@ function FCC_Large($data,$offset=0){
                 WHERE f.active=1');
             $res = $dbc->execute($prep);
         }//please use the order  "Local, Organic, NONGMO, Gluten Free
-        $showLocal = false;
-        $showOrganic = false;
-        $showNONGMO = false;
-        $showGlutenFree = false;
+        //please use the order  "Local, Organic, NONGMO, Gluten Free
+        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false);
         
         while($info = $dbc->fetchRow($res)){
-            if ($info['flagIsSet']==1) {
-                switch ($info['bit_number']) {
-                    case 1:
-                        $showLocal = true;
-                        break;
-                    case 2;
-                        $showOrganic = true;
-                        break;
-                    case 4:
-                        $showNONGMO = true;
-                        break;
-                    case 6:
-                        $showGlutenFree = true;
-                        break;
-                    default:
-                        break;
-                }
-            }
+                $flags[$info['description']] = $info['flagIsSet'];
        }
+       $showLocal = $flags['Local'];
+       $showOrganic = $flags['Organic'];
+       $showNONGMO = $flags['Non_GMO'];
+       $showGlutenFree = $flags['Gluten Free'];
 
         if ($row['scale'] == 0) {$price = $row['normal_price'];}
         elseif ($row['scale'] == 1) {$price = $row['normal_price'] . "/lb";}

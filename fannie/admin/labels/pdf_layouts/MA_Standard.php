@@ -169,9 +169,7 @@ function MA_Standard($data,$offset=0){
         * $testQ query result set
         */
 
-
-        if ($row['scale'] == 0) {$price = $row['normal_price'];}
-        elseif ($row['scale'] == 1) {$price = $row['normal_price'] . "/lb";}
+        $price = $row['normal_price'];
         $desc = strtoupper(substr($row['description'],0,27));
         $brand = ucwords(strtolower(substr($row['brand'],0,13)));
         $pak = $row['units'];

@@ -28,11 +28,6 @@ if (!class_exists('FpdfWithBarcode')) {
   {
     function barcodeText($x, $y, $h, $barcode, $len)
     {
-      
-      if ($len == 12){
-         $barcode = substr($barcode,0,1)."-".substr($barcode,2,5)."-".substr($barcode,7,5)."-".substr($barcode,12);
-         $len +=3;
-      }
       $this->SetFont('Arial','',9);
       if (filter_input(INPUT_GET, 'narrow') !== null)
           $this->Text($x,$y+$h+11/$this->k,substr($barcode,-$len));
@@ -285,9 +280,8 @@ if (!class_exists('FpdfWithBarcode')) {
         * add check digit to pid from testQ
         */
         $pdf->SetFont('Arial','',4);
-        $newUPC = $upc . $check;
         // silas: was $pdf->UPC_A($genLeft+1.25, $unitTop+21.5,$upc,3);
-        $pdf->UPC_A($genLeft+4.5, $unitTop+21.5,$newUPC,3); //changes size //changed to 6 from 3 to move it down
+        $pdf->UPC_A($genLeft+4.5, $unitTop+21.5,$upc,3); //changes size //changed to 6 from 3 to move it down
 
         //  $pdf->SetFont('Arial','',7);
         $pdf->SetXY($genLeft+1.3, $unitTop+23.6);

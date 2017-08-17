@@ -28,10 +28,6 @@ if (!class_exists('FpdfWithBarcode')) {
   {
     function barcodeText($x, $y, $h, $barcode, $len)
     {
-      if ($len == 12){
-         $barcode = substr($barcode,0,1)."-".substr($barcode,2,5)."-".substr($barcode,7,5)."-".substr($barcode,12);
-         $len +=3;
-      }
 
       $this->SetFont('Arial','',9);
       if (filter_input(INPUT_GET, 'narrow') !== null)
@@ -221,12 +217,7 @@ function FCC_Large($data,$offset=0){
         $alpha_unit = "per ".$iStdUnit['unitStandard'];
 
        $upc = $row['upc'];
-       if (!(substr($upc,0,2) == "00")){
-             $check = "";
-        } else {
-             $upc=(substr($upc,2));
-             $check = $pdf->GetCheckDigit($upc);
-        }
+
         /**
         * get tag creation date (today)
         */
@@ -280,14 +271,13 @@ function FCC_Large($data,$offset=0){
   $pdf->Cell($w/3,4,"$vendor $sku",0,0,'C'); 
 
   /** 
-   * add check digit to pid from testQ
+   * add check digit to pid from test
    */
-    $newUPC = $upc . $check;
     //$upc = "0738018001633";
     if (strlen($upc) <= 11)
-        $pdf->UPC_A($barLeft-18,$barTop+8.3,$newUPC,3);
+        $pdf->UPC_A($barLeft-18,$barTop+8.3,$upc,3);
     else
-        $pdf->EAN13($barLeft-18,$barTop+8.3,$newUPC,3);
+        $pdf->EAN13($barLeft-18,$barTop+8.3,$upc,3);
 
     //$pdf->UPC_A($barLeft-18,$barTop+8.3,$newUPC,3); //changes size //changed to 6 from 3 to move it down
   /**

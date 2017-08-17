@@ -124,7 +124,7 @@ class OncueKioskSync extends SyncKiosk {
 			'' as brand, discounttype FROM core_op.products;";
 
 		$prep = $dbc->prepare($q);
-		return $dbc->exicute($prep,array());
+		return $dbc->execute($prep,array());
 	}
 
 	function query($qs,$pdo){

@@ -123,8 +123,8 @@ class OncueKioskSync extends SyncKiosk {
 			END as `memprice`, 
 			'' as brand, discounttype FROM core_op.products;";
 
-		$prep = $dbc->prepare_statement($q);
-		return $dbc->exec_statement($prep,array());
+		$prep = $dbc->prepare($q);
+		return $dbc->exicute($prep,array());
 	}
 
 	function query($qs,$pdo){

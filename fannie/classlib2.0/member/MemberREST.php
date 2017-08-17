@@ -313,7 +313,7 @@ class MemberREST
                 c.staff,
                 m.phone,
                 m.email_1,
-                m.email_2,
+                m.email_2 AS altPhone,
                 CASE WHEN s.memtype2 IS NOT NULL THEN s.memtype2 ELSE c.Type END AS memberStatus,
                 c.SSI,
                 CASE WHEN c.LastChange > m.modified THEN c.LastChange ELSE m.modified END AS modified
@@ -341,7 +341,7 @@ class MemberREST
                 $customer['accountHolder'] = 1;
                 $customer['phone'] = $row['phone'] === null ? '' : $row['phone'];
                 $customer['email'] = $row['email_1'] === null ? '' : $row['email_1'];
-                $customer['altPhone'] = $row['email_2'] === null ? '' : $row['email_2'];
+                $customer['altPhone'] = $row['altPhone'] === null ? '' : $row['altPhone'];
             } else {
                 $customer['accountHolder'] = 0;
                 $customer['phone'] = '';
@@ -391,7 +391,7 @@ class MemberREST
                 c.staff,
                 m.phone,
                 m.email_1,
-                m.email_2,
+                m.email_2 AS altPhone,
                 c.SSI,
                 c.personNum,
                 CASE WHEN c.LastChange > m.modified THEN c.LastChange ELSE m.modified END AS modified
@@ -464,7 +464,7 @@ class MemberREST
                 'modified' => $row['modified'],
                 'phone' => $row['phone'] === null || $row['personNum'] != 1 ? '' : $row['phone'],
                 'email' => $row['email_1'] === null || $row['personNum'] != 1 ? '' : $row['email_1'],
-                'altPhone' => $row['email_2'] === null || $row['personNum'] != 1 ? '' : $row['email_2'],
+                'altPhone' => $row['altPhone'] === null || $row['personNum'] != 1 ? '' : $row['altPhone'],
                 'memberPricingAllowed' => $account['memberStatus'] == 'PC' ? 1 : 0,
                 'memberCouponsAllowed' => $account['memberStatus'] == 'PC' ? 1 : 0,
             );
@@ -934,8 +934,8 @@ class MemberREST
     {
         $query = '
             SELECT a.cardNo,
-                c.firstName,
-                c.lastName,
+                ' . ($minimal ? 'c.firstName' : 'MAX(c.firstName)') . ' AS firstName,
+                ' . ($minimal ? 'c.lastName' : 'MAX(c.lastName)') . ' AS lastName
             FROM CustomerAccounts AS a
                 LEFT JOIN Customers AS c ON a.customerAccountID=c.customerAccountID
             WHERE 1=1 ';
@@ -1015,8 +1015,8 @@ class MemberREST
     {
         $query = '
             SELECT c.CardNo AS cardNo,
-                c.FirstName,
-                c.LastName
+                ' . ($minimal ? 'c.FirstName' : 'MAX(c.FirstName)') . ' AS firstName,
+                ' . ($minimal ? 'c.LastName' : 'MAX(c.LastName)') . ' AS lastName
             FROM custdata AS c
                 LEFT JOIN meminfo AS m ON c.CardNo=m.card_no
                 LEFT JOIN memDates AS d ON c.CardNo=d.card_no
@@ -1157,8 +1157,8 @@ class MemberREST
                 'customers' => array(
                     array(
                         'cardNo' => $row['cardNo'],
-                        'firstName' => $row['FirstName'],
-                        'lastName' => $row['LastName'],
+                        'firstName' => $row['firstName'],
+                        'lastName' => $row['lastName'],
                     ),
                 ),
             );

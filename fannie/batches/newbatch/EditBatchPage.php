@@ -36,6 +36,7 @@ class EditBatchPage extends FannieRESTfulPage
     protected $title = 'Sales Batches Tool';
     protected $header = 'Sales Batches Tool';
     protected $enable_linea = true;
+    protected $debug_routing = false;
 
     public $description = '[Sales Batches] is the primary tool for creating, editing, and managing 
     sale and price change batches.';
@@ -100,7 +101,7 @@ class EditBatchPage extends FannieRESTfulPage
             break;
         }
         $partial->startTime(FormLib::get('pStart', null));
-        $partial->endTime(FormLib::get('pStart', null));
+        $partial->endTime(FormLib::get('pEnd', null));
         $partial->overwriteSales(FormLib::get('pOver', 0));
         $partial->repetition(FormLib::get('pRepeat'));
         $partial->save();
@@ -115,9 +116,10 @@ class EditBatchPage extends FannieRESTfulPage
         $dbc->selectDB($this->config->get('OP_DB'));
         $uid = getUID($this->current_user);
         $uid = ltrim($uid,'0');
+        $bu = new BatchUpdateModel($dbc);
 
         $prep = $dbc->prepare("
-            SELECT listID 
+            SELECT listID,b.upc
             FROM batchList AS l 
                 INNER JOIN batchCutPaste as b ON b.upc=l.upc AND b.batchID=l.batchID
             WHERE b.uid=?"
@@ -128,6 +130,10 @@ class EditBatchPage extends FannieRESTfulPage
         while ($row = $dbc->fetchRow($res)) {
             $dbc->execute($upP,array($this->id,$row['listID']));
             $count++;
+            $bu->reset();
+            $bu->batchID($this->id);
+            $bu->upc($row['upc']);
+            $bu->logUpdate($bu::UPDATE_ADDED);
         }
         $delP = $dbc->prepare("DELETE FROM batchCutPaste WHERE uid=?");
         $dbc->execute($delP,$uid);
@@ -189,7 +195,7 @@ class EditBatchPage extends FannieRESTfulPage
           Nothing submitted; don't do anything
         */
         if ($upc === '') {
-            echo json_encode($json);
+            echo $this->debugJSON($json);
             return false;
         }
 
@@ -216,7 +222,7 @@ class EditBatchPage extends FannieRESTfulPage
                 $json['field'] = '#add-item-price';
             }
         }
-        echo json_encode($json);
+        echo $this->debugJSON($json);
 
         return false;
     }
@@ -237,7 +243,7 @@ class EditBatchPage extends FannieRESTfulPage
           Nothing submitted; don't do anything
         */
         if ($this->addLC === '') {
-            echo json_encode($json);
+            echo $this->debugJSON($json);
             return false;
         }
 
@@ -259,7 +265,7 @@ class EditBatchPage extends FannieRESTfulPage
             $json['field'] = '#add-item-price';
         }
 
-        echo json_encode($json);
+        echo $this->debugJSON($json);
 
         return false;
     }
@@ -283,7 +289,14 @@ class EditBatchPage extends FannieRESTfulPage
             $model->groupSalePrice($price);
             $model->quantity(0);
             $model->pricemethod(0);
-            $model->save();
+            $saved = $model->save();
+
+            if ($saved == true) {
+                $bu = new BatchUpdateModel($dbc);
+                $bu->batchID($this->id);
+                $bu->upc($this->upc);
+                $bu->logUpdate($bu::UPDATE_ADDED);
+            }
 
             if (FormLib::get('audited') == '1') {
                 \COREPOS\Fannie\API\lib\AuditLib::batchNotification(
@@ -295,7 +308,7 @@ class EditBatchPage extends FannieRESTfulPage
             $json['display'] = $this->showBatchDisplay($this->id);
         }
         
-        echo json_encode($json);
+        echo $this->debugJSON($json);
 
         return false;
     }
@@ -340,7 +353,7 @@ class EditBatchPage extends FannieRESTfulPage
         }
 
         $json = array('tags' => $tag_count);
-        echo json_encode($json);
+        echo $this->debugJSON($json);
 
         return false;
     }
@@ -352,7 +365,7 @@ class EditBatchPage extends FannieRESTfulPage
         $model = new BatchesModel($dbc);
         $model->forceStartBatch($this->id);
         $json = array('error'=>0, 'msg'=>'Batch #' . $this->id . ' has been applied');
-        echo json_encode($json);
+        echo $this->debugJSON($json);
 
         return false;
     }
@@ -365,7 +378,7 @@ class EditBatchPage extends FannieRESTfulPage
         $model->forceStopBatch($this->id);
 
         $json = array('error'=>0, 'msg'=> 'Batch items taken off sale');
-        echo json_encode($json);
+        echo $this->debugJSON($json);
 
         return false;
     }
@@ -407,6 +420,11 @@ class EditBatchPage extends FannieRESTfulPage
             ');
             $dbc->execute($insP, $args);
         }
+        
+        $bu = new BatchUpdateModel($dbc);
+        $bu->upc($this->upc);
+        $bu->batchID($this->id);
+        $bu->logUpdate($bu::UPDATE_REMOVED);
 
         return false;
     }
@@ -437,8 +455,19 @@ class EditBatchPage extends FannieRESTfulPage
             $this->qty = 1;
             $model->quantity(0);
         }
-        $model->pricemethod($pmethod);    
-        $model->save();
+        $model->pricemethod($pmethod);
+        $saved = $model->save();
+
+        $bu = new BatchUpdateModel($dbc);
+        $bu->upc($this->upc);
+        $bu->batchID($this->id);
+        $bu->specialPrice($this->price);
+        $bu->quantity($this->qty);
+        if ($this->qty <= 1) {
+            $this->qty = 1;
+            $bu->quantity(0);
+        }
+        $bu->logUpdate($bu::UPDATE_PRICE_EDIT);
 
         $json['price'] = sprintf('%.2f', $this->price);
         $json['qty'] = (int)$this->qty;
@@ -454,7 +483,7 @@ class EditBatchPage extends FannieRESTfulPage
                 (substr($this->upc,0,2)=='LC' ? true : false));
         }
 
-        echo json_encode($json);
+        echo $this->debugJSON($json);
 
         return false;
     }
@@ -472,7 +501,7 @@ class EditBatchPage extends FannieRESTfulPage
             $obj->end_date(0);
             $ret = $obj->save();
         }
-
+     
         return $ret ? true : false;
     }
 
@@ -496,22 +525,34 @@ class EditBatchPage extends FannieRESTfulPage
         $upc = $this->upc;
 
         $json = array('error'=>0, 'msg'=>'Item ' . $upc . ' removed from batch');
-        
-        if (substr($upc,0,2) != 'LC') {
-            // take the item off sale if this batch is currently on sale
-            if ($this->unsaleUPC($this->upc) === false) {
-                $json['error'] = 1;
-                $json['msg'] = 'Error taking item ' . $upc . ' off sale';
-            }
-            
-            COREPOS\Fannie\API\data\ItemSync::sync($upc);
-        } else {
-            $likecode = substr($upc,2);
-            if ($this->unsaleLikeCode($likecode) === false) {
-                $json['error'] = 1;
-                $json['msg'] = 'Error taking like code ' . $likecode . ' off sale';
+
+        $currentSale = $dbc->query('
+            SELECT batchID 
+            FROM batches 
+            WHERE discountType <> 0
+                AND ' . $dbc->curdate() . ' BETWEEN startDate AND endDate');
+        if ($dbc->numRows($currentSale) > 0) { 
+            if (substr($upc,0,2) != 'LC') {
+                // take the item off sale if this batch is currently on sale
+                if ($this->unsaleUPC($this->upc) === false) {
+                    $json['error'] = 1;
+                    $json['msg'] = 'Error taking item ' . $upc . ' off sale';
+                }
+                
+                COREPOS\Fannie\API\data\ItemSync::sync($upc);
+            } else {
+                $likecode = substr($upc,2);
+                if ($this->unsaleLikeCode($likecode) === false) {
+                    $json['error'] = 1;
+                    $json['msg'] = 'Error taking like code ' . $likecode . ' off sale';
+                }
             }
         }
+        
+        $bu = new BatchUpdateModel($dbc);
+        $bu->upc($upc);
+        $bu->batchID($id);
+        $bu->logUpdate($bu::UPDATE_REMOVED);
 
         $delQ = $dbc->prepare("delete from batchList where batchID=? and upc=?");
         $delR = $dbc->execute($delQ,array($id,$upc));
@@ -535,7 +576,7 @@ class EditBatchPage extends FannieRESTfulPage
                 (substr($upc,0,2)=='LC' ? true : false));
         }
         
-        echo json_encode($json);
+        echo $this->debugJSON($json);
 
         return false;
     }
@@ -553,7 +594,7 @@ class EditBatchPage extends FannieRESTfulPage
         if ($r === false) {
             $json['error'] = 'Error moving item';
         }
-        echo json_encode($json);
+        echo $this->debugJSON($json);
 
         return false;
     }
@@ -592,7 +633,7 @@ class EditBatchPage extends FannieRESTfulPage
         if (!$save1 || !$save2 || !$save3) {
             $json['error'] = 'Error saving paired sale settings';
         }
-        echo json_encode($json);
+        echo $this->debugJSON($json);
 
         return false;
     }
@@ -617,11 +658,17 @@ class EditBatchPage extends FannieRESTfulPage
             DELETE FROM batchList
             WHERE batchID=?
                 AND upc=?');
+        $bu = new BatchUpdateModel($dbc);
         while ($w = $dbc->fetchRow($res)) {
             $dbc->execute($delP, array($this->id, $w['upc']));
+            $bu->reset();
+            $bu->batchID($this->id);
+            $bu->upc($w['upc']);
+            $bu->logUpdate($bu::UPDATE_REMOVED);
         }
+
         $ret['display'] = $this->showBatchDisplay($this->id);
-        echo json_encode($ret);
+        echo $this->debugJSON($ret);
 
         return false;
     }
@@ -646,7 +693,7 @@ class EditBatchPage extends FannieRESTfulPage
                 $ret['error'] = 'Error saving store mapping';
             }
         }
-        echo json_encode($ret);
+        echo $this->debugJSON($ret);
 
         return false;
     }
@@ -838,7 +885,8 @@ HTML;
         $ret .= '<b>Sale Dates</b>: ' 
             . date('Y-m-d', strtotime($model->startDate())) 
             . ' - ' 
-            . date('Y-m-d', strtotime($model->endDate())) . '<br />';
+            . date('Y-m-d', strtotime($model->endDate()))
+            . ' | ' . '<a href="batchReport.php?batchID=' . $id . '">Report</a><br />';
         if ($this->config->get('STORE_MODE') === 'HQ') {
             $stores = new StoresModel($dbc);
             $stores->hasOwnItems(1);
@@ -899,12 +947,13 @@ HTML;
             $ret .= "<span id=\"save-limit-link\" class=\"collapse\"><a href=\"\" onclick=\"batchEdit.saveTransLimit($id); return false;\">Save Limit</a></span>";
             $ret .= " <span class=\"form-group form-inline\" id=\"currentLimit\" style=\"color:#000;\">{$limit}</span>";
         }
+        $ret .= " | <a data-toggle='modal' data-target='#myModal'>Batch History</a>";
 
         /**
           Insert extra fields to manage partial day batch
         */
         if ($typeModel->editorUI() == 3) {
-            $partialP = $dbc->prepare('SELECT * FROM PartialBarches WHERE batchID=?');
+            $partialP = $dbc->prepare('SELECT * FROM PartialBatches WHERE batchID=?');
             $partial = $dbc->getRow($partialP, array($id));
             $ret .= '<table class="table small table-bordered">';
             $ret .= '<tr><th>Start Time</th><th>End Time</th><th>Override</th><th>Frequency</th></tr>';
@@ -1245,6 +1294,56 @@ HTML;
         return $this->get_id_view();
     }
 
+    public function batch_history($bid)
+    {
+        include('../batchhistory/BatchHistoryPage.php');   
+        $modal = '';
+        $modal .= '
+            <style>
+            .vertical-alignment-helper {
+                display:table;
+                height: 100%;
+                width: 100%;
+                pointer-events:none; /* This makes sure that we can still click outside of the modal to close it */
+            }
+            .vertical-align-center {
+                /* To center vertically */
+                display: table-cell;
+                vertical-align: middle;
+                pointer-events:none;
+            }
+            .modal-content {
+                /* Bootstrap sets the size of the modal in the modal-dialog class, we need to inherit it */
+                width:inherit;
+                height:inherit;
+                /* To center horizontally */
+                margin: 0 auto;
+                pointer-events: all;
+            }
+            </style>
+        ';
+        $modal .= '
+                <!-- Modal -->
+                <div id="myModal" class="modal" role="dialog">
+                <div class="vertical-alignment-helper">
+                  <div class="modal-dialog vertical-align-center">
+                    <!-- Modal content-->
+                    <div class="modal-content" style="height: 85vh; width: 85vw;">
+                        <div style="max-height: 85vh; overflow-y:auto;">
+                            ';
+        $bhp = new BatchHistoryPage;
+        $modal .= $bhp->getBatchHistory($bid);
+        $modal .='
+                        </div>
+                    </div>
+                  </div>
+                </div>
+                </div>
+        ';
+        
+        return $modal;
+    }
+
     public function get_id_view()
     {
         $this->add_script('edit.js?20160105');
@@ -1255,9 +1354,10 @@ HTML;
         $url = $this->config->get('URL');
         $sort = FormLib::get('sort', 'natural');
         $inputForm = $this->addItemUPCInput();
+        $test = 'test';
         $batchList = $this->showBatchDisplay($this->id, $sort);
         $linea = $this->enable_linea ? '<script type="text/javascript">' . $this->lineaJS() . '</script>' : '';
-
+        $history = $this->batch_history($this->id);
         return <<<HTML
 <div id="inputarea">
 {$inputForm}
@@ -1277,6 +1377,7 @@ HTML;
 <input type="hidden" id="batchID" value="{$this->id}" />
 <input type=hidden id=buttonimgpath value="{$url}src/img/buttons/" />
 {$linea}
+{$history}
 HTML;
     }
 

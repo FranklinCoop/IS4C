@@ -603,14 +603,21 @@ static public function twoColumns($col1, $col2) {
     list($col2s, $c2max) = self::processColumn($col2);
     // space the columns as much as they'll fit
     $spacer = $max - $c1max - $c2max;
+    // avoid warnings when calculated length < 0
+    $space_repeat = function ($len) {
+        if ($len < 0) {
+            return '';
+        }
+        return str_repeat(' ', $length);
+    };
     // scan both columns
     for( $x=0; isset($col1[$x]) && isset($col2[$x]); $x++) {
         $c1r = trim($col1[$x]);  $c1l = strlen($col1s[$x]);
         $c2r = trim($col2[$x]);  $c2l = strlen($col2s[$x]);
         if( ($c1max+$spacer+$c2l) <= $max) {
-            $text .= $c1r . str_repeat(" ", ($c1max+$spacer)-$c1l) . $c2r . "\n";
+            $text .= $c1r . $space_repeat(($c1max+$spacer)-$c1l) . $c2r . "\n";
         } else {
-            $text .= $c1r . "\n" . str_repeat(" ", $c1max+$spacer) . $c2r . "\n";
+            $text .= $c1r . "\n" . $space_repeat($c1max+$spacer) . $c2r . "\n";
         }
     }
     // if one column is longer than the other, print the extras
@@ -730,7 +737,7 @@ static private function getTypeMap()
 static private function memberFooter($receipt, $ref)
 {
     $mod = CoreLocal::get('ReceiptThankYou');
-    if ($mod != '' && class_exists('COREPOS\\pos\\lib\\ReceiptBuilding\\ThankYou\\' . $mod)) {
+    if ($mod != '' && substr($mod, 0, 7) !== 'COREPOS' && class_exists('COREPOS\\pos\\lib\\ReceiptBuilding\\ThankYou\\' . $mod)) {
         $mod = 'COREPOS\\pos\\lib\\ReceiptBuilding\\ThankYou\\' . $mod;
     } elseif ($mod === '' || !class_exists($mod)) {
         $mod = 'COREPOS\\pos\\lib\\ReceiptBuilding\\ThankYou\\DefaultReceiptThanks';
@@ -869,7 +876,7 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
             $receipt['any'] .= self::$PRINT->addRenderingSpacer('end of items');
 
             $savingsMode = CoreLocal::get('ReceiptSavingsMode');
-            if ($savingsMode != '' && class_exists('COREPOS\\pos\\lib\\ReceiptBuilding\\Savings\\' . $savingsMode)) {
+            if ($savingsMode != '' && substr($savingsMode, 0, 7) !== 'COREPOS' && class_exists('COREPOS\\pos\\lib\\ReceiptBuilding\\Savings\\' . $savingsMode)) {
                 $savingsMode = 'COREPOS\\pos\\lib\\ReceiptBuilding\\Savings\\' . $savingsMode;
             } elseif ($savingsMode === '' || !class_exists($savingsMode)) {
                 $savingsMode = 'COREPOS\\pos\\lib\\ReceiptBuilding\\Savings\\DefaultReceiptSavings';
@@ -950,7 +957,7 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
     return $receipt;
 }
 
-static private function cutReceipt($receipt, $second)
+static public function cutReceipt($receipt, $second)
 {
     if (is_array($receipt)){
         if ($second){
@@ -1035,7 +1042,7 @@ static public function memReceiptMessages($cardNo)
     while ($row = $dbc->fetchRow($memR)) {
         // EL This bit new for messages from plugins.
         $className = $row['modifier_module'];
-        if (!empty($className) && class_exists('COREPOS\\pos\\lib\\ReceiptBuilding\\CustMessages\\' . $className)) {
+        if (!empty($className) && substr($className, 0, 7) !== 'COREPOS' && class_exists('COREPOS\\pos\\lib\\ReceiptBuilding\\CustMessages\\' . $className)) {
             $className = 'COREPOS\\pos\\lib\\ReceiptBuilding\\CustMessages\\' . $className;
         }
         if (!empty($className) && class_exists($className)) {

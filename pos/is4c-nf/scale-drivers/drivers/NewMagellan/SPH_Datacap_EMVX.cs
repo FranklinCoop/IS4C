@@ -42,7 +42,7 @@ namespace SPH {
 public class SPH_Datacap_EMVX : SerialPortHandler 
 {
     private DsiEMVX emv_ax_control = null;
-    private DsiPDCX pdc_ax_control = null; // can I include both?
+    private DsiPDCX pdc_ax_control = null;
     private string device_identifier = null;
     private string com_port = "0";
     protected string server_list = "x1.mercurypay.com;x2.backuppay.com";
@@ -71,13 +71,18 @@ public class SPH_Datacap_EMVX : SerialPortHandler
         xml_log = my_location + sep + "xml.log";
         pdc_active = false;
         emv_reset = true;
+
+        if (device_identifier == "INGENICOISC250_MERCURY_E2E") {
+            rba = new RBA_Stub("COM"+com_port);
+            rba.SetEMV(RbaButtons.EMV);
+        }
     }
 
     /**
       Initialize EMVX control with servers
       and response timeout
     */
-    protected bool initDevice()
+    protected bool ReInitDevice()
     {
         if (pdc_ax_control == null) {
             pdc_ax_control = new DsiPDCX();
@@ -97,16 +102,9 @@ public class SPH_Datacap_EMVX : SerialPortHandler
         }
         FlaggedReset();
 
-        if (rba == null) {
-            if (false && device_identifier == "INGENICOISC250_MERCURY_E2E") {
-                rba = new RBA_Stub("COM"+com_port);
-                rba.SetParent(this.parent);
-                rba.SetVerbose(this.verbose_mode);
-                rba.SetEMV(RbaButtons.EMV);
-            }
-        }
-
         if (rba != null) {
+            rba.SetParent(this.parent);
+            rba.SetVerbose(this.verbose_mode);
             try {
                 rba.stubStart();
             } catch (Exception) {}
@@ -126,7 +124,7 @@ public class SPH_Datacap_EMVX : SerialPortHandler
     */
     public override void Read()
     { 
-        initDevice();
+        ReInitDevice();
         TcpListener http = new TcpListener(IPAddress.Loopback, LISTEN_PORT);
         http.Start();
         byte[] buffer = new byte[10];
@@ -156,9 +154,6 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                             result = ProcessPDC(message);
                         }
                         result = WrapHttpResponse(result);
-                        if (this.verbose_mode > 0) {
-                            Console.WriteLine(result);
-                        }
 
                         byte[] response = System.Text.Encoding.ASCII.GetBytes(result);
                         stream.Write(response, 0, response.Length);
@@ -166,9 +161,7 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                     client.Close();
                 }
             } catch (Exception ex) {
-                if (verbose_mode > 0) {
-                    Console.WriteLine(ex);
-                }
+                this.LogMessage(ex.ToString());
             }
         }
     }
@@ -230,11 +223,14 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                 if (rba != null) {
                     rba.stubStop();
                 }
-                initDevice();
+                ReInitDevice();
                 break;
             case "termManual":
                 break;
             case "termApproved":
+                if (rba != null) {
+                    rba.showApproved();
+                }
                 break;
             case "termSig":
                 if (rba != null) {
@@ -251,6 +247,49 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                 break;
             case "termWait":
                 break;
+        }
+    }
+
+    public override void SetConfig(string k, string v)
+    {
+        if (k == "disableRBA" && v == "true") {
+            try {
+                if (this.rba != null) {
+                    rba.stubStop();
+                }
+            } catch (Exception) {}
+            this.rba = null;
+        } else if (k == "disableButtons" && v == "true") {
+            this.rba.SetEMV(RbaButtons.None);
+        } else if (k == "logXML" && v == "true") {
+            this.enable_xml_log = true;
+        }
+    }
+
+    public override void SetConfig(Dictionary<string,string> d)
+    {
+        if (d.ContainsKey("disableRBA") && d["disableRBA"].ToLower() == "true") {
+            try {
+                if (this.rba != null) {
+                    rba.stubStop();
+                }
+            } catch (Exception) {}
+        }
+
+        if (this.rba != null && d.ContainsKey("disableButtons") && d["disableButtons"].ToLower() == "true") {
+            this.rba.SetEMV(RbaButtons.None);
+        }
+
+        if (d.ContainsKey("logXML") && d["logXML"].ToLower() == "true") {
+            this.enable_xml_log = true;
+        }
+
+        if (d.ContainsKey("logErrors") && d["logErrors"].ToLower() == "true") {
+            this.enableUnifiedLog();
+        }
+
+        if (this.rba != null && d.ContainsKey("cashback") && (d["cashback"].ToLower() == "true" || d["cashback"].ToLower() == "false")) {
+            this.rba.SetCashBack(d["cashback"].ToLower() == "true" ? true : false);
         }
     }
 
@@ -279,9 +318,6 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             xml = xml.Replace("{{SecureDevice}}", SecureDeviceToEmvType(this.device_identifier));
         }
         xml = xml.Replace("{{ComPort}}", com_port);
-        if (this.verbose_mode > 0) {
-            Console.WriteLine("Sending: " + xml);
-        }
 
         try {
             /**
@@ -335,9 +371,7 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                     }
                 } catch (Exception ex) {
                     // response was invalid xml
-                    if (this.verbose_mode > 0) {
-                        Console.WriteLine(ex);
-                    }
+                    this.LogMessage(ex.ToString());
                     // status is unclear so do not attempt 
                     // another transaction
                     break;
@@ -348,9 +382,7 @@ public class SPH_Datacap_EMVX : SerialPortHandler
 
         } catch (Exception ex) {
             // request was invalid xml
-            if (this.verbose_mode > 0) {
-                Console.WriteLine(ex);
-            }
+            this.LogMessage(ex.ToString());
         }
 
         return "";
@@ -364,21 +396,22 @@ public class SPH_Datacap_EMVX : SerialPortHandler
         lock (pdcLock) {
             pdc_active = true;
         }
-        xml = xml.Trim(new char[]{'"'});
-        xml = xml.Replace("{{SequenceNo}}", SequenceNo());
-        xml = xml.Replace("{{SecureDevice}}", this.device_identifier);
-        xml = xml.Replace("{{ComPort}}", com_port);
-        if (this.verbose_mode > 0) {
-            Console.WriteLine(xml);
-        }
-
         string ret = "";
-        ret = pdc_ax_control.ProcessTransaction(xml, 1, null, null);
-        if (enable_xml_log) {
-            using (StreamWriter sw = new StreamWriter(xml_log, true)) {
-                sw.WriteLine(DateTime.Now.ToString() + " (send pdc): " + xml);
-                sw.WriteLine(DateTime.Now.ToString() + " (recv pdc): " + ret);
+        try {
+            xml = xml.Trim(new char[]{'"'});
+            xml = xml.Replace("{{SequenceNo}}", SequenceNo());
+            xml = xml.Replace("{{SecureDevice}}", this.device_identifier);
+            xml = xml.Replace("{{ComPort}}", com_port);
+
+            ret = pdc_ax_control.ProcessTransaction(xml, 1, null, null);
+            if (enable_xml_log) {
+                using (StreamWriter sw = new StreamWriter(xml_log, true)) {
+                    sw.WriteLine(DateTime.Now.ToString() + " (send pdc): " + xml);
+                    sw.WriteLine(DateTime.Now.ToString() + " (recv pdc): " + ret);
+                }
             }
+        } catch (Exception ex) {
+            this.LogMessage(ex.ToString());
         }
         lock (pdcLock) {
             pdc_active = false;
@@ -490,7 +523,8 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             string filename = my_location + sep + "ss-output"+ sep + "tmp" + sep + ticks + ".bmp";
             BitmapBPP.Signature sig = new BitmapBPP.Signature(filename, points);
             parent.MsgSend("TERMBMP" + ticks + ".bmp");
-        } catch (Exception) {
+        } catch (Exception ex) {
+            this.LogMessage(ex.ToString());
             return null;
         }
         

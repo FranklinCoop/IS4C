@@ -49,6 +49,7 @@ class EndSalesBatchAlertTask extends FannieTask
         $grocEmail = $this->config->get('GROCERY_EMAIL');
         $scanEmail = $this->config->get('SCANCOORD_EMAIL');
         $contacts = array($grocEmail,$scanEmail);
+        $contacts[] = 'jmatthews@wholefoods.coop';
         $this->getBathchesBySuperDept($superDepts,$contacts);
 
         return false;
@@ -70,7 +71,8 @@ class EndSalesBatchAlertTask extends FannieTask
             FROM batches
             WHERE endDate BETWEEN CURDATE() AND DATE_ADD(NOW(), INTERVAL 7 DAY)
                 AND owner IN (".$inClause.")
-                AND batchName not like '%Co-op Deals%';
+                AND batchName not like '%Co-op Deals%'
+                AND batchType <> 4;
         ";
         $prep = $dbc->prepare($query);
         $result = $dbc->execute($prep,$args);

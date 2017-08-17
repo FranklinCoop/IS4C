@@ -42,6 +42,15 @@ class RemotePrint extends Plugin
                 'HTTP' => 'RemotePrintHandler',
             ),
         ),
+        'RemotePrintDebug' => array(
+            'label' => 'Debug mode',
+            'description' => 'Print debugging info instead of the normal receipt',
+            'default' => 'No',
+            'options' => array(
+                'No' => 0,
+                'Yes' => 1,
+            ),
+        ),
     );
 
     public $plugin_description = 'Send some info to a remote printer';
@@ -58,7 +67,7 @@ class RemotePrint extends Plugin
         $dbc = Database::tDataConnect();
         $infoP = $dbc->prepare("
             SELECT upc, description, quantity, charflag, trans_status, trans_subtype,
-                CASE WHEN a.identifer IS NOT NULL OR OR b.identifier IS NOT NULL THEN 1 ELSE 0 END as remote
+                CASE WHEN a.identifier IS NOT NULL OR b.identifier IS NOT NULL THEN 1 ELSE 0 END as remote
             FROM localtranstoday AS l
                 LEFT JOIN " . CoreLocal::get('pDatabase') . $dbc->sep() . "RemotePrint AS a
                     ON l.upc=a.identifier AND a.type='UPC'
@@ -66,28 +75,42 @@ class RemotePrint extends Plugin
                     ON l.department=b.identifier AND b.type='Department'
             WHERE emp_no=? AND register_no=? AND trans_no=?
             ORDER BY trans_id");
-        $infoR = $dbc->execute($prep, array($emp, $reg, $trans));
+        $infoR = $dbc->execute($infoP, array($emp, $reg, $trans));
         $lines = array();
         $comments = array();
-        while ($infoW = $dbc->fetchRow($infoR)) {
+        $hri = false;
+        while ($row = $dbc->fetchRow($infoR)) {
+            if (CoreLocal::get('RemotePrintDebug')) {
+                $lines[] = array(
+                    'qty'=>1, 
+                    'upc'=>'', 
+                    'description'=>"{$row['upc']} | {$row['charflag']} | {$row['trans_status']} | {$row['trans_subtype']}",
+                );
+                continue;
+            }
             if ($row['trans_status'] == 'X' && $row['charflag'] != 'S') {
                 // This is a canceled line. Skip it.
                 continue;
             }
-            if ($row['upc'] == 'DORESUME' && $row['charflag'] == 'SR') {
+            if ($row['upc'] == 'RESUME' && ($row['charflag'] == 'SR' || $row['charflag'] == 'S')) {
                 // Resumed transaction here. Reset accumulators.
                 $lines = array();
                 $comments = array();
             }
             if ($row['remote']) {
                 $lines[] = array('upc'=>$row['upc'], 'description'=>$row['description'], 'qty'=>$row['quantity']);
+            } elseif ($row['trans_subtype'] == 'CM' && $row['charflag'] == 'HR') {
+                $hri = $row['description'];
             } elseif ($row['trans_subtype'] == 'CM') {
                 $comments[] = $row['description'];
             }
         }
 
         if (count($lines) > 0) {
-            $receipt = date('Y-m-d h:i:sA') . ' ' . $reg . '-' . $emp . '-' . $trans . "\n\n";
+            $receipt = date('Y-m-d h:i:sA') . ' ' . $emp . '-' . $reg . '-' . $trans . "\n\n";
+            if ($hri) {
+                $receipt = date('Y-m-d h:i:sA') . ' ' . $hri . "\n\n";
+            }
             foreach ($lines as $line) {
                 $receipt .= str_pad($line['description'], 35, ' ', STR_PAD_RIGHT)
                     . str_pad($line['quantity'], 5, ' ', STR_PAD_LEFT)
@@ -95,7 +118,8 @@ class RemotePrint extends Plugin
             }
             $receipt .= "\n";
             $receipt .= implode("\n", $comments);
-            $receipt .= ReceiptLib::cutReceipt($receipt);
+            $receipt .= "\n";
+            $receipt = ReceiptLib::cutReceipt($receipt);
             
             if ($driverClass == 'COREPOS\\pos\\lib\\PrintHandlers\ESCPOSPrintHandler') {
                 $port = fopen(CoreLocal::get('RemotePrintDevice'), 'w');

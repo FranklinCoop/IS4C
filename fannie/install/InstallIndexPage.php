@@ -617,6 +617,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'BatchCutPasteModel',
         'BatchBarcodesModel',
         'BatchTypeModel',
+        'BatchUpdateModel',
         'BrandsModel',
         'ConsistentProductRulesModel',
         'CoopDealsItemsModel',
@@ -720,6 +721,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'UserGroupsModel',
         'UserGroupPrivsModel',
         'UserSessionsModel',
+        'UserMessagesModel',
         // VIEWS
         'SuperMinIdViewModel',
         'MasterSuperDeptsModel',

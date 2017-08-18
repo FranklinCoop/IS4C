@@ -24,7 +24,7 @@ if (!class_exists('FpdfWithBarcode')) {
     include(dirname(__FILE__) . '/../FpdfWithBarcode.php');
 }
 
-  class FCC_Small_PDF extends FpdfWithBarcode
+  class MA_Standard_Small_PDF extends FpdfWithBarcode
   {
     function barcodeText($x, $y, $h, $barcode, $len)
     {
@@ -45,7 +45,7 @@ if (!class_exists('FpdfWithBarcode')) {
    * begin to create PDF file using fpdf functions
    */
 
-  function FCC_Small($data,$offset=0){
+  function MA_Standard_Small($data,$offset=0){
     global $FANNIE_OP_DB;
     global $FANNIE_ROOT;
     //global $FANNIE_COOP_ID;

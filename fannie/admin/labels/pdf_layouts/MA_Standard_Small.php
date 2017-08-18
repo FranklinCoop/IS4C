@@ -24,7 +24,7 @@ if (!class_exists('FpdfWithBarcode')) {
     include(dirname(__FILE__) . '/../FpdfWithBarcode.php');
 }
 
-  class MA_Standard_Small_PDF extends FpdfWithBarcode
+  class FCC_Small_PDF extends FpdfWithBarcode
   {
     function barcodeText($x, $y, $h, $barcode, $len)
     {
@@ -45,7 +45,12 @@ if (!class_exists('FpdfWithBarcode')) {
    * begin to create PDF file using fpdf functions
    */
 
-  function MA_Standard_Small($data,$offset=0){
+  function FCC_Small($data,$offset=0){
+    global $FANNIE_OP_DB;
+    global $FANNIE_ROOT;
+    //global $FANNIE_COOP_ID;
+    $dbc = FannieDB::get($FANNIE_OP_DB);
+
     $hspace = 1.5;
     $h = 37.36875; //what is this?
     $top = 5.99 + 2.5; //was 12.7 + 2.5
@@ -54,7 +59,7 @@ if (!class_exists('FpdfWithBarcode')) {
     // and it seems to shift them all right
     $space = 1.190625 * 2; //tried 3 to see if shift columns over
   
-    $pdf=new MA_Standard_Small_PDF('P', 'mm', 'Letter');
+    $pdf=new FCC_Small_PDF('P', 'mm', 'Letter');
     $pdf->AddFont('arialnarrow');
     $pdf->AddFont('steelfish');
     $pdf->SetMargins($left ,$top + $hspace);
@@ -66,7 +71,7 @@ if (!class_exists('FpdfWithBarcode')) {
     * set up location variable starts
     */
 
-    $barLeft = $left ; // this was a 4 now 14 it did create 3 columns
+    $barLeft = $left; // this was a 4 now 14 it did create 3 columns
     $unitTop = $top + $hspace;
     $alpha_unitTop = $unitTop + $hspace;
     $descTop = $unitTop + 17;
@@ -81,10 +86,10 @@ if (!class_exists('FpdfWithBarcode')) {
     $vendLeft = $left + 13;
     $down = 31.006; //30.55 kept it the right hieght
     //there is a relation ship below Left and w
-    $LeftShift = 39; 
+    $LeftShift = 41.25; 
     //was 51 shifts the width between columns 67.990625 seems okay on the PRICE RETAIL
     //the above does alot to create the columns for the top
-    // $w = 70.609375; //this does width of label started at 49 @ 70 it started to line on column one but two and three stuck over so leftshift is the next test
+    //$w = 70.609375; //this does width of label started at 49 @ 70 it started to line on column one but two and three stuck over so leftshift is the next test
     $priceLeft = (8) + ($space); 
     // $priceLeft = 24.85
     /**
@@ -118,7 +123,7 @@ if (!class_exists('FpdfWithBarcode')) {
             $LeftShift = 39; 
             //was 51 shifts the width between columns 67.990625 seems okay on the PRICE RETAIL
             //the above does alot to create the columns for the top
-            // $w = 70.609375; //this does width of label started at 49 @ 70 it started to line on column one but two and three stuck over so leftshift is the next test
+            $w = 39;//70.609375; //this does width of label started at 49 @ 70 it started to line on column one but two and three stuck over so leftshift is the next test
             $priceLeft = (8) + ($space); 
             //$priceLeft = ($w / 2) + ($space);
             // $priceLeft = 24.85
@@ -128,7 +133,7 @@ if (!class_exists('FpdfWithBarcode')) {
         * check to see if we have reached the right most label
         * if we have reset all left hands back to initial values
         */
-        if($barLeft > 165){
+        if($barLeft > 175){
             $barLeft = $leftshift;
             $barTop = $barTop + $down;
             $priceLeft = $priceLeft + $LeftShift;
@@ -143,19 +148,61 @@ if (!class_exists('FpdfWithBarcode')) {
             $vendLeft = $left + 13;
             $skuTop = $skuTop + $down;
         }
-      
+        
         /**
         * instantiate variables for printing on barcode from 
         * $testQ query result set
         */
-        if ($row['scale'] == 0) {$price = $row['normal_price'];}
-        elseif ($row['scale'] == 1) {$price = $row['normal_price'] . "/lb";}
+
+        //get unit and flagging data;
+        $qStdUnit = "SELECT u.unitStandard FROM prodStandardUnit u WHERE u.upc =?";
+        $rStdUnit = $dbc->execute($dbc->prepare($qStdUnit),array($row['upc']));
+        $iStdUnit = $dbc->fetchRow($rStdUnit);
+        
+        $query = "
+            SELECT f.description,
+                f.bit_number,
+                (1<<(f.bit_number-1)) & p.numflag AS flagIsSet
+            FROM products AS p, 
+                prodFlags AS f
+            WHERE p.upc=?
+                " . (FannieConfig::config('STORE_MODE') == 'HQ' ? ' AND p.store_id=? ' : '') . "
+                AND f.active=1";
+        $args = array($row['upc']);
+        if (FannieConfig::config('STORE_MODE') == 'HQ') {
+            $args[] = FannieConfig::config('STORE_ID');
+        }
+
+           /* if ($i==0) $ret .= '<tr>';
+            if ($i != 0 && $i % 2 == 0) $ret .= '</tr><tr>';
+            $ret .= sprintf('<td><input type="checkbox" id="item-flag-%d" name="flags[]" value="%d" %s /></td>
+                <td><label for="item-flag-%d">%s</label></td>',$i, $row['bit_number'],
+                ($row['flagIsSet']==0 ? '' : 'checked'),
+                $i,
+                $row['description']
+            );
+            // embed flag info to avoid re-querying it on save
+            $ret .= sprintf('<input type="hidden" name="pf_attrs[]" value="%s" />
+                            <input type="hidden" name="pf_bits[]" value="%d" />',
+                            $row['description'], $row['bit_number']);
+            $i++;*/
+
+        $price = $row['normal_price'];
         $desc = strtoupper(substr($row['description'],0,27));
         $brand = ucwords(strtolower(substr($row['brand'],0,13)));
         $pak = $row['units'];
         $size = $row['units'] . "-" . $row['size'];
         $sku = $row['sku'];
-        $upc = substr($row['upc'],1,12);
+        $num_unit = $row['pricePerUnit'];
+        $alpha_unit = "per ".$iStdUnit['unitStandard'];
+
+       $upc = $row['upc'];
+       if (!(substr($upc,0,2) == "00")){
+             $check = "";
+        } else {
+             $upc=(substr($upc,2));
+             $check = $pdf->GetCheckDigit($upc);
+        }
         /** 
         * determine check digit using barcode.php function
         */
@@ -169,11 +216,11 @@ if (!class_exists('FpdfWithBarcode')) {
         /**
         * begin creating tag
         */
-        $pdf->SetXY($genLeft - 1, $unitTop+8); 
+        $pdf->SetXY($genLeft +1, $unitTop+8); 
         $pdf->SetFont('steelfish','',29);
         $pdf->Cell(8,4,"\$$num_unit",0,0,'L');
         $pdf->SetFont('Arial','',7);
-        $pdf->SetXY($genLeft+1, $unitTop+13.2); //numerical unit // silas: was above
+        $pdf->SetXY($genLeft+2, $unitTop+13.2); //numerical unit // silas: was above
         //  $pdf->SetXY($genLeft+4.7, $unitTop+10);
 
         $pdf->MultiCell(20,3,$alpha_unit,0,'L',0); //send alpha into a two liner to the right of UNIT price
@@ -182,30 +229,32 @@ if (!class_exists('FpdfWithBarcode')) {
         //$pdf->Cell(10,8,"$",0,0,'R');
     
         $pdf->SetFont('steelfish','',29);
-        $pdf->SetXY($genLeft+27.55,$unitTop+9.9); //price on the right side top Made this +3 cause it goes up toward last row of labels
+        $pdf->SetXY($genLeft+30.55,$unitTop+8.5); //price on the right side top Made this +3 cause it goes up toward last row of labels
         $pdf->Cell(10,8,"\$$price",0,0,'R'); //\$$price $barLeft
   
         $pdf->SetFont('arialnarrow','',6);
-        $pdf->SetXY($genLeft, $unitTop+18.5); //desc of tiem
+        $pdf->SetXY($genLeft+1, $unitTop+18.5); //desc of tiem
         $pdf->Cell($w,4,"$brand $desc",0,0,'L');
         $pdf->SetFont('Arial','',6);
         $pdf->SetXY($genLeft+25, $unitTop+16.2);
+        //please use the order  "Local, Organic, NONGMO, Gluten Free   
+        
         $pdf->Cell($w,4,$cs_size,0,0,'L');
         //$pdf->Cell($w,4,"1/".$size_value." ".$size_unit,0,0,'L');
         $pdf->SetFont('Arial','',7);
         //$pdf->SetXY($priceLeft-22,$skuTop+10);
   
 
-        $pdf->SetXY($genLeft, $unitTop+27.5);
-        $pdf->Cell($w,4,"$vn_init $sku",0,0,'L');
-        $pdf->SetXY($genLeft+25-.5, $unitTop+27.5);
+        $pdf->SetXY($genLeft+3, $unitTop+28.5);
+        $pdf->Cell($w,4,"$vendor $sku",0,0,'L');
+        $pdf->SetXY($genLeft+28-.5, $unitTop+28.5);
         $pdf->Cell(12,4,$tagdate,0,0,'R'); 
         /** 
         * add check digit to pid from testQ
         */
         $pdf->SetFont('Arial','',4);
         // silas: was $pdf->UPC_A($genLeft+1.25, $unitTop+21.5,$upc,3);
-        $pdf->UPC_A($genLeft+1, $unitTop+21.5,$upc,3); //changes size //changed to 6 from 3 to move it down
+        $pdf->UPC_A($genLeft+4.5, $unitTop+21.5,$upc,3); //changes size //changed to 6 from 3 to move it down
 
         //  $pdf->SetFont('Arial','',7);
         $pdf->SetXY($genLeft+1.3, $unitTop+23.6);

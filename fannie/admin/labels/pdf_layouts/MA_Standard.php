@@ -135,7 +135,10 @@ function MA_Standard($data,$offset=0){
             $vendLeft = $left + 13;
             $skuTop = $skuTop + $down;
         }
-
+        // get the unit price unit.
+        $qStdUnit = "SELECT u.unitStandard FROM prodStandardUnit u WHERE u.upc =?";
+        $rStdUnit = $dbc->execute($dbc->prepare($qStdUnit),array($row['upc']));
+        $iStdUnit = $dbc->fetchRow($rStdUnit);
           /**
    *Had to shift items over
    *ie column 2 over 2 

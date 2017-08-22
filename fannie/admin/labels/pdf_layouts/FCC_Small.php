@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2009 Whole Foods Co-op
+    Copyright 2017 Franklin Community Coop
 
     This file is part of CORE-POS.
 
@@ -154,11 +154,12 @@ if (!class_exists('FpdfWithBarcode')) {
         * $testQ query result set
         */
 
-        //get unit and flagging data;
+        // get the unit price unit.
         $qStdUnit = "SELECT u.unitStandard FROM prodStandardUnit u WHERE u.upc =?";
         $rStdUnit = $dbc->execute($dbc->prepare($qStdUnit),array($row['upc']));
         $iStdUnit = $dbc->fetchRow($rStdUnit);
-        
+
+        //get unit and flagging data;        
         $query = "
             SELECT f.description,
                 f.bit_number,
@@ -220,12 +221,6 @@ if (!class_exists('FpdfWithBarcode')) {
         $alpha_unit = "per ".$iStdUnit['unitStandard'];
 
        $upc = $row['upc'];
-       if (!(substr($upc,0,2) == "00")){
-             $check = "";
-        } else {
-             $upc=(substr($upc,2));
-             $check = $pdf->GetCheckDigit($upc);
-        }
         /** 
         * determine check digit using barcode.php function
         */

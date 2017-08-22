@@ -28,11 +28,18 @@ if (!class_exists('FpdfWithBarcode')) {
   {
     function barcodeText($x, $y, $h, $barcode, $len)
     {
+      if($len ==12) {
+        $barText = substr($barcode,0,2)."-".substr($barcode,2,5)."-".substr($barcode,7,5)."-".substr($barcode,12);
+        $len+=3;
+      } else {
+        $barText = $barcode;
+      }
+
       $this->SetFont('Arial','',9);
       if (filter_input(INPUT_GET, 'narrow') !== null)
-          $this->Text($x,$y+$h+11/$this->k,substr($barcode,-$len));
+          $this->Text($x,$y+$h+11/$this->k,substr($barText,-$len));
       else
-          $this->Text($x+6,$y+$h+11/$this->k,substr($barcode,-$len));
+          $this->Text($x+6,$y+$h+11/$this->k,substr($barText,-$len));
     }
   }
   
@@ -166,7 +173,8 @@ if (!class_exists('FpdfWithBarcode')) {
         $size = $row['units'] . "-" . $row['size'];
         $sku = $row['sku'];
         $num_unit = $row['pricePerUnit'];
-        $upc = $row['upc'];
+        $upc = ltrim($row['upc'],0);
+       $check = $pdf->GetCheckDigit($upc);
         $alpha_unit = "per ".$iStdUnit['unitStandard'];
         /** 
         * determine check digit using barcode.php function
@@ -217,7 +225,12 @@ if (!class_exists('FpdfWithBarcode')) {
         */
         $pdf->SetFont('Arial','',4);
         // silas: was $pdf->UPC_A($genLeft+1.25, $unitTop+21.5,$upc,3);
-        $pdf->UPC_A($genLeft+1, $unitTop+21.5,$upc,3); //changes size //changed to 6 from 3 to move it down
+        if (strlen($upc) <= 11) {
+            $pdf->UPC_A($genLeft+3.5, $unitTop+21.5,$upc,3);
+        }
+        else {
+            $pdf->EAN13($genLeft+3.5, $unitTop+21.5,$upc,3);
+        }
 
         //  $pdf->SetFont('Arial','',7);
         $pdf->SetXY($genLeft+1.3, $unitTop+23.6);

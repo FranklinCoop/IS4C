@@ -28,13 +28,18 @@ if (!class_exists('FpdfWithBarcode')) {
   {
     function barcodeText($x, $y, $h, $barcode, $len)
     {
-
+      if($len ==12) {
+        $barText = substr($barcode,0,2)."-".substr($barcode,2,5)."-".substr($barcode,7,5)."-".substr($barcode,12);
+        $len+=3;
+      } else {
+        $barText = $barcode;
+      }
 
       $this->SetFont('Arial','',9);
       if (filter_input(INPUT_GET, 'narrow') !== null)
-          $this->Text($x,$y+$h+11/$this->k,substr($barcode,-$len));
+          $this->Text($x,$y+$h+11/$this->k,substr($barText,-$len));
       else
-          $this->Text($x+6,$y+$h+11/$this->k,substr($barcode,-$len));
+          $this->Text($x+6,$y+$h+11/$this->k,substr($barText,-$len));
     }
   }
   
@@ -178,7 +183,8 @@ function MA_Standard($data,$offset=0){
         $num_unit = $row['pricePerUnit'];
         $alpha_unit = "per ".$iStdUnit['unitStandard'];
 
-       $upc = $row['upc'];
+       $upc = ltrim($row['upc'],0);
+       $check = $pdf->GetCheckDigit($upc);
 
         /**
         * get tag creation date (today)
@@ -215,7 +221,7 @@ function MA_Standard($data,$offset=0){
   //$pdf->Cell($w/2,4,Test1,0,0,'L'); //this is not showing was $brand
   //$pdf->SetXY($genLeft,$sizeTop); 
   //$pdf->Cell($w/2,4,$size,0,0,'L'); //was creating - mark under unit cost
-  $pdf->SetXY($priceLeft+9.5,$unitTop+24);
+  $pdf->SetXY($genLeft + 36.6,$unitTop+24);
   $pdf->Cell($w/3,4,$size,0,0,'R');
   //$pdf->Cell($w/3,4,"1/".$size_value." ".$size_unit,0,0,'R'); //this was date now going to be unit under normal price
   // $pdf->SetFont('Arial','',10);

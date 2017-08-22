@@ -233,9 +233,9 @@ function MA_Standard($data,$offset=0){
    */
     //$upc = "0738018001633";
     if (strlen($upc) <= 11)
-        $pdf->UPC_A($barLeft-18,$barTop+8.3,$upc,3);
+        $pdf->UPC_A($genLeft+14,$barTop+8.3,$upc,3);
     else
-        $pdf->EAN13($barLeft-18,$barTop+8.3,$upc,3);
+        $pdf->EAN13($genLeft+14,$barTop+8.3,$upc,3);
 
     //$pdf->UPC_A($barLeft-18,$barTop+8.3,$newUPC,3); //changes size //changed to 6 from 3 to move it down
   /**

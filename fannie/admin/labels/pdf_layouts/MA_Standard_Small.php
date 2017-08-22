@@ -208,8 +208,8 @@ if (!class_exists('FpdfWithBarcode')) {
         //$pdf->SetXY($priceLeft-22,$skuTop+10);
   
 
-        $pdf->SetXY($genLeft+3, $unitTop+28.5);
-        $pdf->Cell($w,4,"$vn_init $sku",0,0,'L');
+        $pdf->SetXY($genLeft+1, $unitTop+28.5);
+        $pdf->Cell($w,4,"$vendor $sku",0,0,'L');
         $pdf->SetXY($genLeft+28-.5, $unitTop+28.5);
         $pdf->Cell(12,4,$tagdate,0,0,'R'); 
         /** 

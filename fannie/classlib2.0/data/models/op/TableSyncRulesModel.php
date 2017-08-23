@@ -24,28 +24,29 @@
         
 
 /**
-  @class IncidentsModel
+  @class TableSyncRulesModel
 */
-class IncidentsModel extends BasicModel
+class TableSyncRulesModel extends BasicModel
 {
-    protected $name = "Incidents";
-    protected $preferred_db = 'plugin:IncidentDB';
+    protected $name = "TableSyncRules";
+    protected $preferred_db = 'op';
 
     protected $columns = array(
-    'incidentID' => array('type'=>'INT', 'primary_key'=>true, 'increment'=>true),
-    'incidentTypeID' => array('type'=>'INT'),
-    'incidentSubTypeID' => array('type'=>'INT'),
-    'incidentLocationID' => array('type'=>'INT'),
-    'tdate' => array('type'=>'DATETIME'),
-    'reportedBy' => array('type'=>'TINYINT', 'default'=>0),
-    'uid' => array('type'=>'INT'),
-    'image1' => array('type'=>'VARCHAR(255)'),
-    'image2' => array('type'=>'VARCHAR(255)'),
-    'details' => array('type'=>'TEXT'),
-    'trespass' => array('type'=>'TINYINT', 'default'=>0),
-    'police' => array('type'=>'TINYINT', 'default'=>0),
-    'storeID' => array('type'=>'INT'),
-    'deleted' => array('type'=>'TINYINT', 'default'=>0),
+    'tableSyncRuleID' => array('type'=>'INT', 'increment'=>true, 'index'=>true),
+    'tableName' => array('type'=>'VARCHAR(255)', 'primary_key'=>true),
+    'rule' => array('type'=>'VARCHAR(255)'),
     );
+
+    public function doc()
+    {
+        return '
+            TableSyncRules designates how certain tables should
+            be synced to the lanes. Any table *not* appearing here
+            is simply copied one record at a time.
+
+            TableName is the name of the table; rule is the name of
+            the SyncSpecial class responsible for that table.
+            ';
+    }
 }
 

@@ -177,9 +177,10 @@ class AutoLoader
 
             ob_start();
             $nsClass = self::fileToFullClass($file);
-            if (!class_exists($name, false) && class_exists($nsClass)) {
+            include_once($file);
+            if (!class_exists($name, false) && class_exists($nsClass, false)) {
                 $name = $nsClass;
-            } elseif (!class_exists($name)) { 
+            } elseif (!class_exists($name, false)) { 
                 ob_end_clean();
                 continue;
             }
@@ -313,6 +314,10 @@ COREPOS\common\ErrorHandler::setErrorHandlers();
   but the gettext functions may or may not
   be available
 */
+if (!defined('LC_MESSAGES')) {
+    // manually define for windows
+    define('LC_MESSAGES', 5);
+}
 if (function_exists('setlocale') && defined('LC_MESSAGES') && CoreLocal::get('locale') !== '') {
     setlocale(LC_MESSAGES, CoreLocal::get('locale') . '.utf8');
     putenv('LC_MESSAGES=' . CoreLocal::get('locale') . '.utf8');

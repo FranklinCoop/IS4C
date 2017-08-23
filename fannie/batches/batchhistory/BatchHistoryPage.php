@@ -191,7 +191,7 @@ HTML;
         $ret = '';
         $ret .= '<a onClick="history.go(-1);return true;"  style="font-size: 10px;
             cursor: pointer; ">Back</a>';
-		$bm = new BatchesModel($dbc);
+        $bm = new BatchesModel($dbc);
         $bm->batchID($bid);
         $bm->load();
         $ret .= '<div class="" align="center"><h4>Batch History</h4><h3>'.$bm->batchName().'</h3>
@@ -211,11 +211,10 @@ HTML;
             if ($obj->upc() == NULL) {
                 $ret .= '<tr class="warning">';
                 foreach ($columns as $column) {
+                    $fweight = '';
                     if ($s === 0 && $column != 'modified' && $column != 'updateType') {
                         if ($obj->$column() != ${'last_'.$column}) {
                             $fweight = 'font-weight: bold; color: #6b0000;';
-                        } else {
-                            $fweight = '';
                         }
                     } elseif ($obj->$column() == 'BATCH STARTED' || $obj->$column() == 'BATCH STOPPED') {
                         $fweight = 'font-weight: bold; color: #6b0000;';

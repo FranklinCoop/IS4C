@@ -323,9 +323,22 @@ class EditBatchPage extends FannieRESTfulPage
         $delQ = $dbc->prepare("DELETE FROM batchBarcodes where batchID=?");
         $dbc->execute($delQ,array($bid));
         
-        //find the upcs for this batch;
-
-        $selQ = "SELECT l.upc, l.salePrice from batchList l WHERE l.batchID=?";
+        $selQ = "
+            SELECT l.upc,
+                p.description,
+                l.salePrice, 
+            case when p.brand is null then v.brand
+            else p.brand end as brand,
+            case when v.sku is null then '' else v.sku end as sku,
+            case when v.size is null then '' else v.size end as size,
+            case when v.units is null then 1 else v.units end as units,
+            z.vendorName as vendor,
+            l.batchID
+            from batchList as l
+                " . DTrans::joinProducts('l', 'p', 'INNER') . "
+                left join vendorItems as v on l.upc=v.upc AND p.default_vendor_id=v.vendorID
+                left join vendors as z on p.default_vendor_id=z.vendorID
+            WHERE l.batchID=? ";
         $args = array($bid);
         if ($this->config->get('STORE_MODE') == 'HQ') {
             $selQ .= " AND p.store_id=? ";

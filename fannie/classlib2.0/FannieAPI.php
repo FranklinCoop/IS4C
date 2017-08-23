@@ -187,9 +187,6 @@ class FannieAPI
                     return;
                 }
             }
-            $fp = fopen(__DIR__ . '/../logs/fannie.log', 'a');
-            fwrite($fp, date('r') . ": Could not find class {$name}\n");
-            fclose($fp);
         }
     }
 
@@ -318,6 +315,9 @@ class FannieAPI
                 break;
             case 'COREPOS\Fannie\API\monitor\Monitor':
                 $directories[] = dirname(__FILE__) . '/monitor/';
+                break;
+            case 'COREPOS\Fannie\API\data\SyncSpecial':
+                $directories[] = dirname(__FILE__) . '/data/lanesync/';
                 break;
             case 'FanniePage':
                 $directories[] = dirname(__FILE__).'/../admin/';

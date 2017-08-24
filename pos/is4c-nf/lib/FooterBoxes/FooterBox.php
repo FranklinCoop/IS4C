@@ -94,7 +94,7 @@ class FooterBox
             return new $class(new WrappedStorage());
         }
 
-        return new COREPOS\pos\lib\FooterBoxes\FooterBox(new WrappedStorage());
+        return new FooterBox(new WrappedStorage());
     }
 }
 

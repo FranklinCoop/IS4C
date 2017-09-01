@@ -112,7 +112,7 @@ if (!class_exists('FpdfWithBarcode')) {
         if($labelCount == 40){
             $pdf->AddPage('P');
             $barLeft = $left ; // this was a 4 now 14 it did create 3 columns
-            $w=.35;
+            //$w=.35;
             $unitTop = $top + $hspace;
             $alpha_unitTop = $unitTop + $hspace;
             $descTop = $unitTop + 17;
@@ -127,10 +127,10 @@ if (!class_exists('FpdfWithBarcode')) {
             $vendLeft = $left + 13;
             $down = 31.006; //30.55 kept it the right hieght
             //there is a relation ship below Left and w
-            $LeftShift = 39; 
+            $LeftShift = 41.25; 
             //was 51 shifts the width between columns 67.990625 seems okay on the PRICE RETAIL
             //the above does alot to create the columns for the top
-            $w = 39;// $w = 70.609375; //this does width of label started at 49 @ 70 it started to line on column one but two and three stuck over so leftshift is the next test
+            //$w = 39;// $w = 70.609375; //this does width of label started at 49 @ 70 it started to line on column one but two and three stuck over so leftshift is the next test
             $priceLeft = (8) + ($space); 
             //$priceLeft = ($w / 2) + ($space);
             // $priceLeft = 24.85

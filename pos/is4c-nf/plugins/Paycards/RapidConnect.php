@@ -73,12 +73,6 @@ class RapidConnect extends BasicCCModule
 
     function entered($validate,$json)
     {
-                    //REMOVE LATER DEBUG LOGGING
-            $log = realpath(dirname(__FILE__).'/../../log/rc_dev.log');
-            $fp = @fopen($log,'a');
-            fwrite($fp,"INSIDE RapidCOnnect entered:\nJSON: ".$json."\n");
-            fclose($fp);
-
         $this->trans_pan['pan'] = $this->conf->get("paycard_PAN");
         return $this->pmod->ccEntered($this->trans_pan['pan'], $validate, $json);
     }
@@ -108,15 +102,6 @@ class RapidConnect extends BasicCCModule
 
     protected function handleResponseAuth($authResult)
     {
-        
-        $log = realpath(dirname(__FILE__).'/../../log/rc_dev.log');//'/Users/rowan/Projects/IS4C/pos/is4c-nf/log/rc_dev.log';
-        $fp = @fopen($log,'a');
-        foreach ($authResult as $result) {
-            fwrite($fp,"".$result."\n");
-        }
-        //fwrite($fp,$dwXML."\n");
-        fclose($fp);
-
         //test if DataWire communication has worked.
         $rcResponse = $this->handleDatawireResponse($authResult);
         if ($rcResponse) {
@@ -176,13 +161,6 @@ class RapidConnect extends BasicCCModule
                     $this->conf->set("boxMsg","An unknown error occurred<br />at the gateway");
             }
 
-            //REMOVE LATER DEBUG LOGGING
-            $log = realpath(dirname(__FILE__).'/../../log/rc_dev.log');
-            $fp = @fopen($log,'a');
-            fwrite($fp,"Rapid Connect Response:\nRaw Payload: ".$rcResponse."\n");
-            
-            fwrite($fp, "Response Code: ".$responseCode." : ".$message."\n");
-            fclose($fp);
         }
         /*
         $request = $this->last_request;
@@ -356,17 +334,6 @@ class RapidConnect extends BasicCCModule
         $dwXML = $this->dataWireXML($rcXML);
         $headers = $this->dataWireHeaders($dwXML);
 
-        //debuging stuff because I can't figure out how to write to the logs.
-        $log = realpath(dirname(__FILE__).'/../../log/rc_dev.log');//'/Users/rowan/Projects/IS4C/pos/is4c-nf/log/rc_dev.log';
-        $fp = @fopen($log,'a');
-        fwrite($fp, "\n".$rcXML."\n");
-        foreach ($headers as $header) {
-            fwrite($fp,$header."\n");
-        }
-        fwrite($fp,$dwXML."\n");
-        fwrite($fp, "TransArmor Token: ".$transArmorToken."\n");
-        fclose($fp);
-
         $extraCurlSetup = array(
             //CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
             //CURLOPT_USERPWD => "WS".FD_STORE_ID."._.1:".FD_PASSWD,
@@ -405,14 +372,6 @@ class RapidConnect extends BasicCCModule
             $tokenXML = new BetterXmlData($tokenResponse);
             $rcXmlParse->xpath->registerNamespace('g', 'com/firstdata/Merchant/gmfV6.10');
             $responseCode = $rcXmlParse->query('/g:GMF/g:*/g:RespGrp/g:RespCode');
-
-            //REMOVE LATER DEBUG LOGGING
-            $log = realpath(dirname(__FILE__).'/../../log/rc_dev.log');
-            $fp = @fopen($log,'a');
-            fwrite($fp,"Token Response:\nRaw Payload: ".$tokenResponse."\n");
-            
-            //fwrite($fp, "Response Code: ".$responseCode." : ".$message."\n");
-            fclose($fp);
         } else {return $data;}
 
 

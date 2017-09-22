@@ -33,8 +33,8 @@ class SingleAuthTransPreparser extends PreParser {
 
     function parse($str)
     {
-        $str = "SAT" . $str;
-        return $str;
+        $retstr = "SAT" . $str;
+        return $retstr;
     }
 
     function isLast(){

@@ -20,13 +20,16 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
+namespace COREPOS\pos\parser\parse;
+use COREPOS\pos\lib\MiscLib;
 use COREPOS\pos\parser\Parser;
+
 class SingleAuthTransParser extends Parser {
     function check($str){
         if ($str == "SATLOCK") {
             return True;
         } else if ($str == "SATCN") {
-                $this->ret['main_frame'] = MiscLib::base_url()."plugins/SingleTransactionSignOn/SingleAuthTransCancelTrans.php";
+                $this->ret['main_frame'] = MiscLib::base_url().'plugins/SingleTransactionSignOn/SingleAuthTransCancelTrans.php';
                 return true;
         }
         return False;

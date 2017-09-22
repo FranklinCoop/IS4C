@@ -253,7 +253,7 @@ function FCC_Large($data,$offset=0){
 
   
   $pdf->SetFont('Arial','',9);
-  $pdf->SetXY($genLeft, $descTop+3.4); //desc of tiem
+  $pdf->SetXY($genLeft-2, $descTop+3.4); //desc of tiem
   $pdf->Cell($w,4,"$brand $desc",0,0,'L');
           //please use the order  "Local, Organic, NONGMO, Gluten Free
         if ($showLocal) {$pdf->Image($FANNIE_ROOT.'src/images/Local.jpg',$genLeft+43 ,$unitTop+17,4);}
@@ -264,7 +264,7 @@ function FCC_Large($data,$offset=0){
   //$pdf->Cell($w/2,4,Test1,0,0,'L'); //this is not showing was $brand
   //$pdf->SetXY($genLeft,$sizeTop); 
   //$pdf->Cell($w/2,4,$size,0,0,'L'); //was creating - mark under unit cost
-  $pdf->SetXY($genLeft + 36.6,$unitTop+24);
+  $pdf->SetXY($vendLeft+26,$unitTop+24);
   $pdf->Cell($w/3,4,$size,0,0,'R');
   //$pdf->Cell($w/3,4,"1/".$size_value." ".$size_unit,0,0,'R'); //this was date now going to be unit under normal price
   // $pdf->SetFont('Arial','',10);
@@ -274,8 +274,8 @@ function FCC_Large($data,$offset=0){
   //$pdf->SetXY($priceLeft-22,$skuTop+10);
   $pdf->SetXY($vendLeft+26,$skuTop+16.5);
   $pdf->Cell($w/3,4,$tagdate,0,0,'R'); //date moved Down lower left corder
-  $pdf->SetXY($vendLeft-20,$skuTop+16.5);
-  $pdf->Cell($w/3,4,"$vendor $sku",0,0,'C'); 
+  $pdf->SetXY($genLeft-2,$skuTop+16.5);
+  $pdf->Cell($w/3,4,"$vendor $sku",0,0,'L'); 
 
   /** 
    * add check digit to pid from test

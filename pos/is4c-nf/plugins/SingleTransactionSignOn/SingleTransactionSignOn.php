@@ -41,18 +41,4 @@ class SingleTransactionSignOn extends Plugin
 	public $plugin_settings = array();
 
 	public $plugin_description = 'Allows sawping users from the lock screen';
-
-	/**
-	  Callback. Triggered when plugin is enabled
-	*/
-	public function plugin_enable(){
-
-	}
-
-	/**
-	  Callback. Triggered when plugin is disabled
-	*/
-	public function plugin_disable(){
-
-	}
 }

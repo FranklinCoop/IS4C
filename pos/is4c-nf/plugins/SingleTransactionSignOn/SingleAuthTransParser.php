@@ -21,6 +21,7 @@
 
 *********************************************************************************/
 use COREPOS\pos\parser\Parser;
+use COREPOS\pos\lib\MiscLib;
 class SingleAuthTransParser extends Parser {
     function check($str){
         if ($str == "SATLOCK") {

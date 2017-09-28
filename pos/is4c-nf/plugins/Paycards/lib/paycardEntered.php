@@ -34,7 +34,7 @@ class paycardEntered extends Parser
     private $swipetype;
     private $manual = false;
 
-    public function __construct($sessio)
+    public function __construct($session)
     {
         parent::__construct($session);
         $this->conf = new PaycardConf();
@@ -48,11 +48,6 @@ class paycardEntered extends Parser
             return true;
         } elseif (substr($str,0,8) == "02E60080" || substr($str,0,7)=="2E60080" || substr($str, 0, 5) == "23.0%" || substr($str, 0, 5) == "23.0;" || substr($str, 0, 6) == "23.0M%") {
             $this->swipetype = PaycardLib::PAYCARD_TYPE_ENCRYPTED;
-                        //REMOVE LATER DEBUG LOGGING
-            $log = realpath(dirname(__FILE__).'/../../../log/rc_dev.log');
-            $fp = @fopen($log,'a');
-            fwrite($fp,"Inside paycardentered check returning True encrypted\n".$str."\n");
-            fclose($fp);
             return true;
         } elseif (substr($str, 0, 2) === "02" && substr($str, -2) === "03" && strstr($str, '***')) {
             $this->swipetype = PaycardLib::PAYCARD_TYPE_ENCRYPTED;
@@ -64,23 +59,12 @@ class paycardEntered extends Parser
             return true;
         }
 
-                        //REMOVE LATER DEBUG LOGGING
-            $log = realpath(dirname(__FILE__).'/../../../log/rc_dev.log');
-            $fp = @fopen($log,'a');
-            fwrite($fp,"Inside paycardentered check returning false parseing error,\n".$str."\n");
-            fclose($fp);
-
         return false;
     }
 
     function parse($str)
     {
-             $str = urlencode(substr($str,0,6)).substr($str, 6, strlen($str)-6);
-                                //REMOVE LATER DEBUG LOGGING
-            $log = realpath(dirname(__FILE__).'/../../../log/rc_dev.log');
-            $fp = @fopen($log,'a');
-            fwrite($fp,"Inside paycardentered parse,\n".$str."\n");
-            fclose($fp);
+        $str = urlencode(substr($str,0,6)).substr($str, 6, strlen($str)-6);
 
         $ret = array();
         if( substr($str,0,2) == "PV") {
@@ -223,11 +207,6 @@ class paycardEntered extends Parser
         foreach($this->conf->get("RegisteredPaycardClasses") as $rpc){
             if (!class_exists($rpc)) continue;
             $myObj = new $rpc();
-                                    //REMOVE LATER DEBUG LOGGING
-            $log = realpath(dirname(__FILE__).'/../../../log/rc_dev.log');
-            $fp = @fopen($log,'a');
-            fwrite($fp,"Inside paycardentered paycardenetered fucntin,\n".$this->conf->get("paycard_type")."\n");
-            fclose($fp);
             if ($myObj->handlesType($this->conf->get("paycard_type")))
                 return $myObj->entered($validate,$ret);
         }

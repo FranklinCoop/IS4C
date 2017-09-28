@@ -22,6 +22,9 @@
 *********************************************************************************/
 use COREPOS\pos\lib\gui\BasicCorePage;
 use COREPOS\pos\lib\FormLib;
+use COREPOS\pos\lib\DisplayLib;
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\plugins\singletransactionsignon\SingleAuthTransAuthenticate;
 include_once(dirname(__FILE__).'/../../lib/AutoLoader.php');
 
 class SingleAuthTransLogin extends BasicCorePage 

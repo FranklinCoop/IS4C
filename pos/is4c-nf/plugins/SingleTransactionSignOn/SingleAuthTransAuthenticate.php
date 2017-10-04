@@ -94,8 +94,8 @@ static public function checkPassword($password, $activity=1)
             if ($CORE_LOCAL->get("LastID") != 0 && Plugin::isEnabled('SingleTransactionSignOn')){
                 $quire = "UPDATE translog.localtemptrans SET emp_no = ?, trans_no = ?";
                 $args = array($row_q["emp_no"], $transno);
-                $prep = $db_g->prepare_statement($quire);
-                $result = $db_g->exec_statement($prep,$args);
+                $prep = $db_g->prepare($quire);
+                $result = $db_g->execute($prep,$args);
             }
 
         } elseif ($password == 9999) {

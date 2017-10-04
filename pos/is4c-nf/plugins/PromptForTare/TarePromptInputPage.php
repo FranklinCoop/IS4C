@@ -40,7 +40,7 @@ use COREPOS\pos\lib\TransRecord;
  * page or True to go to pos2.php.
  */
 
-include_once(dirname(__FILE__).'/../../lib/AutoLoader.php');
+if (!class_exists("AutoLoader")) include_once(realpath(dirname(__FILE__).'/../../lib/AutoLoader.php'));
 
 class TarePromptInputPage extends NoInputCorePage 
 {

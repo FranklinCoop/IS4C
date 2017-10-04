@@ -22,7 +22,7 @@
 *********************************************************************************/
 use COREPOS\pos\lib\gui\NoInputCorePage;
 use COREPOS\pos\lib\FormLib;
-include_once(dirname(__FILE__).'/../../lib/AutoLoader.php');
+if (!class_exists("AutoLoader")) include_once(realpath(dirname(__FILE__).'/../../lib/AutoLoader.php'));
 
 class SingleAuthTransCancelTrans extends NoInputCorePage 
 {

@@ -69,13 +69,13 @@ class TarePromptInputPage extends NoInputCorePage
                         $reginput = CoreLocal::get('DefaultTare')*100;
                     } else {
                         CoreLocal::set('tarezero', true);
-                        $this->change_page($pos_home.'?reginput='.$item);
+                        //$this->change_page($pos_home.'?reginput='.$item);
                         return false;
                     }
                 } 
                 if (is_numeric($reginput)) {
                     TransRecord::addTare($reginput);
-                    $this->change_page($pos_home.'?reginput='.$item);
+                    //$this->change_page($pos_home.'?reginput='.$item);
                     return false;
                 }
             }

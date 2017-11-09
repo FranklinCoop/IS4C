@@ -528,13 +528,53 @@ static public function addfsTaxExempt()
 */
 static public function discountnotify($strl) 
 {
-    self::addRecord(array(
+    /**
+       I need custom discount breakouts and this seemed like the easyist way to get them.
+       It's messy but seemed like the best way at the time. ~Rowan
+    */
+    if (CoreLocal::get('store') == 'McCuskers' || CoreLocal::get('store')=='GreenFieldsMarket') {
+        self::discountnotifybreakout($strl);
+    } else {
+         self::addRecord(array(
         'description' => '** ' . $strl . '% Discount Applied **',
         'trans_type' => '0',
         'trans_status' => 'D',
         'voided' => 4,
     ));
+    }
 }
+
+/**
+  More compplex break down of 2% discounts.
+*/
+  static public function discountnotifybreakout($strl){
+    $delta = $strl;
+    if (CoreLocal::get("isStaff") == "1") {
+      self::addRecord(array(
+        'description' => '** ' . 15 . '% Staff Discount **',
+        'trans_type' => '0',
+        'trans_status' => 'D',
+        'voided' => 4,
+      ));
+      $delta -=15;
+    }
+    if (CoreLocal::get("SeniorDiscountFlag") == "1") {
+      self::addRecord(array(
+        'description' => '** ' . 2 . '% Senior Discount **',
+        'trans_type' => '0',
+        'trans_status' => 'D',
+        'voided' => 4,
+      ));
+      $delta -=2;
+    }
+    self::addRecord(array(
+        'description' => '** ' . $delta  . '% Member Discount **',
+        'trans_type' => '0',
+        'trans_status' => 'D',
+        'voided' => 4,
+    ));
+
+  }
 
 /**
   Add tax exemption record to transaction

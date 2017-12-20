@@ -203,7 +203,7 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
                 </thead>
                 <tbody>';
         $subTotalP = $dbc->prepare("
-            SELECT SUM(-total) AS subtotal
+            SELECT SUM(regPrice) AS subtotal
             FROM {$dlog} AS d
             WHERE datetime BETWEEN ? AND ?
                 AND trans_type='T'

@@ -154,10 +154,6 @@ class UPC extends Parser
             return $ret;
         }
 
-        if (strlen($entered) <= 12 && strlen($entered)>=7 && $this->session->get('UpcIncludeCheckDigits') != 1){
-            $entered = substr($entered, 0, -1);
-        }
-
         $upc = $this->sanitizeUPC($entered);
 
         list($upc,$scaleStickerItem,$scalepriceUPC,$scalepriceEAN) = $this->rewriteScaleSticker($upc);

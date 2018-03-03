@@ -186,6 +186,17 @@ static public function errorBeep()
 }
 
 /**
+  reboot the scale.
+*/
+static public function reBoot() 
+{
+    $sdh = self::scaleObject();
+    if (is_object($sdh)) {
+        $sdh->writeToScale("reBoot");
+    }
+}
+
+/**
   Send two pairs beep message to the scale
 */
 static public function twoPairs() 

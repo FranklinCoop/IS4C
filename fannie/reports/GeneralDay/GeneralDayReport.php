@@ -77,7 +77,7 @@ class GeneralDayReport extends FannieReportPage
             WHERE d.tdate BETWEEN ? AND ?
                 AND d.trans_subtype = t.TenderCode
                 AND d.total <> 0{$shrinkageUsers}
-                AND d.store_id = $store
+                AND d.store_id = ?
             GROUP BY t.TenderName ORDER BY TenderName");
         $tenderR = $dbc->execute($tenderQ,$dates);
         $report = array();
@@ -152,7 +152,7 @@ class GeneralDayReport extends FannieReportPage
                     INNER JOIN memtype m ON d.memType = m.memtype
                 WHERE d.tdate BETWEEN ? AND ?
                    AND d.upc = 'DISCOUNT'{$shrinkageUsers}
-                   AND d.store_id = $store
+                   AND d.store_id = ?
                 AND total <> 0
                 GROUP BY m.memDesc ORDER BY m.memDesc");
         $discR = $dbc->execute($discQ,$dates);

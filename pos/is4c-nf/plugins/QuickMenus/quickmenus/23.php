@@ -2,7 +2,7 @@
 
 $my_menu = array(
     "Charge Gift Card" => "DATACAPGD",
-    "Check Balance" => "PVPVDATACAPGD",
-    "Activate Card" => "PVPVDATACAPGD",
-    "Add Value to Card" => "PVPVDATACAPGD",
+    "Check Balance" => "PVDATACAPGD",
+    "Activate Card" => "ACDATACAPG",
+    "Add Value to Card" => "APVDATACAPGD",
 );

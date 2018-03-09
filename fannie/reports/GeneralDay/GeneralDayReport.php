@@ -115,6 +115,7 @@ class GeneralDayReport extends FannieReportPage
                     WHERE d.department <> 0
                         AND d.trans_type <> \'T\' ' . $shrinkageUsers . '
                         AND d.tdate BETWEEN ? AND ?
+                        AND d.store_id = ?
                     GROUP BY t.salesCode
                     ORDER BY t.salesCode'; 
                 break;
@@ -258,7 +259,6 @@ class GeneralDayReport extends FannieReportPage
                 LEFT JOIN {$FANNIE_OP_DB}.departments as t ON d.department = t.dept_no
                 WHERE d.tdate BETWEEN ? AND ?
                     AND d.department IN $dlist{$shrinkageUsers}
-                    AND d.store_id = $store
                 GROUP BY d.card_no, t.dept_name ORDER BY d.card_no, t.dept_name");
             $equityR = $dbc->execute($equityQ,$dates);
             $report = array();

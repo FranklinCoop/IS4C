@@ -171,9 +171,9 @@ class GeneralDayReport extends FannieReportPage
                 SUM(regPrice) AS ttl
             FROM $trans AS d
             WHERE datetime BETWEEN ? AND ?
+                AND d.store_id = ?
                 AND d.upc='TAXLINEITEM'
-                AND " . DTrans::isNotTesting('d') 
-                AND d.store_id = ? . "    
+                AND " . DTrans::isNotTesting('d') . "
             GROUP BY d.description
         ");
         $lineItemR = $dbc->execute($lineItemQ, $dates);

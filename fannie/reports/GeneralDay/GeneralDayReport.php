@@ -173,7 +173,7 @@ class GeneralDayReport extends FannieReportPage
             WHERE datetime BETWEEN ? AND ?
                 AND d.upc='TAXLINEITEM'
                 AND " . DTrans::isNotTesting('d') 
-                AND d.store_id ? . "    
+                AND d.store_id = ? . "    
             GROUP BY d.description
         ");
         $lineItemR = $dbc->execute($lineItemQ, $dates);

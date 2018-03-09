@@ -53,7 +53,8 @@ class GeneralDayReport extends FannieReportPage
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
         $d1 = $this->form->date;
-        $dates = array($d1.' 00:00:00',$d1.' 23:59:59');
+        $store = FormLib::get('store');
+        $dates = array($d1.' 00:00:00',$d1.' 23:59:59', $store);
         $data = array();
 
         if ( isset($FANNIE_COOP_ID) && $FANNIE_COOP_ID == 'WEFC_Toronto' )
@@ -76,6 +77,7 @@ class GeneralDayReport extends FannieReportPage
             WHERE d.tdate BETWEEN ? AND ?
                 AND d.trans_subtype = t.TenderCode
                 AND d.total <> 0{$shrinkageUsers}
+                AND d.store_id = ?
             GROUP BY t.TenderName ORDER BY TenderName");
         $tenderR = $dbc->execute($tenderQ,$dates);
         $report = array();
@@ -99,6 +101,7 @@ class GeneralDayReport extends FannieReportPage
                     WHERE d.department <> 0
                         AND d.trans_type <> \'T\' ' . $shrinkageUsers . '
                         AND d.tdate BETWEEN ? AND ?
+                        AND d.store_id = ?
                     GROUP BY t.dept_name
                     ORDER BY t.dept_name'; 
                 break;
@@ -112,6 +115,7 @@ class GeneralDayReport extends FannieReportPage
                     WHERE d.department <> 0
                         AND d.trans_type <> \'T\' ' . $shrinkageUsers . '
                         AND d.tdate BETWEEN ? AND ?
+                        AND d.store_id = ?
                     GROUP BY t.salesCode
                     ORDER BY t.salesCode'; 
                 break;
@@ -126,6 +130,7 @@ class GeneralDayReport extends FannieReportPage
                     WHERE d.department <> 0
                         AND d.trans_type <> \'T\' ' . $shrinkageUsers . '
                         AND d.tdate BETWEEN ? AND ?
+                        AND d.store_id = ?
                     GROUP BY m.super_name
                     ORDER BY m.super_name';
                 break;
@@ -147,6 +152,7 @@ class GeneralDayReport extends FannieReportPage
                     INNER JOIN memtype m ON d.memType = m.memtype
                 WHERE d.tdate BETWEEN ? AND ?
                    AND d.upc = 'DISCOUNT'{$shrinkageUsers}
+                   AND d.store_id = ?
                 AND total <> 0
                 GROUP BY m.memDesc ORDER BY m.memDesc");
         $discR = $dbc->execute($discQ,$dates);
@@ -165,6 +171,7 @@ class GeneralDayReport extends FannieReportPage
                 SUM(regPrice) AS ttl
             FROM $trans AS d
             WHERE datetime BETWEEN ? AND ?
+                AND d.store_id = ?
                 AND d.upc='TAXLINEITEM'
                 AND " . DTrans::isNotTesting('d') . "
             GROUP BY d.description
@@ -179,6 +186,7 @@ class GeneralDayReport extends FannieReportPage
             FROM $dlog as d 
             WHERE d.tdate BETWEEN ? AND ?
                 AND (d.upc = 'tax'){$shrinkageUsers}
+                AND d.store_id = ?
             GROUP BY d.upc");
         $taxR = $dbc->execute($taxSumQ,$dates);
         while($taxW = $dbc->fetch_row($taxR)){
@@ -206,6 +214,7 @@ class GeneralDayReport extends FannieReportPage
             WHERE d.tdate BETWEEN ? AND ?
                 AND trans_type in ('I','D')
                 AND upc <> 'RRR'{$shrinkageUsers}
+                AND d.store_id = ?
             ) as q 
             group by q.trans_num,q.transaction_type");
         $transR = $dbc->execute($transQ,$dates);
@@ -323,6 +332,7 @@ class GeneralDayReport extends FannieReportPage
 
     function form_content()
     {
+        $store = FormLib::storePicker();
         ob_start();
         ?>
         <form action=GeneralDayReport.php method=get>
@@ -341,6 +351,12 @@ class GeneralDayReport extends FannieReportPage
                 <option>Department</option>
                 <option>Sales Code</option>
             </select>
+        </div>
+        <div>
+                <p>
+                    <label>Store(s)</label>
+                    <?php echo $store['html']; ?>
+                </p>
         </div>
         <div class="form-group">
             <label>Excel <input type=checkbox name=excel /></label>

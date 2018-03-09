@@ -71,7 +71,7 @@ class MercuryDC extends MercuryE2E
             <HostOrIP>' . $dcHost . '</HostOrIP>
             <SequenceNo>{{SequenceNo}}</SequenceNo>
             <CollectData>CardholderName</CollectData>
-            <OKAmount>Disallow</OKAmount>
+            <OKAmount>Allow</OKAmount>
             <PartialAuth>Allow</PartialAuth>';
             $msgXml .= '
             <Account>

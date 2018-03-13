@@ -131,8 +131,7 @@ static public function printReceiptHeader($dateTimeStamp, $ref)
         }
     }
 
-    $receipt .= "\n";
-    $receipt .= "Cashier: ".CoreLocal::get("cashier")."\n\n";
+    $receipt .= "\n\n";
 
     $time = self::build_time($dateTimeStamp);
     $time = str_replace(" ","     ",$time);
@@ -243,6 +242,20 @@ static public function printCabCoupon($dateTimeStamp, $ref)
         ."Tips are NOT covered by this coupon.\n"
         ."Acceptance of this coupon by the cab driver is\n"
         ."subject to the terms and conditions noted above.\n"; 
+
+    return $receipt;
+}
+
+
+static public function printGiftReceipt($dateTimeStamp, $ref)
+{
+    $receipt = "\n";
+
+    $reciept .= self::printReceiptHeader($dateTimeStamp, $ref);
+    $receipt .= "\n";
+
+    $receipt .= self::biggerFont(self::centerBig("GIFT RECEIPT"))."\n\n";
+    $receipt .= "\n";
 
     return $receipt;
 }
@@ -919,6 +932,8 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
             $ref = CoreLocal::get("cabReference");
             $receipt = self::printCabCoupon($dateTimeStamp, $ref);
             CoreLocal::set("cabReference","");
+        } elseif ($arg1 == "giftReceipt") {
+            $receipt = self::printGiftReceipt($dateTimeStamp, $ref);
         } else {
             $receipt = self::simpleReceipt($receipt, $arg1, $where);
         }
@@ -1099,13 +1114,17 @@ static public function mostRecentReceipt()
     return $row['emp_no'] . '-' . $row['register_no'] . '-' . $row['trans_no'];
 }
 
-static public function code39($barcode)
+static public function code39($barcode, $forcePaper=false)
 {
     if (!is_object(self::$PRINT)) {
         self::$PRINT= PrintHandler::factory(CoreLocal::get('ReceiptDriver'));
     }
+    $printMod = self::$PRINT;
+    if ($forcePaper && (get_class(self::$PRINT) == self::$EMAIL || get_class(self::$PRINT) == self::$HTML)) {
+        $printMod = PrintHandler::factory(CoreLocal::get('ReceiptDriver'));
+    }
 
-    return self::$PRINT->printBarcode(PrintHandler::BARCODE_CODE39, $barcode);
+    return $printMod->printBarcode(PrintHandler::BARCODE_CODE39, $barcode);
 }
 
 static public function emailReceiptMod()

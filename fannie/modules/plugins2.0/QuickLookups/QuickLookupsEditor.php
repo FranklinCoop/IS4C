@@ -22,8 +22,8 @@
 *********************************************************************************/
 
 include(dirname(__FILE__) . '/../../../config.php');
-if (!class_exists('FannieAPI.php')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+if (!class_exists('FannieAPI')) {
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class QuickLookupsEditor extends \COREPOS\Fannie\API\FannieCRUDPage 
@@ -38,6 +38,12 @@ class QuickLookupsEditor extends \COREPOS\Fannie\API\FannieCRUDPage
     'lookupSet' => 'Menu Number', 
     'sequence' => 'Position in Menu',
     );
+
+    public function get_view()
+    {
+        return '<div class="alert alert-info"><a href="QuickLookupsImages.php">Manage Images</a> for menu entires</div>'
+            . parent::get_view();
+    }
 
     public function helpContent()
     {

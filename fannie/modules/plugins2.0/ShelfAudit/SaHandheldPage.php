@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 /**
@@ -85,6 +85,11 @@ class SaHandheldPage extends FannieRESTfulPage
                 $args = array($upc, $store, $this->section, $orderID, $transID);
                 $p = $dbc->prepare($q);
                 $r = $dbc->execute($p, $args);
+                if ($dbc->numRows($r) == 0) {
+                    $q2 = str_replace('PendingSpecialOrder', 'CompleteSpecialOrder', $q);
+                    $p = $dbc->prepare($q2);
+                    $r = $dbc->execute($p, $args);
+                }
             } elseif ($dbc->numRows($r)==0) {
                 // try again; item on-hand but not in products
                 $q = 'SELECT v.description,v.brand,s.quantity,v.units FROM
@@ -187,8 +192,8 @@ class SaHandheldPage extends FannieRESTfulPage
 
         $this->linea_ios_mode = $this->linea_support_available();
         if ($this->linea_ios_mode){
-            $this->add_script($this->config->get('URL').'src/javascript/linea/cordova-2.2.0.js');
-            $this->add_script($this->config->get('URL').'src/javascript/linea/ScannerLib-Linea-2.0.0.js');
+            $this->addScript($this->config->get('URL').'src/javascript/linea/cordova-2.2.0.js');
+            $this->addScript($this->config->get('URL').'src/javascript/linea/ScannerLib-Linea-2.0.0.js');
         }
         
         return parent::preprocess();
@@ -245,7 +250,7 @@ Device = new ScannerDevice({
 });
 ScannerDevice.registerListener(Device);
 
-if (typeof WebBarcode == 'object') {
+if (typeof WebBarcode != 'undefined') {
     WebBarcode.onBarcodeScan(function(ev) {
         var data = ev.value;
         var upc = data.substring(0,data.length-1);
@@ -253,6 +258,12 @@ if (typeof WebBarcode == 'object') {
         $('#goBtn').click();
     });
 }
+document.addEventListener("BarcodeScanned", function (ev) {
+    var data = ev.value;
+    var upc = data.substring(0,data.length-1);
+    $('#upc_in').val(upc);
+    $('#goBtn').click();
+}, false);
         <?php } ?>
 
         <?php

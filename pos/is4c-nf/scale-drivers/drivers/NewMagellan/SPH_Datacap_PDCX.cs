@@ -34,6 +34,7 @@ using CustomForms;
 using BitmapBPP;
 using DSIPDCXLib;
 using AxDSIPDCXLib;
+using ComPort;
 
 namespace SPH {
 
@@ -45,10 +46,12 @@ public class SPH_Datacap_PDCX : SerialPortHandler
     protected string server_list = "x1.mercurypay.com;x2.backuppay.com";
     protected int LISTEN_PORT = 8999; // acting as a Datacap stand-in
     protected short CONNECT_TIMEOUT = 60;
-    private bool log_xml = true;
+    private bool log_xml = false;
     private RBA_Stub rba = null;
     private bool pdc_active;
     private Object pdcLock = new Object();
+    private short hideDialogs = 1;
+    private string lastResponse = "";
 
     public SPH_Datacap_PDCX(string p) : base(p)
     { 
@@ -80,6 +83,36 @@ public class SPH_Datacap_PDCX : SerialPortHandler
         }
     }
 
+    /**
+      Supported options:
+        -- Global Options --
+        * logErrors [boolean] default false
+            Write error information to the same debug_lane.log file as PHP.
+            Errors are logged regardless of whether the verbose switch (-v) 
+            is used but not all verbose output is treated as an error & logged
+        * logXML [boolean] default false
+            Log XML requests & responses to "xml.log" in the current directory.
+
+        -- Ingencio Specific Options --
+        * disableRBA [boolean] default false
+            Stops all direct communication with Ingenico terminal.
+            Driver will solely utilize Datacap functionality
+        * disableButtons [boolean] default false
+            Does not display payment type or cashback selection buttons.
+            RBA commands can still be used to display static text
+            Irrelevant if disableRBA is true
+        * buttons [string] default Credit
+            Change labeling of the buttons. Valid options are "credit"
+            and "cashback" currently.
+            Irrelevant if disableRBA or disableButtons is true
+        * defaultMessage [string] default "Welcome"
+            Message displayed onscreen at the start of a transaction
+            Irrelevant if disableRBA is true
+        * cashback [boolean] default true
+            Show cashback selections if payment type debit or ebt cash
+            is selected.
+            Irrelevant if disableRBA or disableButtons is true
+    */
     public override void SetConfig(Dictionary<string,string> d)
     {
         if (d.ContainsKey("disableRBA") && d["disableRBA"].ToLower() == "true") {
@@ -88,10 +121,21 @@ public class SPH_Datacap_PDCX : SerialPortHandler
                     rba.stubStop();
                 }
             } catch (Exception) {}
+            this.rba = null;
         }
 
         if (this.rba != null && d.ContainsKey("disableButtons") && d["disableButtons"].ToLower() == "true") {
             this.rba.SetEMV(RbaButtons.None);
+        }
+
+        if (this.rba != null && d.ContainsKey("buttons")) {
+            if (d["buttons"].ToLower() == "cashback") {
+                this.rba.SetEMV(RbaButtons.Cashback);
+            }
+        }
+
+        if (this.rba != null && d.ContainsKey("defaultMessage")) {
+            this.rba.SetDefaultMessage(d["defaultMessage"]);
         }
 
         if (d.ContainsKey("logXML") && d["logXML"].ToLower() == "true") {
@@ -100,6 +144,14 @@ public class SPH_Datacap_PDCX : SerialPortHandler
 
         if (d.ContainsKey("logErrors") && d["logErrors"].ToLower() == "true") {
             this.enableUnifiedLog();
+        }
+
+        if (d.ContainsKey("showDialogs") && d["showDialogs"].ToLower() == "true") {
+            this.hideDialogs = 0;
+        }
+
+        if (this.rba != null && d.ContainsKey("cashback") && (d["cashback"].ToLower() == "true" || d["cashback"].ToLower() == "false")) {
+            this.rba.SetCashBack(d["cashback"].ToLower() == "true" ? true : false);
         }
     }
 
@@ -118,6 +170,7 @@ public class SPH_Datacap_PDCX : SerialPortHandler
         lock (pdcLock) {
             if (pdc_active) {
                 ax_control.CancelRequest();
+                pdc_active = false;
             }
         }
         if (rba != null) {
@@ -161,6 +214,21 @@ public class SPH_Datacap_PDCX : SerialPortHandler
                         }
 
                         message = GetHttpBody(message);
+
+                        /**
+                          Re-send the last successful response
+                          If any kind of communication error occurs between this
+                          HTTP server and the POS client then the client does
+                          not know the status of their request. This "termGetLast"
+                          signal lets the client re-establish the connection and
+                          see if any information is available.
+                        */
+                        if (message.Contains("termGetLast")) {
+                            SendResponse(stream, this.lastResponse);
+                            continue;
+                        }
+
+                        this.lastResponse = "";
                         message = message.Replace("{{SecureDevice}}", this.device_identifier);
                         message = message.Replace("{{ComPort}}", com_port);
                         message = message.Trim(new char[]{'"'});
@@ -171,14 +239,13 @@ public class SPH_Datacap_PDCX : SerialPortHandler
                         if (message.Contains("termSig")) {
                             result = GetSignature(true);
                         } else {
-                            result = ax_control.ProcessTransaction(message, 1, null, null);
+                            result = ax_control.ProcessTransaction(message, this.hideDialogs, string.Empty, string.Empty);
+                            this.lastResponse = result;
                         }
                         PdcActive(false);
 
-                        result = WrapHttpResponse(result);
                         LogXml(result);
-                        byte[] response = System.Text.Encoding.ASCII.GetBytes(result);
-                        stream.Write(response, 0, response.Length);
+                        SendResponse(stream, result);
                     }
                     client.Close();
                 }
@@ -188,6 +255,13 @@ public class SPH_Datacap_PDCX : SerialPortHandler
                 PdcActive(false);
             }
         }
+    }
+
+    private void SendResponse(NetworkStream stream, string msg)
+    {
+        msg = WrapHttpResponse(msg);
+        byte[] response = System.Text.Encoding.ASCII.GetBytes(msg);
+        stream.Write(response, 0, response.Length);
     }
 
     private void PdcActive(bool isActive)
@@ -242,8 +316,18 @@ public class SPH_Datacap_PDCX : SerialPortHandler
             msg = "termSig";
         }
         switch(msg) {
-            case "termReset":
             case "termReboot":
+                lock (pdcLock) {
+                    if (!pdc_active) {
+                        if (rba != null) {
+                            rba.hardReset();
+                        }
+                        ax_control = null;
+                        initDevice();
+                    }
+                }
+                break;
+            case "termReset":
                 if (rba != null) {
                     rba.stubStop();
                 }
@@ -253,7 +337,17 @@ public class SPH_Datacap_PDCX : SerialPortHandler
                 break;
             case "termApproved":
                 if (rba != null) {
-                    rba.showApproved();
+                    rba.showMessage("Approved");
+                }
+                break;
+            case "termDeclined":
+                if (rba != null) {
+                    rba.showMessage("Declined");
+                }
+                break;
+            case "termError":
+                if (rba != null) {
+                    rba.showMessage("Error");
                 }
                 break;
             case "termSig":
@@ -269,6 +363,12 @@ public class SPH_Datacap_PDCX : SerialPortHandler
             case "termGetPin":
                 break;
             case "termWait":
+                break;
+            case "termFindPort":
+                var new_port = this.PortSearch(this.device_identifier);
+                if (new_port != "" && new_port != this.com_port && new_port.All(char.IsNumber)) {
+                    this.com_port = new_port;
+                }
                 break;
         }
     }
@@ -290,7 +390,11 @@ public class SPH_Datacap_PDCX : SerialPortHandler
             + "</Admin>"
             + "</TStream>";
         
-        return ax_control.ProcessTransaction(xml, 1, null, null);
+        PdcActive(true);
+        string ret = ax_control.ProcessTransaction(xml, this.hideDialogs, string.Empty, string.Empty);
+        PdcActive(false);
+
+        return ret;
     }
     
     protected string GetSignature(bool udp=true)
@@ -308,7 +412,7 @@ public class SPH_Datacap_PDCX : SerialPortHandler
             + "</Transaction>"
             + "</TStream>";
         PdcActive(true);
-        string result = ax_control.ProcessTransaction(xml, 1, null, null);
+        string result = ax_control.ProcessTransaction(xml, this.hideDialogs, string.Empty, string.Empty);
         PdcActive(false);
         XmlDocument doc = new XmlDocument();
         try {
@@ -338,6 +442,20 @@ public class SPH_Datacap_PDCX : SerialPortHandler
         }
         
         return "<err>Error collecting signature</err>";
+    }
+
+    protected string PortSearch(string device)
+    {
+        switch (device) {
+            case "VX805XPI":
+            case "VX805XPI_MERCURY_E2E":
+                return ComPortUtility.FindComPort("Verifone");
+            case "INGENICOISC250":
+            case "INGENICOISC250_MERCURY_E2E":
+                return ComPortUtility.FindComPort("Ingenico");
+            default:
+                return "";
+        }
     }
 
     protected string SecureDeviceToPadType(string device)
@@ -387,7 +505,7 @@ public class SPH_Datacap_PDCX : SerialPortHandler
     {
         if (log_xml) {
             using (StreamWriter file = new StreamWriter("log.xml", true)) {
-                file.WriteLine(xml);
+                file.WriteLine(DateTime.Now.ToString() + ": " + xml);
             }
         }
     }

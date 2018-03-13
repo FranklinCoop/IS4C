@@ -80,7 +80,7 @@ class B2BListPage extends NoInputCorePage
         echo "<div class=\"baseHeight\">"
             ."<div class=\"listbox\">"
             ."<form name=\"selectform\" method=\"post\" action=\""
-            . filter_input(INPUT_SERVER, 'PHP_SELF') . "\""
+            . AutoLoader::ownURL() . "\""
             ." id=\"selectform\">"
             ."<select name=\"search\" id=\"search\" "
             .' style="min-height: 200px; min-width: 220px;'
@@ -89,21 +89,23 @@ class B2BListPage extends NoInputCorePage
             ."ondblclick=\"document.forms['selectform'].submit();\">";
 
         $dbc = Database::mDataConnect();
-        $mAlt = Database::mAltName();
-        $prep = $dbc->prepare("SELECT * FROM {$mAlt}B2BInvoices WHERE cardNo=? AND isPaid=0 ORDER BY createdDate DESC");
-        $res = $dbc->execute($prep, array(CoreLocal::get('memberID')));
-        $selected = "selected";
-        while ($row = $dbc->fetchRow($res)) {
-            $amount = MiscLib::truncate2($row['amount']);
-            $for = $row['description'];
-            $coding = $row['coding'];
-            $b2bID = $row['b2bInvoiceID'];
-            $date = date('Y-m-d', strtotime($row['createdDate']));
-            $value = base64_encode(json_encode(array('amount'=>$amount, 'id'=>$b2bID, 'coding'=>$coding)));
+        if ($dbc !== false) {
+            $mAlt = Database::mAltName();
+            $prep = $dbc->prepare("SELECT * FROM {$mAlt}B2BInvoices WHERE cardNo=? AND isPaid=0 ORDER BY createdDate DESC");
+            $res = $dbc->execute($prep, array(CoreLocal::get('memberID')));
+            $selected = "selected";
+            while ($row = $dbc->fetchRow($res)) {
+                $amount = MiscLib::truncate2($row['amount']);
+                $for = $row['description'];
+                $coding = $row['coding'];
+                $b2bID = $row['b2bInvoiceID'];
+                $date = date('Y-m-d', strtotime($row['createdDate']));
+                $value = base64_encode(json_encode(array('amount'=>$amount, 'id'=>$b2bID, 'coding'=>$coding)));
 
-            printf('<option %s value="%s">#%s %s $%.2f %s</option>',
-                $selected, $value, $b2bID, $date, $amount, $for);
-            $selected = "";
+                printf('<option %s value="%s">#%s %s $%.2f %s</option>',
+                    $selected, $value, $b2bID, $date, $amount, $for);
+                $selected = "";
+            }
         }
         echo "</select>"
             . '<div id="filter-span"></div>'

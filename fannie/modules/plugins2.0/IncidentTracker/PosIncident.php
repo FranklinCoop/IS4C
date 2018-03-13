@@ -13,6 +13,8 @@ class PosIncident extends AlertIncident
     protected $header = 'POS Incidents';
     protected $title = 'POS Incidents';
     protected $must_authenticate = true;
+    public $discoverable = true;
+    public $description = '[POS Incident Log] tracks problems occuring with POS.';
 
     public function preprocess()
     {
@@ -31,10 +33,13 @@ class PosIncident extends AlertIncident
         $model->incidentTypeID(2);
         $model->incidentSubTypeID(FormLib::get('subtype'));
         $model->incidentLocationID(FormLib::get('location'));
-        $model->tdate(date('Y-m-d H:i:s'));
+        $model->tdate(FormLib::get('iDate') ? FormLib::get('iDate') : date('Y-m-d H:i:s'));
+        $model->modified(FormLib::get('iDate') ? FormLib::get('iDate') : date('Y-m-d H:i:s'));
         $model->details(FormLib::get('details'));
         $model->uid($uid);
         $model->storeID(FormLib::get('store'));
+        $json = array('remedy' => FormLib::get('remedy'));
+        $model->json(json_encode($json));
         $id = $model->save();
 
         $prefix = $settings['IncidentDB'] . $this->connection->sep();
@@ -56,12 +61,59 @@ class PosIncident extends AlertIncident
 
         return 'PosIncident.php?id=' . $id;
     }
+    
+    protected function post_id_handler()
+    {
+        $uid = FannieAuth::getUID($this->current_user);
+        $settings = $this->config->get('PLUGIN_SETTINGS');
+        $this->connection->selectDB($settings['IncidentDB']);
+        if (trim(FormLib::get('comment')) !== '') {
+            $model = new IncidentCommentsModel($this->connection);
+            $model->incidentID($this->id);
+            $model->userID($uid);
+            $model->tdate(date('Y-m-d H:i:s'));
+            $model->comment(FormLib::get('comment'));
+            $model->save();
+        }
+
+        $incident = new IncidentsModel($this->connection);
+        $incident->incidentID($this->id);
+        $json = json_decode($incident->json(), true);
+        if (!is_array($json)) {
+            $json = array();
+        }
+        $json['remedy'] = FormLib::get('remedy');
+        $incident->json(json_encode($json));
+        $incident->save();
+
+        return 'PosIncident.php?id=' . $this->id;
+    }
 
     protected function get_id_view()
     {
         $row = $this->getIncident($this->id);
         $row['details'] = nl2br($row['details']);
         $row['details'] = preg_replace('/#(\d+)/', '<a href="?id=$1">#$1</a>', $row['details']);
+        $json = json_decode($row['json'], true);
+        if (!is_array($json)) {
+            $json = array('remedy'=>'Unknown');
+        }
+
+        $comments = $this->getComments($this->id);
+        $cHtml = '';
+        foreach ($comments as $c) {
+            $c['comment'] = preg_replace('/#(\d+)/', '<a href="?id=$1">#$1</a>', $c['comment']);
+            $c['comment'] = preg_replace('`(http|ftp|https)://([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?`',
+                '<a href="$1://$2$3">$1://$2$3</a>', $c['comment']);
+            $cHtml .= sprintf('<div class="panel panel-default">
+                <div class="panel panel-heading">%s - %s</div>
+                <div class="panel panel-body">%s
+                </div>
+                </div>',
+                $c['tdate'], $c['userName'],
+                nl2br($c['comment'])
+            );
+        }
 
         return <<<HTML
 <p>
@@ -81,12 +133,40 @@ class PosIncident extends AlertIncident
     <th>Location</th><td>{$row['incidentLocation']}</td>
 </tr>
 <tr>
+    <th>Remedy Status</th><td>{$json['remedy']}</td>
+</tr>
+<tr>
     <th>Entered by</th><td>{$row['userName']}</td>
 </tr>
 </table>
-<p>
+<div class="panel panel-default">
+    <div class="panel-body">
     {$row['details']}
-</p>
+    </div>
+</div>
+{$cHtml}
+<form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="id" value="{$this->id}" />
+    <div class="panel panel-default">
+        <div class="panel-heading">Add a Comment</div>
+        <div class="panel-body">
+            <p>
+            <textarea name="comment" class="form-control" rows="7"></textarea>
+            </p>
+            <div class="form-group">
+                <label>Remedy Status</label>
+                <select name="remedy" class="form-control">
+                    <option value="No">Has not been remedied</option>
+                    <option value="Yes">Remedy has been applied</option>
+                    <option value="Unknown">Unclear how to fix</option>
+                </select>
+            </div>
+            <p>
+            <button type="submit" class="btn btn-default">Post Comment</button>
+            </p>
+        </div>
+    </div>
+</form>
 HTML;
     }
 
@@ -146,6 +226,18 @@ HTML;
         <textarea name="details" class="form-control" rows="10"></textarea>
     </div>
     <div class="form-group">
+        <label>Date/Time (optional)</label>
+        <input type="text" class="form-control date-field" name="iDate" />
+    </div>
+    <div class="form-group">
+        <label>Remedy Status</label>
+        <select name="remedy" class="form-control">
+            <option value="No">Has not been remedied</option>
+            <option value="Yes">Remedy has been applied</option>
+            <option value="Unknown">Unclear how to fix</option>
+        </select>
+    </div>
+    <div class="form-group">
         <button type="submit" class="btn btn-default">Save Incident</button>
     </div>
 </form>
@@ -172,8 +264,12 @@ HTML;
         $byDay = array();
         $byCat = array();
         while ($row = $this->connection->fetchRow($res)) {
+            $json = json_decode($row['json'], true);
+            if (!is_array($json)) {
+                $json = array('remedy' => 'Unknown');
+            }
             $table .= sprintf('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><a href="?id=%d">View #%d</a><td>%s...</td></tr>',
-                $row['tdate'], $row['storeName'], $row['incidentSubType'], $row['name'], $row['incidentID'], $row['incidentID'], substr($row['details'], 0, 200));
+                $row['tdate'], $row['storeName'], $row['incidentSubType'], $json['remedy'], $row['incidentID'], $row['incidentID'], substr($row['details'], 0, 200));
             list($date,) = explode(' ', $row['tdate'], 2);
             if (!isset($byDay[$date])) {
                 $byDay[$date] = 0;
@@ -221,6 +317,7 @@ HTML;
 </p>
 <table class="table small table-bordered">
 <tr><th colspan="6" class="text-center">Recent Incidents</th></tr>
+<tr><th>Date</th><th>Store</th><th>Type</th><th>Fix Attempted</th><th>View</th><th>Excerpt</th></tr>
     {$table}
 </table>
 <div class="row">
@@ -276,6 +373,57 @@ function drawCharts() {
 }
 </script>
 HTML;
+    }
+
+    public function helpContent()
+    {
+        switch ($this->__route_stem) {
+            case 'get_id':
+                return <<<HTML
+<p>
+These are the details of a POS incident. You can use
+the comment form at the bottom to attach more information to
+the incident. The remedy status can be changed when adding
+a comment since there might be some delay between initially
+entering the incident and applying an actual fix.
+</p>
+HTML;
+                break;
+            case 'get_new':
+                return <<<HTML
+<p>
+You are entering a new POS incident. Please fill out all the
+fields except Date/Time which is optional. With no Date/Time
+provided the incident will be logged as "right now". But if
+there's lag between the incident occurring and getting it entered
+into the system you can use Date/Time to back-date an entry to
+approximately when it really occurred.
+</p>
+HTML;
+                break;
+            case 'get_search':
+                return <<<HTML
+<p>
+These are the results of your search. Click the View link on
+one of the result rows to view its details. You can also
+enter a new search term if you didn't find what you were looking
+for. Note that "%" can be used as a wildcard.
+</p>
+HTML;
+                break;
+            case 'get':
+            default:
+                return <<<HTML
+<p>
+This is a listing of recent POS problems. The default
+listing will show the 30 most recent reported incidents.
+To view an incident click the link in the <strong>View</strong>
+column. To locate older incidents use the search box.
+To enter a new incident use the New Incident button.
+</p>
+HTML;
+                break;
+        }
     }
 }
 

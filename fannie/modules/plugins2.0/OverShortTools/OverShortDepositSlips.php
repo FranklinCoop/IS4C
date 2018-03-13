@@ -23,10 +23,10 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 if (!class_exists('FPDF')) {
-    include_once($FANNIE_ROOT.'src/fpdf/fpdf.php');
+    include_once(__DIR__ . '/../../../src/fpdf/fpdf.php');
 }
 
 class OverShortDepositSlips extends FanniePage 
@@ -300,7 +300,7 @@ class OverShortDepositSlips extends FanniePage
     function body_content(){
         global $FANNIE_URL, $FANNIE_PLUGIN_SETTINGS;
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
-        $this->add_script('js/count.js');
+        $this->addScript('js/count.js');
         ob_start();
         ?>
         <form action=OverShortDepositSlips.php method=get>

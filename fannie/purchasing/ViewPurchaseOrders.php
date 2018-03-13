@@ -25,7 +25,7 @@ use COREPOS\Fannie\API\lib\Store;
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class ViewPurchaseOrders extends FannieRESTfulPage 
@@ -38,6 +38,7 @@ class ViewPurchaseOrders extends FannieRESTfulPage
     protected $must_authenticate = true;
 
     private $show_all = true;
+    protected $debug_routing = false;
 
     public function preprocess()
     {
@@ -58,11 +59,32 @@ class ViewPurchaseOrders extends FannieRESTfulPage
             'post<id><note>',
             'post<id><sku><isSO>',
             'post<id><sku><adjust>',
+            'post<id><ignore>',
             'get<merge>'
         );
         if (FormLib::get('all') === '0')
             $this->show_all = false;
         return parent::preprocess();
+    }
+
+    protected function post_id_ignore_handler()
+    {
+        $prep = $this->connection->prepare('UPDATE PurchaseOrder SET inventoryIgnore=? WHERE orderID=?');
+        $res = $this->connection->execute($prep, array($this->ignore, $this->id));
+
+        $selfP = $this->connection->prepare('SELECT i.internalUPC AS upc, o.storeID FROM PurchaseOrderItems AS i
+            INNER JOIN PurchaseOrder AS o ON i.orderID=o.orderID
+            WHERE i.orderID=?
+                AND i.isSpecialOrder=0');
+        $selfR = $this->connection->execute($selfP, array($this->id));
+        $this->connection->startTransaction();
+        $model = new InventoryCacheModel($this->connection);
+        while ($row = $this->connection->fetchRow($selfR)) {
+            $model->recalculateOrdered($row['upc'], $row['storeID']);
+        }
+        $this->connection->commitTransaction();
+
+        return false;
     }
 
     /**
@@ -387,14 +409,14 @@ class ViewPurchaseOrders extends FannieRESTfulPage
             <table class="table table-striped table-bordered tablesorter table-float">';
         $headers = '<thead style="background: #fff;"><tr>
             <th class="thead">Created</th>
-            <th class="thead">Invoice#</th>
-            <th class="thead">Store</th>
+            <th class="thead hidden-xs">Invoice#</th>
+            <th class="thead hidden-xs">Store</th>
             <th class="thead">Vendor</th>
             <th class="thead"># Items</th>
-            <th class="thead">Est. Cost</th>
-            <th class="thead">Placed</th>
-            <th class="thead">Received</th>
-            <th class="thead">Rec. Cost</th></tr></thead><tbody>';
+            <th class="thead hidden-xs">Est. Cost</th>
+            <th class="thead hidden-xs">Placed</th>
+            <th class="thead hidden-xs">Received</th>
+            <th class="thead hidden-xs">Rec. Cost</th></tr></thead><tbody>';
         $tPending .= $headers;
         $tPlaced .= $headers;
         $mergable = array();
@@ -425,14 +447,15 @@ class ViewPurchaseOrders extends FannieRESTfulPage
 
     private function orderRowToTable($row, $placed)
     {
-        return sprintf('<tr %s><td><a href="ViewPurchaseOrders.php?id=%d">%s</a></td>
-                <td>%s</td>
-                <td>%s</td>
-                <td>%s</td><td>%d</td><td>%.2f</td>
-                <td>%s</td><td>%s</td><td>%.2f</td></tr>',
+        list($date, $time) = explode(' ', $row['creationDate']);
+        return sprintf('<tr %s><td><a href="ViewPurchaseOrders.php?id=%d">%s <span class="hidden-xs">%s</span></a></td>
+                <td class="hidden-xs">%s</td>
+                <td class="hidden-xs">%s</td>
+                <td>%s</td><td>%d</td><td class="hidden-xs">%.2f</td>
+                <td class="hidden-xs">%s</td><td class="hidden-xs">%s</td><td class="hidden-xs">%.2f</td></tr>',
                 ($row['soFlag'] ? 'class="success" title="Contains special order(s)" ' : ''),
                 $row['orderID'],
-                $row['creationDate'], $row['vendorInvoiceID'], $row['storeName'], $row['vendorName'], $row['records'],
+                $date, $time, $row['vendorInvoiceID'], $row['storeName'], $row['vendorName'], $row['records'],
                 $row['estimatedCost'],
                 ($placed == 1 ? $row['placedDate'] : '&nbsp;'),
                 (!empty($row['receivedDate']) ? $row['receivedDate'] : '&nbsp;'),
@@ -460,6 +483,38 @@ class ViewPurchaseOrders extends FannieRESTfulPage
         return false;
     }
 
+    /**
+     * Add items to inventory if they're not currently perpetual
+     * @param $orderID [int] purchase order ID
+     * @param $uid [int] user ID
+     * @param $data [array] UPC => inital quantity
+     */
+    private function newToInventory($orderID, $uid, $data)
+    {
+        $order = new PurchaseOrderModel($this->connection);
+        $order->orderID($orderID);
+        $order->load();
+        list($inStr, $args) = $this->connection->safeInClause(array_keys($data));
+        $prodP = $this->connection->prepare("SELECT upc
+            FROM products
+            WHERE upc IN ({$inStr})
+                AND store_id=?");
+        $args[] = $order->storeID();
+        $prodR = $this->connection->execute($prodP, $args);
+        $this->connection->startTransaction();
+        $invP = $this->connection->prepare("SELECT upc FROM InventoryCounts WHERE upc=? AND storeID=?");
+        $insP = $this->connection->prepare("INSERT INTO InventoryCounts (upc, storeID, count, countDate, mostRecent, uid, par)
+            VALUES (?, ?, ?, ?, 1, ?, ?)");
+        while ($prodW = $this->connection->fetchRow($prodR)) {
+            $found = $this->connection->getValue($invP, array($prodW['upc'], $order->storeID()));
+            if ($found === false && isset($data[$prodW['upc']]) && $prodW['upc'] != '0000000000000') {
+                $this->connection->execute($insP, array($prodW['upc'], $order->storeID(),
+                    $data[$prodW['upc']], date('Y-m-d H:i:s'), $uid, $data[$prodW['upc']]));
+            }
+        }
+        $this->connection->commitTransaction();
+    }
+
     protected function post_id_sku_qty_receiveAll_handler()
     {
         $dbc = $this->connection;
@@ -468,6 +523,7 @@ class ViewPurchaseOrders extends FannieRESTfulPage
         $model->orderID($this->id);
         $re_date = FormLib::get('re-date', false);
         $uid = FannieAuth::getUID($this->current_user);
+        $upcs = array();
         $dbc->startTransaction();
         for ($i=0; $i<count($this->sku); $i++) {
             $model->sku($this->sku[$i]);
@@ -478,9 +534,14 @@ class ViewPurchaseOrders extends FannieRESTfulPage
             if ($model->receivedDate() === null || $re_date) {
                 $model->receivedDate(date('Y-m-d H:i:s'));
             }
+            if (!$model->isSpecialOrder() && $this->qty[$i] > 0) {
+                $upcs[BarcodeLib::padUPC($model->internalUPC())] = $this->qty[$i];
+            }
             $model->save();
         }
         $dbc->commitTransaction();
+
+        $this->newToInventory($this->id, $uid, $upcs);
 
         $prep = $dbc->prepare('
             SELECT o.storeID, i.internalUPC
@@ -588,6 +649,7 @@ class ViewPurchaseOrders extends FannieRESTfulPage
         $orderObj = $order->toStdClass();
         $orderObj->placedDate = $orderObj->placed ? $orderObj->placedDate : 'n/a';
         $placedCheck = $orderObj->placed ? 'checked' : '';
+        $notInv = $orderObj->inventoryIgnore ? 'checked' : '';
         $init = $orderObj->placed ? 'init=placed' : 'init=pending';
         $pendingOnlyClass = 'pending-only' . ($orderObj->placed ? ' collapse' : '');
         $placedOnlyClass = 'placed-only' . ($orderObj->placed ? '' : ' collapse');
@@ -684,8 +746,14 @@ class ViewPurchaseOrders extends FannieRESTfulPage
                 </td>
             {{CODING}}
             <tr>
-                <td><b>Created by</b>: {$uname}</td>
-                <td>&nbsp;</td>
+                <td colspan="2"><b>Created by</b>: {$uname}</td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <label>Not Inventory
+                        <input type="checkbox" {$notInv} onchange="toggleInventory({$this->id}, this.checked);" />
+                    </label>
+                </td>
             </tr>
         </table>
     </div>
@@ -728,19 +796,19 @@ HTML;
 
         $ret .= '<table class="table tablesorter table-bordered small table-float"><thead style="background:#fff;">';
         $ret .= '<tr>
-            <th class="thead">Coding</th>
+            <th class="thead hidden-xs">Coding</th>
             <th class="thead">SKU</th>
-            <th class="thead">UPC</th>
-            <th class="thead">Brand</th>
+            <th class="thead hidden-xs">UPC</th>
+            <th class="thead hidden-xs">Brand</th>
             <th class="thead">Description</th>
-            <th class="thead">Unit Size</th>
+            <th class="thead hidden-xs">Unit Size</th>
             <th class="thead">Units/Case</th>
             <th class="thead">Cases</th>
-            <th class="thead">Est. Cost</th>
-            <th class="thead">Received</th>
+            <th class="thead hidden-xs">Est. Cost</th>
+            <th class="thead hidden-xs">Received</th>
             <th class="thead">Rec. Qty</th>
-            <th class="thead">Rec. Cost</th>
-            <th class="thead">SO</th></tr></thead><tbody>';
+            <th class="thead hidden-xs">Rec. Cost</th>
+            <th class="thead hidden-xs">SO</th></tr></thead><tbody>';
         $count = 0;
         foreach ($model->find() as $obj) {
             $css = $this->qtyToCss($order->placed(), $obj->quantity(),$obj->receivedQty());
@@ -756,7 +824,9 @@ HTML;
                     $css = 'class="info" title="' . $title . '"';
                 }
             }
+            $link = '../item/ItemEditorPage.php?searchupc=' . $obj->internalUPC();
             if ($obj->isSpecialOrder()) {
+                $link = '../ordering/OrderViewPage.php?orderID=' . ltrim(substr($obj->internalUPC(), 0, 9), '0');
                 $css = 'class="success" title="Special order"';
             }
             if ($obj->salesCode() == '') {
@@ -770,18 +840,18 @@ HTML;
                 $codings[$coding] = 0.0;
             }
             $codings[$coding] += $obj->receivedTotalCost();
-            $ret .= sprintf('<tr %s><td>%d</td><td>%s</td>
-                    <td><a href="../item/ItemEditorPage.php?searchupc=%s">%s</a></td><td>%s</td><td>%s</td>
-                    <td>%s</td><td>%s</td>
+            $ret .= sprintf('<tr %s><td class="hidden-xs">%d</td><td>%s</td>
+                    <td class="hidden-xs"><a href="%s">%s</a></td><td class="hidden-xs">%s</td><td>%s</td>
+                    <td class="hidden-xs">%s</td><td>%s</td>
                     <td><span id="qty%d">%s</span> <span class="%s pull-right">
                         <a href="" onclick="itemInc(%d, \'%s\', %d); return false;"><span class="glyphicon glyphicon-chevron-up small" /></a>
                         <br />
                         <a href="" onclick="itemDec(%d, \'%s\', %d); return false;"><span class="glyphicon glyphicon-chevron-down small" /></a>
                         </span>
                     </td>
-                    <td>%.2f</td>
-                    <td>%s</td><td>%s</td><td>%.2f</td>
-                    <td>
+                    <td class="hidden-xs">%.2f</td>
+                    <td class="hidden-xs">%s</td><td>%s</td><td class="hidden-xs">%.2f</td>
+                    <td class="hidden-xs">
                         <select class="form-control input-sm" onchange="isSO(%d, \'%s\', this.value);">
                         %s
                         </select>
@@ -789,7 +859,7 @@ HTML;
                     $css,
                     $accounting::toPurchaseCode($obj->salesCode()),
                     $obj->sku(),
-                    $obj->internalUPC(), $obj->internalUPC(),
+                    $link, $obj->internalUPC(),
                     $obj->brand(),
                     $obj->description(),
                     $obj->unitSize(), $obj->caseSize(),
@@ -811,8 +881,8 @@ HTML;
         }
         $ret = str_replace('{{CODING}}', $coding_rows, $ret);
 
-        $this->add_script('js/view.js');
-        $this->add_script('../src/javascript/tablesorter/jquery.tablesorter.min.js');
+        $this->addScript('js/view.js?date=20180220');
+        $this->addScript('../src/javascript/tablesorter/jquery.tablesorter.min.js');
         $this->addScript($this->config->get('URL') . 'src/javascript/jquery.floatThead.min.js');
         $this->addOnloadCommand("\$('.tablesorter').tablesorter();\n");
         $this->addOnloadCommand("\$('.table-float').floatThead();\n");
@@ -842,13 +912,20 @@ HTML;
         }
     }
 
+    protected function get_id_receive_handler()
+    {
+        $this->enable_linea = true;
+
+        return true;
+    }
+
     /**
       Receiving interface for processing enter recieved costs and quantities
       on an order
     */
     protected function get_id_receive_view()
     {
-        $this->add_script('js/view.js');
+        $this->addScript('js/view.js');
         $ret = '
             <p>Receiving order #<a href="ViewPurchaseOrders.php?id=' . $this->id . '">' . $this->id . '</a></p>
             <p><div class="form-inline">
@@ -858,10 +935,12 @@ HTML;
                 <input type="hidden" name="id" value="' . $this->id . '" />
                 <button type="submit" class="btn btn-default">Continue</button>
                 <a href="?id=' . $this->id . '&receiveAll=1" class="btn btn-default btn-reset">All</a>
+                <a href="?id=' . $this->id . '" class="btn btn-default btn-reset">Order</a>
                 </form>
             </div></p>
             <div id="item-area">
             </div>';
+        $this->addOnloadCommand("enableLinea('#sku-in', receiveSKU);");
         $this->addOnloadCommand("\$('#sku-in').focus();\n");
 
         return $ret;
@@ -922,15 +1001,25 @@ HTML;
     {
         $dbc = $this->connection;
         $model = new PurchaseOrderItemsModel($dbc);
-        $model->orderID($this->id);
-        $model->sku($this->sku);
-        $model->receivedQty($this->qty);
-        $model->receivedTotalCost($this->cost);
-        $model->receivedBy(FannieAuth::getUID($this->current_user));
-        if ($model->receivedDate() === null) {
-            $model->receivedDate(date('Y-m-d H:i:s'));
+        $uid = FannieAuth::getUID($this->current_user);
+        $upcs = array();
+        for ($i=0; $i<count($this->sku); $i++) {
+            $model->orderID($this->id);
+            $model->sku($this->sku[$i]);
+            $model->load();
+            $model->receivedQty($this->qty[$i]);
+            $model->receivedTotalCost($this->cost[$i]);
+            $model->receivedBy($uid);
+            if ($model->receivedDate() === null) {
+                $model->receivedDate(date('Y-m-d H:i:s'));
+            }
+            if (!$model->isSpecialOrder() && $this->qty[$i] > 0) {
+                $upcs[BarcodeLib::padUPC($model->internalUPC())] = $this->qty[$i];
+            }
+            $model->save();
         }
-        $model->save();
+
+        $this->newToInventory($this->id, $uid, $upcs);
 
         return false;
     }
@@ -945,6 +1034,16 @@ HTML;
         $dbc = $this->connection;
         $model = new PurchaseOrderItemsModel($dbc);
         $model->orderID($this->id);
+        // short circuit on choosing an SPO
+        if (FormLib::get('spoSKU', '') !== '') {
+            $model->sku(FormLib::get('spoSKU'));
+            $model->load();
+            $model->receivedDate(date('Y-m-d H:i:s'));
+            $model->receivedTotalCost($model->unitCost() * $model->quantity() * $model->caseSize());
+            $model->receivedQty($model->quantity() * $model->caseSize());
+            $model->save();
+            return false;
+        }
         $model->sku($this->sku);
         $model->internalUPC(BarcodeLib::padUPC($this->upc));
         $model->brand($this->brand);
@@ -978,13 +1077,31 @@ HTML;
         if ($model->load()) {
             $found = true;
         } else {
-            $model->reset();
-            $model->orderID($this->id);
-            $model->internalUPC(BarcodeLib::padUPC($this->sku));
-            $matches = $model->find();
-            if (count($matches) == 1) {
-                $model = $matches[0];
-                $found = true;
+            $barcodes = array(
+                BarcodeLib::padUPC($this->sku),
+                BarcodeLib::padUPC(substr($this->sku, 0, strlen($this->sku)-1)),
+            );
+            foreach ($barcodes as $barcode) {
+                $model->reset();
+                $model->orderID($this->id);
+                $model->internalUPC($barcode);
+                $matches = $model->find('quantity');
+                if (count($matches) > 0) {
+                    $found = true;
+                }
+                $spo = $this->findInSPO($this->id, $barcode);
+                foreach ($spo as $s) {
+                    $spoModel = new PurchaseOrderItemsModel($this->connection);
+                    $spoModel->orderID($this->id);
+                    $spoModel->sku($s);
+                    $spoModel->load();
+                    $matches[] = $spoModel;
+                    $found = true;
+                }
+                if ($found) {
+                    $model = $matches;
+                    break;
+                }
             }
         }
         
@@ -1001,19 +1118,56 @@ HTML;
         return false;
     }
 
+    private function findInSPO($orderID, $upc)
+    {
+        $itemsP = $this->connection->prepare('SELECT internalUPC AS upc, sku FROM PurchaseOrderItems WHERE orderID=? AND isSpecialOrder=1');
+        $itemR = $this->connection->execute($itemsP, array($orderID));
+        $spoP = $this->connection->prepare('
+            SELECT upc
+            FROM ' . $this->config->get('TRANS_DB') . '.PendingSpecialOrder
+            WHERE order_id=? AND trans_id=?');
+        $ret = array();
+        while ($itemW = $this->connection->fetchRow($itemR)) {
+            $poUPC = $itemW['upc'];
+            $spoID = ltrim(substr($poUPC, 0, 9), '0');
+            $transID = ltrim(substr($poUPC, -4), '0');
+            $spoUPC = $this->connection->getValue($spoP, array($spoID, $transID));
+            if ($spoUPC == $upc) {
+                $ret[] = $itemW['sku'];
+            }
+        }
+
+        return $ret;
+    }
+
     private function receiveUnOrderedItem($dbc)
     {
         echo '<div class="alert alert-danger">SKU not found in order</div>';
         echo '<table class="table table-bordered">';
         echo '<tr><th>SKU</th><th>UPC</th><th>Brand</th><th>Description</th>
             <th>Qty Ordered</th><th>Cost (est)</th><th>Qty Received</th><th>Cost Received</th></tr>';
-        $order = new PurchaseOrderModel($dbc);
-        $order->orderID($this->id);
-        $order->load();
-        $item = new VendorItemsModel($dbc);
-        $item->vendorID($order->vendorID());
-        $item->sku($this->sku);
-        $item->load();
+        $vendP = $dbc->prepare('SELECT vendorID FROM PurchaseOrder WHERE orderID=?');
+        $vendorID = $dbc->getValue($vendP, array($this->id));
+        $itemP = $dbc->prepare('SELECT * FROM vendorItems WHERE vendorID=? AND sku LIKE ?');
+        $item = $dbc->getRow($itemP, array($vendorID, '%' . $this->sku));
+        if ($item === false) {
+            $itemP = $dbc->prepare('SELECT * FROM vendorItems WHERE vendorID=? AND upc=?');
+            $item = $dbc->getRow($itemP, array($vendorID, BarcodeLib::padUPC($this->sku)));
+            if ($item === false) {
+                $itemP = $dbc->prepare('SELECT *, 1 AS units FROM products WHERE default_vendor_id=? AND upc=?');
+                $item = $dbc->getRow($itemP, array($vendorID, BarcodeLib::padUPC($this->sku)));
+            }
+        }
+        if ($item === false) {
+            $item = array(
+                'sku' => $this->sku,
+                'upc' => BarcodeLib::padUPC($this->sku),
+                'brand' => '',
+                'description' => '',
+                'cost' => 0,
+                'units' => 1,
+            );
+        }
         printf('<tr>
             <td>%s<input type="hidden" name="sku" value="%s" /></td>
             <td><input type="text" class="form-control" name="upc" value="%s" /></td>
@@ -1025,54 +1179,84 @@ HTML;
             <td><input type="text" class="form-control" name="receiveCost" value="%.2f" /></td>
             <td><button type="submit" class="btn btn-default">Add New Item</button><input type="hidden" name="id" value="%d" /></td>
             </tr>',
-            $item->sku(), $item->sku(),
-            $item->upc(),
-            $item->brand(),
-            $item->description(),
-            1,
-            $item->cost() * $item->units(),
+            $item['sku'],
+            $item['sku'],
+            $item['upc'],
+            $item['brand'],
+            $item['description'],
+            0,
+            $item['cost'] * $item['units'],
             0,
             0,
             $this->id
         );
         echo '</table>';
+
+        $opts = '';
+        $prep = $dbc->prepare('SELECT sku, quantity, caseSize, brand, description 
+            FROM PurchaseOrderItems WHERE isSpecialOrder=1 AND orderID=?');
+        $res = $dbc->execute($prep, array($this->id));
+        while ($row = $dbc->fetchRow($res)) {
+            $opts .= sprintf('<option value="%s">%s %s (%sx%s)</option>',
+                $row['sku'], $row['brand'], $row['description'],
+                $row['quantity'], $row['caseSize']);
+        }
+        if ($opts !== '') {
+            echo '<p>Special Orders<br /><select name="spoSKU" class="form-control input-sm">
+                <option value="">Select...</option>'
+                . $opts
+                . '<optgroup label=""></optgroup><!-- keeps iOS from truncating option labels above -->
+                </select><br />
+                <button type="submit" class="btn btn-default">Receive Item(s)</button><p>';
+        }
     }
 
     private function receiveOrderedItem($dbc, $model)
     {
-        echo '<table class="table table-bordered">';
-        echo '<tr><th>SKU</th><th>UPC</th><th>Brand</th><th>Description</th>
-            <th>Qty Ordered</th><th>Cost (est)</th><th>Qty Received</th><th>Cost Received</th></tr>';
+        echo '<table class="table table-bordered small">';
         $uid = FannieAuth::getUID($this->current_user);
-        if ($model->receivedQty() === null) {
-            $model->receivedQty($model->quantity());
-            $model->receivedBy($uid);
+        if (!is_array($model)) {
+            $model = array($model);
         }
-        if ($model->receivedTotalCost() === null) {
-            $model->receivedTotalCost($model->quantity()*$model->unitCost()*$model->caseSize());
-            $model->receivedBy($uid);
+        foreach ($model as $m) {
+            echo '<tr><th class="">SKU</th><th class="hidden-xs">UPC</th>
+                <th class="hidden-xs">Brand</th><th class="">Description</th></tr>';
+            if ($m->receivedQty() === null) {
+                $m->receivedQty($m->quantity() * $m->caseSize());
+                $m->receivedBy($uid);
+            }
+            if ($m->receivedTotalCost() === null) {
+                $m->receivedTotalCost($m->quantity()*$m->unitCost()*$m->caseSize());
+                $m->receivedBy($uid);
+            }
+            printf('<tr %s>
+                <td class="small">%s<input type="hidden" name="sku[]" value="%s" /></td>
+                <td class="hidden-xs">%s</td>
+                <td class="hidden-xs">%s</td>
+                <td class="small">%s</td>
+                </tr><tr>
+                <th>Qty Ordered</th><th class="hidden-xs">Cost (est)</th>
+                <th>Qty Received</th></tr>
+                <tr><td>%s (%sx%s)</td>
+                <td class="hidden-xs">%.2f</td>
+                <td><input type="text" pattern="\\d*" class="form-control" name="qty[]" value="%s" /></td>
+                </tr><tr><th>Cost Received</th></tr>
+                <td><input type="number" min="-999" max="999" step="0.01" pattern="\\d+(\\.\\d*)?" class="form-control" name="cost[]" value="%.2f" /></td>
+                <td><button type="submit" class="btn btn-default">Save</button><input type="hidden" name="id[]" value="%d" /></td>
+                </tr>',
+                ($m->isSpecialOrder() ? 'class="success"' : ''),
+                $m->sku(), $m->sku(),
+                $m->internalUPC(),
+                $m->brand(),
+                $m->description(),
+                $m->quantity() * $m->caseSize(),
+                $m->quantity() , $m->caseSize(),
+                $m->quantity() * $m->unitCost() * $m->caseSize(),
+                $m->receivedQty(),
+                $m->receivedTotalCost(),
+                $this->id
+            );
         }
-        printf('<tr>
-            <td>%s<input type="hidden" name="sku" value="%s" /></td>
-            <td>%s</td>
-            <td>%s</td>
-            <td>%s</td>
-            <td>%s</td>
-            <td>%.2f</td>
-            <td><input type="text" class="form-control" name="qty" value="%s" /></td>
-            <td><input type="text" class="form-control" name="cost" value="%.2f" /></td>
-            <td><button type="submit" class="btn btn-default">Save</button><input type="hidden" name="id" value="%d" /></td>
-            </tr>',
-            $model->sku(), $model->sku(),
-            $model->internalUPC(),
-            $model->brand(),
-            $model->description(),
-            $model->quantity(),
-            $model->quantity() * $model->unitCost() * $model->caseSize(),
-            $model->receivedQty(),
-            $model->receivedTotalCost(),
-            $this->id
-        );
         echo '</table>';
     }
 

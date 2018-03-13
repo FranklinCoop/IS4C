@@ -9,14 +9,14 @@ namespace COREPOS\Fannie\API\data\lanesync;
 */
 class ProductsMultiSync extends MySQLSync
 {
-    public function push($tableName, $dbName)
+    public function push($tableName, $dbName, $includeOffline=false)
     {
         $ret = array('success'=>false, 'details'=>'');
         $tempfile = tempnam(sys_get_temp_dir(),$table.".sql");
         $cmd = $this->dumpCommand()
             . ' -w ' . escapeshellarg('store_id=' . ((int)$this->config->get('STORE_ID')))
             . ' '   . escapeshellarg($dbName)
-            . ' '   . escapeshellarg($table)
+            . ' '   . escapeshellarg($tableName)
             . ' > ' . escapeshellarg($tempfile)
             . ' 2> ' . escapeshellarg($tempfile . '.err');
 
@@ -32,24 +32,9 @@ class ProductsMultiSync extends MySQLSync
             return $ret;
         }
 
-        $laneNumber = 1;
         $ret['success'] = true;
-        foreach ($this->config->get('LANES') as $lane) {
-            $laneCmd = $this->laneConnect($lane, $dbName, $tempfile); 
-            exec($laneCmd, $output, $exitCode);
-            if ($exitCode == 0) {
-                $ret['details'] .= "Lane {$laneNumber} ({$lane['host']}) completed successfully\n";
-            } else {
-                $ret['details'] .= "Lane {$laneNumber} ({$lane['host']}) failed, returned: " . implode(', ', $output) . "\n";
-                $ret['success'] = false;
-            }
-            unset($output);
-            unset($exitCode);
-            $laneNumber++;
-        }
-        unlink($tempfile);
 
-        return $ret;
+        return $this->sendDumpToLanes($ret, $dbName, $tempfile, $includeOffline);
     }
 }
 

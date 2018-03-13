@@ -23,6 +23,7 @@
 
 namespace COREPOS\common;
 use COREPOS\common\sql\CharSets;
+use \Exception;
 
 if (!function_exists("ADONewConnection")) {
     include(dirname(__FILE__).'/adodb5/adodb.inc.php');
@@ -66,16 +67,20 @@ class SQLManager
 
     protected $last_connect_error = false;
 
-    /** Constructor
+    /** 
+        Create an initial connection to the database. Will
+        attempt to create the database if it does not exist
+        and permissions allow.
+
         @param $server Database server host
         @param $type Database type. Most supported are
-        'mysql' and 'mssql' but anything ADOdb supports
+        'mysqli' and 'pdo_mysql' but anything ADOdb supports
         will kind of work
         @param $database Database name
         @param $username Database username
         @param $password Database password
-        @param $persistent Make persistent connection.
-        @param $new Force new connection
+        @param [obsolete] $persistent Make persistent connection.
+        @param [obsolote] $new Force new connection
     */
     public function __construct($server,$type,$database,$username,$password='',$persistent=false, $new=false)
     {
@@ -114,16 +119,18 @@ class SQLManager
         return $conn;
     }
 
-    /** Add another connection
+    /** Add another connection. If the specified database does not
+        exist this method will attempt to create it.
+
         @param $server Database server host
         @param $type Database type. Most supported are
-        'mysql' and 'mssql' but anything ADOdb supports
+        'mysqli' and 'pdo_mysql' but anything ADOdb supports
         will kind of work
         @param $database Database name
         @param $username Database username
         @param $password Database password
-        @param $persistent Make persistent connection.
-        @param $new Force new connection
+        @param [obsolete] $persistent Make persistent connection.
+        @param [obsolete] $new Force new connection
 
         When dealing with multiple connections, user the
         database name to distinguish which is to be used
@@ -131,37 +138,40 @@ class SQLManager
     public function addConnection($server,$type,$database,$username,$password='',$persistent=false,$new=false)
     {
         if (empty($type)) {
-            return false;
+            throw new Exception("Database type is required");
         } elseif (strtolower($type) == 'postgres9') {
             // value here is really schema. Database name must match user name.
             $savedDB = $database;
             $database = $username;
         } elseif (strtolower($type) == 'mysql' && version_compare(PHP_VERSION, '7.0.0') >= 0) {
-            $type = function_exists('mysqli_connect') ? 'mysqli' : 'pdo_mysql';
+            if (function_exists('mysqli_connect')) {
+                $type = 'mysqli';
+            } elseif (class_exists('PDO', false)) {
+                $type = 'pdo_mysql';
+            } else {
+                throw new Exception("mysql driver is not supported on PHP 7+. Use msyqli or PDO");
+            }
         }
 
         $conn = ADONewConnection($this->isPDO($type) ? 'pdo' : $type);
         $conn->SetFetchMode(ADODB_FETCH_BOTH);
         $conn = $this->setConnectTimeout($conn, $type);
-        $connected = false;
-        if (isset($this->connections[$database]) || $new) {
-            $connected = $conn->NConnect($this->getDSN($server,$type,$database),$username,$password, $database);
-        } elseif ($persistent) {
-            $connected = $conn->PConnect($this->getDSN($server,$type,$database),$username,$password,$database);
-        } else {
+        if ($database) {
             $connected = $conn->Connect($this->getDSN($server,$type,$database),$username,$password,$database);
+        } else {
+            $connected = $conn->Connect($this->getDSN($server,$type,false),$username,$password);
         }
         $conn = $this->clearConnectTimeout($conn, $type);
 
         if (strtolower($type) == 'postgres9') {
             $database = $savedDB;
         }
-        $this->connections[$database] = $conn;
+        $this->connections[$database ? $database : '_unselected'] = $conn;
 
         $this->last_connect_error = false;
-        if (!$connected) {
+        if (!$connected && $database) {
             $this->last_connect_error = $conn->ErrorMsg();
-            return $this->connectAndCreate($server, $type, $username, $password, $database);
+            $this->connectAndCreate($server, $type, $username, $password, $database);
         }
         $this->saveConnection($server, $type, $username, $password, $database);
 
@@ -227,30 +237,26 @@ class SQLManager
     */
     private function connectAndCreate($server, $type, $username, $password, $database)
     {
-        $conn = ADONewConnection($this->isPDO($type) ? 'pdo' : $type);
-        $conn->SetFetchMode(ADODB_FETCH_BOTH);
-        $conn = $this->setConnectTimeout($conn, $type);
-        $connected = $conn->Connect($this->getDSN($server,$type,false),$username,$password,$database);
-        $conn = $this->clearConnectTimeout($conn, $type);
-        if ($connected) {
-            $this->last_connect_error = false;
+        $connected = $this->addConnection($server, $type, null, $username, $password);
+        if ($connected && is_object($this->connections['_unselected'])) {
+            $conn = $this->connections['_unselected'];
+            unset($this->connections['_unselected']);
             $adapter = $this->getAdapter(strtolower($type));
             $stillok = $conn->Execute($adapter->createNamedDB($database));
             if (!$stillok) {
-                $this->last_connect_error = $conn->ErrorMsg();
+                $last_connect_error = $conn->ErrorMsg();
                 $this->connections[$database] = false;
-                return false;
+                throw new Exception("Could not create database {$database} ({$last_connect_error})");
             }
             $conn->Execute($adapter->useNamedDB($database));
             $conn->SelectDB($database);
             $this->connections[$database] = $conn;
-            $this->saveConnection($server, $type, $username, $password, $database);
             return true;
-        } else {
-            $this->last_connect_error = $conn->ErrorMsg();
-            $this->connections[$database] = false;
-            return false;
         }
+
+        unset($this->connections['_unselected']);
+        $last_connect_error = $conn->ErrorMsg();
+        throw new Exception("Could not connect to database. Check username and password. ({$last_connect_error})");
     }
 
     /**
@@ -1619,6 +1625,20 @@ class SQLManager
         }
     }
 
+    public function getAllValues($sql, $input_array=array(), $which_connection='')
+    {
+        $res = $this->execute($sql, $input_array, $which_connection);
+        if ($res === false && $this->throw_on_fail) {
+            throw new \Exception('Record not found');
+        }
+        $ret = array();
+        while ($row = $this->fetchRow($res)) {
+            $ret[] = $row[0];
+        }
+
+        return $ret;
+    }
+
     /**
       Get a row directly from a query without verifying
       rows exist and fetching one
@@ -1643,6 +1663,20 @@ class SQLManager
                 return false;
             }
         }
+    }
+
+    public function getAllRows($sql, $input_array=array(), $which_connection='')
+    {
+        $res = $this->execute($sql, $input_array, $which_connection);
+        if ($res === false && $this->throw_on_fail) {
+            throw new \Exception('Record not found');
+        }
+        $ret = array();
+        while ($row = $this->fetchRow($res)) {
+            $ret[] = $row;
+        }
+
+        return $ret;
     }
 
     /** 
@@ -1830,7 +1864,7 @@ class SQLManager
         'sqlite3'   => 'COREPOS\common\sql\SqliteAdapter',
     );
 
-    protected function getAdapter($type)
+    public function getAdapter($type)
     {
         if (isset($this->adapters[$type])) {
             return $this->adapters[$type];

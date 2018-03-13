@@ -42,6 +42,8 @@ class FanniePage extends \COREPOS\common\ui\CorePage
     protected $title = 'Page window title';
     protected $header = 'Page displayed header';
 
+    public $default_db = false;
+
     /** wrapper around $_SESSION superglobal **/
     protected $session;
 
@@ -131,7 +133,7 @@ class FanniePage extends \COREPOS\common\ui\CorePage
                 $this->addScript($url . 'src/javascript/jquery-ui.js');
             }
             $this->addScript($url . 'src/javascript/calculator.js');
-            $this->addScript($url . 'src/javascript/core.js');
+            $this->addScript($url . 'src/javascript/core.js?date=20171213');
             if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
                 // windows has trouble with symlinks
                 $this->addCssFile($url . 'src/javascript/jquery-ui-1.10.4/css/smoothness/jquery-ui.min.css?id=20140625');
@@ -204,11 +206,6 @@ class FanniePage extends \COREPOS\common\ui\CorePage
         return true;
     }
 
-    public function get_header()
-    {
-        return $this->getHeader();
-    }
-
     /**
       Get the standard footer
       @return An HTML string
@@ -230,10 +227,6 @@ class FanniePage extends \COREPOS\common\ui\CorePage
         }
 
         return ob_get_clean();
-    }
-    public function get_footer()
-    {
-        return $this->getFooter();
     }
 
     protected function lineaJS()

@@ -23,7 +23,7 @@
 
 require(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class SyncFromSearch extends FannieRESTfulPage
@@ -193,8 +193,7 @@ class SyncFromSearch extends FannieRESTfulPage
     private function getItemInfo($model)
     {
         // extract scale PLU
-        preg_match("/002(\d\d\d\d)0/", $model->plu(), $matches);
-        $s_plu = $matches[1];
+        $s_plu = COREPOS\Fannie\API\item\ServiceScaleLib::upcToPLU($model->plu());
 
         $item_info = array(
             'RecordType' => 'ChangeOneItem',
@@ -247,8 +246,8 @@ class SyncFromSearch extends FannieRESTfulPage
     function post_u_view()
     {
         global $FANNIE_OP_DB, $FANNIE_URL;
-        $this->add_script($FANNIE_URL.'/src/javascript/jquery.js');
-        $this->add_css_file($FANNIE_URL.'/src/style.css');
+        $this->addScript($FANNIE_URL.'/src/javascript/jquery.js');
+        $this->addCssFile($FANNIE_URL.'/src/style.css');
         $ret = '';
 
         $ret .= '<form action="SyncFromSearch.php" method="post">';

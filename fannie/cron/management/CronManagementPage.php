@@ -22,7 +22,7 @@
 *********************************************************************************/
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 /* --COMMENTS - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -138,12 +138,13 @@ class CronManagementPage extends FanniePage
         $ret .= '</p>';
 
         $ret .= '<p>';
-        if (!is_writable($FANNIE_ROOT.'logs/fannie.log')) {
-            $ret .= "<i>Warning: fannie.log ({$FANNIE_ROOT}logs/fannie.log)
+        $fannie_path = realpath(__DIR__ . '/../');
+        if (!is_writable(__DIR__ . '/../logs/fannie.log')) {
+            $ret .= "<i>Warning: fannie.log ({$fannie_path}/logs/fannie.log)
                 is not writable. Logging task results may
                 not work</i>";
          } else {
-            $ret .= "Default logging will be to {$FANNIE_ROOT}logs/fannie.log";
+            $ret .= "Default logging will be to {$fannie_path}/logs/fannie.log";
          }
         $ret .= '</p>';
 
@@ -172,7 +173,7 @@ class CronManagementPage extends FanniePage
             if (!$obj->schedulable) {
                 continue;
             }
-            $cmd = 'php '.realpath(dirname(__FILE__).'/../../classlib2.0/FannieTask.php').' '.$task.' >> '.$FANNIE_ROOT.'logs/fannie.log';;
+            $cmd = 'php '.realpath(dirname(__FILE__).'/../../classlib2.0/FannieTask.php').' '.$task.' >> '.$fannie_path.'/logs/fannie.log';;
             $simple = $this->simpleRow($task, $task, $cmd, $tab, $i);
             if ($simple !== false && $mode == 'simple') {
                 $ret .= $simple;
@@ -193,7 +194,7 @@ class CronManagementPage extends FanniePage
             $nicename = rtrim($nicename,'.');
             $nicename = str_replace('.',' ',$nicename);
 
-            $cmd = "cd {$FANNIE_ROOT}cron && php ./{$shortname} >> {$FANNIE_ROOT}logs/fannie.log";
+            $cmd = "cd {$fannie_path}/cron && php ./{$shortname} >> {$fannie_path}/logs/fannie.log";
 
             $simple = $this->simpleRow($shortname,$nicename,$cmd,$tab,$i);
             if ($simple !== false && $mode == 'simple') {
@@ -244,9 +245,9 @@ class CronManagementPage extends FanniePage
                     class="btn btn-default">Save</button></p>';
         $ret .= '</form>';
 
-        $this->add_script($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.js?v=1');
-        $this->add_css_file($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.css');
-        $this->add_onload_command('$(\'.fancybox-link\').fancybox();');
+        $this->addScript($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.js?v=1');
+        $this->addCssFile($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.css');
+        $this->addOnloadCommand('$(\'.fancybox-link\').fancybox();');
 
         return $ret;
     }

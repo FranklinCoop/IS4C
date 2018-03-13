@@ -32,10 +32,10 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT . 'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 if (!function_exists('cron_msg')) {
-    include($FANNIE_ROOT.'src/cron_msg.php');
+    include(__DIR__ . '/../../src/cron_msg.php');
 }
 
 if (!chdir(dirname(__FILE__))){
@@ -67,7 +67,16 @@ while($fetchW = $sql->fetch_row($fetchR))
 $errors = False;
 // connect to each lane and update payments
 foreach($FANNIE_LANES as $lane){
-    $db = new SQLManager($lane['host'],$lane['type'],$lane['op'],$lane['user'],$lane['pw']);
+    if (isset($lane['offline']) && $lane['offline']) {
+        continue;
+    }
+    try {
+        $db = new SQLManager($lane['host'],$lane['type'],$lane['op'],$lane['user'],$lane['pw']);
+    } catch (Exception $ex) {
+        echo cron_msg("Can't connect to lane: ".$lane['host']);
+        $errors = True;
+        continue;
+    }
 
     if ($db === False){
         echo cron_msg("Can't connect to lane: ".$lane['host']);

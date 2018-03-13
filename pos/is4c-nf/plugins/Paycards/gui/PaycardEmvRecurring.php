@@ -78,7 +78,7 @@ class PaycardEmvRecurring extends PaycardProcessPage
     {
         $url = MiscLib::baseURL();
         echo '<script type="text/javascript" src="' . $url . '/js/singleSubmit.js"></script>';
-        echo '<script type="text/javascript" src="../js/emv.js"></script>';
+        echo '<script type="text/javascript" src="../js/emv.js?date=20180308"></script>';
         if (!$this->runTransaction) {
             return '';
         }
@@ -95,6 +95,9 @@ function emvSubmit() {
         location = '<?php echo MiscLib::baseURL(); ?>gui-modules/boxMsg2.php';
         return false;
     }
+    <?php if ($this->conf->Get('training') == 1) { ?>
+    emv.setURL('../ajax/AjaxPaycardTest.php');
+    <?php } ?>
     emv.submit(xmlData);
 }
 </script>

@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class TransferPurchaseOrder extends FannieRESTfulPage 
@@ -244,6 +244,15 @@ class TransferPurchaseOrder extends FannieRESTfulPage
     {
         return '<p>Create a pair of purchase orders representing a transfer. Specify which store is sending the items,
 which is receiving them, and a vendor then fill in as many rows as necessary to represent all the items.</p>';
+    }
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertInternalType('string', $this->get_view());
+        $this->id = 999;
+        $phpunit->assertInternalType('string', $this->get_id_view());
+        $phpunit->assertInternalType('string', $this->post_id_handler());
+        $phpunit->assertInternalType('string', $this->post_handler());
     }
 }
 

@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class VendorMovementReport extends FannieReportPage 
@@ -43,7 +43,7 @@ class VendorMovementReport extends FannieReportPage
             default:
                 return "
                     SELECT t.upc,
-                        p.brand
+                        p.brand,
                         p.description, "
                         . DTrans::sumQuantity('t') . " AS qty,
                         SUM(t.total) AS ttl,

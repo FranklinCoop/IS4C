@@ -285,6 +285,11 @@ class NewSpecialOrdersPage extends FannieRESTfulPage
             '<select id="f_4" onchange="refilter();"',
             $stores['html']
         );
+        $stores['html'] = str_replace(
+            '</select>',
+            '<option value="-1">No Store!</option></select>',
+            $stores['html']
+        );
         $stores['html'] = str_replace('form-control', 'form-control input-sm', $stores['html']);
 
         $filterstring = "";
@@ -294,7 +299,9 @@ class NewSpecialOrdersPage extends FannieRESTfulPage
             $filterstring .= ' AND statusFlag=?';
             $filterargs[] = $filter_status;
         }
-        if ($filter_store) {
+        if ($filter_store == -1) {
+            $filterstring .= ' AND o.storeID=0 ';
+        } elseif ($filter_store) {
             $filterstring .= ' AND o.storeID=? ';
             $filterargs[] = $filter_store;
         }
@@ -468,8 +475,8 @@ class NewSpecialOrdersPage extends FannieRESTfulPage
             </p>
             </form>';
 
-        $this->add_script('../src/javascript/tablesorter/jquery.tablesorter.js');
-        $this->add_onload_command("\$('.tablesorter').tablesorter();");
+        $this->addScript('../src/javascript/tablesorter/jquery.tablesorter.js');
+        $this->addOnloadCommand("\$('.tablesorter').tablesorter();");
         
         return $ret;
     }

@@ -34,6 +34,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
+using System.Reflection;
 
 #if NEWTONSOFT_JSON
 using Newtonsoft.Json;
@@ -48,6 +49,8 @@ using CustomForms;
 using CustomUDP;
 using SPH;
 using Discover;
+
+[assembly: AssemblyVersion("1.0.*")]
 
 public class Magellan : DelegateForm 
 {
@@ -176,6 +179,10 @@ public class Magellan : DelegateForm
         try {
             if (msg == "exit") {
                 this.ShutDown();
+            } else if (msg == "die!") {
+                new Thread(() => this.ShutDown()).Start();
+                Thread.Sleep(500);
+                Environment.Exit(0);
             } else if (msg == "full_udp") {
                 full_udp = true;
             } else if (msg == "mq_up" && mq_available) {
@@ -247,8 +254,8 @@ public class Magellan : DelegateForm
     public void ShutDown()
     {
         try {
-            sph.ForEach(s => { s.Stop(); });
             u.Stop();
+            sph.ForEach(s => { s.Stop(); });
         }
         catch(Exception ex) {
             Magellan.LogMessage(ex.ToString());
@@ -420,3 +427,4 @@ public class MagellanConfigPair
     public string module { get; set; }
     public Dictionary<string,string> settings { get; set; }
 }
+

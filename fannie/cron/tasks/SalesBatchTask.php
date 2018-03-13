@@ -56,7 +56,7 @@ class SalesBatchTask extends FannieTask
                     ' . (isset($b_def['transLimit']) ? ',b.transLimit' : ',0 AS transLimit') . '
                   FROM batches AS b
                     INNER JOIN batchList AS l ON b.batchID = l.batchID
-                  WHERE b.discounttype <> 0
+                  WHERE b.discounttype > 0
                     AND b.startDate <= ?
                     AND b.endDate >= ?
                   ORDER BY l.upc,
@@ -171,7 +171,7 @@ class SalesBatchTask extends FannieTask
                 $sale_upcs = $this->addSaleUPC($sale_upcs, $upc, $product->store_id());
 
                 // for qtyEnforcedGroupPM the salePrice is the whole group price
-                if ($specialpricemethod == 2) {
+                if ($specialpricemethod == 2 && $special_price == $specialgroupprice) {
                     $special_price = $product->normal_price();
                 }
 
@@ -254,8 +254,8 @@ class SalesBatchTask extends FannieTask
             $product->special_price(0);
             $product->specialgroupprice(0);
             $product->specialquantity(0);
-            $product->start_date('');
-            $product->end_date('');
+            $product->start_date('1900-01-01');
+            $product->end_date('1900-01-01');
             $product->batchID(0);
             $product->save();
 

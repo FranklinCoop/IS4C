@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class EditManyPurchaseOrders extends FannieRESTfulPage 
@@ -213,31 +213,31 @@ class EditManyPurchaseOrders extends FannieRESTfulPage
         $ret .= $this->calculate_sidebar();
         $ret .= '</div>';
 
-        $this->add_onload_command("\$('#searchField').focus();\n");
-        $this->add_script('js/editmany.js');
+        $this->addOnloadCommand("\$('#searchField').focus();\n");
+        $this->addScript('js/editmany.js');
     
         return $ret;
     }
 
     private function getOrderID($vendorID, $userID)
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = FannieDB::get($this->config->get('OP_DB'));
+        $store = COREPOS\Fannie\API\lib\Store::getIdByIp(0);
+        $cutoff = date('Y-m-d', strtotime('30 days ago'));
         $orderQ = 'SELECT orderID FROM PurchaseOrder WHERE
-            vendorID=? AND userID=? and placed=0
+            vendorID=? AND userID=? AND storeID=? AND creationDate > ? and placed=0
             ORDER BY creationDate DESC';
         $orderP = $dbc->prepare($orderQ);
-        $orderR = $dbc->execute($orderP, array($vendorID, $userID));
-        if ($dbc->num_rows($orderR) > 0){
-            $row = $dbc->fetch_row($orderR);
-            return $row['orderID'];
-        } else {
+        $orderID = $dbc->getValue($orderP, array($vendorID, $userID, $store, $cutoff));
+        if (!$orderID) {
             $insQ = 'INSERT INTO PurchaseOrder (vendorID, creationDate,
-                placed, userID) VALUES (?, '.$dbc->now().', 0, ?)';
+                placed, userID, storeID) VALUES (?, '.$dbc->now().', 0, ?, ?)';
             $insP = $dbc->prepare($insQ);
-            $insR = $dbc->execute($insP, array($vendorID, $userID));
-            return $dbc->insertID();
+            $insR = $dbc->execute($insP, array($vendorID, $userID, $store));
+            $orderID = $dbc->insertID();
         }
+
+        return $orderID;
     }
 
     public function helpContent()

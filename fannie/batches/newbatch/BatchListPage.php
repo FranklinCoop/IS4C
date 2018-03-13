@@ -25,10 +25,10 @@ use COREPOS\Fannie\API\lib\FannieUI;
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 if (!function_exists('checkLogin')) {
-    include_once($FANNIE_ROOT . 'auth/login.php');
+    include_once(__DIR__ . '/../../auth/login.php');
 }
 
 class BatchListPage extends FannieRESTfulPage
@@ -193,8 +193,10 @@ class BatchListPage extends FannieRESTfulPage
         $batchUpdate->batchID($this->id);
         $json['batchUpdate'] = $batchUpdate->logUpdate($batchUpdate::UPDATE_DELETE);
 
-
         $batch = new BatchesModel($dbc);
+        $batch->batchID($this->id);
+        $batch->load();
+        // forceStopBatch checks both discountType and stat/end dates
         $batch->forceStopBatch($this->id);
 
         $delQ = $dbc->prepare("delete from batches where batchID=?");
@@ -204,14 +206,21 @@ class BatchListPage extends FannieRESTfulPage
         $itemR = $dbc->execute($delQ,array($this->id));
         if ($itemR !== false && $batchR === false) {
             $json['error'] = 1;
-            $json['msg'] = 'Items were unsaled and removed from the batch, but the batch could not be deleted';
+            $json['msg'] = $batch->discountType() > 0 
+                ? 'Items were unsaled and removed from the batch, but the batch could not be deleted'
+                : 'Items were removed from the batch but the batch could not be deleted';
         } elseif ($itemR === false && $batchR !== false) {
             $json['error'] = 1;
-            $json['msg'] = 'Items were unsaled and the batch was deleted, but some orphaned items remain in the batchList table.'
-                . ' This probably is not a big deal unless it happens often.';
+            $json['msg'] = $batch->discountType() > 0
+                ? ('Items were unsaled and the batch was deleted, but some orphaned items remain in the batchList table.'
+                    . ' This probably is not a big deal unless it happens often.')
+                : ('Batch was deleted, but some orphaned items remain in the batchList table.'
+                    . ' This probably is not a big deal unless it happens often.');
         } elseif ($itemR === false && $batchR === false) {
             $json['error'] = 1;
-            $json['msg'] = 'Items were unsaled but an error occurred deleting the batch.';
+            $json['msg'] = $batch->discountType() > 0
+                ? 'Items were unsaled but an error occurred deleting the batch.'
+                : 'An error occurred deleting the batch.';
         }
 
         echo $this->debugJSON($json);
@@ -507,7 +516,7 @@ HTML;
         $batchList = $this->batchListDisplay();
         $this->addScript('list.js?20170817');
         $this->addScript('../../src/javascript/tablesorter/jquery.tablesorter.min.js');
-        $this->add_css_file('index.css');
+        $this->addCssFile('index.css');
         $this->addOnloadCommand("\$('.tablesorter').tablesorter();");
 
         return <<<HTML

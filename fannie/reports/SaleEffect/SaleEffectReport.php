@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class SaleEffectReport extends FannieReportPage 
@@ -63,6 +63,7 @@ class SaleEffectReport extends FannieReportPage
                 AND trans_status <> 'R'
                 AND charflag <> 'SO'
             GROUP BY t.upc,
+                t.store_id,
                 p.brand,
                 p.description,
                 t.department,

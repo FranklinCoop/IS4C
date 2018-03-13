@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class VendorDepartmentEditor extends FanniePage {
@@ -151,7 +151,7 @@ class VendorDepartmentEditor extends FanniePage {
         <input type="hidden" id="vendorID" value="<?php echo $vid; ?>" />
         <?php
 
-        $this->add_script('vdepts.js');
+        $this->addScript('vdepts.js');
 
         return ob_get_clean();
     }

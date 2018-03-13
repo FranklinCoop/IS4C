@@ -363,7 +363,7 @@ class UPC extends Parser
         $row['foodstamp'] = $foodstamp;
         $row['discount'] = $discountable;
 
-        $this->enforceSaleLimit($dbc, $row, $quantity);
+        $row = $this->enforceSaleLimit($dbc, $row, $quantity);
 
         /*
             BEGIN: figure out discounts by type
@@ -612,7 +612,7 @@ class UPC extends Parser
                 $scalepriceEAN = MiscLib::truncate2(substr($upc, 7, 5)/100);
             }
             $rewriteClass = $this->session->get('VariableWeightReWriter');
-            if ($rewriteClass != '' && class_exists('COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\' . $rewriteClass)) {
+            if ($rewriteClass != '' && substr($rewriteClass, 0, 7) !== 'COREPOS' && class_exists('COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\' . $rewriteClass)) {
                 $rewriteClass = 'COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\' . $rewriteClass;
             } elseif ($rewriteClass === '' || !class_exists($rewriteClass)) {
                 $rewriteClass = 'COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\ZeroedPriceReWrite';

@@ -41,7 +41,7 @@
 */
 
 include(dirname(__FILE__) . '/../../config.php');
-include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 
 class SalesAndTaxTodayReport extends \COREPOS\Fannie\API\FannieReportTool 
 {
@@ -92,7 +92,7 @@ class SalesAndTaxTodayReport extends \COREPOS\Fannie\API\FannieReportTool
         $this->title = "Fannie : Today's $this->name Sales and Taxes";
         $this->header = "Today's $this->name Sales and Taxes";
 
-        $this->has_menus(True);
+        $this->hasMenus(True);
 
         return True;
 

@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class CoopDealsMergePage extends FannieRESTfulPage 
@@ -147,7 +147,7 @@ class CoopDealsMergePage extends FannieRESTfulPage
             $opts[$allW['batchID']] = $allW['batchName'];
         }
 
-        $ret = "<form action=CoopDealsMergePage.php method=post>
+        $ret = "
         <div class=\"form-group\">
             <label>Month</label>
             <select name=\"deal-set\" class=\"form-control\" 
@@ -202,22 +202,25 @@ class CoopDealsMergePage extends FannieRESTfulPage
         $ret .= <<<html
         </tbody>
         </table>
-        <textarea rows="5" cols="15">A
-{$upcs['a']}</textarea>
-        <textarea rows="5" cols="15">B
-{$upcs['b']}</textarea>
-        <textarea rows="5" cols="15">TPR
-{$upcs['tpr']}</textarea>
-        <p>    
-            <button type=submit class="btn btn-default">Merge Items into Batch(es)</button>
-            <a href="CoopDealsReviewPage.php" class="pull-right btn btn-default">Create New Batch(es)</a>
-        </p>
         </form>
 html;
 
-        return $ret;
+        $lists = <<<html
+                <textarea rows="5" cols="15">A
+        {$upcs['a']}</textarea>
+                <textarea rows="5" cols="15">B
+        {$upcs['b']}</textarea>
+                <textarea rows="5" cols="15">TPR
+        {$upcs['tpr']}</textarea>
+                <form action=CoopDealsMergePage.php method=post>
+                <p>    
+                    <button type=submit class="btn btn-default">Merge Items into Batch(es)</button>
+                    <a href="CoopDealsReviewPage.php" class="pull-right btn btn-default">Create New Batch(es)</a>
+                </p>
+html;
+        return $lists.$ret;
     }
-    
+
     public function helpContent()
     {
         return '<p>This tool creates A, B, and TPR batches. The TPR batches will

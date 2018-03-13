@@ -285,6 +285,7 @@ class FannieAPI
 
         switch($base_class) {
             case 'COREPOS\Fannie\API\item\ItemModule':
+            case 'COREPOS\Fannie\API\item\ItemRow':
                 $directories[] = dirname(__FILE__).'/../item/modules/';
                 break;
             case 'COREPOS\Fannie\API\member\MemberModule':
@@ -296,7 +297,6 @@ class FannieAPI
             case 'BasicModel':
                 $directories[] = dirname(__FILE__).'/data/models/';
                 break;
-            case 'BasicModelHook':
             case 'COREPOS\Fannie\API\data\hooks\BasicModelHook':
                 $directories[] = dirname(__FILE__).'/data/hooks/';
                 break;
@@ -360,6 +360,7 @@ class FannieAPI
                 while( ($file=readdir($dh)) !== false) {
                     if ($file == '.' || $file == '..') continue;
                     if ($file == 'noauto') continue;
+                    if ($file == 'node_modules') continue;
                     if ($file == 'index.php') continue;
                     if ($file == 'Store-Specific') continue;
                     $ret = array_merge($ret, $search($path.'/'.$file, $depth+1));

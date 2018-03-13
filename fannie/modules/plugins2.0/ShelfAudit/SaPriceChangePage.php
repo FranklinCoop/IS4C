@@ -44,9 +44,9 @@ class SaPriceChangePage extends FannieRESTfulPage {
     protected $header = '';
 
     private function linea_support_available(){
-        global $FANNIE_ROOT;
-        if (file_exists($FANNIE_ROOT.'src/javascript/linea/cordova-2.2.0.js')
-        && file_exists($FANNIE_ROOT.'src/javascript/linea/ScannerLib-Linea-2.0.0.js'))
+        $root = __DIR__ . '/../../../';
+        if (file_exists($root.'src/javascript/linea/cordova-2.2.0.js')
+        && file_exists($root.'src/javascript/linea/ScannerLib-Linea-2.0.0.js'))
             return True;
         else
             return False;
@@ -55,12 +55,12 @@ class SaPriceChangePage extends FannieRESTfulPage {
     function preprocess(){
         global $FANNIE_URL;
 
-        $this->add_script($FANNIE_URL.'src/javascript/jquery.js');
+        $this->addScript($FANNIE_URL.'src/javascript/jquery.js');
 
         $this->linea_ios_mode = $this->linea_support_available();
         if ($this->linea_ios_mode){
-            $this->add_script($FANNIE_URL.'src/javascript/linea/cordova-2.2.0.js');
-            $this->add_script($FANNIE_URL.'src/javascript/linea/ScannerLib-Linea-2.0.0.js');
+            $this->addScript($FANNIE_URL.'src/javascript/linea/cordova-2.2.0.js');
+            $this->addScript($FANNIE_URL.'src/javascript/linea/ScannerLib-Linea-2.0.0.js');
         }
 
         $this->__routes[] = 'post<upc><price>';

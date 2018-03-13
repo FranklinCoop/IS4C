@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class XlsBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
@@ -71,6 +71,9 @@ class XlsBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
         $dtQ = $dbc->prepare("SELECT discType FROM batchType WHERE batchTypeID=?");
         $discountType = $dbc->getValue($dtQ, array($btype));
+        if ($discountType === false || !is_numeric($discountType)) {
+            $discountType = 0;
+        }
 
         $insQ = $dbc->prepare("
             INSERT INTO batches 

@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class ObfWeeklyReportV2 extends ObfWeeklyReport
@@ -47,6 +47,17 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
     protected $class_lib = 'ObfLibV2';
 
     protected $OU_START = 162;
+
+    protected function getOuStart($weekID)
+    {
+        if ($weekID >= 188) {
+            return 188;
+        } elseif ($weekID >= 175) { // Week of Oct 2, 2017
+            return 175;
+        }
+
+        return 162;
+    }
 
     /** previous numbers
     protected $PLAN_SALES = array(
@@ -131,6 +142,60 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
         '9,17' => 8414.48,
     );
 
+    protected $PLAN_SALES_Q2_2018 = array(
+        '1,6' => 51031.00,      // Hillside Produce
+        '2,10' => 11448.32,     // Hillside Deli
+        '2,11' => 31119.86,
+        '2,16' => 12686.82,
+        '3,1' => 26430.32,      // Hillside Grocery
+        '3,4' => 64309.57,
+        '3,5' => 24345.53,
+        '3,7' => 203.71,
+        '3,8' => 17988.26,
+        '3,9' => 2807.52,
+        '3,13' => 15460.30,
+        '3,17' => 27136.80,
+        '7,6' => 17975.00,      // Denfeld Produce
+        '8,10' => 4383.48,      // Denfeld Deli
+        '8,11' => 13217.67,
+        '8,16' => 5161.85,
+        '9,1' => 8470.24,       // Denfeld Grocery
+        '9,4' => 25460.06,
+        '9,5' => 8837.77,
+        '9,7' => 85.06,
+        '9,8' => 5938.41,
+        '9,9' => 1039.62,
+        '9,13' => 4807.43,
+        '9,17' => 8725.41,
+    );
+
+    protected $PLAN_SALES_Q3_2018 = array(
+        '1,6' => 51510.00,      // Hillside Produce
+        '2,10' => 11676.94,     // Hillside Deli
+        '2,11' => 31742.34,
+        '2,16' => 12940.72,
+        '3,1' => 25497.83,      // Hillside Grocery
+        '3,4' => 62041.83,
+        '3,5' => 23487.33,
+        '3,7' => 196.81,
+        '3,8' => 17353.57,
+        '3,9' => 2708.96,
+        '3,13' => 14914.74,
+        '3,17' => 26179.90,
+        '7,6' => 20085.00,      // Denfeld Produce
+        '8,10' => 4514.67,      // Denfeld Deli
+        '8,11' => 13615.10,
+        '8,16' => 5317.08,
+        '9,1' => 8949.35,       // Denfeld Grocery
+        '9,4' => 26900.87,
+        '9,5' => 9338.17,
+        '9,7' => 89.81,
+        '9,8' => 6274.05,
+        '9,9' => 1098.86,
+        '9,13' => 5079.05,
+        '9,17' => 9218.78,
+    );
+
     public function preprocess()
     {
         $this->addScript('../../../src/javascript/Chart.min.js');
@@ -141,10 +206,14 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
 
     private function getPlanSales($weekID)
     {
-        if ($weekID < 162) {
-            return $this->PLAN_SALES;
-        } else {
+        if ($weekID >= 188) {
+            return $this->PLAN_SALES_Q3_2018;
+        } elseif ($weekID >= 175) {
+            return $this->PLAN_SALES_Q2_2018;
+        } elseif ($weekID >= 162) {
             return $this->PLAN_SALES_Q1_2018;
+        } else {
+            return $this->PLAN_SALES;
         }
     }
 
@@ -249,7 +318,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
                 if ($quarter === false) {
                     $quarter = array('actual'=>0, 'lastYear'=>0, 'plan'=>0, 'trans'=>0, 'ly_trans'=>0);
                 }
-                $ou_weeks = ($week->obfWeekID() - $this->OU_START) + 1;
+                $ou_weeks = ($week->obfWeekID() - $this->getOuStart($week->obfWeekID())) + 1;
                 $qtd_dept_plan += ($proj * $ou_weeks);
                 $qtd_dept_sales += $quarter['actual'];
                 $total_trans->quarterThisYear = $quarter['trans'];
@@ -265,7 +334,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
                     sprintf('%.2f%%', $this->percentGrowth($row['actualSales'], $row['lastYearSales'])),
                     number_format($row['actualSales'], 0), // converts to % of sales
                     number_format($row['actualSales'] - $proj, 0),
-                    number_format($quarter['actual'] - $quarter['plan'], 0),
+                    number_format($quarter['actual'] - ($proj * $ou_weeks), 0),
                     'meta' => FannieReportPage::META_COLOR,
                     'meta_background' => $this->colors[0],
                     'meta_foreground' => 'black',
@@ -331,7 +400,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
                 $quarter['planSales'] = $qt_splh['planSales'];
             }
             $qt_average_wage = $quarter['hours'] == 0 ? 0 : $quarter['wages'] / ((float)$quarter['hours']);
-            $qt_proj_hours = $quarter['planSales'] / $category->salesPerLaborHourTarget();
+            $qt_proj_hours = ($dept_proj * $ou_weeks) / $labor->splhTarget();
             $qt_proj_labor = $qt_proj_hours * $qt_average_wage;
             $total_hours->quarterActual += $quarter['hours'];
             $total_hours->quarterProjected += $qt_proj_hours;
@@ -608,7 +677,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
                 $quarter = array('hours'=>0, 'wages'=>0, 'laborTarget'=>0, 'hoursTarget'=>0);
             }
             $qt_average_wage = $quarter['hours'] == 0 ? 0 : $quarter['wages'] / ((float)$quarter['hours']);
-            $qt_proj_hours = $total_sales->quarterProjected / $c->salesPerLaborHourTarget();
+            $qt_proj_hours = $c->salesPerLaborHourTarget() == 0 ? 0 : $total_sales->quarterProjected / $c->salesPerLaborHourTarget();
             $qt_proj_labor = $qt_proj_hours * $qt_average_wage;
             $total_hours->quarterActual += $quarter['hours'];
             $total_hours->quarterProjected += $qt_proj_hours;
@@ -638,13 +707,13 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
             $data[] = array(
                 'Sales per Hour',
                 '',
-                sprintf('%.2f', ($total_sales->projected+$otherStore['plan']) / $proj_hours),
+                sprintf('%.2f', $proj_hours == 0 ? 0 : ($total_sales->projected+$otherStore['plan']) / $proj_hours),
                 '',
                 '',//sprintf('%.2f', $total_sales->trend / $trend_hours),
                 number_format($labor->hours() == 0 ? 0 : ($total_sales->thisYear+$otherStore['actual']) / $labor->hours(), 2),
                 '',
                 '',
-                number_format(($labor->hours() == 0 ? 0 : $total_sales->thisYear/$labor->hours()) - ($total_sales->projected / $proj_hours), 2),
+                number_format(($labor->hours() == 0 || $proj_hours == 0 ? 0 : $total_sales->thisYear/$labor->hours()) - ($total_sales->projected / $proj_hours), 2),
                 '',//number_format($quarter_actual_sph - $quarter_proj_sph, 2),
                 'meta' => FannieReportPage::META_COLOR,
                 'meta_background' => $this->colors[0],
@@ -886,14 +955,16 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
             $info['lastYear'] += $row['lastYear'];
             $info['trans'] = $row['trans'];
             $info['lyTrans'] = $row['lyTrans'];
+            $catPlan = 0;
             foreach ($PLAN_SALES as $planID => $planVal) {
                 if (strpos($planID, $row['catID'] . ',') === 0) {
                     $info['plan'] += $planVal;
+                    $catPlan += $planVal;
                 }
             }
             $cat->obfCategoryID($row['catID']);
             $cat->load();
-            $plan[$row['catID']] = $this->projectHours($cat->salesPerLaborHourTarget(), $row['plan'], $row['plan']);
+            $plan[$row['catID']] = $this->projectHours($cat->salesPerLaborHourTarget(), $catPlan, $catPlan);
         }
 
         /**

@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class GenericBillingPage extends FannieRESTfulPage 
@@ -44,13 +44,6 @@ class GenericBillingPage extends FannieRESTfulPage
         $value = FormLib::get_form_value('id');
         $this->add_onload_command('$(\'#memnum\').val($(\'#sel\').val());');
         $this->addScript('billing.js');
-        $ret = "<form onsubmit=\"genericBilling.getMemInfo(); return false;\">
-            <div class=\"form-group form-inline\">
-            <label>Member #</label>:
-            <input type=text id=memnum name=id 
-                class=\"form-control\" value=\"$value\" />
-            <select id=sel class=\"form-control\"
-                onchange=\"\$('#memnum').val(this.value);\">";
         $accounts = \COREPOS\Fannie\API\member\MemberREST::search(
             array(
                 'customerTypeID' => 2,
@@ -61,91 +54,100 @@ class GenericBillingPage extends FannieRESTfulPage
             0,
             true
         );
+        $opts = '';
         foreach ($accounts as $account) {
-            $ret .= sprintf('<option %s value="%d">%d %s</option>',
+            $opts .= sprintf('<option %s value="%d">%d %s</option>',
                     ($value == $account['cardNo'] ? 'selected' : ''),
                     $account['cardNo'], $account['cardNo'],
                     $account['customers'][0]['lastName']);
         }
-        $ret .= "</select>
-            <button type=submit class=\"btn btn-default\">Submit</button>
-            </div>
-            </form><hr /><div id=\"contentArea\"></div>
-            <div id=\"resultArea\"></div>";
-        return $ret;
+
+        return <<<HTML
+<form onsubmit="genericBilling.getMemInfo(); return false;">
+<div class="form-group form-inline">
+    <label>Member #</label>:
+    <input type=text id=memnum name=id 
+        class="form-control" value="{$value}" />
+    <select id=sel class="form-control"
+        onchange="$('#memnum').val(this.value);">"
+        {$opts}
+    </select>
+    <button type=submit class="btn btn-default">Submit</button>
+</div>
+</form><hr /><div id="contentArea"></div>
+<div id="resultArea"></div>
+HTML;
     }
 
     function get_id_handler(){
-        global $FANNIE_TRANS_DB;
         $sql = FannieDB::getReadOnly($this->config->get('OP_DB'));
 
         $account = \COREPOS\Fannie\API\member\MemberREST::get($this->id);
         $query = "SELECT n.balance
-            FROM  " . $FANNIE_TRANS_DB.$sql->sep()."ar_live_balance AS n 
+            FROM  " . FannieDB::fqn('ar_live_balance', 'trans') . " AS n 
             WHERE n.card_no=?";
         $prep = $sql->prepare($query);
-        $result = $sql->execute($prep, array($this->id));
-        $row = $sql->fetch_row($result);
+        $row = $sql->getRow($prep, array($this->id));
 
-        printf("<form onsubmit=\"genericBilling.postBilling();return false;\">
-            <div class=\"col-sm-6\">
-            <table class=\"table\">
-            <tr>
-                <th>Member</th>
-                <td>%d<input type=hidden id=form_memnum value=%d /></td>
-                <th>Name</th>
-                <td>%s</td>
-            </tr>
-            <tr>
-                <th>Current Balance</th>
-                <td>%.2f</td>
-                <th>Bill</th>
-                <td>
-                    <div class=\"input-group\">
-                        <span class=\"input-group-addon\">$</span>
-                        <input type=text class=\"form-control\" id=amount required />
-                    </div>
-                </td>
-            </tr>
-            <tr>
-                <th>For</th>
-                <td colspan=3><input type=text maxlength=35 id=desc 
-                    class=\"form-control\" required /></td>
-            </tr>
-            </table>
-            <p>
-            <button type=submit class=\"btn btn-default\">Bill Account</button>
-            </p>
-            </div>
-            </form>",
-            $account['cardNo'], $account['cardNo'],
-            $account['customers'][0]['lastName'],
-            $row['balance']
-        );
+        echo <<<HTML
+<form onsubmit="genericBilling.postBilling();return false;">
+<div class="col-sm-6">
+    <table class="table">
+        <tr>
+            <th>Member</th>
+            <td>{$account['cardNo']}<input type=hidden id=form_memnum value="{$account['cardNo']}" /></td>
+            <th>Name</th>
+            <td>{$account['customers'][0]['lastName']}</td>
+        </tr>
+        <tr>
+            <th>Current Balance</th>
+            <td>{$row['balance']}</td>
+            <th>Bill</th>
+            <td>
+                <div class="input-group">
+                    <span class="input-group-addon">$</span>
+                    <input type=text class="form-control" id=amount required />
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <th>For</th>
+            <td colspan=3><input type=text maxlength=35 id=desc 
+                class="form-control" required /></td>
+        </tr>
+    </table>
+    <p>
+        <button type=submit class="btn btn-default">Bill Account</button>
+    </p>
+</div>
+</form>
+HTML;
 
         return false;
     }
 
     function post_id_handler()
     {
-        global $FANNIE_OP_DB, $FANNIE_TRANS_DB;
-        $sql = FannieDB::get($FANNIE_TRANS_DB);
-
-        $amount = FormLib::get_form_value('amount');
-        $desc = FormLib::get_form_value('desc');
+        $sql = FannieDB::get($this->config->get('TRANS_DB'));
         $json = array('msg' => '', 'billed' => 0);
-        if ($amount === '') {
+
+        try {
+            $amount = $this->form->amount;
+            $desc = $this->form->desc;
+        } catch (Exception $ex) {
+            $json['msg'] = 'Invalid request';
+        }
+        if (isset($amount) && $amount === '') {
             $json['msg'] = "Amount is required";
-            echo json_encode($json);
-            return false;
-        } elseif ($desc === '') {
+        } elseif (isset($desc) && $desc === '') {
             $json['msg'] =  "Description is required";
+        }
+        if ($json['msg']) {
             echo json_encode($json);
             return false;
         }
 
         $desc = str_replace("'","''",$desc);
-
         $trans_no = DTrans::getTransNo($sql, $this->EMP_NO, $this->LANE_NO);
         $params = array(
             'card_no' => $this->id,
@@ -168,8 +170,9 @@ class GenericBillingPage extends FannieRESTfulPage
 
         $json['msg'] = sprintf("Member <b>%d</b> billed <b>$%.2f</b>.<br />
                 Receipt is %d-%d-%d.",$this->id,$amount,
-                $this->EMP_NO,$this->LANE_NO,$t_no);
+                $this->EMP_NO,$this->LANE_NO,$trans_no);
         $json['billed'] = 1;
+        $json['trans_no'] = $trans_no;
         echo json_encode($json);
 
         return false;
@@ -191,6 +194,18 @@ class GenericBillingPage extends FannieRESTfulPage
         ob_start();
         $phpunit->assertEquals(false, $this->get_id_handler());
         $phpunit->assertNotEquals(0, strlen(ob_get_clean()));
+        $form = new COREPOS\common\mvc\ValueContainer();
+        $form->amount = 1;
+        $form->desc = 'TEST';
+        $this->setForm($form);
+        ob_start();
+        $phpunit->assertEquals(false, $this->post_id_handler());
+        $json = ob_get_clean();
+        $json = json_decode($json, true);
+        $phpunit->assertArrayHasKey('trans_no', $json);
+        $delP = $this->connection->prepare('DELETE FROM ' . FannieDB::fqn('dtransactions', 'trans') . ' WHERE emp_no=? AND register_no=? AND trans_no=?');
+        $delR = $this->connection->execute($delP, array($this->EMP_NO, $this->LANE_NO, $json['trans_no']));
+        $phpunit->assertNotEquals(false, $delR, 'Cleaning up: ' . $this->connection->error());
     }
 }
 

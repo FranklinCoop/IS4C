@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class StockSummaryReport extends FannieReportPage
@@ -53,7 +53,7 @@ class StockSummaryReport extends FannieReportPage
                 left join custdata as c on s.card_no=c.CardNo and c.personNum=1
                 LEFT JOIN memtype AS m ON c.memType=m.memtype
             where card_no > 0
-            group by card_no,LastName,FirstName,Type
+            group by card_no,LastName,FirstName,Type,m.memDesc
             order by card_no");
         $r = $dbc->execute($q);
 

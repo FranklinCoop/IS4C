@@ -63,7 +63,8 @@ class InventoryCacheModel extends BasicModel
                     AND placedDate IS NOT NULL
                     AND storeID=?
                     AND i.isSpecialOrder = 0
-                    AND i.quantity > 0
+                    AND o.inventoryIgnore = 0
+                    AND (i.quantity > 0 OR (i.receivedQty IS NOT NULL AND i.receivedQty > 0))
                     AND (i.receivedQty > 0 OR i.receivedQty IS NULL)
                     AND (placedDate >= ? OR receivedDate >= ?)');
         }
@@ -90,6 +91,23 @@ class InventoryCacheModel extends BasicModel
             $obj->onHand($obj->baseCount() + $obj->ordered() - $obj->sold() - $obj->shrunk());
             $obj->save();
         }
+    }
+
+    public function doc()
+    {
+        return '
+Use:
+InventoryCache stores a snapshot of inventory activity to
+avoid real-time calculation across large chunks of data.
+* baseCount is the amount present at the last count
+* ordered is the amount ordered since the last count
+  and can be re-calculated from purchase orders
+* sold is the amount sold since the last count
+  and can be re-calculated from transaction data
+* shrunk is the amount shrunk since the last count
+  and can be re-calculated from transaction data
+* onHand is baseCount + ordered - sold - shrunk
+            ';
     }
 }
 

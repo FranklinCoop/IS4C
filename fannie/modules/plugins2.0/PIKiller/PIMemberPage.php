@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'/classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 if (!class_exists('PIKillerPage')) {
     include('lib/PIKillerPage.php');
@@ -474,6 +474,8 @@ class PIMemberPage extends PIKillerPage {
             echo '<a href="PIMemberPage.php?id=' . ($this->card_no - 1) . '">Prev Mem</a>';
             echo '&nbsp;&nbsp;';
             echo '<a href="PIMemberPage.php?id=' . ($this->card_no + 1) . '">Next Mem</a>';
+            echo '&nbsp;&nbsp;';
+            echo '<a href="../../../reports/CustomerHistory/AccountHistoryReport.php?id=' . $this->card_no . '">Changes History</a>';
         }
         else
             echo '<input type="submit" value="Save Member" />';

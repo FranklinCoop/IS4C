@@ -56,15 +56,14 @@ class CCReceiptMessage extends ReceiptMessage {
     {
         $date = ReceiptLib::build_time(time());
         list($emp, $reg, $trans) = ReceiptLib::parseRef($ref);
-        $sort = 'asc';
 
         $slip = '';
-        $idclause = '';
         $dbc = Database::tDataConnect();
-        if ($reprint)
+        if ($reprint) {
             $dbc = Database::mDataConnect();
-        if ($sigSlip && is_numeric(CoreLocal::get('paycard_id'))) {
-            $idclause = ' AND transID='.CoreLocal::get('paycard_id');
+            if ($dbc === false) {
+                return '';
+            }
         }
 
         $trans_type = $dbc->concat('p.cardType', "' '", 'p.transType', '');
@@ -82,15 +81,25 @@ class CCReceiptMessage extends ReceiptMessage {
                     p.transID
                   FROM PaycardTransactions AS p
                   WHERE dateID=" . date('Ymd') . "
-                    AND empNo=" . $emp . "
-                    AND registerNo=" . $reg . "
-                    AND transNo=" . $trans . $idclause . "
                     AND p.validResponse=1
                     AND (p.xResultMessage LIKE '%APPROVE%' OR p.xResultMessage LIKE '%PENDING%')
-                    AND p.cardType IN ('Credit', 'Debit', 'EMV', 'R.Credit', 'R.EMV')
-                  ORDER BY p.requestDatetime";
+                    AND p.cardType IN ('Credit', 'Debit', 'EMV', 'R.Credit', 'R.EMV') ";
+        $moreSpecific = $query;
+        $moreSpecific .= "
+                    AND empNo=" . $emp . "
+                    AND registerNo=" . $reg . "
+                    AND transNo=" . $trans;
+        $query .= " ORDER BY p.requestDatetime";
+        $moreSpecific .= " ORDER BY p.requestDatetime";
+        if ($sigSlip) {
+            $query .= ' DESC';
+            $moreSpecific .= ' DESC';
+        }
 
-        $result = $dbc->query($query);
+        $result = $dbc->query($moreSpecific);
+        if ($sigSlip && $dbc->numRows($result) == 0) {
+            $result = $dbc->query($query);
+        }
 
         $emvP = $dbc->prepare('
             SELECT content
@@ -155,9 +164,9 @@ class CCReceiptMessage extends ReceiptMessage {
                         $slip .= ReceiptLib::centerString(CoreLocal::get("chargeSlip" . $i))."\n";
                     }
                     if (strpos($row['tranType'], ' R.')) {
-                        $para1 = 'Whole Foods Co-op (WFC) will charge four (4) additional $20 payments to your card. Payments will occur monthly starting one month from today. Each payment will purchase four (4) shares of class B equity in WFC. Entries on your bank statement may be labeled recurring.';
+                        $para1 = 'Whole Foods Co-op (WFC) will charge four (4) additional $20 payments to your card. Payments will occur monthly starting one month from today. Each $20 payment will purchase four (4) shares of class B equity in WFC. Entries on your bank statement may be labeled recurring.';
                         $para2 = 'To cancel this arrangement at any point, contact WFC by phone at 218-728-0884 or by email at equity@wholefoods.coop.';
-                        $para3 = 'If a monthly payment fails or is declined, no future monthly charges will be made. You will retain ownership of all equity purchased up to that point and may pay the remaining balance any time before the due date, one year from today.';
+                        $para3 = 'WFC does not keep any credit card information on file. As such if a monthly payment fails or is declined, no future monthly charges will be made. You will retain ownership of all equity purchased up to that point and may pay the remaining balance any time before the due date, one year from today.';
                         $slip .= wordwrap($para1, 55) . "\n\n";
                         $slip .= wordwrap($para2, 55) . "\n\n";
                         $slip .= wordwrap($para3, 55) . "\n\n";
@@ -200,6 +209,9 @@ class CCReceiptMessage extends ReceiptMessage {
                 }
             }
             $slip .= ReceiptLib::centerString(".................................................")."\n";
+            if ($sigSlip) {
+                break;
+            }
         }
 
         return $slip;

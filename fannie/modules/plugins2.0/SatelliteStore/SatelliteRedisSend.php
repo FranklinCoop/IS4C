@@ -39,6 +39,11 @@ class SatelliteRedisSend extends FannieTask
     
     public function run()
     {
+        if ($this->isLocked()) {
+            return false;
+        }
+        $this->lock();
+
         $conf = $this->config->get('PLUGIN_SETTINGS');
         $my_db = $conf['SatelliteDB'];
         $myID = $conf['SatelliteStoreID'];
@@ -47,20 +52,27 @@ class SatelliteRedisSend extends FannieTask
         $remote = FannieDB::get($this->config->get('TRANS_DB'));
         if (!$remote->isConnected()) {
             echo "No connection";
+            $this->unlock();
             return false;
         }
 
         $local = $this->localDB($remote, $myID, $my_db);
         if (!$local->isConnected($my_db)) {
             echo "No local connection";
+            $this->unlock();
             return false;
         }
 
-        $redis = new Predis\Client($redis_host);
+        try {
+            $redis = new Predis\Client($redis_host);
 
-        $this->sendTable($local, $redis, $myID, 'dtransactions', 'store_row_id');
-        $this->sendTable($local, $redis, $myID, 'PaycardTransactions', 'storeRowId');
-        $this->sendTable($local, $redis, $myID, 'CapturedSignature', 'capturedSignatureID');
+            $this->sendTable($local, $redis, $myID, 'dtransactions', 'store_row_id');
+            $this->sendTable($local, $redis, $myID, 'PaycardTransactions', 'storeRowId');
+            $this->sendTable($local, $redis, $myID, 'CapturedSignature', 'capturedSignatureID');
+        } catch (Exception $ex) {
+        }
+
+        $this->unlock();
     }
 
     /**
@@ -87,7 +99,7 @@ class SatelliteRedisSend extends FannieTask
             if ($lastID === null) {
                 $lastID = 0;
             }
-            $prep = $local->prepare('SELECT * FROM ' . $table . ' WHERE ' . $column . ' > ?');
+            $prep = $local->prepare('SELECT * FROM ' . $table . ' WHERE ' . $column . ' > ? ORDER BY ' . $column);
             $res = $local->execute($prep, array($lastID));
             $max = $lastID;
             while ($row = $local->fetchRow($res)) {
@@ -95,8 +107,8 @@ class SatelliteRedisSend extends FannieTask
                     $max = $row[$column];
                 }
                 $redis->lpush($table, json_encode($row));
+                $redis->set($table . ':' . $column . ':' . $myID, $max);
             }
-            $redis->set($table . ':' . $column . ':' . $myID, $max);
         } catch (Exception $ex) {
             // connection to redis failed. 
             // no cleanup required

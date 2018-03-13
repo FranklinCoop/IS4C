@@ -21,7 +21,10 @@
 
 *********************************************************************************/
 
-class ItemFlagsModule extends \COREPOS\Fannie\API\item\ItemModule 
+use COREPOS\Fannie\API\item\ItemModule;
+use COREPOS\Fannie\API\item\ItemRow;
+
+class ItemFlagsModule extends ItemModule implements ItemRow
 {
 
     public function width()
@@ -103,6 +106,32 @@ class ItemFlagsModule extends \COREPOS\Fannie\API\item\ItemModule
         $ret .= '</div>' . '<!-- /#ItemFlagsTable -->';
         $ret .= '</div>' . '<!-- /#ItemFlagsContents -->';
         $ret .= '</div>' . '<!-- /#ItemFlagsFieldset -->';
+
+        return $ret;
+    }
+
+    public function formRow($upc, $activeTab)
+    {
+        return $activeTab ? $this->rowOfFlags($upc) : '';
+    }
+
+    private function rowOfFlags($upc)
+    {
+        $upc = BarcodeLib::padUPC($upc);
+        $dbc = $this->db();
+        $res = $this->getFlags($upc);
+
+        $ret = '<tr class="small"><th class="text-right">Flags</th><td colspan="9">';
+        while ($row = $dbc->fetchRow($res)) {
+            $ret .= sprintf('<label><input type="checkbox" name="flags[]" value="%d" %s />
+                    %s</label>&nbsp;&nbsp;&nbsp;',
+                    $row['bit_number'], ($row['flagIsSet'] ? 'checked' : ''), $row['description']);
+            // embed flag info to avoid re-querying it on save
+            $ret .= sprintf('<input type="hidden" name="pf_attrs[]" value="%s" />
+                            <input type="hidden" name="pf_bits[]" value="%d" />',
+                            $row['description'], $row['bit_number']);
+        }
+        $ret .= '</td></tr>';
 
         return $ret;
     }

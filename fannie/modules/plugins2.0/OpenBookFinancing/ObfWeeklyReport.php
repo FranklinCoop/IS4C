@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class ObfWeeklyReport extends FannieReportPage
@@ -213,8 +213,8 @@ class ObfWeeklyReport extends FannieReportPage
 
     protected function projectHours($splhGoal, $dept_proj, $dept_trend)
     {
-        $proj_hours = $dept_proj / $splhGoal;
-        $trend_hours = $dept_trend / $splhGoal;
+        $proj_hours = $splhGoal == 0 ? 0 : $dept_proj / $splhGoal;
+        $trend_hours = $splhGoal == 0 ? 0 : $dept_trend / $splhGoal;
 
         return array($proj_hours, $trend_hours);
     }

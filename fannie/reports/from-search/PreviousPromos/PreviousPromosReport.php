@@ -25,7 +25,7 @@ use COREPOS\Fannie\API\lib\Store;
 
 include(dirname(__FILE__) . '/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class PreviousPromosReport extends FannieReportPage 
@@ -134,7 +134,7 @@ class PreviousPromosReport extends FannieReportPage
         }
 
         $url = $this->config->get('URL');
-        $this->add_script($url . 'src/javascript/jquery.js');
+        $this->addScript($url . 'src/javascript/jquery.js');
         $dates_form = '<form method="post" action="' . $_SERVER['PHP_SELF'] . '">';
         foreach ($_POST as $key => $value) {
             if ($key != 'store') {

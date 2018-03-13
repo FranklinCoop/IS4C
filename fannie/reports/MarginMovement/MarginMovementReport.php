@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class MarginMovementReport extends FannieReportPage 
@@ -129,7 +129,7 @@ class MarginMovementReport extends FannieReportPage
         if ($include_sales != 1) {
             $query .= "AND d.discounttype=0 ";
         }
-        $query .= "GROUP BY d.upc,p.description,d.department,t.dept_name
+        $query .= "GROUP BY d.upc,p.brand,p.description,d.department,t.dept_name
             ORDER BY sum(total) DESC";
 
         $prep = $dbc->prepare($query);

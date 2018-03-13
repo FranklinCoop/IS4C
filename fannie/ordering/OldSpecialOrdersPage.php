@@ -22,7 +22,7 @@
 *********************************************************************************/
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 if (!class_exists('NewSpecialOrdersPage')) {
     include(dirname(__FILE__) . '/NewSpecialOrdersPage.php');
@@ -289,8 +289,8 @@ class OldSpecialOrdersPage extends NewSpecialOrdersPage
             $ret .= sprintf('<a href="%s">Next</a>',$next_url);
         }
 
-        $this->add_script('../src/javascript/tablesorter/jquery.tablesorter.js');
-        $this->add_onload_command("\$('.tablesorter').tablesorter();");
+        $this->addScript('../src/javascript/tablesorter/jquery.tablesorter.js');
+        $this->addOnloadCommand("\$('.tablesorter').tablesorter();");
 
         return $ret;
     }

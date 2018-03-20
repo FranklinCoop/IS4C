@@ -38,7 +38,7 @@ use \CoreLocal;
   if paper signature slips are being used. The signature
   slip is provided by standalone receipt.
 */
-class StoreChargeMessage extends ReceiptMessage 
+class RCreditsReceiptMessage extends ReceiptMessage 
 {
     /**
       This message has to be printed on paper
@@ -49,11 +49,10 @@ class StoreChargeMessage extends ReceiptMessage
     {
         $arDepts = MiscLib::getNumbers(CoreLocal::get('ArDepartments'));
         if (count($arDepts) == 0) {
-            return "SUM( CASE WHEN trans_subtype='MI' THEN 1 ELSE 0 END )";
+            return ' CASE WHEN trans_subtype=\'MI\' THEN 1 ELSE 0 END ';
         }
 
-        $arStr = implode(',', $arDepts);
-        return "SUM( CASE WHEN trans_subtype='MI' OR department IN (" . $arStr . ") THEN 1 ELSE 0 END) ";
+        return " CASE WHEN trans_subtype='MI' OR department IN (" . implode(',', $arDepts) . ") THEN 1 ELSE 0 END ";
     }
 
     /**
@@ -148,8 +147,5 @@ class StoreChargeMessage extends ReceiptMessage
 
         return $receipt . $this->message(1, $ref, $reprint);
     }
-
-    public $standalone_receipt_type = 'miSlip';
-
 }
 

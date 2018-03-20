@@ -34,6 +34,7 @@ use \CoreLocal;
 class StoreChargeTender extends TenderModule 
 {
 
+    protected $slip_type = 'miSlip';
     /**
       Check for errors
       @return True or an error message string
@@ -106,5 +107,6 @@ class StoreChargeTender extends TenderModule
 
         return true;
     }
+
 }
 

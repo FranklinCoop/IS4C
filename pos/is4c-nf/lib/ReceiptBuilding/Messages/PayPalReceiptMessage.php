@@ -38,7 +38,7 @@ use \CoreLocal;
   if paper signature slips are being used. The signature
   slip is provided by standalone receipt.
 */
-class StoreChargeMessage extends ReceiptMessage 
+class PayPalReceiptMessage extends ReceiptMessage 
 {
     /**
       This message has to be printed on paper
@@ -47,13 +47,12 @@ class StoreChargeMessage extends ReceiptMessage
 
     public function select_condition()
     {
-        $arDepts = MiscLib::getNumbers(CoreLocal::get('ArDepartments'));
-        if (count($arDepts) == 0) {
-            return "SUM( CASE WHEN trans_subtype='MI' THEN 1 ELSE 0 END )";
-        }
+        //$arDepts = MiscLib::getNumbers(CoreLocal::get('ArDepartments'));
+        //if (count($arDepts) == 0) {
+        //    return ' CASE WHEN trans_subtype=\'MI\' THEN 1 ELSE 0 END ';
+        //}
 
-        $arStr = implode(',', $arDepts);
-        return "SUM( CASE WHEN trans_subtype='MI' OR department IN (" . $arStr . ") THEN 1 ELSE 0 END) ";
+        return "SUM(CASE WHEN trans_subtype='PY' THEN 1 ELSE 0 END)";
     }
 
     /**
@@ -65,38 +64,16 @@ class StoreChargeMessage extends ReceiptMessage
     */
     public function message($val, $ref, $reprint=false)
     {
-        MemberLib::chargeOk();
+        return "TEST REMOVE LATER\n\n\n";
 
-        $labels = array();
-        $labels['charge'] = array(_("Current IOU Balance:") , 1);
-        $labels['debit'] = array(_("Debit available:"), -1);
-        if (CoreLocal::get('InvertAR')) {
-            $labels['charge'][1] = -1;
-        }
-
-        $currActivity = CoreLocal::get("memChargeTotal");
-        $currBalance = CoreLocal::get("balance") - $currActivity;
-
-        if (($numRows > 0 || $currBalance != 0) && CoreLocal::get("memberID") != CoreLocal::get('defaultNonMem')) {
-            $chargeString = $labels["$program"][0] .
-                " $".sprintf("%.2f",($labels["$program"][1] * $currBalance));
-            $receipt = "\n\n"
-                . $this->printHandler->textStyle(true, false, true)
-                . $this->printHandler->centerString($chargeString)
-                . $this->printHandler->textStyle(true) . "\n";
-
-            return $receipt;
-        }
-
-        return '';
     }
 
     public function standalone_receipt($ref, $reprint=false)
     {
-        $chgName = MemberLib::getChgName();
+		$chgName = MemberLib::getChgName();
         $dateTimeStamp = time();
         $date = ReceiptLib::build_time($dateTimeStamp);
-        $program = 'charge';
+        $program = 'paypal';
 
         /* Where should the label values come from, be entered?
            20Mar15 Eric Lee. Andy's comment was about Coop Cred which
@@ -118,6 +95,12 @@ class StoreChargeMessage extends ReceiptMessage
                 _("Debit Amount:"),
                 _("I ACKNOWLEDGE THE ABOVE DEBIT\n"),
                 _("TO MY DEBIT ACCOUNT\n"),
+        );
+        $labels['paypal'] = array(
+                _("PAYPAL CHARGE\n"),
+                _("PayPal Amount:"),
+                _("STORE RECORD KEEP IN DRAWER\n"),
+                _("PAYPAL CHARGE\n"),
         );
 
         /* Could append labels from other modules
@@ -149,7 +132,6 @@ class StoreChargeMessage extends ReceiptMessage
         return $receipt . $this->message(1, $ref, $reprint);
     }
 
-    public $standalone_receipt_type = 'miSlip';
-
+    public $standalone_receipt_type = 'pySlip';
 }
 

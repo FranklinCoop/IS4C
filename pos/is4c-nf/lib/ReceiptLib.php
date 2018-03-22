@@ -791,7 +791,7 @@ static private function messageModFooters($receipt, $where, $ref, $reprint)
 {
     // check if message mods have data
     // and add them to the receipt
-    $validMods = self::validateMessageMods($where,$receipt);
+    $validMods = self::validateMessageMods($where);
     foreach($validMods as $class =>$thing){   
         if ($thing['val'] != 0) {
             $obj = $thing[$class];
@@ -805,7 +805,7 @@ static private function messageModFooters($receipt, $where, $ref, $reprint)
     return $receipt;
 }
 
-static private function validateMessageMods($where, $receipt) {
+static private function validateMessageMods($where) {
     $dbc = Database::tDataConnect();
     $modQ = "SELECT ";
     $selectMods = array();
@@ -820,7 +820,6 @@ static private function validateMessageMods($where, $receipt) {
         $obj = new $class();
         $obj->setPrintHandler(self::$PRINT);
         $modQ .= $obj->select_condition().' AS '.$dbc->identifierEscape($class).',';
-        $receipt .= "\nselect_condition: ".$obj->select_condition()."\n***\n";
         $selectMods[$class] = $obj;
     }
     $modQ = rtrim($modQ,',');
@@ -838,10 +837,6 @@ static private function validateMessageMods($where, $receipt) {
     }
     return $returnMods;
 
-                //$receipt .= "ModClass: ".$modClass."\n";
-            //$receipt .= "Valid: ".$mod['val']."\n";
-            //$receipt .= "Slip Type: ".$modObj->standalone_receipt_type."\n";
-            //$receipt .= "\nselect_condition: ".$modObj->select_condition."\n***\n";
 }
 
 static private function messageMods()
@@ -964,32 +959,30 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
       print store copy of charge slip regardless of receipt print setting - apbw 2/14/05 
       ---------------------------------------------------------------- */
     $tmap = CoreLocal::get('TenderMap');
+    // skip signature slips if using electronic signature capture (unless it's a reprint)
+    if ((is_array($tmap) && isset($tmap['MI']) && $tmap['MI'] != 'SignedStoreChargeTender') || $reprint) {
+        if (CoreLocal::get("chargeTotal") != 0 && ((CoreLocal::get("End") == 1 && !$second) || $reprint)) {
+            if (is_array($receipt)) {
+                $receipt['print'] .= self::printChargeFooterStore($dateTimeStamp, $ref, $chargeProgram);
+            } else {
+                $receipt .= self::printChargeFooterStore($dateTimeStamp, $ref, $chargeProgram);
+            }
+        }
+    }
+
     /*
      Check which standalone mods should print.
     */
-    $receipt .= "\n***DEBUG Vlid Slips PRINT***\n";
     $validSlips = array();
-    foreach (self::validateMessageMods($where,$receipt) as $modClass => $mod) {
+    foreach (self::validateMessageMods($where) as $modClass => $mod) {
         if ($mod['val'] !=0) {
             $modObj = $mod[$modClass];
             $validSlips[$modObj->standalone_receipt_type] = $modObj;
-            $receipt .= "ModClass: ".$modClass."\n";
-            $receipt .= "Valid: ".$mod['val']."\n";
-            $receipt .= "Slip Type: ".$modObj->standalone_receipt_type."\n";
-            $receipt .= "\nselect_condition: ".$modObj->select_condition()."\n***\n";
-        } else {
-            //$receipt .= "ModClass: ".$modClass."\n";
-            //$receipt .= "Valid: ".$mod['val']."\n";
-            //$receipt .= "Slip Type: ".$modObj->standalone_receipt_type."\n";
-            
-            //$receipt .= "Slip Type: ".$modObj->select_condition()."\n";
-
-        }
+        } 
     }
     /*
      Finds slips neede for each tender.
     */
-    $receipt .= "\n***DEBUG STANDALONE PRINT***\n";
     foreach ($tmap as $tender => $tenderClass) {
         if (!class_exists($tenderClass)) { // try namespaced version
             $tenderClass = 'COREPOS\\pos\\lib\\Tenders\\' . $tenderClass;
@@ -998,14 +991,9 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
         $slipType = $tenderObject->getSlip();
         if (isset($typeMap[$slipType]) && isset($validSlips[$slipType])) {
             $mod = $validSlips[$slipType];
+            $receipt = self::cutReceipt($receipt, $second);
             $receipt .= $mod->standalone_receipt($ref);
-        } else {
-            
-            //$receipt .= "Slip Type: ".$slipType."\n";
-            //$receipt .= "Tender Type: ".$tender."\n";
-            //$receipt .= "Tender Class: ".$tenderClass."\n";
-            //$receipt .= "Valid Slip Type: ".$validSlips[$slipType]->standalone_receipt_type."\n";
-        }
+        } 
     }
             
     $receipt = self::cutReceipt($receipt, $second);

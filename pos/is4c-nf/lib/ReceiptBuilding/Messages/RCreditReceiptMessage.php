@@ -39,7 +39,7 @@ use \CoreLocal;
   if paper signature slips are being used. The signature
   slip is provided by standalone receipt.
 */
-class PayPalReceiptMessage extends ReceiptMessage 
+class RCreditReceiptMessage extends ReceiptMessage 
 {
     /**
       This message has to be printed on paper
@@ -53,7 +53,7 @@ class PayPalReceiptMessage extends ReceiptMessage
         //    return ' CASE WHEN trans_subtype=\'MI\' THEN 1 ELSE 0 END ';
         //}
 
-        return "SUM(CASE WHEN trans_subtype='PY' THEN 1 ELSE 0 END)";
+        return "SUM(CASE WHEN trans_subtype='RC' THEN 1 ELSE 0 END)";
     }
 
     /**
@@ -71,7 +71,7 @@ class PayPalReceiptMessage extends ReceiptMessage
 
     public function standalone_receipt($ref, $reprint=false)
     {
-	      $date = ReceiptLib::build_time(time());
+        $date = ReceiptLib::build_time(time());
         list($emp, $reg, $trans) = ReceiptLib::parseRef($ref);
         $slip = '';
 
@@ -87,7 +87,7 @@ class PayPalReceiptMessage extends ReceiptMessage
         $sql = "SELECT -1*SUM(Total) AS amount, 
                 `datetime` AS datetime
                 FROM localtranstoday 
-                WHERE trans_subtype = 'PY'
+                WHERE trans_subtype = 'RC'
                    AND emp_no=".$emp."
                    AND register_no = ".$reg."
                    AND trans_no = ".$trans."
@@ -102,7 +102,7 @@ class PayPalReceiptMessage extends ReceiptMessage
                 $slip .= ReceiptLib::centerString(CoreLocal::get("chargeSlip" . $i))."\n";
             }
             $slip .= "\n";
-            $slip .= "PAYPAL CHARGE\n";
+            $slip .= "RCERDITS CHARGE\n";
             $slip .= "Date: ".date('m/d/y h:i a', strtotime($row['datetime']))."\n";
             $slip .= "REFERNCE #: ".$emp."-".$reg."-".$trans."\n\n";
             $slip .= ReceiptLib::boldFont().ReceiptLib::centerString(" S T O R E   C O P Y ").ReceiptLib::normalFont()."\n";
@@ -115,6 +115,6 @@ class PayPalReceiptMessage extends ReceiptMessage
         return $slip;
     }
 
-    public $standalone_receipt_type = 'pySlip';
+    public $standalone_receipt_type = 'rcSlip';
 }
 

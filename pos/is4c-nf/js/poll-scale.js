@@ -26,7 +26,8 @@ function scalePollSuccess(data){
 		if (data.scans && data.scans.indexOf && data.scans.indexOf(':') !== -1){
 			// data from the cc terminal
 			// run directly; don't include user input
-			if (typeof runParser === 'function')
+			//data.scans = '0XA' + data.scans;
+            if (typeof runParser === 'function')
 				runParser(encodeURI(data.scans), SCALE_REL_PRE);
 		}
 		else if ($('#reginput').length !== 0 && data.scans){
@@ -46,7 +47,8 @@ function scalePollSuccess(data){
                 data.scans = '0XA' + data.scans;
             }
             // pos2 parseWrapper is adding current input
-			parseWrapper(data.scans);
+			data.scans = '0XA' + data.scans;
+            parseWrapper(data.scans);
 			//return; // why is this here? scale needs to keep polling...
 		}
 	}

@@ -61,6 +61,7 @@ class UPC extends Parser
 
     const GS1_PREFIX = 'GS1~RX';
     const GS1_STATUS = 'GS';
+    const FCC_NCR = false;
 
     /**
       The default case is pretty simple. A numeric string
@@ -108,7 +109,7 @@ class UPC extends Parser
                 return $prefix;
             }
         }
-
+        
         return false;
     }
 
@@ -131,6 +132,8 @@ class UPC extends Parser
         }
         $this->status = self::GENERIC_STATUS;
         if ($this->source !== false) {
+            //strip the prefix from the upc here so that parsing continues
+            $str = substr($str,strlen($this->source));
             $this->status = $this->getStatus($this->source);
         }
 
@@ -140,6 +143,10 @@ class UPC extends Parser
         */
         if ($this->session->get('tare') > 0 && $this->source === self::SCANNED_PREFIX) {
             return $this->default_json();
+        }
+
+        if(strlen($str)<=12 && strlen($str) >= 6 && self::FCC_NCR === True && $this->source === self::SCANNED_PREFIX) {
+            $str = substr($str, 0, -1);
         }
 
         return $this->upcscanned($str);

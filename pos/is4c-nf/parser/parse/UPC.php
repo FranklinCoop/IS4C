@@ -34,6 +34,7 @@ use COREPOS\pos\lib\Scanning\SpecialDept;
 use COREPOS\pos\lib\Scanning\SpecialUPC;
 use COREPOS\pos\parser\Parser;
 use COREPOS\pos\plugins\Plugin;
+use COREPOS\pos\lib\LaneLogger;
 use \CoreLocal;
 
 class UPC extends Parser
@@ -82,6 +83,8 @@ class UPC extends Parser
     */
     public function check($str)
     {
+        $logger = new LaneLogger();
+        $logger->debug("TEST: ".$str);
         if (is_numeric($str) && strlen($str) < 16) {
             return true;
         } elseif ($this->getPrefix($str) !== false) {
@@ -145,7 +148,7 @@ class UPC extends Parser
             return $this->default_json();
         }
 
-        if(strlen($str)<=12 && strlen($str) >= 6 && self::FCC_NCR === True && $this->source === self::SCANNED_PREFIX) {
+        if(strlen($str)<=12 && strlen($str) > 8 && self::FCC_NCR === True && $this->source === self::SCANNED_PREFIX) {
             $str = substr($str, 0, -1);
         }
 

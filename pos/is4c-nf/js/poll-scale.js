@@ -43,9 +43,7 @@ function scalePollSuccess(data){
             // is not added. Filtering out scans while the scale is waiting
             // for a weight uses the prefix, so once the scale is ready
             // a UPC has to go through w/o prefix
-            if (!data.scans && url.substring(url.length - 8) === 'pos2.php' && data.scans.substring(0, 3) !== 'OXA') {
-                data.scans = '0XA' + data.scans;
-            } else if (data.scans.substring(0, 7) !== 'TERMBMP') {
+            if (data.scans && url.substring(url.length - 8) === 'pos2.php' && data.scans.substring(0, 3) !== '0XA') {
                 data.scans = '0XA' + data.scans;
             }
             // pos2 parseWrapper is adding current input

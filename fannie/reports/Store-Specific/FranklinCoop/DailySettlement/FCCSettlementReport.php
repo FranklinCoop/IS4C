@@ -65,7 +65,7 @@ class FCCSettlementReport extends FannieReportPage
 		sum(case when upc='TAXLINEITEM' and description IN ('MaStateMealsTax','StateAndLocalMealsTax', 'MealsTax') then regPrice else 0 end) as sales_tax_total,
 		sum(case when upc='TAXLINEITEM' and description IN ('MASalesTax','MassSalesTax', 'SalesTax') then regPrice else 0 end) as sales_tax_total
 		FROM core_trans.transarchive
-		WHERE datetime BETWEEN ? AND ?;
+		WHERE datetime BETWEEN ? AND ? AND store_no=2;
 		";
 
 		$total_sales = '';
@@ -97,7 +97,7 @@ class FCCSettlementReport extends FannieReportPage
 		sum(case when trans_subtype='IC' AND trans_type ='T' then -total else 0 end) as store_coupon_total,
 		sum(case when trans_subtype='CP' OR trans_subtype='MC' AND trans_type ='T' then -total else 0 end) as mfg_coupon_total
 		FROM core_trans.dlog_90_view
-		WHERE tdate BETWEEN ? AND ?;";
+		WHERE tdate BETWEEN ? AND ? AND store_no=2;";
 
 		$prep = $dbc->prepare($total_sales);
 		$result = $dbc->execute($prep,$dates);

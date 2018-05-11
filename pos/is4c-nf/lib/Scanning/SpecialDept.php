@@ -40,6 +40,7 @@ class SpecialDept
     public $help_summary = 'Documentation Needed!';
 
     protected $session;
+    protected $slip_type ='';
 
     public function __construct($session)
     {
@@ -92,6 +93,10 @@ class SpecialDept
     public function handle($deptID,$amount,$json)
     {
         return $json;
+    }
+
+    public function getSlip() {
+        return $this->slip_type;
     }
 
     private static $builtin = array(

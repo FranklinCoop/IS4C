@@ -56,6 +56,7 @@ class PaycardDatacapParser extends Parser
         'AVDATACAPGD',
         'DATACAPRECUR',
         'PVDATACAP',
+        'DATACAPMEF',
     );
     
     public function __construct($session)
@@ -114,6 +115,8 @@ class PaycardDatacapParser extends Parser
             case 'DATACAPDC':
                 if ($this->conf->get('CacheCardCashBack')) {
                     $this->conf->set('paycard_amount', $this->conf->get('amtdue') + $this->conf->get('CacheCardCashBack'));
+                } else {
+                    $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardCashBackPrompt.php';
                 }
                 $this->conf->set('CacheCardType', 'DEBIT');
                 break;

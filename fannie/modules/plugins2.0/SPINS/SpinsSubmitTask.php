@@ -90,7 +90,7 @@ class SpinsSubmitTask extends FannieTask
                   WHERE p.Scale = 0
                     AND d.upc > '0000000999999' 
                     AND tdate BETWEEN ? AND ?
-                    " . ($this->config->get('STORE_MODE') == 'HQ' ? ' AND d.store_id=? ' : '') . "
+                    AND d.store_id=?
                   GROUP BY d.upc, p.description";
 
         $outfile = sys_get_temp_dir()."/".$filename;
@@ -98,9 +98,9 @@ class SpinsSubmitTask extends FannieTask
 
         $dataP = $dbc->prepare($dataQ);
         $args = array($dateObj->startDate() . ' 00:00:00', $dateObj->endDate() . ' 23:59:59');
-        if ($this->config->get('STORE_MODE') == 'HQ') {
+        //if ($this->config->get('STORE_MODE') == 'HQ') {
             $args[] = $this->config->get('STORE_ID');
-        }
+        //}
         $dataR = $dbc->execute($dataP, $args);
         while($row = $dbc->fetch_row($dataR)){
             for($i=0;$i<4; $i++){

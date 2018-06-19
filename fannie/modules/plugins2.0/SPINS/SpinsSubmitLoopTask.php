@@ -104,7 +104,7 @@ class SpinsSubmitLoopTask extends FannieTask
                     " . DTrans::joinProducts('d', 'p', 'INNER') . "
                   WHERE p.Scale = 0
                     AND d.upc > '0000000999999' 
-                    AND tdate BETWEEN ? AND ?
+                    AND tdate BETWEEN ? AND ? AND store_id=?
                   GROUP BY d.upc, p.description";
 
         $filenameprefix = '';

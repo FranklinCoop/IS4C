@@ -108,8 +108,8 @@ class SpinsSubmitLoopTask extends FannieTask
                   GROUP BY d.upc, p.description";
 
             $filenameprefix = '';
-            if (isset($FANNIE_PLUGIN_SETTINGS['SpinsFileNamePrefix'])) {
-                $filenameprefix = $FANNIE_PLUGIN_SETTINGS['SpinsFileNamePrefix'];
+            if (isset($FANNIE_PLUGIN_SETTINGS['SpinsPrefix'])) {
+                $filenameprefix = $FANNIE_PLUGIN_SETTINGS['SpinsPrefix'];
             }
 
             $filename = $filenameprefix . date('mdY', $end) . '.csv';

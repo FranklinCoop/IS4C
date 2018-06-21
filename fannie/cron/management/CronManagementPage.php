@@ -475,6 +475,7 @@ class CronManagementPage extends FanniePage
                 if (strstr($tmp[5], 'FannieTask')) {
                     $script = str_replace(" >> {$FANNIE_ROOT}logs/fannie.log","",$tmp[5]);
                     $script = str_replace(" >> {$FANNIE_ROOT}logs/dayend.log","",$script);
+                    $script = str_replace(" >> {$FANNIE_ROOT}cron/logs/fannie.log"),"",$script);
                     $tmp[5] = str_replace(" >> {$FANNIE_ROOT}logs/dayend.log", " >> {$FANNIE_ROOT}logs/fannie.log", $tmp[5]);
                     $parts = explode(' ', $script);
                     $script = $parts[count($parts)-1];

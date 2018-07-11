@@ -95,10 +95,13 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			else {$monthAmt = $yearAmt;}//doesn't increment after month 5 so it's the same as for the year.
 
 			$blueLine = $row['card_no'].' '.substr($row['FirstName'], 0, 1).'. '.$row['LastName'].' ';
+			$memberLevel = $row['memType'];
 			if ($yearAmt > 0){ 
+				if ($memberLevel == 1) { $memberLevel = 0; }
 				$blueLine .= $monthAmt.'/'.$yearAmt.'/'.$remainAmt;
-			} /*else {
-				switch ($row['memType']) {
+			} else {
+				if ($memberLevel == 0) { $memberLevel = 1; }
+				/*switch ($row['memType']) {
 					case 1:
 						$blueLine .= 'Member';
 						break;
@@ -120,11 +123,11 @@ class FCC_EquityPaymentDueTask extends FannieTask
 					default:
 						$blueLine .= 'Member';
 						break;
-				}
-			}*/
+				}*/
+			}
 			if ($blueLine != $row['blueLine']) {
 				$opDBC = FannieDB::get($OpDB);
-				$updateQ = 'UPDATE '.$OpDB.'.custdata c set blueLine="'.$blueLine.'" where c.CardNo='.$row['card_no'].' AND c.id='.$row['id'];
+				$updateQ = 'UPDATE '.$OpDB.'.custdata c set blueLine="'.$blueLine.'",memType ='.$memberLevel.' where c.CardNo='.$row['card_no'].' AND c.id='.$row['id'];
 				$updateP = $opDBC->prepare($updateQ);
 				$updateR = $opDBC->execute($updateP,array());
 				echo $this->cronMsg("Blue Line: ".$blueLine.'  '.$yearAmt);

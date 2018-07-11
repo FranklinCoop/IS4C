@@ -28,7 +28,7 @@ if (!class_exists('FannieAPI')) {
 
 /**
 */
-class FileByEmail extends \COREPOS\Fannie\API\FanniePlugin 
+class FCCEquityPlan extends \COREPOS\Fannie\API\FanniePlugin 
 {
     public $plugin_settings = array();
 

@@ -64,7 +64,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 		$TransDB = $this->config->get('TRANS_DB');
 		$OpDB = $FANNIE_OP_DB;
 		$dbc = FannieDB::get($TransDB);
-		$query = "select e.card_no, e.payments, e.startdate, e.mostRecent, c.LastName, c.FirstName, c.memType,c.id
+		$query = "select e.card_no, e.payments, e.startdate, e.mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id
 					from ".$TransDB.".equity_history_sum e
 					left join ".$OpDB.".custdata c on e.card_no=c.CardNo where e.card_no < 8000";
 		$prep = $dbc->prepare($query);
@@ -122,11 +122,13 @@ class FCC_EquityPaymentDueTask extends FannieTask
 						break;
 				}
 			}*/
-			$opDBC = FannieDB::get($OpDB);
-			$updateQ = 'UPDATE '.$OpDB.'.custdata c set blueLine="'.$blueLine.'" where c.CardNo='.$row['card_no'].' AND c.id='.$row['id'];
-			$updateP = $opDBC->prepare($updateQ);
-			$updateR = $opDBC->execute($updateP,array());
-			echo $this->cronMsg("Blue Line: ".$blueLine.'  '.$yearAmt);
+			if ($blueLine != $row['blueLine']) {
+				$opDBC = FannieDB::get($OpDB);
+				$updateQ = 'UPDATE '.$OpDB.'.custdata c set blueLine="'.$blueLine.'" where c.CardNo='.$row['card_no'].' AND c.id='.$row['id'];
+				$updateP = $opDBC->prepare($updateQ);
+				$updateR = $opDBC->execute($updateP,array());
+				echo $this->cronMsg("Blue Line: ".$blueLine.'  '.$yearAmt);
+			}
 		}
 
 	}

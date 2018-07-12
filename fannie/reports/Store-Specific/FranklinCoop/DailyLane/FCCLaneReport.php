@@ -80,7 +80,7 @@ class FCCLaneReport extends FannieReportPage
             sum(case when department='994' then -total else 0 end) as paid_out_total,
             sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
             sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total
-            FROM core_trans.dlog_90_view
+            FROM core_trans.transarchive
             WHERE tdate BETWEEN ? AND ? AND store_id =2;");
         $totalSalesR = $dbc->execute($total_sales,$dates);
         $totalSalesW = $dbc->fetch_row($totalSalesR);
@@ -104,7 +104,7 @@ class FCCLaneReport extends FannieReportPage
 			sum(case when department='994' then -total else 0 end) as paid_out_total,
 			sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
 			sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total
-			FROM core_trans.dlog_90_view
+			FROM core_trans.transarchive
 			WHERE register_no='1' and tdate BETWEEN ? AND ? AND store_id =2;");
         $lane1SalesR = $dbc->execute($lane1Sales,$dates);
         $lane1SalesW = $dbc->fetch_row($lane1SalesR); 
@@ -128,7 +128,7 @@ class FCCLaneReport extends FannieReportPage
 			sum(case when department='994' then -total else 0 end) as paid_out_total,
 			sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
 			sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total
-			FROM core_trans.dlog_90_view
+			FROM core_trans.transarchive
 			WHERE register_no='2' and tdate BETWEEN ? AND ? AND store_id =2;");
         $lane2SalesR = $dbc->execute($lane2Sales,$dates);
         $lane2SalesW = $dbc->fetch_row($lane2SalesR);
@@ -152,7 +152,7 @@ class FCCLaneReport extends FannieReportPage
 			sum(case when department='994' then -total else 0 end) as paid_out_total,
 			sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
 			sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total
-			FROM core_trans.dlog_90_view
+			FROM core_trans.transarchive
 			WHERE register_no='3' and tdate BETWEEN ? AND ? AND store_id =2;");
         $lane3SalesR = $dbc->execute($lane3Sales,$dates);
         $lane3SalesW = $dbc->fetch_row($lane3SalesR);

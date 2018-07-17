@@ -340,7 +340,7 @@ HTML;
         }
 
         if ($mode === '') {
-            $mode = $this->config->get('BATCH_VIEW', 'all');
+            $mode = $this->config->get('FANNIE_BATCH_VIEW', 'all');
         }
 
         $ret = "";

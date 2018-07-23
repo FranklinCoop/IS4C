@@ -75,7 +75,7 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
     private AutoResetEvent sleeper;
     private Object syncLock;
 
-    private bool allowDebitCB = true;
+    private bool allowDebitCB = false;
     private string defaultMsg = "Welcome";
     private string bufferedCardType = "";
 
@@ -263,10 +263,10 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
             char fs = (char)0x1c;
 
             // standard credit/debit/ebt/gift
-            string buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,S"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S";
+            string buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,S"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S"+fs+"Bbtne,S";
             if (this.emv_buttons == RbaButtons.EMV) {
                 // CHIP+PIN button in place of credit & debit
-                buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,S"+fs+"Bbtnb,CHIP+PIN"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S";
+                buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,S"+fs+"Bbtnb,CHIP+PIN"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S"+fs+"Bbtne,S";
             } else if (this.emv_buttons == RbaButtons.Cashback) {
                 buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,CASHBACK"+fs+"Bbtna,S"+fs+"Bbtnb,CREDIT"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S";
             } else if (this.emv_buttons == RbaButtons.None) {
@@ -319,7 +319,9 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
                         System.Console.Write(buffer[i] + " ");
                     }
                     if (Choice(enc.GetString(buffer))) {
-                        WriteMessageToDevice(SimpleMessageScreen("Please Wait for Cashier"));
+                        WriteMessageToDevice(GetCardType());
+                        WriteMessageToDevice(UpdateScreenMessage("TPROMPT6,Please Wait For Cashier"));
+                        //WriteMessageToDevice(SimpleMessageScreen("Please Wait for Cashier"));
                         this.ReadAndAck();
                         // input is done; no need to keep the read thread alive
                         // and rely on cross-thread signaling to end it later
@@ -396,6 +398,11 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
                     ret = true;
                     this.sendBufferedCardType();
                     break;
+                case "E":
+                    parent.MsgSend("TERM:DCGD");
+                    ret = true;
+                    this.sendBufferedCardType();
+                    break;
                 case "1":
                     parent.MsgSend("TERMCB:10");
                     ret = true;
@@ -426,6 +433,7 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
                     this.sendBufferedCardType();
                     break;
                 default:
+                    parent.MsgSend("TERM:CANCEL");
                     System.Console.WriteLine("Cancel \n");
                     showPaymentScreen();
                     this.ReadAndAck();

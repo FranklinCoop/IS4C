@@ -31,6 +31,7 @@ use COREPOS\pos\parser\Parser;
 use COREPOS\pos\lib\Drawers;
 use COREPOS\pos\lib\FormLib;
 use COREPOS\pos\lib\Kickers\Kicker;
+use \CoreLocal;
 
 /* --COMMENTS - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
  *
@@ -241,7 +242,17 @@ class Steering extends Parser
                 return true;
 
             case "CN":
-                $this->ret['main_frame'] = $myUrl."gui-modules/mgrlogin.php";
+                if ($this->tenderApplied()) {
+                    $this->ret['output'] = DisplayLib::boxMsg(
+                        _("Tender Applied"),
+                        _('Cancel not allowed.'),
+                        true,
+                        DisplayLib::standardClearButton()
+                    );
+                } else {
+                  $this->ret['main_frame'] = $myUrl."gui-modules/mgrlogin.php";             
+                }
+
                 return true;
 
             case "PO":
@@ -250,6 +261,18 @@ class Steering extends Parser
         }
 
         return false;
+    }
+
+    function tenderApplied() {
+        if (CoreLocal::get('store') == 'McCuskers' || CoreLocal::get('store')=='GreenFieldsMarket' || CoreLocal::get('store') == 'FranklinCoop') {
+            $dbc = Database::tDataConnect();
+            $query = "select * from localtemptrans where trans_type ='T' and trans_subtype IN('CC','DC','EF','EC','GD') group by trans_type;";
+            $result = $dbc->query($query);
+            if ($dbc->numRows($result) > 0){
+                return true;
+            }
+        }
+        return  false;
     }
 
     public function parse($str)

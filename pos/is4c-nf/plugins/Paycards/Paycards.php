@@ -64,6 +64,15 @@ class Paycards extends Plugin {
             'Customer' => 0
             )
         ),
+        'PaycardsCustomerChoice' => array(
+        'label' => 'Mode',
+        'description' => 'Who picks card type?',
+        'default' => 1,
+        'options' => array(
+            'Cashier' => 1,
+            'Customer' => 0
+            )
+        ),
         'PaycardsStateChange' => array(
         'label' => 'Communication',
         'description' => 'Should terminal switch screens 
@@ -97,6 +106,7 @@ messages from POS?',
             'Yes' => 1,
             'No' => 0,
             'Member Only' => 2,
+            'Prompt Cashier' => 3,
             )
         ),
         'PaycardsTermCashBackLimit' => array(

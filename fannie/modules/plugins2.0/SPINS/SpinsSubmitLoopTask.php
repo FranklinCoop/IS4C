@@ -30,10 +30,9 @@ if (!class_exists('FannieAPI')) {
 */
 class SpinsSubmitLoopTask extends FannieTask 
 {
-    public $name = 'Submit SPINS data';
+    public $name = 'Spins Loop Command Line Only';
 
-    public $description = 'Submits weekly sales data to SPINS. SPINS plugin must be configured
-    with proper FTP credentials';
+    public $description = 'Generates A range of Spins weeks Only run via command line "php /pos/fannie/classlib2.0/FannieTask.php SpinsSubmitLoopTask"';
 
     public $default_schedule = array(
         'min' => 0,
@@ -79,24 +78,24 @@ class SpinsSubmitLoopTask extends FannieTask
         }
 
         $today = strtotime("now");
-        $loopStart = strtotime("2016-01-04");
+        $loopStart = strtotime("2018-02-26");
 
         while ($loopStart < $today) {
                     // walk forward to Sunday
-        $start = $loopStart;
-        $end = $loopStart;
-        while (date('w', $end) != 0) {
-            $end = mktime(0,0,0,date('n',$end),date('j',$end)+1,date('Y',$end));
-        }
-        $dlog = DTransactionsModel::selectDlog(date('Y-m-d', $start), date('Y-m-d',$end));
+            $start = $loopStart;
+            $end = $loopStart;
+            while (date('w', $end) != 0) {
+                $end = mktime(0,0,0,date('n',$end),date('j',$end)+1,date('Y',$end));
+            }
+            $dlog = DTransactionsModel::selectDlog(date('Y-m-d', $start), date('Y-m-d',$end));
 
-        $lastDay = date("M d, Y", $end) . ' 11:59PM'; 
+            $lastDay = date("M d, Y", $end) . ' 11:59PM'; 
 
-        $this->cronMsg('SPINS data for week #' . $spins_week . '(' . date('Y-m-d', $start) . ' to ' . date('Y-m-d', $end) . ')', FannieLogger::INFO);
+            $this->cronMsg('SPINS data for week #' . $spins_week . '(' . date('Y-m-d', $start) . ' to ' . date('Y-m-d', $end) . ')', FannieLogger::INFO);
 
-        // Odd "CASE" statement is to deal with special order
-        // line items the have case size & number of cases
-        $dataQ = "SELECT d.upc, p.description,
+            // Odd "CASE" statement is to deal with special order
+            // line items the have case size & number of cases
+            $dataQ = "SELECT d.upc, p.description,
                     SUM(CASE WHEN d.quantity <> d.ItemQtty AND d.ItemQtty <> 0 THEN d.quantity*d.ItemQtty ELSE d.quantity END) as quantity,
                     SUM(d.total) AS dollars,
                     '$lastDay' AS lastDay
@@ -104,54 +103,54 @@ class SpinsSubmitLoopTask extends FannieTask
                     " . DTrans::joinProducts('d', 'p', 'INNER') . "
                   WHERE p.Scale = 0
                     AND d.upc > '0000000999999' 
-                    AND tdate BETWEEN ? AND ?
+                    AND tdate BETWEEN ? AND ? AND d.store_id=?
                   GROUP BY d.upc, p.description";
 
-        $filenameprefix = '';
-        if (isset($FANNIE_PLUGIN_SETTINGS['SpinsFileNamePrefix'])) {
-            $filenameprefix = $FANNIE_PLUGIN_SETTINGS['SpinsFileNamePrefix'];
-        }
-
-        $filename = $filenameprefix . date('mdY', $end) . '.csv';
-        $outfile = sys_get_temp_dir()."/".$filename;
-        $fp = fopen($outfile,"w");
-
-        $dataP = $dbc->prepare($dataQ);
-        $args = array(date('Y-m-d 00:00:00', $start), date('Y-m-d 23:59:59', $end));
-        $dataR = $dbc->execute($dataP, $args);
-        while($row = $dbc->fetch_row($dataR)){
-            for($i=0;$i<4; $i++){
-                if ($i==2 || $i==3) {
-                    $row[$i] = sprintf('%.2f', $row[$i]);
-                }
-                fwrite($fp,"\"".$row[$i]."\",");
+            $filenameprefix = '';
+            if (isset($FANNIE_PLUGIN_SETTINGS['SpinsPrefix'])) {
+                $filenameprefix = $FANNIE_PLUGIN_SETTINGS['SpinsPrefix'];
             }
-            fwrite($fp,"\"".$row[4]."\"\n");
-        }
-        fclose($fp);
 
-        if ($upload) {
-            $conn_id = ftp_connect('ftp.spins.com');
-            $login_id = ftp_login($conn_id, $FANNIE_PLUGIN_SETTINGS['SpinsFtpUser'], $FANNIE_PLUGIN_SETTINGS['SpinsFtpPw']);
-            if (!$conn_id || !$login_id) {
-                $this->cronMsg('FTP Connection failed', FannieLogger::ERROR);
-            } else {
-                ftp_chdir($conn_id, "data");
-                ftp_pasv($conn_id, true);
-                $uploaded = ftp_put($conn_id, $filename, $outfile, FTP_ASCII);
-                if (!$uploaded) {
-                    $this->cronMsg('FTP upload failed', FannieLogger::ERROR);
+            $filename = $filenameprefix . date('mdY', $end) . '.csv';
+            $outfile = sys_get_temp_dir()."/".$filename;
+            $fp = fopen($outfile,"w");
+
+            $dataP = $dbc->prepare($dataQ);
+            $args = array(date('Y-m-d 00:00:00', $start), date('Y-m-d 23:59:59', $end), $this->config->get('STORE_ID'));
+            $dataR = $dbc->execute($dataP, $args);
+            while($row = $dbc->fetch_row($dataR)){
+                for($i=0;$i<4; $i++){
+                    if ($i==2 || $i==3) {
+                        $row[$i] = sprintf('%.2f', $row[$i]);
+                    }
+                    fwrite($fp,"\"".$row[$i]."\",");
+                }
+                fwrite($fp,"\"".$row[4]."\"\n");
+            }
+            fclose($fp);
+
+            if ($upload) {
+                $conn_id = ftp_connect('ftp.spins.com');
+                $login_id = ftp_login($conn_id, $FANNIE_PLUGIN_SETTINGS['SpinsFtpUser'], $FANNIE_PLUGIN_SETTINGS['SpinsFtpPw']);
+                if (!$conn_id || !$login_id) {
+                    $this->cronMsg('FTP Connection failed', FannieLogger::ERROR);
                 } else {
-                    $this->cronMsg('FTP upload successful', FannieLogger::INFO);
+                    ftp_chdir($conn_id, "data");
+                    ftp_pasv($conn_id, true);
+                    $uploaded = ftp_put($conn_id, $filename, $outfile, FTP_ASCII);
+                    if (!$uploaded) {
+                        $this->cronMsg('FTP upload failed', FannieLogger::ERROR);
+                    } else {
+                        $this->cronMsg('FTP upload successful', FannieLogger::INFO);
+                    }
+                    ftp_close($conn_id);
                 }
-                ftp_close($conn_id);
+                unlink($outfile);
+            } else {
+                rename($outfile, './' . $filename);    
+                $this->cronMsg('Generated file: ' . $filename, FannieLogger::INFO);
             }
-            unlink($outfile);
-        } else {
-            rename($outfile, './' . $filename);    
-            $this->cronMsg('Generated file: ' . $filename, FannieLogger::INFO);
-        }
-        $loopStart = mktime(0,0,0,date('n',$end),date('j',$end)+7,date('Y',$end));
+            $loopStart = mktime(0,0,0,date('n',$end),date('j',$end)+1,date('Y',$end));
         }
 
     }

@@ -59,7 +59,7 @@ class FCCLaneReport extends FannieReportPage
 		else
 			$shrinkageUsers = "";
 
-		$dlog = DTransactionsModel::selectDlog($d1);
+		$dlog = DTransactionsModel::selectDTrans($d1);
 
 		$total_sales = $dbc->prepare("SELECT 
             sum(case when trans_subtype='CA' then -total else 0 end) + 500 as cash_total,

@@ -66,7 +66,7 @@ class TaxCollectedReport extends FannieReportPage
                 AND " . DTrans::isStoreID($store, 'd') ."
             GROUP BY YEAR(datetime), MONTH(datetime), DAY(datetime), numflag"
         );
-        $lineR = $dbc->execute($lineP, array($date1 . ' 00:00:00', $date2 . ' 23:59:59'),$store);
+        $lineR = $dbc->execute($lineP, array($date1 . ' 00:00:00', $date2 . ' 23:59:59',$store));
         while ($lineW = $dbc->fetchRow($lineR)) {
             $key = date('Y-m-d', mktime(0,0,0, $lineW['month'], $lineW['day'], $lineW['year']));
             if (!isset($data[$key])) {

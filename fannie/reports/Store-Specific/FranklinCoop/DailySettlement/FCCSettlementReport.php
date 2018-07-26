@@ -59,11 +59,11 @@ class FCCSettlementReport extends FannieReportPage
 		else
 			$shrinkageUsers = "";
 
-		$dlog = DTransactionsModel::selectDlog($d1);
+		$dlog = DTransactionsModel::selectDTrans($d1);
 
 		$total_tax = "SELECT
-		sum(case when upc='TAXLINEITEM' and description IN ('MaStateMealsTax','StateAndLocalMealsTax', 'MealsTax') then regPrice else 0 end) as sales_tax_total,
-		sum(case when upc='TAXLINEITEM' and description IN ('MASalesTax','MassSalesTax', 'SalesTax') then regPrice else 0 end) as sales_tax_total
+		sum(case when upc='TAXLINEITEM' and numflag =1  then regPrice else 0 end) as sales_tax_total,
+		sum(case when upc='TAXLINEITEM' and numflag =2 then regPrice else 0 end) as sales_tax_total
 		FROM ".$dlog."
 		WHERE `tdate` BETWEEN ? AND ? AND store_id=2;
 		";

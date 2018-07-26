@@ -42,6 +42,7 @@ class TaxCollectedReport extends FannieReportPage
         $dbc->setDefaultDB($this->config->get('OP_DB'));
         $date1 = $this->form->date1;
         $date2 = $this->form->date2;
+        $store = FormLib::get('store');
 
         $rate_models = new TaxRatesModel($dbc);
         $rates = array();
@@ -62,9 +63,10 @@ class TaxCollectedReport extends FannieReportPage
                 AND d.upc='TAXLINEITEM'
                 AND d.trans_status NOT IN ('Z','X')
                 AND " . DTrans::isNotTesting('d') . "
+                AND " . DTrans::isStoreID($store, 'd') ."
             GROUP BY YEAR(datetime), MONTH(datetime), DAY(datetime), numflag"
         );
-        $lineR = $dbc->execute($lineP, array($date1 . ' 00:00:00', $date2 . ' 23:59:59'));
+        $lineR = $dbc->execute($lineP, array($date1 . ' 00:00:00', $date2 . ' 23:59:59',$store));
         while ($lineW = $dbc->fetchRow($lineR)) {
             $key = date('Y-m-d', mktime(0,0,0, $lineW['month'], $lineW['day'], $lineW['year']));
             if (!isset($data[$key])) {
@@ -81,9 +83,10 @@ class TaxCollectedReport extends FannieReportPage
                 AND d.upc='TAX'
                 AND d.trans_status NOT IN ('Z','X')
                 AND " . DTrans::isNotTesting('d') . "
+                AND " . DTrans::isStoreID($store, 'd') . "
             GROUP BY YEAR(datetime), MONTH(datetime), DAY(datetime)"
         );
-        $allR = $dbc->execute($allP, array($date1 . ' 00:00:00', $date2 . ' 23:59:59'));
+        $allR = $dbc->execute($allP, array($date1 . ' 00:00:00', $date2 . ' 23:59:59',$store));
         while ($allW = $dbc->fetchRow($allR)) {
             $key = date('Y-m-d', mktime(0,0,0, $allW['month'], $allW['day'], $allW['year']));
             $data[$key]['actual'] = $allW['ttl'];
@@ -119,15 +122,22 @@ class TaxCollectedReport extends FannieReportPage
 
     public function form_content()
     {
+        $store = FormLib::storePicker();
         return '<form method="get">
             <div class="row">'
                 . FormLib::standardDateFields() . '
+            </div>
+            <div class="form-group">
+            <label class="col-sm-4 control-label">Store</label>
+            <div class="col-sm-4">
+                '.$store['html'].'
             </div>
             <p>
                 <button type="submit" class="btn btn-default">Submit</button>
             </p>
             </form>';
     }
+
 }
 
 FannieDispatch::conditionalExec();

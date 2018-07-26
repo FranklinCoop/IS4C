@@ -44,7 +44,10 @@ class PaycardEmvCustomerAction extends BasicCorePage
         $this->conf = new PaycardConf();
         $msg = 'Select card type on pin pad.';
         $msgTitle = 'Customer Action';
-        
+        if ($this->conf->get("ttlflag") != 1) { // must subtotal before running card
+                $url = $this->page_url.'gui-modules/pos2.php?reginput=DATACAPEMV&repeat=1';
+                $this->change_page($url);
+        }
 
         if (FormLib::get('reginput', false) !== false) {
             $input = strtoupper(trim(FormLib::get('reginput')));
@@ -105,6 +108,7 @@ class PaycardEmvCustomerAction extends BasicCorePage
         <?php
     }
     function body_content(){
+        $this->icon = MiscLib::base_url()."graphics/exclaimC.gif";
         $this->input_header('action="PaycardEmvCustomerAction.php" onsubmit="return submitWrapper"');
         echo DisplayLib::printheaderb();
         echo '<div class="baseHeight">';
@@ -118,7 +122,7 @@ class PaycardEmvCustomerAction extends BasicCorePage
         echo"</div>";
         echo "
             <div class=\"boxMsgBody\">
-                <div class=\"msgicon\"><img src=\"$icon\" /></div>
+                <div class=\"msgicon\"><img src=\"$this->icon\" /></div>
                 <div class=\"msgtext\">"
                 . $this->strmsg . "
                 </div>

@@ -49,6 +49,7 @@ class PaycardEmvPage extends PaycardProcessPage
                 $this->conf->set("CachePinEncBlock","");
                 $this->conf->set("CacheCardType","");
                 $this->conf->set("CacheCardCashBack",0);
+                $this->conf->set("CardCashBackChecked", false);
                 $this->conf->set('ccTermState','swipe');
                 UdpComm::udpSend("termReset");
                 $this->change_page($this->page_url."gui-modules/pos2.php");

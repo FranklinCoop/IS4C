@@ -82,6 +82,7 @@ class paycardSuccess extends BasicCorePage
                     UdpComm::udpSend('termReset');
                     $this->conf->set('ccTermState','swipe');
                     $this->conf->set("CacheCardType","");
+                    $this->conf->set("CardCashBackChecked", false);
                 }
                 $this->conf->reset();
 

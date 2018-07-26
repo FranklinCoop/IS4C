@@ -128,6 +128,7 @@ class PaycardCashBackPrompt extends BasicCorePage
     }
 
     function body_content(){
+        $this->icon = MiscLib::base_url()."graphics/exclaimC.gif";
         $this->input_header('action="PaycardCashBackPrompt.php" onsubmit="return submitWrapper"');
         echo '<div class="baseHeight">';
         echo DisplayLib::printheaderb();
@@ -141,7 +142,7 @@ class PaycardCashBackPrompt extends BasicCorePage
         echo"</div>";
         echo "
             <div class=\"boxMsgBody\">
-                <div class=\"msgicon\"><img src=\"$icon\" /></div>
+                <div class=\"msgicon\"><img src=\"$this->icon\" /></div>
                 <div class=\"msgtext\">"
                 . $this->strmsg . "
                 </div>

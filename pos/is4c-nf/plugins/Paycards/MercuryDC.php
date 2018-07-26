@@ -71,7 +71,7 @@ class MercuryDC extends MercuryE2E
             <HostOrIP>' . $dcHost . '</HostOrIP>
             <SequenceNo>{{SequenceNo}}</SequenceNo>
             <CollectData>CardholderName</CollectData>
-            <OKAmount>Disallow</OKAmount>
+            <OKAmount>Allow</OKAmount>
             <PartialAuth>Allow</PartialAuth>';
             $msgXml .= '
             <Account>
@@ -519,6 +519,7 @@ class MercuryDC extends MercuryE2E
                 }
                 UdpComm::udpSend('termReset');
                 $this->conf->set('ccTermState','swipe');
+                $this->conf->set("CardCashBackChecked", false);
                 break;
             default:
                 $this->conf->set("boxMsg","An unknown error occurred<br />at the gateway");

@@ -533,7 +533,7 @@ static public function discountnotify($strl)
        I need custom discount breakouts and this seemed like the easyist way to get them.
        It's messy but seemed like the best way at the time. ~Rowan
     */
-    if (CoreLocal::get('store') == 'McCuskers' || CoreLocal::get('store')=='GreenFieldsMarket') {
+    if (CoreLocal::get('store') == 'McCuskers' || CoreLocal::get('store')=='GreenFieldsMarket' || CoreLocal::get('store') == 'FranklinCoop') {
         self::discountnotifybreakout($strl);
     } else {
          self::addRecord(array(
@@ -560,21 +560,23 @@ static public function discountnotify($strl)
       $delta -=15;
     }
     if (CoreLocal::get("SeniorDiscountFlag") == "1") {
+      $seniorDisc =CoreLocal::get('SeniorDiscountAmt');
       self::addRecord(array(
-        'description' => '** ' . 2 . '% Senior Discount **',
+        'description' => '** ' . $seniorDisc . '% Senior Discount **',
         'trans_type' => '0',
         'trans_status' => 'D',
         'voided' => 4,
       ));
-      $delta -=2;
+      $delta -=$seniorDisc;
     }
-    self::addRecord(array(
+    if ($delta > 0) {
+          self::addRecord(array(
         'description' => '** ' . $delta  . '% Member Discount **',
         'trans_type' => '0',
         'trans_status' => 'D',
         'voided' => 4,
     ));
-
+    }
   }
 
 /**

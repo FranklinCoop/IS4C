@@ -65,7 +65,7 @@ class FCCSettlementReport extends FannieReportPage
 		sum(case when upc='TAXLINEITEM' and numflag =1  then regPrice else 0 end) as sales_tax_total,
 		sum(case when upc='TAXLINEITEM' and numflag =2 then regPrice else 0 end) as sales_tax_total
 		FROM ".$dlog."
-		WHERE `tdate` BETWEEN ? AND ? AND store_id=2;
+		WHERE `datetime` BETWEEN ? AND ? AND store_id=2;
 		";
 
 		$total_sales = '';
@@ -97,7 +97,7 @@ class FCCSettlementReport extends FannieReportPage
 		sum(case when trans_subtype='IC' AND trans_type ='T' then -total else 0 end) as store_coupon_total,
 		sum(case when trans_subtype='CP' OR trans_subtype='MC' AND trans_type ='T' then -total else 0 end) as mfg_coupon_total
 		FROM ".$dlog."
-		WHERE `tdate` BETWEEN ? AND ? AND store_id=2;";
+		WHERE `datetime` BETWEEN ? AND ? AND store_id=2;";
 
 		$prep = $dbc->prepare($total_sales);
 		$result = $dbc->execute($prep,$dates);

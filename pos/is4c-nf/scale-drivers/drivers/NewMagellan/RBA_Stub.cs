@@ -266,7 +266,7 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
             string buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,S"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S"+fs+"Bbtne,S";
             if (this.emv_buttons == RbaButtons.EMV) {
                 // CHIP+PIN button in place of credit & debit
-                buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,S"+fs+"Bbtnb,CHIP+PIN"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S"+fs+"Bbtne,S";
+                buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,S"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S"+fs+"Bbtne,GIFT"+fs+"Bbtne,S";
             } else if (this.emv_buttons == RbaButtons.Cashback) {
                 buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,CASHBACK"+fs+"Bbtna,S"+fs+"Bbtnb,CREDIT"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S";
             } else if (this.emv_buttons == RbaButtons.None) {

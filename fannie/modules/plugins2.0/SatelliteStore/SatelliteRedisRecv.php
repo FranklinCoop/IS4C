@@ -40,6 +40,7 @@ class SatelliteRedisRecv extends FannieTask
     public function run()
     {
         if ($this->isLocked()) {
+            echo $this->cronMsg("Locked");
             return false;
         }
         $this->lock();
@@ -49,7 +50,7 @@ class SatelliteRedisRecv extends FannieTask
 
         $dbc = FannieDB::get($this->config->get('TRANS_DB'));
         if (!$dbc->isConnected()) {
-            echo "No connection";
+            echo $this->cronMsg("No connection");
             $this->unlock();
             return false;
         }
@@ -61,6 +62,7 @@ class SatelliteRedisRecv extends FannieTask
             $this->getTrans($dbc, $redis, new PaycardTransactionsModel(null));
             $this->getTrans($dbc, $redis, new CapturedSignatureModel(null), array('capturedSignatureID'));
         } catch (Exception $ex) {
+            $this->cronMsg("Exception: ".$ex);
         }
 
         $this->unlock();

@@ -40,6 +40,7 @@ class SatelliteRedisSend extends FannieTask
     public function run()
     {
         if ($this->isLocked()) {
+            echo $this->cronMsg('Task Locked');
             return false;
         }
         $this->lock();
@@ -51,14 +52,14 @@ class SatelliteRedisSend extends FannieTask
 
         $remote = FannieDB::get($this->config->get('TRANS_DB'));
         if (!$remote->isConnected()) {
-            echo "No connection";
+            echo $this->cronMsg("No connection");
             $this->unlock();
             return false;
         }
 
         $local = $this->localDB($remote, $myID, $my_db);
         if (!$local->isConnected($my_db)) {
-            echo "No local connection";
+            echo $this->cronMsg("No local connection");
             $this->unlock();
             return false;
         }
@@ -70,6 +71,7 @@ class SatelliteRedisSend extends FannieTask
             $this->sendTable($local, $redis, $myID, 'PaycardTransactions', 'storeRowId');
             $this->sendTable($local, $redis, $myID, 'CapturedSignature', 'capturedSignatureID');
         } catch (Exception $ex) {
+            echo $this->cronMsg("Send Fail: ".$ex);
         }
 
         $this->unlock();

@@ -77,7 +77,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 		while ($row = $dbc->fetch_row($results)) {
 			$paid = $row['payments'];
 			$remainAmt = 175 - $paid;
-			$startDate = new DateTime($row['start_date']);
+			$startDate = new DateTime($row['startdate']);
 			$startDate->modify('first day of this month')->setTime(0,0,0);
 			$interval = $now->diff($startDate);
 

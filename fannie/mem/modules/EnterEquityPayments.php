@@ -126,6 +126,8 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
                 return "Error: problem saving payments.";
             else
                 return "Payment Saved!";
+        } else {
+            return "No data enteired."
         }
 
 

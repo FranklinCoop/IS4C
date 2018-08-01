@@ -125,7 +125,7 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
             if ( $upR === False )
                 return "Error: problem saving payments.";
             else
-                return "";
+                return "Payment Saved!";
         }
 
 

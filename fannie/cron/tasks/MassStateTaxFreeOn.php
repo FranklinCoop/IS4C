@@ -78,11 +78,10 @@ Make sure to set MassStateTaxFreeOff to run to reenable taxes.';
 		    }
 			
 			$args = array(0.0, 1);//asummes sales tax is id 1 change as needed
-			$query = 'UPDATE taxrates SET rate = 0 WHERE id = 1';
+			$query = 'UPDATE taxrates SET rate = ? WHERE id = ?';
 			
-			$dbc->query($query,$lane['trans'])
-            //$prep = $dbc->prepare($query,$lane['trans']);
-			//$result = $dbc->execute($prep,$args);
+			$prep = $dbc->prepare($query);
+			$result = $dbc->execute($prep,$args,$lane['trans']);
 			
 			
 		    //$resutls = $dbc->query('UPDATE taxrates SET rate = ? WHERE description = ?', $connection ,$args);

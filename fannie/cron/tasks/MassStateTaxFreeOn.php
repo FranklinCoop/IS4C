@@ -78,9 +78,9 @@ Make sure to set MassStateTaxFreeOff to run to reenable taxes.';
 		    }
 			
 			$args = array(0.0, 1);//asummes sales tax is id 1 change as needed
-			$query = 'UPDATE '.$FANNIE_OP_DB.'.taxrates SET rate = ? WHERE id = ?';
+			$query = 'UPDATE taxrates SET rate = ? WHERE id = ?';
 			
-			$prep = $dbc->prepare($query,);
+			$prep = $dbc->prepare($query,$lane['trans']);
 			$result = $dbc->execute($prep,$args);
 			
 			

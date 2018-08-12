@@ -127,7 +127,7 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
             else
                 return "Payment Saved!";
         } else {
-            return "No data enteired."
+            return "No data enteired.";
         }
 
 

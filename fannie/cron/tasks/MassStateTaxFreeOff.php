@@ -82,9 +82,6 @@ Server side tax table remains the same.';
             $prep = $dbc->prepare($query);
             $result = $dbc->execute($prep,$args,$lane['trans']);
             
-            
-            //$resutls = $dbc->query('UPDATE taxrates SET rate = ? WHERE description = ?', $connection ,$args);
-            
         }
     }
 

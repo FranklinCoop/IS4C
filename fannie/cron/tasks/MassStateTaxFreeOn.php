@@ -84,8 +84,6 @@ Make sure to set MassStateTaxFreeOff to run to reenable taxes.';
 			$result = $dbc->execute($prep,$args,$lane['trans']);
 			
 			
-		    //$resutls = $dbc->query('UPDATE taxrates SET rate = ? WHERE description = ?', $connection ,$args);
-			
 		}
     }
 

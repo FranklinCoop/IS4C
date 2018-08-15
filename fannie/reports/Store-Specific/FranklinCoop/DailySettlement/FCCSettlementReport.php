@@ -68,6 +68,7 @@ class FCCSettlementReport extends FannieReportPage
 		WHERE `datetime` BETWEEN ? AND ? AND store_id=2;
 		";
 
+
 		$total_sales = '';
 
 		$total_sales = "SELECT 
@@ -78,14 +79,10 @@ class FCCSettlementReport extends FannieReportPage
 		sum(case when department='990' then total else 0 end) as charge_payment_total,
 		sum(case when department='902' then total else 0 end) as gift_total,
 		sum(case when department='995' then total else 0 end) as paid_in_total,
-		sum(case when upc='DISCOUNT' and memType in (1,2) then -unitPrice else 0 end) as member_disc2,
-		sum(case when upc='DISCOUNT' and memType=3 then -unitPrice else 0 end) as member_disc10,
-		sum(case when upc='DISCOUNT' and memType=5 then -unitPrice else 0 end) as member_disc15,
-		sum(case when upc='DISCOUNT' and memType=7 then -unitPrice else 0 end) as staff_disc15,
-		sum(case when upc='DISCOUNT' and memType=8 then -unitPrice else 0 end) as staff_disc17,
-		sum(case when upc='DISCOUNT' and memType=9 then -unitPrice else 0 end) as staff_disc23,
-		sum(case when upc='DISCOUNT' and memType=0 then -unitPrice else 0 end) as senior_disc,
-		sum(case when upc='DISCOUNT' and memType=6 then -unitPrice else 0 end) as food_for_all_disc,
+		'ERR' as working_disc,
+		'ERR' as staff_disc,
+		'ERR' as senior_disc,
+    	'ERR' as food_for_all_disc,
 		sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
 		sum(case when trans_subtype='DC' AND trans_type ='T' then -total else 0 end) as debit_total,
 		sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
@@ -107,15 +104,20 @@ class FCCSettlementReport extends FannieReportPage
 		$result_tax = $dbc->execute($prep_tax,$dates);
 		$row_tax = $dbc->fetch_row($result_tax);
 
+		$row_discounts = $this->calculateDiscounts($dbc,$dlog,$dates);
+
 		$record = array();
 
 		$row_names = array("Department Sales Totals", "Sales Tax", "Meals Tax", "Member Payments", "Charge Payments",
-				"Gift Cards Sold", "Paid In", "Member 2%", "Member 10%", "Member 15%", "Staff 15%",
-				"Staff 17%", "Staff 23%", "Senior Discout", "Food For All Disc", "Credit Card Total", "Debit Card Total", "SNAP Total",
+				"Gift Cards Sold", "Paid In", "Working Discount", "Staff Discount", "Senior Discount", "Food For All Disc", "Credit Card Total", "Debit Card Total", "SNAP Total",
 				"SNAP Cash Total", "Gift Card Total", "Paper Gift Total", "In Store Charge Total",
 				"Paid Out Total", "Store Coupon Total", "Manufactures Coupon Total");
-		$row[1] = $row_tax[1];
-		$row[2] = $row_tax[0];
+		$row[1] = $row_tax[1]; //sales tax
+		$row[2] = $row_tax[0]; //meals tax
+		$row[7] = $row_discounts[0]; //working member discount
+		$row[8] = $row_discounts[1]; //staff discount
+		$row[9] = $row_discounts[2]; //Senior Discount
+		$row[10] = $row_discounts[3]; //Food For All Disc
 
 		for($i = 0; $i <count($row_names); $i++) {
 			$record = array($row_names[$i], $row[$i]);
@@ -124,6 +126,61 @@ class FCCSettlementReport extends FannieReportPage
 		$data[] = $report;
 		
 		return $data;
+	}
+
+	private function calculateDiscounts($dbc,$dlog,$args=array()){
+		$discQ =$dbc->prepare("	
+			SELECT 
+			sum(case 
+					when upc='DISCOUNT'  and percentDiscount >=10 and memType =3 then -unitPrice* (10/percentDiscount)
+    				when upc='DISCOUNT'  and percentDiscount >= 15 and memType =5 then -unitPrice* (15/percentDiscount)
+    				when upc='DISCOUNT'  and percentDiscount >= 23 and memType =9 then -unitPrice* (8/percentDiscount)
+    				when upc='DISCOUNT'  and percentDiscount = 21 and memType =9 then -unitPrice* (6/percentDiscount)
+    			else 0 end) as working_disc,
+			sum(case
+					when upc='DISCOUNT' and percentDiscount != 0 and memType in (7,8,9,10) then -unitPrice*(15/percentDiscount)
+				else 0 end) as staff_disc,
+			sum(case
+					when upc='DISCOUNT' and percentDiscount != 0 and memType =6 then -unitPrice* (10/percentDiscount)
+    				when upc='DISCOUNT' and percentDiscount != 0 and memType =10 then -unitPrice* (8/percentDiscount )
+    			else 0 end) as food_for_all_disc,
+			sum(case
+					when upc='DISCOUNT' and percentDiscount >0 and memType in (0,1) then -unitPrice
+    				when upc='DISCOUNT' and (percentDiscount-10)/percentDiscount >0 and memType in (3,6) then -unitPrice*((percentDiscount-10)/percentDiscount)
+    				when upc='DISCOUNT' and (percentDiscount-15)/percentDiscount >0 and memType in (5,7,8) then -unitPrice*((percentDiscount-15)/percentDiscount)
+    				when upc='DISCOUNT' and (percentDiscount-23)/percentDiscount >0 and memType in (9,10) then -unitPrice*((percentDiscount-23)/percentDiscount)
+					when upc='DISCOUNT' and percentDiscount = 0 then -unitPrice
+    			else 0 end) as seinorDisc,
+			sum(case when upc='DISCOUNT' then -unitPrice else 0 end) as total_disc
+			FROM ".$dlog."
+			WHERE `datetime` BETWEEN ? AND ? AND store_id=2;");
+		$discR = $dbc->execute($discQ, $args);
+		
+		$return = array();
+		$discSum = 0;
+		$row = $dbc->fetch_row($discR);
+		
+		//correct rounding errors
+		for($key=0;$key<=5;$key++) {
+			$info = number_format($row[$key], 2, '.', '');
+			if ($key < 4) {
+				$discSum += $info;
+				$return[$key] = $info;
+			} elseif ($key==4) {
+				$diff = $info-$discSum;
+				$return[$key] = $info;
+				if ($diff != 0) { 
+					$return[2] += $diff;
+					$discSum += $diff;
+				}
+			}
+		}
+		//final error check returns values for troubleshooting.
+		if ($discSum - $return[4] !=0) {
+			$return = array('Math ERR',$discSum,$return[4],'Math ERR','Math ERR');
+		}
+
+		return $return;
 	}
 
 	function calculate_footers($data)

@@ -71,6 +71,7 @@ class SatelliteRedisSend extends FannieTask
             $this->sendTable($local, $redis, $myID, 'PaycardTransactions', 'storeRowId');
             $this->sendTable($local, $redis, $myID, 'CapturedSignature', 'capturedSignatureID');
         } catch (Exception $ex) {
+            $this->unlock();
             echo $this->cronMsg("Send Fail: ".$ex);
         }
 

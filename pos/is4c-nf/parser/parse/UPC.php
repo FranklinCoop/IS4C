@@ -34,6 +34,7 @@ use COREPOS\pos\lib\Scanning\SpecialDept;
 use COREPOS\pos\lib\Scanning\SpecialUPC;
 use COREPOS\pos\parser\Parser;
 use COREPOS\pos\plugins\Plugin;
+use COREPOS\pos\lib\LaneLogger;
 use \CoreLocal;
 
 class UPC extends Parser
@@ -61,6 +62,7 @@ class UPC extends Parser
 
     const GS1_PREFIX = 'GS1~RX';
     const GS1_STATUS = 'GS';
+    const FCC_NCR = false;
 
     /**
       The default case is pretty simple. A numeric string
@@ -81,6 +83,8 @@ class UPC extends Parser
     */
     public function check($str)
     {
+        $logger = new LaneLogger();
+        $logger->debug("TEST: ".$str);
         if (is_numeric($str) && strlen($str) < 16) {
             return true;
         } elseif ($this->getPrefix($str) !== false) {
@@ -108,7 +112,7 @@ class UPC extends Parser
                 return $prefix;
             }
         }
-
+        
         return false;
     }
 
@@ -131,6 +135,8 @@ class UPC extends Parser
         }
         $this->status = self::GENERIC_STATUS;
         if ($this->source !== false) {
+            //strip the prefix from the upc here so that parsing continues
+            $str = substr($str,strlen($this->source));
             $this->status = $this->getStatus($this->source);
         }
 
@@ -140,6 +146,10 @@ class UPC extends Parser
         */
         if ($this->session->get('tare') > 0 && $this->source === self::SCANNED_PREFIX) {
             return $this->default_json();
+        }
+
+        if(strlen($str)<=12 && strlen($str) > 8 && self::FCC_NCR === True && $this->source === self::SCANNED_PREFIX) {
+            $str = substr($str, 0, -1);
         }
 
         return $this->upcscanned($str);
@@ -363,7 +373,7 @@ class UPC extends Parser
         $row['foodstamp'] = $foodstamp;
         $row['discount'] = $discountable;
 
-        $this->enforceSaleLimit($dbc, $row, $quantity);
+        $row = $this->enforceSaleLimit($dbc, $row, $quantity);
 
         /*
             BEGIN: figure out discounts by type
@@ -612,7 +622,7 @@ class UPC extends Parser
                 $scalepriceEAN = MiscLib::truncate2(substr($upc, 7, 5)/100);
             }
             $rewriteClass = $this->session->get('VariableWeightReWriter');
-            if ($rewriteClass != '' && class_exists('COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\' . $rewriteClass)) {
+            if ($rewriteClass != '' && substr($rewriteClass, 0, 7) !== 'COREPOS' && class_exists('COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\' . $rewriteClass)) {
                 $rewriteClass = 'COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\' . $rewriteClass;
             } elseif ($rewriteClass === '' || !class_exists($rewriteClass)) {
                 $rewriteClass = 'COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\ZeroedPriceReWrite';

@@ -39,20 +39,33 @@ class SatelliteRedisRecv extends FannieTask
     
     public function run()
     {
+        if ($this->isLocked()) {
+            echo $this->cronMsg("Locked");
+            return false;
+        }
+        $this->lock();
+
         $conf = $this->config->get('PLUGIN_SETTINGS');
         $redis_host = $conf['SatelliteRedis'];
 
         $dbc = FannieDB::get($this->config->get('TRANS_DB'));
         if (!$dbc->isConnected()) {
-            echo "No connection";
+            echo $this->cronMsg("No connection");
+            $this->unlock();
             return false;
         }
 
-        $redis = new Predis\Client($redis_host);
+        try {
+            $redis = new Predis\Client($redis_host);
 
-        $this->getTrans($dbc, $redis, new DTransactionsModel(null));
-        $this->getTrans($dbc, $redis, new PaycardTransactionsModel(null));
-        $this->getTrans($dbc, $redis, new CapturedSignatureModel(null), array('capturedSignatureID'));
+            $this->getTrans($dbc, $redis, new DTransactionsModel(null));
+            $this->getTrans($dbc, $redis, new PaycardTransactionsModel(null));
+            $this->getTrans($dbc, $redis, new CapturedSignatureModel(null), array('capturedSignatureID'));
+        } catch (Exception $ex) {
+            $this->cronMsg("Exception: ".$ex);
+        }
+
+        $this->unlock();
     }
 
     private function getTrans($dbc, $redis, $model, $skip_columns=array())

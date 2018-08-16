@@ -49,10 +49,11 @@ class StoreChargeMessage extends ReceiptMessage
     {
         $arDepts = MiscLib::getNumbers(CoreLocal::get('ArDepartments'));
         if (count($arDepts) == 0) {
-            return ' CASE WHEN trans_subtype=\'MI\' THEN 1 ELSE 0 END ';
+            return "SUM( CASE WHEN trans_subtype='MI' THEN 1 ELSE 0 END )";
         }
 
-        return " CASE WHEN trans_subtype='MI' OR department IN (" . implode(',', $arDepts) . ") THEN 1 ELSE 0 END ";
+        $arStr = implode(',', $arDepts);
+        return "SUM( CASE WHEN trans_subtype='MI' OR department IN (" . $arStr . ") THEN 1 ELSE 0 END) ";
     }
 
     /**
@@ -147,5 +148,8 @@ class StoreChargeMessage extends ReceiptMessage
 
         return $receipt . $this->message(1, $ref, $reprint);
     }
+
+    public $standalone_receipt_type = 'miSlip';
+
 }
 

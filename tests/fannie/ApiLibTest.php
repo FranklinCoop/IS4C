@@ -1,5 +1,8 @@
 <?php
 
+use COREPOS\Fannie\API\data\FileData;
+use COREPOS\Fannie\API\lib\AuditLib;
+
 /**
  * @backupGlobals disabled
  */
@@ -106,6 +109,9 @@ class ApiLibTest extends PHPUnit_Framework_TestCase
     {
         $dbc = FannieDB::get(FannieConfig::config('OP_DB'));
         $dbc->throwOnFailure(true);
+        if (strstr(FannieConfig::config('SERVER_DBMS'), 'mysql')) {
+            $dbc->query("SET SESSION sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'");
+        }
 
         $signs = new \COREPOS\Fannie\API\item\FannieSignage(array(), 'shelftags', 1);
         $signs->setDB($dbc);
@@ -142,7 +148,7 @@ class ApiLibTest extends PHPUnit_Framework_TestCase
         $this->assertEquals('$1.99', $signs->formatPrice('$1.99', 1));
         $this->assertEquals('4/$2', $signs->formatPrice('4/$2', 1));
 
-        $this->assertEquals('1.99', $signs->formatPrice(1.99, -1, 0));
+        $this->assertEquals('$1.99', $signs->formatPrice(1.99, -1, 0));
         $this->assertEquals('$1 OFF', $signs->formatPrice(1.99, -1, 2.99));
         $this->assertEquals('$0.50 OFF', $signs->formatPrice(1.99, -1, 2.49));
         $this->assertEquals('SAVE 50%', $signs->formatPrice(1.00, -2, 2.00));
@@ -317,6 +323,86 @@ class ApiLibTest extends PHPUnit_Framework_TestCase
         ob_start();
         FannieDispatch::runPage('AdminIndexPage');
         ob_end_clean();
+    }
+
+    public function testFileData()
+    {
+        $expect = array(
+            '=asdf' => 'asdf',
+            '@asdf' => 'asdf',
+            '+asdf' => 'asdf',
+            ' +asdf' => 'asdf',
+            ' ++==@=asdf' => 'asdf',
+            '-123' => '-123',
+            '-123.45' => '-123.45',
+            '-=asdf' => 'badval',
+            ' -=asdf' => 'badval',
+        );
+        foreach ($expect as $input => $output) {
+            $this->assertEquals($output, FileData::excelNoFormula($input));
+        }
+    }
+
+    public function testDbWrapper()
+    {
+        $config = FannieConfig::factory();
+        $this->assertEquals($config->get('OP_DB') . '.foo', FannieDB::fqn('foo', 'op'));
+        $this->assertEquals($config->get('TRANS_DB') . '.foo', FannieDB::fqn('foo', 'trans'));
+        $this->assertEquals($config->get('ARCHIVE_DB') . '.foo', FannieDB::fqn('foo', 'arch'));
+    }
+
+    public function testAudit()
+    {
+        $this->assertInternalType('boolean', AuditLib::itemUpdate('0000000000111', true));
+    }
+
+    public function testCSS()
+    {
+        ob_start();
+        include(__DIR__ . '/../../fannie/src/css/configurable.php');
+        $this->assertNotEquals(0, strlen(ob_get_clean()));
+    }
+
+    public function testLegacy()
+    {
+        if (!function_exists('cron_msg')) {
+            include(__DIR__ . '/../../fannie/src/cron_msg.php');
+        }
+        $this->assertInternalType('string', cron_msg('foo'));
+
+        if (!function_exists('select_to_table')) {
+            include(__DIR__ . '/../../fannie/src/functions.php');
+        }
+        $data = array(
+            array(0=>'5.5', 2=>'test'),
+        );
+        ob_start();
+        select_to_table3($data, 3, 1, '#ffffff');
+        $this->assertNotEquals(0, strlen(ob_get_clean()));
+
+        if (!function_exists('graph')) {
+            include(__DIR__ . '/../../fannie/reports/cash_report/graph.php');
+        }
+        $data = array(10, 20, 30);
+        $labels = array('Jan', 'Feb', 'Mar');
+        $file = tempnam(sys_get_temp_dir(), 'gph');
+        $ret = graph($data, $labels, $file);
+        if (file_exists($file)) {
+            unlink($file);
+        }
+        $this->assertEquals(22 + (10*3) + 2, $ret);
+
+        if (!function_exists('writeitem')) {
+            include(__DIR__ . '/../../fannie/item/hobartcsv/writecsv.php');
+        }
+        $file = tempnam(sys_get_temp_dir(), 'hbt');
+        writeitem($file, 'type', '127.0.0.1', 'dept', 'write', '1234', 'test', 0.01, 5, 1.99, 0, 'iType', 0.00, 1, 1);
+        $this->assertEquals(true, file_exists($file));
+        unlink($file);
+        $file = tempnam(sys_get_temp_dir(), 'hbt');
+        writetext($file, 'type', '127.0.0.1', 'dept', '1234', 'test');
+        $this->assertEquals(true, file_exists($file));
+        unlink($file);
     }
 }
 

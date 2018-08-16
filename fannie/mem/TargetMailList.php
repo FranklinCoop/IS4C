@@ -70,13 +70,16 @@ class TargetMailList extends FannieReportPage
         $query = $this->selectFrom();
         $where = 'WHERE c.personNum=1 ';
         $types = FormLib::get('type', array());
+        $args = array();
 
-        list($inStr, $args) = $dbc->safeInClause($types);
-        if (FormLib::get('inactive', false)) {
-            $where .= " AND (c.memType IN ({$inStr}) OR s.memtype2 IN ({$inStr})) AND c.Type IN ('PC', 'INACT') ";
-            list($inStr, $args) = $dbc->safeInClause($types, $args); // add types to $args again
-        } else {
-            $where .= " AND c.memType IN ({$inStr}) ";
+        if ($types !== 'all') {
+            list($inStr, $args) = $dbc->safeInClause($types, $args);
+            if (FormLib::get('inactive', false)) {
+                $where .= " AND (c.memType IN ({$inStr}) OR s.memtype2 IN ({$inStr})) AND c.Type IN ('PC', 'INACT') ";
+                list($inStr, $args) = $dbc->safeInClause($types, $args); // add types to $args again
+            } else {
+                $where .= " AND c.memType IN ({$inStr}) ";
+            }
         }
 
         if (FormLib::get('dateLimit', false)) {
@@ -104,6 +107,12 @@ class TargetMailList extends FannieReportPage
         if (count($zips) != 0) {
             list($inStr, $args) = $dbc->safeInClause($zips, $args);
             $where .= " AND m.zip IN ({$inStr}) ";
+        }
+
+        $ids = FormLib::get('id');
+        if (is_array($ids) && count($ids) > 0) {
+            list($inStr, $args) = $dbc->safeInClause($ids, $args);
+            $where .= " AND c.CardNo IN ({$inStr}) ";
         }
 
         $query .= $where;
@@ -176,6 +185,11 @@ class TargetMailList extends FannieReportPage
         </form>';
 
         return $ret;
+    }
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertInternalType('string', $this->form_content());
     }
 }
 

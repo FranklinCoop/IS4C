@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class LocalInvoicesReport extends FannieReportPage 
@@ -59,7 +59,7 @@ class LocalInvoicesReport extends FannieReportPage
             $codingQ .= ' AND i.vendorID=? ';
             $args[] = $vendorID;
         }
-        $codingQ .= 'GROUP BY o.orderID, i.vendorInvoiceID, g.name
+        $codingQ .= 'GROUP BY o.orderID, i.vendorInvoiceID, g.name, v.vendorName
                     ORDER BY rdate, i.vendorInvoiceID, g.name';
         return array($dbc->prepare($codingQ), $args);
     }

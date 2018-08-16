@@ -22,7 +22,7 @@
 *********************************************************************************/
 include(dirname(__FILE__). '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class BatchTypeEditor extends FanniePage {
@@ -33,12 +33,14 @@ class BatchTypeEditor extends FanniePage {
         2 => "Sale for Members",
         3 => 'Sliding % Off for Members',
         5 => 'Sliding $ Off for Members',
+       -1 => 'Tracking (does not change any prices)',
     );
 
     private $editor_uis = array(
         1 => 'Standard',
         2 => 'Paired Sale',
         3 => 'Partial',
+        4 => 'Tracking',
     );
 
     protected $title = 'Fannie - Batch Module';

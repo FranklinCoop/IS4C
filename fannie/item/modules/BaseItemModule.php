@@ -809,6 +809,7 @@ HTML;
                     $store_id
                 );
             }
+            $ret .= $this->getRowMods($upc, $active_tab);
             $ret .= '</table></div>';
             if (FannieConfig::config('STORE_MODE') != 'HQ') {
                 break;
@@ -845,6 +846,38 @@ HTML;
         return $ret;
     }
 
+    private function getRowMods($upc, $active_tab)
+    {
+        $mods = FannieConfig::config('PRODUCT_ROWS');
+        asort($mods);
+        $ret = '';
+        foreach (array_keys($mods) as $mod) {
+            if (!class_exists($mod, false)) {
+                include(__DIR__ . '/' . $mod . '.php');
+            }
+            $obj = new $mod();
+            $ret .= $obj->formRow($upc, $active_tab);
+        }
+
+        return $ret;
+    }
+
+    private function saveRowMods($upc)
+    {
+        $mods = FannieConfig::config('PRODUCT_ROWS');
+        asort($mods);
+        foreach (array_keys($mods) as $mod) {
+            if (!class_exists($mod, false)) {
+                include(__DIR__ . '/' . $mod . '.php');
+            }
+            $obj = new $mod();
+            $obj->setConfig($this->config);
+            $obj->setForm($this->form);
+            $obj->setConnection($this->connection);
+            $obj->saveFormData($upc);
+        }
+    }
+
     public function getFormJavascript($upc)
     {
         return file_get_contents(__DIR__ . '/baseItem.js');
@@ -859,7 +892,7 @@ HTML;
         }
     }
 
-    function SaveFormData($upc)
+    function saveFormData($upc)
     {
         $FANNIE_PRODUCT_MODULES = FannieConfig::config('PRODUCT_MODULES', array());
         $upc = BarcodeLib::padUPC($upc);
@@ -881,8 +914,8 @@ HTML;
                 $model->specialgroupprice(0);
                 $model->advertised(0);
                 $model->tareweight(0);
-                $model->start_date('0000-00-00');
-                $model->end_date('0000-00-00');
+                $model->start_date('1900-01-01');
+                $model->end_date('1900-01-01');
                 $model->discounttype(0);
                 $model->wicable(0);
                 $model->scaleprice(0);
@@ -1007,6 +1040,7 @@ HTML;
         if (!isset($FANNIE_PRODUCT_MODULES['ProdUserModule']) && $dbc->tableExists('productUser')) {
             $this->saveProdUser($upc);
         }
+        $this->saveRowMods($upc);
     }
 
     private function getVendorID($name)

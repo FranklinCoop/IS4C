@@ -22,7 +22,7 @@
 *********************************************************************************/
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class NewMemberTool extends FanniePage 
@@ -78,6 +78,8 @@ class NewMemberTool extends FanniePage
                 $w['memtype'],$w['memDesc']);
         }
 
+        $unused = $this->getUnusedNumbers($dbc);
+
         $ret = '';
         if (!empty($this->errors)) {
             $ret .= '<div class="alert alert-danger well">';
@@ -124,6 +126,13 @@ class NewMemberTool extends FanniePage
             <button type="submit" name="createMems" value="Create Members"
                 class="btn btn-default">Create Members</button>
         </p>
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr><th>Unused Numbers</th></tr>
+            </thead>
+            <tbody><?php echo $unused; ?></tbody>
+            </table>
+
         </form>
         <?php
         $ret .= ob_get_clean();
@@ -225,7 +234,7 @@ class NewMemberTool extends FanniePage
         $model = new CustdataModel($dbc);
         $model->personNum(1);
         $model->LastName($name);
-        $model->FirstName('');
+        $model->FirstName('New');
         $model->CashBack(999.99);
         $model->Balance(0);
         $model->memCoupons(0);
@@ -259,6 +268,32 @@ class NewMemberTool extends FanniePage
         $dbc->commitTransaction();
 
         return $ret;
+    }
+
+    private function getUnusedNumbers($dbc) {
+        $unusedQ = $dbc->prepare("SELECT
+                    CONCAT(z.expected, IF(z.got-1>z.expected, CONCAT(' thru ',z.got-1), '')) AS missing
+                    FROM (
+                    SELECT
+                    @rownum:=@rownum+1 AS expected,
+                    IF(@rownum=CardNo, 0, @rownum:=CardNo) AS got
+                    FROM
+                    (SELECT @rownum:=0) AS a
+                    JOIN core_op.custdata where PersonNum=1 AND FirstName !=''
+                    ORDER BY CardNo
+                    ) AS z
+                    WHERE z.got!=0 ");
+        $unusedR = $dbc->execute($unusedQ);
+        $unused ='';
+        if ($unusedR) {
+            while($w = $dbc->fetch_row($unusedR)) {
+                $unused .= sprintf("<tr><td>%s</td></tr>", $w[0]);
+            } 
+        } else {
+            $unused .= "<tr><td>99999 members? wow we are doing great!</td></tr>";
+        }
+
+        return $unused;
     }
 
     public function helpContent()

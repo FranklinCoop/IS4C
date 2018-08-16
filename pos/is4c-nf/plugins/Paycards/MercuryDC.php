@@ -71,7 +71,7 @@ class MercuryDC extends MercuryE2E
             <HostOrIP>' . $dcHost . '</HostOrIP>
             <SequenceNo>{{SequenceNo}}</SequenceNo>
             <CollectData>CardholderName</CollectData>
-            <OKAmount>Disallow</OKAmount>
+            <OKAmount>Allow</OKAmount>
             <PartialAuth>Allow</PartialAuth>';
             $msgXml .= '
             <Account>
@@ -207,7 +207,7 @@ class MercuryDC extends MercuryE2E
             <HostOrIP>' . $dcHost . '</HostOrIP>
             <SequenceNo>{{SequenceNo}}</SequenceNo>
             <CollectData>CardholderName</CollectData>
-            <OKAmount>Disallow</OKAmount>
+            <OKAmount>Allow</OKAmount>
             <PartialAuth>Allow</PartialAuth>';
             if ($this->conf->get('PaycardsDatacapMode') == 2) {
                 $msgXml .= '<MerchantLanguage>English</MerchantLanguage>';
@@ -519,6 +519,7 @@ class MercuryDC extends MercuryE2E
                 }
                 UdpComm::udpSend('termReset');
                 $this->conf->set('ccTermState','swipe');
+                $this->conf->set("CardCashBackChecked", false);
                 break;
             default:
                 $this->conf->set("boxMsg","An unknown error occurred<br />at the gateway");
@@ -574,6 +575,21 @@ class MercuryDC extends MercuryE2E
         } else {
             return array_reduce($names, function($c, $i){ return $c . trim($i) . ','; });
         }
+    }
+
+    private function batchXmlInit($type)
+    {
+        $termID = $this->getTermID();
+        $msg = <<<XML
+<?xml version="1.0">
+<TStream>
+    <Admin>
+        <MerchantID>{$termID}</MerchantID>
+        <TranCode>{$type}</TranCode>
+        <SecureDevice>{{SecureDevice}}</SecureDevice>
+        <ComPort>{{ComPort}}</ComPort>
+XML;
+        return $msg;
     }
 }
 

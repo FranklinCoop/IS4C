@@ -32,10 +32,10 @@
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT . 'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 if (!function_exists('cron_msg')) {
-    include($FANNIE_ROOT.'src/cron_msg.php');
+    include(__DIR__ . '/../src/cron_msg.php');
 }
 
 set_time_limit(0);
@@ -80,12 +80,12 @@ if ($sql->num_rows($r) > 0){
     $msg_body = "Homeless orders detected!\n\n";
     while($w = $sql->fetch_row($r)){
         $msg_body .= $w['datetime'].' - '.(empty($w['name'])?'(no name)':$w['name']).' - '.$w['description']."\n";
-        $msg_body .= "http://key".$FANNIE_URL."ordering/view.php?orderID=".$w['order_id']."\n\n";
+        $msg_body .= "http://key".$FANNIE_URL."ordering/OrderViewPage.php?orderID=".$w['order_id']."\n\n";
     }
     $msg_body .= "These messages will be sent daily until orders get departments\n";
     $msg_body .= "or orders are closed\n";
 
-    $to = "buyers, dbuyers";
+    $to = "buyers, dbuyers, it";
     $subject = "Incomplete SO(s)";
     mail($to,$subject,$msg_body);
 }

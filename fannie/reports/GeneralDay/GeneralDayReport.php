@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class GeneralDayReport extends FannieReportPage 
@@ -46,6 +46,36 @@ class GeneralDayReport extends FannieReportPage
     protected $report_headers = array('Desc','Qty','Amount');
     protected $required_fields = array('date');
 
+    public function preprocess()
+    {
+        if ($this->report_format == 'html' && $this->hasAllFields($this->required_fields)) {
+            $this->addScript('../../src/javascript/Chart.min.js');
+            $this->addScript('../../src/javascript/CoreChart.js?date=20171207');
+            $this->addScript('generalDay.js?date=20171207');
+            $this->addOnloadCommand('generalDay.tenders();');
+            $this->addOnloadCommand('generalDay.sales();');
+            $this->addOnloadCommand('generalDay.members();');
+        }
+
+        return parent::preprocess();
+    }
+
+    public function report_description_content()
+    {
+        if ($this->report_format == 'html') {
+            return array(
+                "<br /><label><input type=\"checkbox\" checked class=\"hidden-print\"
+                    onchange=\"if (this.checked) \$('canvas').show(); else \$('canvas').hide();\" />
+                    Show Charts</label>",
+                "<br /><label><input type=\"checkbox\" checked class=\"hidden-print\"
+                    onchange=\"if (this.checked) \$('table').show(); else \$('table').hide();\" />
+                    Show Tables</label>",
+            );
+        }
+
+        return array();
+    }
+
     function fetch_report_data()
     {
         global $FANNIE_OP_DB, $FANNIE_ARCHIVE_DB, $FANNIE_EQUITY_DEPARTMENTS,
@@ -53,8 +83,9 @@ class GeneralDayReport extends FannieReportPage
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
         $d1 = $this->form->date;
+        $dates = array($d1.' 00:00:00',$d1.' 23:59:59');
         $store = FormLib::get('store');
-        $dates = array($d1.' 00:00:00',$d1.' 23:59:59', $store);
+        $dates[] = $store;
         $data = array();
 
         if ( isset($FANNIE_COOP_ID) && $FANNIE_COOP_ID == 'WEFC_Toronto' )
@@ -75,9 +106,9 @@ class GeneralDayReport extends FannieReportPage
             FROM $dlog as d,
                 {$FANNIE_OP_DB}.tenders as t 
             WHERE d.tdate BETWEEN ? AND ?
+                AND " . DTrans::isStoreID($store, 'd') . "
                 AND d.trans_subtype = t.TenderCode
                 AND d.total <> 0{$shrinkageUsers}
-                AND d.store_id = ?
             GROUP BY t.TenderName ORDER BY TenderName");
         $tenderR = $dbc->execute($tenderQ,$dates);
         $report = array();
@@ -101,7 +132,7 @@ class GeneralDayReport extends FannieReportPage
                     WHERE d.department <> 0
                         AND d.trans_type <> \'T\' ' . $shrinkageUsers . '
                         AND d.tdate BETWEEN ? AND ?
-                        AND d.store_id = ?
+                        AND ' . DTrans::isStoreID($store, 'd') . '
                     GROUP BY t.dept_name
                     ORDER BY t.dept_name'; 
                 break;
@@ -115,7 +146,7 @@ class GeneralDayReport extends FannieReportPage
                     WHERE d.department <> 0
                         AND d.trans_type <> \'T\' ' . $shrinkageUsers . '
                         AND d.tdate BETWEEN ? AND ?
-                        AND d.store_id = ?
+                        AND ' . DTrans::isStoreID($store, 'd') . '
                     GROUP BY t.salesCode
                     ORDER BY t.salesCode'; 
                 break;
@@ -130,7 +161,7 @@ class GeneralDayReport extends FannieReportPage
                     WHERE d.department <> 0
                         AND d.trans_type <> \'T\' ' . $shrinkageUsers . '
                         AND d.tdate BETWEEN ? AND ?
-                        AND d.store_id = ?
+                        AND ' . DTrans::isStoreID($store, 'd') . '
                     GROUP BY m.super_name
                     ORDER BY m.super_name';
                 break;
@@ -151,14 +182,14 @@ class GeneralDayReport extends FannieReportPage
                 FROM $dlog d 
                     INNER JOIN memtype m ON d.memType = m.memtype
                 WHERE d.tdate BETWEEN ? AND ?
+                    AND " . DTrans::isStoreID($store, 'd') . "
                    AND d.upc = 'DISCOUNT'{$shrinkageUsers}
-                   AND d.store_id = ?
                 AND total <> 0
                 GROUP BY m.memDesc ORDER BY m.memDesc");
         $discR = $dbc->execute($discQ,$dates);
         $report = array();
         while($discW = $dbc->fetch_row($discR)){
-            $record = array($discW['memDesc'],$discW[2],$discW[1]);
+            $record = array($discW['memDesc'],$discW[2],sprintf('%.2f', $discW[1]));
             $report[] = $record;
             $reconciliation['Discounts'] += $discW['Discount'];
         }
@@ -166,27 +197,48 @@ class GeneralDayReport extends FannieReportPage
 
         $report = array();
         $trans = DTransactionsModel::selectDTrans($d1);
+        $componentP = $dbc->prepare('SELECT description, rate FROM TaxRateComponents WHERE taxRateID=?');
         $lineItemQ = $dbc->prepare("
-            SELECT description,
+            SELECT MIN(description) AS description,
+                numflag,
                 SUM(regPrice) AS ttl
             FROM $trans AS d
             WHERE datetime BETWEEN ? AND ?
-                AND d.store_id = ?
+                AND " . DTrans::isStoreID($store, 'd') . "
                 AND d.upc='TAXLINEITEM'
                 AND " . DTrans::isNotTesting('d') . "
-            GROUP BY d.description
+            GROUP BY numflag
         ");
         $lineItemR = $dbc->execute($lineItemQ, $dates);
         while ($lineItemW = $dbc->fetch_row($lineItemR)) {
-            $record = array($lineItemW['description'] . ' (est. owed)', sprintf('%.2f', $lineItemW['ttl']));
+            $componentR = $dbc->execute($componentP, array($lineItemW['numflag']));
+            $baseDesc = $lineItemW['description'];
+            if ($dbc->numRows($componentR) > 0) {
+                $lineItemW['description'] .= ' - Total';
+            }
+            $comp = array();
+            $sum = 0;
+            while ($compW = $dbc->fetchRow($componentR)) {
+                $comp[] = $compW;
+                $sum += $compW['rate'];
+            }
+            $record = array(
+                sprintf('%s (est. owed)', $lineItemW['description']),
+                sprintf('%.2f', $lineItemW['ttl']),
+            );
             $report[] = $record;
+            foreach ($comp as $c) {
+                $report[] = array(
+                    sprintf('%s - %s (%.4f%%) (est. owed)', $baseDesc, $c['description'], $c['rate']*100),
+                    sprintf('%.2f', $lineItemW['ttl'] * ($c['rate']/$sum)));
+            }
         }
 
         $taxSumQ = $dbc->prepare("SELECT  sum(total) as tax_collected
             FROM $dlog as d 
             WHERE d.tdate BETWEEN ? AND ?
+                AND " . DTrans::isStoreID($store, 'd') . "
                 AND (d.upc = 'tax'){$shrinkageUsers}
-                AND d.store_id = ?
             GROUP BY d.upc");
         $taxR = $dbc->execute($taxSumQ,$dates);
         while($taxW = $dbc->fetch_row($taxR)){
@@ -212,9 +264,9 @@ class GeneralDayReport extends FannieReportPage
             from $dlog as d
             left join memtype as m on d.memType = m.memtype
             WHERE d.tdate BETWEEN ? AND ?
+                AND " . DTrans::isStoreID($store, 'd') . "
                 AND trans_type in ('I','D')
                 AND upc <> 'RRR'{$shrinkageUsers}
-                AND d.store_id = ?
             ) as q 
             group by q.trans_num,q.transaction_type");
         $transR = $dbc->execute($transQ,$dates);
@@ -258,6 +310,7 @@ class GeneralDayReport extends FannieReportPage
                 FROM $dlog as d
                 LEFT JOIN {$FANNIE_OP_DB}.departments as t ON d.department = t.dept_no
                 WHERE d.tdate BETWEEN ? AND ?
+                    AND " . DTrans::isStoreID($store, 'd') . "
                     AND d.department IN $dlist{$shrinkageUsers}
                 GROUP BY d.card_no, t.dept_name ORDER BY d.card_no, t.dept_name");
             $equityR = $dbc->execute($equityQ,$dates);
@@ -289,6 +342,7 @@ class GeneralDayReport extends FannieReportPage
             $this->report_headers = array('Tax', 'Amount');
             $sumTax = 0.0;
             for ($i=0; $i<count($data)-1; $i++) {
+                if (!strstr($data[$i][0], ' - Total (')) continue;
                 $sumTax += $data[$i][1];
             }
             return array('Total Sales Tax', sprintf('%.2f', $sumTax));
@@ -333,8 +387,7 @@ class GeneralDayReport extends FannieReportPage
     function form_content()
     {
         $store = FormLib::storePicker();
-        ob_start();
-        ?>
+        return <<<HTML
         <form action=GeneralDayReport.php method=get>
         <div class="form-group">
             <label>
@@ -342,7 +395,11 @@ class GeneralDayReport extends FannieReportPage
                 (<a href="../GeneralRange/">Range of Dates</a>)
             </label>
             <input type=text id=date name=date 
-                class="form-control date-field" required />
+                class="form-control date-field" />
+        </div>
+        <div class="form-group">
+            <label>Store</label>
+            {$store['html']}
         </div>
         <div class="form-group">
             <label>List Sales By</label>
@@ -352,12 +409,6 @@ class GeneralDayReport extends FannieReportPage
                 <option>Sales Code</option>
             </select>
         </div>
-        <div>
-                <p>
-                    <label>Store(s)</label>
-                    <?php echo $store['html']; ?>
-                </p>
-        </div>
         <div class="form-group">
             <label>Excel <input type=checkbox name=excel /></label>
         </div>
@@ -366,8 +417,7 @@ class GeneralDayReport extends FannieReportPage
             class="btn btn-default">Submit</button>
         </p>
         </form>
-        <?php
-        return ob_get_clean();
+HTML;
     }
 
     public function helpContent()

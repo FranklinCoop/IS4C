@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class StoreSummaryReport extends FannieReportPage {
@@ -66,7 +66,7 @@ class StoreSummaryReport extends FannieReportPage {
             */
             if (FormLib::get_form_value('excel') !== '') {
                 $this->report_format = FormLib::get_form_value('excel');
-                $this->has_menus(False);
+                $this->hasMenus(False);
             }
         }
 

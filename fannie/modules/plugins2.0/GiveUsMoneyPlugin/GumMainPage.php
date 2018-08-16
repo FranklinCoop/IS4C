@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 /**
@@ -342,7 +342,7 @@ class GumMainPage extends FannieRESTfulPage
     public function get_id_view()
     {
         global $FANNIE_URL;
-        $this->add_script('js/main.js');
+        $this->addScript('js/main.js');
         $ret = '';
 
         $ret .= '<form id="piForm" action="GumMainPage.php" method="post">';

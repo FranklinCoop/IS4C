@@ -44,6 +44,7 @@ class TenderModule
     protected $min_limit = 0;
     protected $max_limit = 0;
     protected $ends_trans = true;
+    protected $slip_type ='';
 
     /**
       Constructor
@@ -229,6 +230,10 @@ class TenderModule
     public function endsTransaction()
     {
         return $this->ends_trans;
+    }
+
+    public function getSlip() {
+        return $this->slip_type;
     }
 
     /**

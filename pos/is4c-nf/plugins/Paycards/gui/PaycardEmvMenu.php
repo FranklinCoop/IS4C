@@ -41,7 +41,7 @@ class PaycardEmvMenu extends NoInputCorePage
         $this->conf = new PaycardConf();
         $choice = FormLib::get('selectlist', false);
         if ($choice !== false) {
-            $parser = new PaycardDatacapParser();
+            $parser = new PaycardDatacapParser($this->session);
             switch ($choice) {
                 case 'CAADMIN':
                     $this->change_page('PaycardEmvCaAdmin.php');
@@ -60,6 +60,7 @@ class PaycardEmvMenu extends NoInputCorePage
                 case 'PVGD':
                     $json = $parser->parse('PVDATACAP' . substr($choice, -2));
                     $this->change_page($json['main_frame']);
+                    return false;
                 case 'ACGD':
                 case 'AVGD':
                     $json = $parser->parse(substr($choice,0,2) . 'DATACAPGD');
@@ -83,6 +84,14 @@ class PaycardEmvMenu extends NoInputCorePage
                     );
                     $this->clearToHome = 0;
                     break;
+                case 'PV':
+                    $this->menu = array(
+                        'PVEF' => 'Food Balance',
+                        'PVEC' => 'Cash Balance',
+                        'PVGD' => 'Gift Balance',
+                    );
+                    $this->clearToHome = 1;
+                    break;
                 case 'CL':
                 default:
                     if (FormLib::get('clear-to-home')) {
@@ -97,6 +106,7 @@ class PaycardEmvMenu extends NoInputCorePage
                 $this->menu = array(
                     'EMV' => 'EMV Credit/Debit',
                     'CC' => 'Credit only',
+                    'DC' => 'Debit only',
                     'EBT' => 'EBT',
                     'GIFT' => 'Gift',
                 );
@@ -128,7 +138,7 @@ class PaycardEmvMenu extends NoInputCorePage
         <div class="centeredDisplay colored rounded">
         <span class="larger">process card transaction</span>
         <form name="selectform" method="post" id="selectform"
-            action="<?php echo filter_input(INPUT_SERVER, 'PHP_SELF'); ?>">
+            action="<?php echo AutoLoader::ownURL(); ?>">
         <input type="hidden" name="clear-to-home" value="<?php echo $this->clearToHome; ?>" />
         <?php if ($this->conf->get('touchscreen')) { ?>
         <button type="button" class="pos-button coloredArea"

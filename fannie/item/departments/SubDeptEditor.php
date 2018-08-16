@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class SubDeptEditor extends FanniePage 
@@ -166,8 +166,8 @@ class SubDeptEditor extends FanniePage
         </div>
         <?php
 
-        $this->add_script('sub.js');
-        $this->add_onload_command('showSubsForDept('.$firstID.');');
+        $this->addScript('sub.js');
+        $this->addOnloadCommand('showSubsForDept('.$firstID.');');
         
         return ob_get_clean();
     }

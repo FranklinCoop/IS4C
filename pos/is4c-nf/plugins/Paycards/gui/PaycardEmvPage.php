@@ -25,6 +25,7 @@
 use COREPOS\pos\lib\FormLib;
 use COREPOS\pos\lib\MiscLib;
 use COREPOS\pos\lib\UdpComm;
+use COREPOS\pos\lib\LaneLogger;
 use COREPOS\pos\plugins\Paycards\card\CardValidator;
 if (!class_exists('AutoLoader')) include_once(dirname(__FILE__).'/../../../lib/AutoLoader.php');
 
@@ -48,6 +49,7 @@ class PaycardEmvPage extends PaycardProcessPage
                 $this->conf->set("CachePinEncBlock","");
                 $this->conf->set("CacheCardType","");
                 $this->conf->set("CacheCardCashBack",0);
+                $this->conf->set("CardCashBackChecked", false);
                 $this->conf->set('ccTermState','swipe');
                 UdpComm::udpSend("termReset");
                 $this->change_page($this->page_url."gui-modules/pos2.php");
@@ -73,8 +75,13 @@ class PaycardEmvPage extends PaycardProcessPage
                 }
             }
             // if we're still here, we haven't accepted a valid amount yet; display prompt again
-        } elseif (FormLib::get('xml-resp') !== '') {
+        } elseif (FormLib::get('xml-resp', false) !== false) {
             $xml = FormLib::get('xml-resp');
+            $err = FormLib::get('err-info');
+            if ($err) {
+                $log = new LaneLogger();
+                $log->error('javascript: ' . $err);
+            }
             $this->emvResponseHandler($xml);
             return false;
         } elseif (FormLib::get('cancel') == 1) {
@@ -90,7 +97,7 @@ class PaycardEmvPage extends PaycardProcessPage
     {
         $url = MiscLib::baseURL();
         echo '<script type="text/javascript" src="' . $url . '/js/singleSubmit.js"></script>';
-        echo '<script type="text/javascript" src="../js/emv.js"></script>';
+        echo '<script type="text/javascript" src="../js/emv.js?date=20180308"></script>';
         if (!$this->runTransaction) {
             return '';
         }
@@ -98,13 +105,16 @@ class PaycardEmvPage extends PaycardProcessPage
         ?>
 <script type="text/javascript">
 function emvSubmit() {
-    $('div.baseHeight').html('Processing transaction');
+    emv.showProcessing('div.baseHeight');
     // POST XML request to driver using AJAX
     var xmlData = '<?php echo json_encode($e2e->prepareDataCapAuth($this->conf->get('CacheCardType'), $this->conf->get('paycard_amount'), $this->prompt)); ?>';
     if (xmlData == '"Error"') { // failed to save request info in database
         location = '<?php echo MiscLib::baseURL(); ?>gui-modules/boxMsg2.php';
         return false;
     }
+    <?php if ($this->conf->Get('training') == 1) { ?>
+    emv.setURL('../ajax/AjaxPaycardTest.php');
+    <?php } ?>
     emv.submit(xmlData);
     $(document).keyup(checkForCancel);
 }

@@ -42,20 +42,30 @@ class paycardEntered extends Parser
 
     function check($str)
     {
-        $str = urlencode(substr($str,0,6)).substr($str, 6, strlen($str)-6);
         $this->swipetype = PaycardLib::PAYCARD_TYPE_UNKNOWN;
         if (substr($str,-1,1) == "?"){
             return true;
-        } elseif (substr($str,0,8) == "02E60080" || substr($str,0,7)=="2E60080" || substr($str, 0, 5) == "23.0%" || substr($str, 0, 5) == "23.0;" || substr($str, 0, 6) == "23.0M%") {
+        } elseif ($this->isE2E($str) || $this->isE2E(substr($str, 2))) {
             $this->swipetype = PaycardLib::PAYCARD_TYPE_ENCRYPTED;
             return true;
-        } elseif (substr($str, 0, 2) === "02" && substr($str, -2) === "03" && strstr($str, '***')) {
-            $this->swipetype = PaycardLib::PAYCARD_TYPE_ENCRYPTED;
-            return true;
-        } elseif ((is_numeric($str) && strlen($str) >= 16) || (is_numeric(substr($str,2)) && strlen($str) >= 18)) {
+        } elseif (((is_numeric($str) && strlen($str) >= 16) || (is_numeric(substr($str,2)) && strlen($str) >= 18)) && substr($str,0, 3)!='0XA') {
             $this->manual = true;
             return true;
-        } elseif (substr($str,0,6) == "23.0MB") {
+        }
+
+        return false;
+    }
+
+    private function isE2E($str)
+    {
+        if (substr($str,0,8) == "02E60080" || substr($str,0,7)=="2E60080") {
+            // ID Tech Sign&Pay
+            return true;
+        } elseif (substr($str, 0, 5) == "23.0%" || substr($str, 0, 5) == "23.0;") {
+            // Ingenico
+            return true;
+        } elseif (substr($str, 0, 2) === "02" && substr($str, -2) === "03" && strstr($str, '***')) {
+            // ID Tech SecureMag
             return true;
         }
 
@@ -64,8 +74,6 @@ class paycardEntered extends Parser
 
     function parse($str)
     {
-        $str = urlencode(substr($str,0,6)).substr($str, 6, strlen($str)-6);
-
         $ret = array();
         if( substr($str,0,2) == "PV") {
             $ret = $this->paycard_entered(PaycardLib::PAYCARD_MODE_BALANCE, substr($str,2), $this->manual, $this->swipetype);
@@ -136,7 +144,7 @@ class paycardEntered extends Parser
     {
         $ret = $this->default_json();
         // initialize
-        $validate = false; // run Luhn's on PAN, check expiration date
+        $validate = true; // run Luhn's on PAN, check expiration date
         $reader = new CardReader();
         $this->conf->reset();
         $this->conf->set("paycard_mode",$mode);
@@ -202,7 +210,6 @@ class paycardEntered extends Parser
             $ret['output'] = $ex->getMessage();
             return $ret;
         }
-    
 
         foreach($this->conf->get("RegisteredPaycardClasses") as $rpc){
             if (!class_exists($rpc)) continue;

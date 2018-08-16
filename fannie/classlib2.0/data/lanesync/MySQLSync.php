@@ -10,20 +10,20 @@ use COREPOS\Fannie\API\data\SyncSpecial;
 */
 class MySQLSync extends SyncSpecial
 {
-    public function push($tableName, $dbName)
+    public function push($tableName, $dbName, $includeOffline=false)
     {
         $ret = array('success'=>false, 'details'=>'');
         
-        $tempfile = tempnam(sys_get_temp_dir(),$table.".sql");
+        $tempfile = tempnam(sys_get_temp_dir(),$tableName.".sql");
         $cmd = $this->dumpCommand()
             . ' '   . escapeshellarg($dbName)
-            . ' '   . escapeshellarg($table)
+            . ' '   . escapeshellarg($tableName)
             . ' > ' . escapeshellarg($tempfile)
             . ' 2> ' . escapeshellarg($tempfile . '.err');
         exec($cmd, $output, $exitCode);
         
         if ($exitCode > 0) {
-            $ret['details'] = 'mysqldump failed';
+            $ret['details'] = 'mysqldump failed. Ran as ' . $cmd;
             if (file_exists($tempfile . '.err')) {
                 $ret['details'] .= ': ' . file_get_contents($tempfile . '.err');
                 unlink($tempfile . '.err');
@@ -32,9 +32,18 @@ class MySQLSync extends SyncSpecial
             return $ret;
         }
 
-        $laneNumber = 1;
         $ret['success'] = true;
+
+        return $this->sendDumpToLanes($ret, $dbName, $tempfile, $includeOffline);
+    }
+
+    protected function sendDumpToLanes($ret, $dbName, $tempfile, $includeOffline)
+    {
+        $laneNumber = 1;
         foreach ($this->config->get('LANES') as $lane) {
+            if (!$includeOffline && isset($lane['offline']) && $lane['offline']) {
+                continue;
+            }
             $laneCmd = $this->laneConnect($lane, $dbName, $tempfile); 
             exec($laneCmd, $output, $exitCode);
             if ($exitCode == 0) {
@@ -61,8 +70,8 @@ class MySQLSync extends SyncSpecial
         }
 
         $cmd = 'mysqldump'
-            . ' -u ' . escapeshellarg($config->get('SERVER_USER'))
-            . (empty($config->get('SERVER_PW')) ? '' : ' -p' . escapeshellarg($config->get('SERVER_PW')))
+            . ' -u ' . escapeshellarg($this->config->get('SERVER_USER'))
+            . (empty($this->config->get('SERVER_PW')) ? '' : ' -p' . escapeshellarg($this->config->get('SERVER_PW')))
             . ' -h ' . escapeshellarg($host)
             . ' -P ' . escapeshellarg($port);
 
@@ -78,7 +87,7 @@ class MySQLSync extends SyncSpecial
         }
         $laneCmd = 'mysql --connect-timeout 15 '
             . ' -u ' . escapeshellarg($lane['user'])
-            . ' -p' . escapeshellarg($lane['pw'])
+            . (empty($lane['pw']) ? '' : ' -p' . escapeshellarg($lane['pw']))
             . ' -h ' . escapeshellarg($lane_host)
             . ' -P ' . escapeshellarg($lane_port)
             . ' ' . escapeshellarg($lane['op'])

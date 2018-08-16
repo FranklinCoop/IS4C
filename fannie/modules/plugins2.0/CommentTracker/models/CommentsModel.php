@@ -37,8 +37,11 @@ class CommentsModel extends BasicModel
     'publishable' => array('type'=>'TINYINT', 'default'=>0),
     'appropriate' => array('type'=>'TINYINT', 'default'=>1),
     'email' => array('type'=>'VARCHAR(255)'),
+    'phone' => array('type'=>'VARCHAR(255)'),
     'comment' => array('type'=>'TEXT'),
     'tdate' => array('type'=>'DATETIME'),
+    'fromPaper' => array('type'=>'TINYINT', 'default'=>0),
+    'posNeg' => array('type'=>'TINYINT', 'default'=>0),
     );
 }
 

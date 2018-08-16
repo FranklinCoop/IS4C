@@ -393,6 +393,9 @@ class HouseCoupon extends SpecialUPC
             }
 
             $mDB = Database::mDataConnect();
+            if ($mDB === false) {
+                return true;
+            }
             $mAlt = Database::mAltName();
 
             // Future idea: lookup usage of this coupon by this member
@@ -469,7 +472,8 @@ class HouseCoupon extends SpecialUPC
             case "Q": // quantity discount
                 // discount = coupon's discountValue
                 // times the cheapeast coupon item
-                $valQ = "select unitPrice, department, trans_id
+                $valQ = "select CASE WHEN l.scale=1 OR l.upc LIKE '002%' THEN total ELSE unitPrice END as unitPrice,
+                        department, trans_id
                     " . $this->baseSQL($transDB, $coupID, 'upc') . "
                     and h.type in ('BOTH', 'DISCOUNT')
                     and l.total > 0
@@ -635,9 +639,29 @@ class HouseCoupon extends SpecialUPC
                 $sets = ($qualW['qty'] > $discW['qty']) ? $discW['qty'] : $qualW['qty'];
                 $value = $sets * $value;
                 break;
+            case 'SC':
+                $giftQ = "
+                    SELECT COUNT(*) AS cards,
+                       SUM(CASE WHEN total IS NULL THEN 0 ELSE total END) AS ttl
+                    " . $this->baseSQL($transDB, $coupID, 'department') . "
+                    and h.type in ('BOTH', 'DISCOUNT') AND l.trans_type='D'";
+                $giftR = $transDB->query($giftQ);
+                $giftW = $transDB->fetchRow($giftR);
+                $freeCards = floor($giftW['ttl'] / $infoW['minValue']);
+                $value = $infoW['discountValue'] * $freeCards;
+                $discountable = 0;
+                TransRecord::addtender('Store Credit', 'SC', $value);
+                break;
             case "F": // completely flat; no scaling for weight
                 $value = $infoW["discountValue"];
                 $discountable = 0;
+                break;
+            case "FC": // flat but capped at current amount due
+                $value = $infoW["discountValue"];
+                Database::getsubtotals();
+                if ($value > $this->session->get('amtdue')) {
+                    $value = $this->session->get('amtdue');
+                }
                 break;
             case "%": // percent discount on all items
                 Database::getsubtotals();

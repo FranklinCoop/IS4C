@@ -26,6 +26,7 @@ use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DisplayLib;
 use COREPOS\pos\lib\UdpComm;
 use COREPOS\pos\parser\Parser;
+use COREPOS\pos\lib\LaneLogger;
 
 class SigTermCommands extends Parser 
 {
@@ -33,6 +34,8 @@ class SigTermCommands extends Parser
 
     function check($str)
     {
+        $log = new LaneLogger();
+        $log->debug("SigTerm Check: ".$str);
         if ($str == "TERMMANUAL") {
             UdpComm::udpSend("termManual");
             $this->session->set("paycard_keyed", true);
@@ -89,7 +92,7 @@ class SigTermCommands extends Parser
 
             return true;
 
-        } elseif ($str == "TERMCLEARALL") {
+        } elseif ($str == "TERM:CANCEL" || $str == "TERMCLEARALL") {
             $this->stateReset();
 
             return true;
@@ -247,6 +250,7 @@ class SigTermCommands extends Parser
         $this->session->set("CachePinEncBlock","");
         $this->session->set("CacheCardType","");
         $this->session->set("CacheCardCashBack",0);
+        $this->session->set("CardCashBackChecked", false);
         $this->session->set('ccTermState', 'swipe');
     }
 

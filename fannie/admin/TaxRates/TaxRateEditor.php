@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class TaxRateEditor extends FannieRESTfulPage 
@@ -44,7 +44,7 @@ class TaxRateEditor extends FannieRESTfulPage
             $account = $this->form->account;
             $delete_flag = isset($this->form->del) ? $this->form->del : array();
             $tax_id = 1;
-            $trun = $dbc->query("TRUNCATE TABLE taxrates");
+            $trun = $dbc->query("TRUNCATE TABLE " . FannieDB::fqn('taxrates', 'op'));
             $model = new TaxRatesModel($dbc);
             for ($j=0;$j<count($desc);$j++) {
                 if (empty($desc[$j]) || empty($rate[$j])) {
@@ -106,8 +106,10 @@ class TaxRateEditor extends FannieRESTfulPage
             <td>NEW</td></tr>';
         $ret .= "</table>";
         $ret .= '<p><button type="submit" value="1" name="sub"
-                        class="btn btn-default">Save Tax Rates</button></p>';
-        $ret .= '</form>';
+                        class="btn btn-default btn-core">Save Tax Rates</button>';
+        $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;';
+        $ret .= '<a href="TaxComponentEditor.php" class="btn btn-default">Edit Component Rates</a>';
+        $ret .= '</p></form>';
 
         return $ret;
     }

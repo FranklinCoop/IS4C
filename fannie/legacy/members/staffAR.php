@@ -1,9 +1,11 @@
 <?php
+header('Location: ../../modules/plugins2.0/StaffArPayrollDeduction/StaffArAccountsPage.php');
+exit;
 include('../../config.php');
 
-if (!class_exists("FannieAPI")) require_once($FANNIE_ROOT."classlib2.0/FannieAPI.php");
-if (!class_exists("SQLManager")) require_once($FANNIE_ROOT."src/SQLManager.php");
-include($FANNIE_ROOT.'auth/login.php');
+if (!class_exists('FannieAPI')) include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
+if (!class_exists("SQLManager")) require_once(__DIR__ . '/../../src/SQLManager.php');
+include(__DIR__ . '/../../auth/login.php');
 
 include('../db.php');
 

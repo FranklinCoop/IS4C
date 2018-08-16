@@ -30,10 +30,9 @@ if (!class_exists('FannieAPI')) {
 */
 class SpinsSubmitLoopTask extends FannieTask 
 {
-    public $name = 'Submit SPINS data';
+    public $name = 'Spins Loop Command Line Only';
 
-    public $description = 'Submits weekly sales data to SPINS. SPINS plugin must be configured
-    with proper FTP credentials';
+    public $description = 'Generates A range of Spins weeks Only run via command line "php /pos/fannie/classlib2.0/FannieTask.php SpinsSubmitLoopTask"';
 
     public $default_schedule = array(
         'min' => 0,

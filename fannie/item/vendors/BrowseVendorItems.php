@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class BrowseVendorItems extends FanniePage 
@@ -393,7 +393,7 @@ class BrowseVendorItems extends FanniePage
         <p><a href="VendorIndexPage.php?vid=<?php echo $vid; ?>" class="btn btn-default">Home</a></p>
         <?php
         
-        $this->add_script('browse.js');
+        $this->addScript('browse.js');
 
         return ob_get_clean();
     }

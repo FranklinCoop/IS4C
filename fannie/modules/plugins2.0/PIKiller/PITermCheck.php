@@ -2,7 +2,7 @@
 
 include(__DIR__ . '/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'/classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class PITermCheck extends FannieRESTfulPage
@@ -125,6 +125,8 @@ class PITermCheck extends FannieRESTfulPage
             $dbc->execute($prep, $info['arguments']);
         } else {
             $equity = $amount;
+            $classA = $equity < 20 ? $equity : 20;
+            $classB = $equity < 20 ? 0 : $equity - 20;
         }
 
         /******************
@@ -142,6 +144,11 @@ class PITermCheck extends FannieRESTfulPage
             FROM " . $checkDB . $dbc->sep() . "GumPayoffs
             WHERE alternateKey=?");
 
+        $checkDateP = $dbc->prepare("
+            UPDATE " . $checkDB . $dbc->sep() . "GumPayoffs 
+            SET checkIssued=NOW()
+            WHERE checkNumber=?");
+
         $custdata = new CustdataModel($dbc);
         $custdata->CardNo($this->id);
         $custdata->personNum(1);
@@ -150,11 +157,12 @@ class PITermCheck extends FannieRESTfulPage
         $meminfo->card_no($this->id);
         $meminfo->load();
 
-        $payoffKey = 'eqr' . $card_no;
+        $payoffKey = 'eqr' . $this->id;
         $number = $dbc->getValue($numberP, array($payoffKey));
         if ($number === false) {
-            $number = GumLib::allocateCheck($custdata, false, 'EQ REFUND', 'eqr' . $card_no);
+            $number = GumLib::allocateCheck($custdata, false, 'EQ REFUND', 'eqr' . $this->id);
         }
+        $dbc->execute($checkDateP, array($number));
 
         $pdf->SetXY(0, 0);
         $pdf->Image('../GiveUsMoneyPlugin/img/new_letterhead.png', 10, 10, 35);
@@ -208,6 +216,7 @@ class PITermCheck extends FannieRESTfulPage
         $pdf->Cell($width, $line_height, 'os@wholefoods.coop', 0, 1);
 
         $check = new GumCheckTemplate($custdata, $meminfo, $equity, 'Equity Refund', $number);
+        $check->shiftMICR(true);
         $check->renderAsPDF($pdf);
 
         $pdf->Output('Equity Refund ' . $this->id . '.pdf', 'I');

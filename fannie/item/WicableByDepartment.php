@@ -23,7 +23,7 @@
 
 require(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI'))
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 
 class WicableByDepartment extends FannieRESTfulPage 
 {
@@ -85,7 +85,7 @@ class WicableByDepartment extends FannieRESTfulPage
 
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
-        $query = "SELECT dept_no, dept_name FROM departments GROUP BY dept_no ORDER BY dept_no;";
+        $query = "SELECT dept_no, dept_name FROM departments GROUP BY dept_no, dept_name ORDER BY dept_no;";
         $result = $dbc->query($query);
         while ($row = $dbc->fetch_row($result)) {
             $dept_no[] = $row['dept_no'];

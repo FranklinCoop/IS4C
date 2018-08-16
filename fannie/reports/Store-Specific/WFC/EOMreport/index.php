@@ -6,7 +6,7 @@ include('../../../../config.php');
 if (!class_exists('FannieAPI')) {
     include(dirname(__FILE__).'/../../../../classlib2.0/FannieAPI.php');
 }
-include($FANNIE_ROOT.'src/functions.php');
+include(__DIR__ . '/../../../../src/functions.php');
 $dbc = FannieDB::get($FANNIE_OP_DB);
 
 if (isset($_GET["excel"])){
@@ -20,6 +20,7 @@ $_SERVER['REQUEST_URI'] = str_replace("index.php","",$_SERVER['REQUEST_URI']);
         . $storeInfo['html'] . 
         '<input type="submit" value="Change" />
         </form>';
+    echo '<p><a href="../../../../modules/plugins2.0/CoreWarehouse/reports/EOMReport.php">Or use the newer one</a></p>';
 }
 
 $store = FormLib::get('store', false);
@@ -364,6 +365,11 @@ echo $output;
     $city = 0.01;
     $deli = 0.0225;
     $county = 0.005;
+    $startDT = new DateTime($start);
+    $noCounty = new DateTime('2017-10-01');
+    if ($startDT >= $noCount) {
+        //$county = 0;
+    }
     echo '<table border="1" cellspacing="0" cellpadding="4">';
     echo '<tr><th>Tax Collected on Regular rate items</th>
             <th>' . sprintf('%.2f', $collected[1]) . '</th>

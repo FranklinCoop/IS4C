@@ -23,10 +23,10 @@
 
 require(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 if (!function_exists('login'))
-    include($FANNIE_ROOT.'auth/login.php');
+    include(__DIR__ . '/../auth/login.php');
 
 class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool 
 {
@@ -201,8 +201,8 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
     private function saveExtra($dbc, $upc, $form)
     {
         try {
-            $brand = $this->form->brand;
-            $supplier = $this->form->supplier;
+            $brand = $form->brand;
+            $supplier = $form->supplier;
 
             $chkP = $dbc->prepare('SELECT upc FROM prodExtra WHERE upc=?');
             $chkR = $dbc->execute($chkP, array($upc));
@@ -461,8 +461,8 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
             $array = \COREPOS\Fannie\API\data\DataConvert::htmlToArray($ret);
             $ret = \COREPOS\Fannie\API\data\DataConvert::arrayToCsv($array);
         } else {
-            $this->add_script('../src/javascript/tablesorter/jquery.tablesorter.min.js');
-            $this->add_onload_command("\$('.tablesorter').tablesorter();\n");
+            $this->addScript('../src/javascript/tablesorter/jquery.tablesorter.min.js');
+            $this->addOnloadCommand("\$('.tablesorter').tablesorter();\n");
         }
 
         return $ret;

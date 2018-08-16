@@ -36,6 +36,7 @@ using DSIEMVXLib;
 using AxDSIEMVXLib;
 using DSIPDCXLib;
 using AxDSIPDCXLib;
+using ComPort;
 
 namespace SPH {
 
@@ -55,6 +56,7 @@ public class SPH_Datacap_EMVX : SerialPortHandler
     private bool pdc_active;
     private Object pdcLock = new Object();
     private bool emv_reset;
+    private bool always_reset = false;
     private Object emvLock = new Object();
 
     public SPH_Datacap_EMVX(string p) : base(p)
@@ -68,7 +70,7 @@ public class SPH_Datacap_EMVX : SerialPortHandler
 
         string my_location = AppDomain.CurrentDomain.BaseDirectory;
         char sep = Path.DirectorySeparatorChar;
-        xml_log = my_location + sep + "xml.log";
+        xml_log = my_location + sep + "log.xml";
         pdc_active = false;
         emv_reset = true;
 
@@ -94,6 +96,7 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             if (pdc_active) {
                 Console.WriteLine("Reset PDC");
                 pdc_ax_control.CancelRequest();
+                pdc_active = false;
             }
         }
 
@@ -231,8 +234,19 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             case "termManual":
                 break;
             case "termApproved":
+                FlaggedReset();
                 if (rba != null) {
-                    rba.showApproved();
+                    rba.showMessage("Approved");
+                }
+                break;
+            case "termDeclined":
+                if (rba != null) {
+                    rba.showMessage("Declined");
+                }
+                break;
+            case "termError":
+                if (rba != null) {
+                    rba.showMessage("Error");
                 }
                 break;
             case "termSig":
@@ -249,6 +263,12 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             case "termGetPin":
                 break;
             case "termWait":
+                break;
+            case "termFindPort":
+                var new_port = this.PortSearch(this.device_identifier);
+                if (new_port != "" && new_port != this.com_port && new_port.All(char.IsNumber)) {
+                    this.com_port = new_port;
+                }
                 break;
         }
     }
@@ -269,6 +289,41 @@ public class SPH_Datacap_EMVX : SerialPortHandler
         }
     }
 
+    /**
+      Supported options:
+        -- Global Options --
+        * alwaysReset [boolean] default false
+            Issue a PadReset command following a transaction. This will make
+            the terminal beep until the customer removes their card. Control
+            will not be returned to the cashier until the card is removed or
+            the reset command times out.
+        * logErrors [boolean] default false
+            Write error information to the same debug_lane.log file as PHP.
+            Errors are logged regardless of whether the verbose switch (-v) 
+            is used but not all verbose output is treated as an error & logged
+        * logXML [boolean] default false
+            Log XML requests & responses to "xml.log" in the current directory.
+
+        -- Ingencio Specific Options --
+        * disableRBA [boolean] default false
+            Stops all direct communication with Ingenico terminal.
+            Driver will solely utilize Datacap functionality
+        * disableButtons [boolean] default false
+            Does not display payment type or cashback selection buttons.
+            RBA commands can still be used to display static text
+            Irrelevant if disableRBA is true
+        * buttons [string] default EMV
+            Change labeling of the buttons. Valid options are "credit"
+            and "cashback" currently.
+            Irrelevant if disableRBA or disableButtons is true
+        * defaultMessage [string] default "Welcome"
+            Message displayed onscreen at the start of a transaction
+            Irrelevant if disableRBA is true
+        * cashback [boolean] default true
+            Show cashback selections if payment type debit or ebt cash
+            is selected.
+            Irrelevant if disableRBA or disableButtons is true
+    */
     public override void SetConfig(Dictionary<string,string> d)
     {
         if (d.ContainsKey("disableRBA") && d["disableRBA"].ToLower() == "true") {
@@ -277,10 +332,27 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                     rba.stubStop();
                 }
             } catch (Exception) {}
+            this.rba = null;
         }
 
         if (this.rba != null && d.ContainsKey("disableButtons") && d["disableButtons"].ToLower() == "true") {
             this.rba.SetEMV(RbaButtons.None);
+        }
+
+        if (this.rba != null && d.ContainsKey("buttons")) {
+            if (d["buttons"].ToLower() == "credit") {
+                this.rba.SetEMV(RbaButtons.Credit);
+            } else if (d["buttons"].ToLower() == "cashback") {
+                this.rba.SetEMV(RbaButtons.Cashback);
+            }
+        }
+
+        if (this.rba != null && d.ContainsKey("defaultMessage")) {
+            this.rba.SetDefaultMessage(d["defaultMessage"]);
+        }
+
+        if (d.ContainsKey("alwaysReset") && d["alwaysReset"].ToLower() == "true") {
+            this.always_reset = true;
         }
 
         if (d.ContainsKey("logXML") && d["logXML"].ToLower() == "true") {
@@ -379,6 +451,10 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                     // another transaction
                     break;
                 }
+            }
+
+            if (autoReset && this.always_reset) {
+                FlaggedReset();
             }
 
             return result;
@@ -532,6 +608,20 @@ public class SPH_Datacap_EMVX : SerialPortHandler
         }
 
         return "<err>Error collecting signature</err>";
+    }
+
+    protected string PortSearch(string device)
+    {
+        switch (device) {
+            case "VX805XPI":
+            case "VX805XPI_MERCURY_E2E":
+                return ComPortUtility.FindComPort("Verifone");
+            case "INGENICOISC250":
+            case "INGENICOISC250_MERCURY_E2E":
+                return ComPortUtility.FindComPort("Ingenico");
+            default:
+                return "";
+        }
     }
 
     /**

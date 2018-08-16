@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 /**
@@ -220,8 +220,8 @@ class HouseCouponEditor extends FanniePage
     {
         $FANNIE_URL = $this->config->get('URL');
 
-        $this->add_script($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.js?v=1');
-        $this->add_css_file($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.css');
+        $this->addScript($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.js?v=1');
+        $this->addCssFile($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.css');
         $dbc = FannieDB::get($this->config->get('OP_DB'));
         
         $ret = '<form action="HouseCouponEditor.php" method="get">';
@@ -231,14 +231,14 @@ class HouseCouponEditor extends FanniePage
         $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
         $ret .= '<button type="button" class="fancybox-btn btn btn-default"
             href="explainify.html">Explanation of Settings</button>';
-        $this->add_onload_command('$(\'.fancybox-btn\').fancybox();');
+        $this->addOnloadCommand('$(\'.fancybox-btn\').fancybox();');
         $ret .= '</p>';
         $ret .= '</form>';
         $ret .= '<table class="table">';
         $ret .= '<tr><th>ID</th><th>Name</th><th>Value</th>';
         $ret .= '<th>Begins</th><th>Expires</th></tr>';
         $model = new HouseCouponsModel($dbc);
-        foreach($model->find('coupID') as $obj) {
+        foreach($model->find('coupID', true) as $obj) {
             if (strstr($obj->startDate(), ' ')) {
                 $tmp = explode(' ', $obj->startDate());
                 $obj->startDate($tmp[0]);
@@ -427,6 +427,7 @@ class HouseCouponEditor extends FanniePage
             'FD'=>'Scaling Discount (Department)',
             'MD'=>'Capped Discount (Department)',
             'F'=>'Flat Discount',
+            'FC' => 'Flat Discount (Capped at amount due)',
             'PI'=>'Per-Item Discount',
             'PS'=>'Per-Set Discount',
             'BG'=>'BOGO (Buy one get one)',
@@ -438,6 +439,7 @@ class HouseCouponEditor extends FanniePage
             '%S'=>'Percent Discount (Department excludes sale items)',
             'PD'=>'Percent Discount (Anytime)',
             'AD'=>'All Discount (Department)',
+            'SC'=>'Store Credit (WFC; maybe temporary)',
         );
         if ($mType != '') {
             unset($dts['%']);
@@ -570,13 +572,14 @@ class HouseCouponEditor extends FanniePage
         $result = $dbc->execute($prep, array($id));
         $ret = '';
         while ($w = $dbc->fetch_row($result)) {
+            $link = strlen($w['upc']) == 13 ? "<a href=\"../../../item/ItemEditorPage.php?searchupc={$w['upc']}\">{$w['upc']}</a>" : $w['upc'];
             $ret .= sprintf('<tr>
                 <td>%s</td>
                 <td>%s</td>
                 <td>%s</td>
                 <td><input type="checkbox" name="del[]" value="%s" /></td>
                 </tr>',
-                $w['upc'],
+                $link,
                 $w['description'],
                 $w['type'],
                 $w['upc']);

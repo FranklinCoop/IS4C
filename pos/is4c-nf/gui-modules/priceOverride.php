@@ -89,8 +89,8 @@ class PriceOverride extends NoInputCorePage {
         }
 
         $deptmods = CoreLocal::get('SpecialDeptMap');
-        if (is_array($deptmods) && isset($deptmods[$row['department']])){
-            foreach($deptmods[$row['department']] as $mod){
+        if (is_array($deptmods) && isset($deptmods[$dept])){
+            foreach($deptmods[$dept] as $mod){
                 if ($mod === 'BottleReturnDept') {
                     return true;
                 }
@@ -131,7 +131,7 @@ class PriceOverride extends NoInputCorePage {
         <div class="centeredDisplay colored">
         <span class="larger"><?php echo _('enter purchase price'); ?></span>
         <form name="overrideform" method="post" 
-            id="overrideform" action="<?php echo filter_input(INPUT_SERVER, 'PHP_SELF'); ?>">
+            id="overrideform" action="<?php echo AutoLoader::ownURL(); ?>">
         <input type="text" id="reginput" name='reginput' tabindex="0" onblur="$('#reginput').focus()" />
         </form>
         <span><?php echo $this->itemDescription; ?> - <?php echo $this->price; ?>

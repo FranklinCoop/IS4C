@@ -25,10 +25,10 @@ if (basename(__FILE__) != basename($_SERVER['PHP_SELF'])) {
 }
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 if (!function_exists('checkLogin')) {
-    include($FANNIE_ROOT.'auth/login.php');
+    include(__DIR__ . '/../auth/login.php');
 }
 $dbc = FannieDB::get($FANNIE_OP_DB);
 
@@ -41,17 +41,34 @@ if (!checkLogin()){
 
 $page_title = "Special Order :: Review";
 $header = "Review Special Order";
-include($FANNIE_ROOT.'src/header.html');
+include(__DIR__ . '/../src/header.html');
 
 $orderID = isset($_REQUEST['orderID'])?$_REQUEST['orderID']:'';
 if ($orderID === ''){
     echo 'Error: no order specified';
-    include($FANNIE_ROOT.'src/footer.html');
+    include(__DIR__ . '/../src/footer.html');
     return;
 }
+$dbc = FannieDB::get($FANNIE_TRANS_DB);
+$orderP = $dbc->prepare('SELECT * FROM ' . FannieDB::fqn('SpecialOrders', 'trans') . ' WHERE specialOrderID=?');
+$order = $dbc->getRow($orderP, array($orderID));
+$nodupe = '';
+$checked = '';
+if ($order['noDuplicate']) {
+    $nodupe = 'disabled title="This order cannot be duplicated"';
+    $checked = 'checked';
+}
+$new = 'OrderReviewPage.php';
+if (isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING']) {
+    $new .= '?' . $_SERVER['QUERY_STRING'];
+}
 ?>
-<input type="submit" value="Duplicate Order" 
+<div style="text-align: center; background: #00aa00;" class="alert alert-info"><a style="color:#fff" href="<?php echo $new; ?>">Newer Version</a></div>
+    <input type="submit" value="Duplicate Order" <?php echo $nodupe; ?>
     onclick="copyOrder(<?php echo $orderID; ?>); return false;" />
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <input type="checkbox" disabled <?php echo $checked; ?> />
+    Duplication disabled for this order
 <fieldset>
 <legend>Customer Information</legend>
 <div id="customerDiv"></div>
@@ -117,5 +134,5 @@ $(document).ready(function(){
 });
 </script>
 <?php
-include($FANNIE_ROOT.'src/footer.html');
+include(__DIR__ . '/../src/footer.html');
 

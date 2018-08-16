@@ -19,6 +19,7 @@
             <file>tests/fannie/OrdersTest.php</file>
             <file>tests/fannie/PagesFannieTest.php</file>
             <file>tests/fannie/PluginFannieTest.php</file>
+            <file>tests/fannie/SyncTest.php</file>
             <file>tests/fannie/TagTest.php</file>
             <file>tests/fannie/TasksTest.php</file>
             <file>tests/fannie/WebServicesTest.php</file>
@@ -66,6 +67,7 @@
                 <directory>fannie/cron/LanePush</directory>
                 <directory>fannie/cron/Suspensions</directory>
                 <directory>fannie/per_coop</directory>
+                <directory>fannie/reports/noauto</directory>
                 <directory>fannie/reports/Store-Specific</directory>
                 <directory>fannie/src/Excel</directory>
                 <directory>fannie/src/fpdf</directory>

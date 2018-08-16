@@ -52,13 +52,13 @@ class DTrans
         'trans_type'=>'',
         'trans_subtype'=>'',
         'trans_status'=>'',
-        'department'=>'',
+        'department'=>0,
         'quantity'=>0,
         'scale'=>0,
         'cost'=>0,
-        'unitPrice'=>'',
-        'total'=>'',
-        'regPrice'=>'',
+        'unitPrice'=>0,
+        'total'=>0,
+        'regPrice'=>0,
         'tax'=>0,
         'foodstamp'=>0,
         'discount'=>0,
@@ -73,8 +73,8 @@ class DTrans
         'VolSpecial'=>0,
         'mixMatch'=>'',
         'matched'=>0,
-        'memType'=>'',
-        'staff'=>'',
+        'memType'=>0,
+        'staff'=>0,
         'numflag'=>0,
         'charflag'=>'',
         'card_no'=>0,
@@ -209,6 +209,7 @@ class DTrans
 
         return ' SUM(CASE '
                 . 'WHEN ' . $prefix . "trans_status = 'M' THEN 0 "
+                . 'WHEN ' . $prefix . "trans_subtype = 'OG' THEN 0 "
                 . 'WHEN ' . $prefix . "unitPrice = 0.01 THEN 1 "
                 . 'ELSE ' . $prefix . 'quantity '
                 . 'END) ';
@@ -229,7 +230,7 @@ class DTrans
             $store_condition = ' AND ' . $product_alias . '.store_id=' . ((int)$store_id); 
         }
 
-        return ' ' . self::normalizeJoin($join_type) . ' JOIN ' . self::opTable('products')
+        return ' ' . self::normalizeJoin($join_type) . ' JOIN ' . FannieDB::fqn('products', 'op')
                 . ' AS ' . $product_alias
                 . ' ON ' . $product_alias . '.upc = ' . $dlog_alias . '.upc ' . $store_condition;
     }
@@ -247,19 +248,6 @@ class DTrans
         }
     }
 
-    private static function opTable($table)
-    {
-        $conf = FannieConfig::factory();
-        $fq_table = $table;
-        if ($conf->get('OP_DB') != '') {
-            $fq_table = $conf->get('OP_DB');
-            $fq_table .= ($conf->get('SERVER_DBMS') == 'mssql') ? '.dbo.' : '.';
-            $fq_table .= $table;
-        }
-
-        return $fq_table;
-    }
-
     /**
       Get join statement for departments table
       @param $dlog_alias [optional] alias for the transaction table (default 't')
@@ -268,7 +256,7 @@ class DTrans
     */
     public static function joinDepartments($dlog_alias='t', $dept_alias='d')
     {
-        return ' LEFT JOIN ' . self::opTable('departments') . ' AS ' . $dept_alias
+        return ' LEFT JOIN ' . FannieDB::fqn('departments', 'op') . ' AS ' . $dept_alias
                 . ' ON ' . $dept_alias . '.dept_no = ' . $dlog_alias . '.department ';
     }
 
@@ -280,7 +268,7 @@ class DTrans
     */
     public static function joinCustomerAccount($dlog_alias='t', $cust_alias='c')
     {
-        return ' LEFT JOIN ' . self::opTable('custdata') . ' AS ' . $cust_alias
+        return ' LEFT JOIN ' . FannieDB::fqn('custdata', 'op') . ' AS ' . $cust_alias
                 . ' ON ' . $cust_alias . '.CardNo = ' . $dlog_alias . '.card_no '
                 . ' AND ' . $cust_alias . '.personNum = 1 ';
     }
@@ -293,7 +281,7 @@ class DTrans
     */
     public static function joinTenders($dlog_alias='t', $tender_alias='n')
     {
-        return ' LEFT JOIN ' . self::opTable('tenders') . ' AS ' . $tender_alias
+        return ' LEFT JOIN ' . FannieDB::fqn('tenders', 'op') . ' AS ' . $tender_alias
                 . ' ON ' . $tender_alias . '.TenderCode = ' . $dlog_alias . '.trans_subtype ';
     }
 
@@ -372,16 +360,22 @@ class DTrans
             $model->trans_id($last->trans_id() + 1);
         }
 
+        $model->memType(0);
+        $model->staff(0);
         if (isset($params['card_no'])) {
             $account = \COREPOS\Fannie\API\member\MemberREST::get($params['card_no']);
             if ($account) {
-                $model->memType($account['customerTypeID']);
-                $model->staff($account['customers'][0]['staff']);
+                if (is_numeric($account['customerTypeID'])) {
+                    $model->memType($account['customerTypeID']);
+                }
+                if (is_numeric($account['customers'][0]['staff'])) {
+                    $model->staff($account['customers'][0]['staff']);
+                }
             }
         }
 
         $defaults = self::defaults();
-        $skip = array('datetime', 'emp_no', 'register_no', 'trans_no', 'trans_id');
+        $skip = array('datetime', 'emp_no', 'register_no', 'trans_no', 'trans_id', 'memType');
         foreach ($defaults as $name => $value) {
             if (in_array($name, $skip)) {
                 continue;

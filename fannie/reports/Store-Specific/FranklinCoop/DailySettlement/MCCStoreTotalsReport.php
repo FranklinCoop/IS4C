@@ -68,7 +68,7 @@ sum(case when department='994' then total else 0 end) as paid_out_total,
 sum(case when trans_subtype='IC' AND trans_type ='T' then total else 0 end) as store_coupon_total,
 sum(case when trans_subtype='CP' AND trans_type ='T' then total else 0 end) as mfg_coupon_total
 FROM core_trans.transarchive
-WHERE datetime BETWEEN ? AND ?;";
+WHERE datetime BETWEEN ? AND ? AND store_no=2;";
 
 $row_names = ["Department Sales Totals", "Sales Tax", "Meals Tax", "Member Payments", "Charge Payments",
 				"Gift Cards Sold", "Paid In", "Member 2%", "Member 10%", "Member 15%", "Staff 15",

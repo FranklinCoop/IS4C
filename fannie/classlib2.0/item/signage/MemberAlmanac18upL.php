@@ -104,8 +104,8 @@ class MemberAlmanac18upL extends \COREPOS\Fannie\API\item\FannieSignage
             $y += $fontSize -2;
             $fontSize = 6.33;
             $pdf->SetXY($x, $y);
-            $pdf->SetFontSize($fontSize);
-            $pdf->Cell($textWidth, $fontSize, "Members' Almanac Price!", 0, 0, 'C');
+            $pdf->SetFont($this->fontM,'',$fontSize);
+            $pdf->Cell($textWidth, $fontSize, "MEMBERS' ALMANAC PRICE!", 0, 0, 'C');
 
             //sale date.
             $y += $fontSize - .5;

@@ -89,8 +89,8 @@ class MemberAlmanac16upL extends \COREPOS\Fannie\API\item\FannieSignage
             $pdf->Cell($this->width, 29.37, sprintf('$%.2f', $item['normal_price']), 0, 0, 'C');
             //Member Alminac Price
             $pdf->SetXY($this->startX  + $xOffset*$column, $this->startY+51.37 + $row*$yOffset);
-            $pdf->SetFontSize(6.33);
-            $pdf->Cell($this->width, 6.33, "Members' Almanac Price!", 0, 0, 'C');
+            $pdf->SetFont($this->fontM,'',6.33);
+            $pdf->Cell($this->width, 6.33, "MEMBERS' ALMANAC PRICE!", 0, 0, 'C');
 
             //sale date.
             $pdf->SetFont($this->font);

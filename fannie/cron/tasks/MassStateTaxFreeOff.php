@@ -77,13 +77,10 @@ Server side tax table remains the same.';
             }
             
             $args = array(0.0625, 1); //asummes sales tax is id 1 change as needed
-            $query = 'UPDATE '.$lane['trans'].'.taxrates SET rate = ? WHERE id = ?';
+            $query = 'UPDATE taxrates SET rate = ? WHERE id = ?';
             
             $prep = $dbc->prepare($query);
-            $result = $dbc->execute($prep,$args);
-            
-            
-            //$resutls = $dbc->query('UPDATE taxrates SET rate = ? WHERE description = ?', $connection ,$args);
+            $result = $dbc->execute($prep,$args,$lane['trans']);
             
         }
     }

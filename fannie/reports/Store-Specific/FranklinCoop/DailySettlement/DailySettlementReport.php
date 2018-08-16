@@ -49,7 +49,7 @@ WHERE datetime BETWEEN ? AND ? AND store_no=2;
 $total_sales = '';
 
 $total_sales = "SELECT 
-sum(case when department!=0 and trans_subtype!='CP' and department NOT IN (992,990,994,995) and upc!='0000000001930' then total else 0 end) as dept_sales_total,
+sum(case when department!=0 and trans_subtype!='CP' and department NOT IN (992,990,994,995,902) and upc!='0000000001930' then total else 0 end) as dept_sales_total,
 'ERR' as sales_tax_total,
 'ERR' as meals_tax_total,
 sum(case when department='992' then total else 0 end) as member_payment_total,

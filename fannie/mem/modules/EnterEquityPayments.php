@@ -117,7 +117,10 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
         $paymentDate = FormLib::get_form_value('paymentDate');
         $paymentAmt = FormLib::get_form_value('payment_amt');
         $paymentNote = FormLib::get_form_value('payment_note');
-        if ($paymentDate != 0 && $paymentAmt!= 0 && $paymentNote !=0) {
+        if ($paymentDate != null || $paymentAmt!= null || $paymentNote !=null) {
+            if($paymentDate == null) {return 'Payment Requires Date';}
+            if($paymentAmt == null) {return 'Payment Requires Amount';}
+            if($paymentNote == null) {return 'Payment Requires Note';}
             $upQ = $dbc->prepare("INSERT INTO {$trans}stockpurchases (card_no,stockPurchase,tdate,trans_num,trans_id, dept)
             VALUES (?,?,?,?,0,992)");
             $upR = $dbc->execute($upQ, array($memNum,$paymentAmt,$paymentDate,$paymentNote));
@@ -126,8 +129,6 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
                 return "Error: problem saving payments.";
             else
                 return "Payment Saved!";
-        } else {
-            return "No data enteired."
         }
 
 

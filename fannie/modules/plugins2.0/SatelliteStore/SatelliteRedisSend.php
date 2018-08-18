@@ -113,8 +113,9 @@ class SatelliteRedisSend extends FannieTask
                 $redis->set($table . ':' . $column . ':' . $myID, $max);
             }
         } catch (Exception $ex) {
-            // connection to redis failed. 
-            // no cleanup required
+            $this->unlock();
+            echo $this->cronMsg("Send Fail: ".$ex);
+
         }
     }
 

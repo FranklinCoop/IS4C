@@ -125,7 +125,7 @@ class MemberAlmanac16upL extends \COREPOS\Fannie\API\item\FannieSignage
 
             //reg price
             $pdf->SetFont($this->fontM,'',6.72);
-            $pdf->SetXY($this->startX +2 + $xOffset*$column, $this->startY + 178.57 + $row*$yOffset);
+            $pdf->SetXY($this->startX +2 + $xOffset*$column, $this->startY + 177.57 + $row*$yOffset);
             $pdf->Cell($this->width/2, 6.72, sprintf('REG. $%.2f', $info['normal_price']), 0,0, 'L');
             //size
             $pdf->SetX($this->startX -2 + $xOffset*$column + $this->width/2);

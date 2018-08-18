@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2018 Franklin Community Coop
+    Copyright 2014 Whole Foods Co-op
 
     This file is part of CORE-POS.
 
@@ -18,47 +18,46 @@
     You should have received a copy of the GNU General Public License
     in the file license.txt along with IT CORE; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-CREATE TABLE FCC_MonthlyDiscountChanges(
-    id INT(11) AUTO_INCREMENT PRIMARY KEY,
-    `month` date,
-    card_no INT(11) NOT NULL,
-    oldMemType tinyint(4),
-    newMemType tinyint(4)
-);
 
 *********************************************************************************/
 
 /**
-  @class BatchesModel
+  @class ArHistoryTodayModel
 */
-class FCC_MonthlyDiscountChangesModel extends BasicModel 
+class FCC_MonthlyDiscountChangesViewModel extends ViewModel
 {
 
-    protected $name = "FCC_MonthlyDiscountChanges";
+    protected $name = "FCC_MonthlyDiscountChangesView";
     protected $preferred_db = 'op';
 
     protected $columns = array(
-    'changeID' => array('type'=>'INT', 'primary_key'=>True, 'increment'=>True),
+    'changeID' => array('type'=>'INT'),
     'month' => array('type'=>'DATE'),
-    'card_no' => array('type'=>'INT', 'default'=>0),
-    'oldMemType' => array('type'=>'SMALLINT'),
-    'newMemType' => array('type'=>'SMALLINT'),
+    'card_no' => array('type'=>'INT'),
+    'LastName' => array('type'=>'VARCHAR(30)'),
+    'FirstName' => array('type'=>'VARCHAR(30)'),
+    'oldMemType' => array('type'=>'INT'),
+    'newMemType' => array('type'=>'INT'),
     );
 
-    protected $unique = array('changeID');
+    public function definition()
+    {
 
+        return '
+            SELECT m.changeID, m.card_no, c.LastName, c.FirstName, m.oldMemType, m.newMemType
+                  FROM FCC_MonthlyDiscountChanges m left join custdata c on m.card_no = c.CardNo
+                  WHERE c.personNum =1 order by c.LastName,c.FirstName';
+    }
 
     public function doc()
     {
         return '
 Depends on:
-Nothing
+* FCC_MonthyDiscountChanges
+* custdata.
 
 Use:
-This table stores a set of members be month
-each number has an old member type at the end
-of each month a cron will reset every memeber
-to the new member type.
+  display data for fcc monthy member dicsount editor.
         ';
     }
 }

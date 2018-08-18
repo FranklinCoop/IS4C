@@ -178,8 +178,10 @@ class FCC_MergeOldTransArchiveTask extends FannieTask
         $oldTables = array();
         $currentTable = '201701';
         $endTable = '201712';
-        while ($currentTable < $endTable) {
-        	$oldTables[] = "transArchive".$currentTable;
+        $size = 11;
+        $key=0;
+        while($currentTable<=$endTable) {
+        	$oldTables[$key] = "transArchive".$currentTable;
         	$this->cronMsg('Table:'.$currentTable, FannieLogger::INFO);
         	if ($currentTable%100 == 12) {
         		$currentTable += 89;
@@ -187,8 +189,12 @@ class FCC_MergeOldTransArchiveTask extends FannieTask
         	} else {
         		$currentTable++;
         	}
+        	$key++;
         }
-        foreach ($oldTables as $table) {
+
+
+        for ($key =0;$key < sizeof($oldTables);$key++) {
+        	$table = $oldTables[$key];
         	$dates = $this->getDates($sql,$table);
         	if (count($dates) == 0) {
             	$this->cronMsg('No data to rotate', FannieLogger::INFO);
@@ -206,13 +212,13 @@ class FCC_MergeOldTransArchiveTask extends FannieTask
             /* figure out which monthly archive dtransactions data belongs in */
             list($year, $month, $day) = explode('-', $date);
             $yyyymm = $year.$month;
-            $table = 'transArchive'.$yyyymm;
+            //$table = 'transArchive'.$yyyymm;
 
             if ($FANNIE_ARCHIVE_METHOD == "partitions") {
                 // we're just partitioning
                 // create a partition if it doesn't exist
                 $bigArchive = $this->createPartitionIfNeeded($sql, $date, $bigArchive);
-        
+        		$this->cronMsg('Loading:'.$table.' Date: '.$date, FannieLogger::INFO);
                 // now just copy rows into the partitioned table
                 $loadQ = "INSERT INTO bigArchive 
                           SELECT * 

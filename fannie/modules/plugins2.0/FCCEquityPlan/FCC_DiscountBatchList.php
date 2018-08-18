@@ -38,54 +38,96 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
     public $themed = true;
     
     protected $model_name = 'FCC_MonthlyDiscountChangesModel';
+    protected $date = '';
+    protected $sortby = 'LastName';
+    protected $columnNames = array('card_no'=>'Member No',
+                         'LastName'=>'Last name',
+                         'FirstName'=>'First name',
+                         'oldMemType'=>'Status',
+                         'newMemType'=>'New Status');
+
+    public function preprocess()
+    {
+        if ($this->date == '') {
+            $this->date = date('Y-m').'-01'; // date is year plus month day one.
+        }
+        
+        $this->__routes[] = 'get<filter>';
+        $this->__routes[] = 'post<id><newMemType>';
+
+        return parent::preprocess();
+    }
 
     public function put_handler()
     {
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
         $model = new $this->model_name($dbc);
+        $saved = false;
         $missing_pk = false;
-        foreach ($model->getColumns() as $name => $info) {
-            $val = FormLib::get($name);
-            $model->$name($val);
-            if (isset($info['primary_key']) && $info['primary_key'] && $val === '') {
-                $missing_pk = true;
+        $memberID = FormLib::get('card_no');
+        //$args = array($memberID[0],'=',False);
+        $model->card_no($memberID,'=',False);
+        $obj = $model->find();
+        if (sizeof($obj)==0) {
+            if(true) {
+                $custQ = $dbc->prepare("SELECT CardNo, memType FROM custdata WHERE CardNo = ? AND personNum=1");
+                $custR = $dbc->execute($custQ,array($memberID));
+                if ($custR) {
+                    $memType = $dbc->fetch_row($custR)['memType'];
+                        $model = new $this->model_name($dbc);
+                        $model->month(date('Y-m').'-01');
+                        $model->card_no($memberID);
+                        $model->oldMemType($memType);
+                        $model->newMemType($memType);
+                        $saved = $model->save();
+                } else {
+                    header('Location: ' . $_SERVER['PHP_SELF'] . '?flash=Error+Adding+DBCon');
+                }   
+            } 
+        } else {
+                header('Location: ' . $_SERVER['PHP_SELF'] . '?flash=Error+Already+'.$obj[0]->card_no());
             }
-        }
-        if (!$missing_pk) {
-            $saved = $model->save();
-        }
 
-        if (!$missing_pk && $saved) {
+        if ($saved) {
             header('Location: ' . $_SERVER['PHP_SELF'] . '?flash=Added+Entry');
         } else {
-            header('Location: ' . $_SERVER['PHP_SELF'] . '?flash=Error+Adding+Entry');
+            header('Unknowen Error in FCC_DiscountBatchList.php put_handler()');
         }
+        return false;
+
+}
+    public function get_filter_handler()
+    {
+        if (isset($$this->filter['date']) && $$this->filter['date'] != '') {
+            
+            $this->date = $this->filter['date'];
+        }
+        echo 'gaga';
 
         return false;
     }
 
-    public function post_handler()
+    public function post_id_newMemType_handler()
     {
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
-        $model = new $this->model_name($dbc);
-        $columns = array_keys($model->getColumns());
-        $col0 = $columns[0];
-        $vals0 = FormLib::get($col0, array());
-        for ($i=0; $i<count($vals0); $i++) {
-            $model->$col0($vals0[$i]);
-            for ($j=1; $j<count($columns); $j++) {
-                $col = $columns[$j];
-                $vals = FormLib::get($col);
-                if (is_array($vals) && isset($vals[$i])) {
-                    $model->$col($vals[$i]);
-                }
-            }
-            $model->save();
+        $json = array('msg'=>'');
+
+
+        $mtModel = new FCC_MonthlyDiscountChangesModel($dbc);
+        $saved=false;
+        $mtModel->changeID($this->id,'=');
+        $mtModel->month($this->date,'=');
+        foreach ($mtModel->find() as $obj) {
+            $obj->newMemType($this->newMemType);
+            $saved = $obj->save();
+        }
+        if (!$saved) {
+            $json['msg'] = 'Error saving membership status: *'.$this->id.'* *'.$this->newMemType.'*';
         }
 
-        header('Location: ' . $_SERVER['PHP_SELF'] . '?flash=Saved+Changes');
+        echo json_encode($json);
 
         return false;
     }
@@ -95,14 +137,18 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
         $model = new $this->model_name($dbc);
-        foreach ($model->getColumns() as $name => $info) {
-            if (isset($info['primary_key']) && $info['primary_key']) {
-                $model->$name($this->id);
-                break;
+        $model->changeID($this->id,'=');
+        $model->month($this->date,'=');
+        $deleteMsg ='';
+        foreach ($model->find() as $obj) {
+            if ($obj->changeID() == $this->id) {
+                $deleteMsg ='?flash=Deleted+Entry+'.$obj->changeID();
+                $obj->delete();
             }
+            
         }
-        if ($model->delete()) {
-            header('Location: ' . $_SERVER['PHP_SELF'] . '?flash=Deleted+Entry');
+        if ($deleteMsg != '') {
+            header('Location: ' . $_SERVER['PHP_SELF'] . $deleteMsg);
         } else {
             header('Location: ' . $_SERVER['PHP_SELF'] . '?flash=Error+Deleting+Entry');
         }
@@ -135,13 +181,105 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
         return $opts;
     }
 
+    private function getDateSelector($dbc) {
+        $dates = $dbc->query('SELECT YEAR(`month`) AS Y,MONTH(`month`) AS M 
+                                FROM FCC_MonthlyDiscountChanges 
+                                GROUP BY M,Y ORDER BY Y,M');
+        $selected = date('Yn');
+        $opts ='';
+        while($row = $dbc->fetch_row($dates)){
+            if($row[0] != '') {
+                $name = date('M Y',strtotime($row[0].'-'.$row[1].'-01')); 
+                $value = $row[0].$row[1];
+                $opts .= sprintf('<option %s value="%d">%s</option>',
+                        ($value == $selected ? 'selected' : ''),
+                            $value, $name);
+            }
+        }
+
+        //sprintf('<td><select class="%s form-control input-sm">%s</select></td>',$obj->$name(),$memTypeOpts);
+
+        $ret = sprintf('<select onchange="redrawList(this, this.value);" class="date form-control input-sm"
+            id="filterDate">%s</select>',
+                $opts);
+
+        return $ret;
+    }
+
+    private function getSortSelector($dbc) {
+        $viewModel = new FCC_MonthlyDiscountChangesViewModel($dbc);
+        $opts = '';
+        foreach ($viewModel->getColumns() as $name => $info) {
+            if ($name != 'month' && $name != 'changeID')
+            $opts .= sprintf('<option %s value="%s">%s</option>',
+                        ($name == $this->sortby ? 'selected' : ''),
+                            $name, $this->columnNames[$name]);
+        }
+        $ret = sprintf('<select class="date form-control input-sm">%s</select>',
+                $opts);
+
+        return $ret;
+    }
+
+    function javascript_content()
+    {
+        ob_start();
+        ?>
+        function saveMemType(memType,t_id){
+            var elem = $(this);
+            var orig = this.defaultValue;
+            $.ajax({url:'FCC_DiscountBatchList.php',
+                cache: false,
+                type: 'post',
+                data: 'id='+t_id+'&newMemType='+memType,
+                dataType: 'json'
+            }).done(function(data){
+                showBootstrapPopover(elem, orig, data.msg);
+            });
+        }
+        function setNewDate(newDate){
+            var elem = $(this);
+            var orig = this.defaultValue;
+            $.ajax({url:'FCC_DiscountBatchList.php',
+                cache: false,
+                type: 'post',
+                data: 'newDate='+newDate,
+                dataType: 'json'
+            }).done(function(data){
+                showBootstrapPopover(elem, orig, data.msg);
+            });
+        }
+
+        function refilter() {
+            filters.date = $('#filterDate').val();
+            pageStart = '';
+          redrawList();
+    };
+
+        function redrawList(filterDate) {
+            data += '&filter=' +filterDate
+            $.ajax({
+                url: 'FCC_DiscountBatchList.php',
+                type: 'get',
+                data: data
+            }).done(function(resp) {
+                $('#displayarea').html(resp);
+            });
+        };
+
+        <?php
+        return ob_get_clean();
+    }
+
     public function get_view()
     {
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
-        $model = new $this->model_name($dbc);
+        //$model = new $this->model_name($dbc);
 
         $memTypes = $this->getMemTypes($dbc);
+
+        
 
         $ret = '';
         if (FormLib::get('flash') !== '') {
@@ -149,66 +287,96 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
         }
         $ret .= '<form method="get">';
         $ret .= '<div class="form-inline">';
-        foreach ($model->getColumns() as $name => $info) {
-            switch ($name) {
-                case 'changeID':
-                    break; //do nothing.      
-                default:
-                    $ret .= sprintf('
-                    <div class="form-group">
-                        <label class="control-label">%s</label>
-                        <input type="text" class="form-control" name="%s" %s />
-                    </div> ',
-                    ucwords($name),
-                    $name,
-                    (isset($info['primary_key']) && $info['primary_key']) ? 'required' : ''
+        
+        //add a member to the list.
+        $ret .= sprintf('<div class="form-group">
+                        <label class="control-label">Add Number</label>
+                        <input type="text" class="form-control" name="card_no" required />
+                        </div> '
                     );
-                    break;
-            }
 
-        }
         $ret .= '<input type="hidden" name="_method" value="put" />';
-        $ret .= '<button type="submit" class="btn btn-default">Add Entry</button>';
+        $ret .= '<button type="submit" class="btn btn-default">Add Member</button>';
+        
+        //select Month
+        $ret .= '<div class="form-group">';
+        $ret .= '<label class="control-label">Select Month</label>';
+        $ret .= $this->getDateSelector($dbc);
+        $ret .='</div> ';
+        //sort
+        $ret .= '<div class="form-group">';
+        $ret .= '<label class="control-label">Sort By</label>';
+        $ret .= $this->getSortSelector($dbc);
+        $ret .= '</select>';
+        $ret .='</div> ';
+        //group
+
+
         $ret .= '</div>';
         $ret .= '</form>';
 
         $ret .= '<hr />';
 
-        //Main Editing Table;
 
-        $ret .= '<form method="post">';
+        $table = $this->getTable($dbc);
+        
+        //Main Editing Table;
+        $ret .= sprintf('<div id="displayarea">
+                    %s
+                </div>',$table);
+        // after table
+        //removed this save button because they table saves automatically.
+        //$ret .= '<p><button class="btn btn-default">Save Changes</button></p>';
+        //$ret .= '</form>';
+
+        $this->addOnloadCommand("\$('input:first').focus();\n");
+
+        return $ret;
+    }
+
+    private function getTable() {
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
+        $memTypes = $this->getMemTypes($dbc);
+        $ret = '<form method="post">';
         $ret .= '<table class="table table-striped table-bordered">';
         $ret .= '<thead><tr>';
         
-        foreach ($model->getColumns() as $name => $info) {
-            if($name != 'changeID') {
-                $ret .= '<th>' . ucwords($name) . '</th>';
-            }
+        foreach ($this->columnNames as $name => $info) {
+            $ret .= '<th>' . $info . '</th>';
         }
         $ret .= '</tr></thead>';
         $ret .= '<tbody>';
-        foreach ($model->find() as $obj) {
+        
+        $viewModel = new FCC_MonthlyDiscountChangesViewModel($dbc);
+        $viewModel->month($this->date,'=');
+        foreach ($viewModel->find($this->sortby) as $obj) {
             $ret .= '<tr>';
-            $pk = false;
-            foreach ($model->getColumns() as $name => $info) {
-                $memTypeOpts = $this->arrayToOpts($memTypes, $obj->$name());
+            $pk = '';
+            foreach ($viewModel->getColumns() as $name => $info) {
                 switch ($name) {
+                    case 'oldMemType':
+                        $ret .= sprintf('<td>%s
+                                <input type="hidden" name="%s[]" value="%s"/>
+                                </td>',
+                                $memTypes[$obj->$name()], $obj->$name(), $obj->$name()
+                        );     
+                        break;
                     case 'newMemType':
-                        $ret .= sprintf('<td><select name="newMemType[]" class="newMemType form-control input-sm">%s</select></td>',$memTypeOpts);
+                        $memTypeOpts = $this->arrayToOpts($memTypes, $obj->$name());
+                        $ret .= sprintf('<td><select onchange="saveMemType.call(this, this.value, %d);" class="%s form-control input-sm">%s</select></td>',$pk,$obj->$name(),$memTypeOpts);
                         break;
                     case 'changeID':
-                        break; // do nothing;
+                        $pk = $obj->$name();
+                        break; // nothing;
+                    case'month':
+                        break;// donothing
                     default:
                         $ret .= sprintf('<td>%s
                                 <input type="hidden" name="%s[]" value="%s" />
                                 </td>',
                                 $obj->$name(), $name, $obj->$name()
                         );        
-                        if ($pk === false) {
-                            $pk = $obj->$name();
-                        } else {
-                            $pk = false;
-                        }
                         break;
                 }
             }
@@ -221,11 +389,6 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
             $ret .= '</tr>';
         }
         $ret .= '</tbody></table>';
-        // after table
-        $ret .= '<p><button class="btn btn-default">Save Changes</button></p>';
-        $ret .= '</form>';
-
-        $this->addOnloadCommand("\$('input:first').focus();\n");
 
         return $ret;
     }

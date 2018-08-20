@@ -40,7 +40,7 @@ $dlog = select_dlog($startDate,$endDate);
 $dbconn = ($FANNIE_SERVER_DBMS=='MSSQL')?'.dbo.':'.';
 
 $total_tax = "SELECT
-sum(case when upc='TAXLINEITEM' and description IN ('MaStateMealsTax','StateAndLocalMealsTax', 'MealsTax') then regPrice else 0 end) as sales_tax_total,
+sum(case when upc='TAXLINEITEM' and description IN ('MaStateMealsTax','StateAndLocalMealsTax', 'MealsTax') then regPrice else 0 end) as meals_tax_total,
 sum(case when upc='TAXLINEITEM' and description IN ('MASalesTax','MassSalesTax', 'SalesTax') then regPrice else 0 end) as sales_tax_total
 FROM core_trans.transarchive
 WHERE datetime BETWEEN ? AND ? AND store_no=2;

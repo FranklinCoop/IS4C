@@ -27,7 +27,7 @@ class SatelliteRedisSend extends FannieTask
 {
     public $name = 'Satellite Store Redis Send';
 
-    public $log_start_stop = false;
+    public $log_start_stop = true;
 
     public $default_schedule = array(
         'min' => '2,7,12,17,22,27,32,37,42,47,52,57',
@@ -39,10 +39,12 @@ class SatelliteRedisSend extends FannieTask
     
     public function run()
     {
+        
         if ($this->isLocked()) {
             echo $this->cronMsg('Task Locked');
             return false;
         }
+        echo $this->cronMsg('Task Lock Enganged');
         $this->lock();
 
         $conf = $this->config->get('PLUGIN_SETTINGS');
@@ -53,6 +55,7 @@ class SatelliteRedisSend extends FannieTask
         $remote = FannieDB::get($this->config->get('TRANS_DB'));
         if (!$remote->isConnected()) {
             echo $this->cronMsg("No connection");
+            echo $this->cronMsg('Task Unlock Enganged');
             $this->unlock();
             return false;
         }
@@ -60,6 +63,8 @@ class SatelliteRedisSend extends FannieTask
         $local = $this->localDB($remote, $myID, $my_db);
         if (!$local->isConnected($my_db)) {
             echo $this->cronMsg("No local connection");
+            echo $this->cronMsg('Task Unlock Enganged');
+
             $this->unlock();
             return false;
         }
@@ -71,9 +76,12 @@ class SatelliteRedisSend extends FannieTask
             $this->sendTable($local, $redis, $myID, 'PaycardTransactions', 'storeRowId');
             $this->sendTable($local, $redis, $myID, 'CapturedSignature', 'capturedSignatureID');
         } catch (Exception $ex) {
+            echo $this->cronMsg('Task Unlock Enganged');
+
             $this->unlock();
             echo $this->cronMsg("Send Fail: ".$ex);
         }
+        echo $this->cronMsg('Task Unlock Enganged');
 
         $this->unlock();
     }
@@ -113,8 +121,11 @@ class SatelliteRedisSend extends FannieTask
                 $redis->set($table . ':' . $column . ':' . $myID, $max);
             }
         } catch (Exception $ex) {
-            // connection to redis failed. 
-            // no cleanup required
+            echo $this->cronMsg('Task Unlock Enganged');
+
+            $this->unlock();
+            echo $this->cronMsg("Send Fail: ".$ex);
+
         }
     }
 

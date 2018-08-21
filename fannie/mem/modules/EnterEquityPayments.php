@@ -30,7 +30,7 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
 
     function showEditForm($memNum, $country="US")
     {
-        global $FANNIE_URL,$FANNIE_TRANS_DB;
+        global $FANNIE_URL,$FANNIE_TRANS_DB,$FANNIE_OP_DB;
 
         $dbc = $this->db();
         $trans = $FANNIE_TRANS_DB.$dbc->sep();
@@ -51,11 +51,23 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
                                     ORDER BY tdate DESC");
         $paymentsR = $dbc->execute($paymentsQ,array($memNum));
 
-
+        $op = $FANNIE_OP_DB.$dbc->sep();
+        $blueLineQ = $dbc->prepare("SELECT c.blueLine FROM {$op}custdata c WHERE c.CardNo=? AND c.personNum=1");
+        $blueLineR = $dbc->execute($blueLineQ,array($memNum));
+        $blueLine = '';
+        if ($dbc->num_rows($blueLineR) > 0) {
+            $w = $dbc->fetch_row($blueLineR);
+            $blueLine = $w['blueLine'];
+        }
 
         $ret = "<div class=\"panel panel-default\">
             <div class=\"panel-heading\">Equity Payments</div>
             <div class=\"panel-body\">";
+
+        $ret .= '<div class="form-group">';
+        $ret .= '<span class="label primaryBackground">Register Name:</span> ';
+        $ret .= $blueLine.'</div>'; 
+
 
         $ret .= '<div class="form-group">';
         $ret .= '<span class="label primaryBackground">Stock Purchased</span> ';

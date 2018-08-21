@@ -40,6 +40,7 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
     protected $model_name = 'FCC_MonthlyDiscountChangesModel';
     protected $date = '';
     protected $sortby = 'LastName';
+    protected $groupby = 'oldMemType';
     protected $columnNames = array('card_no'=>'Member No',
                          'LastName'=>'Last name',
                          'FirstName'=>'First name',
@@ -99,11 +100,7 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
 }
     public function get_filter_handler()
     {
-        if (isset($$this->filter['date']) && $$this->filter['date'] != '') {
-            
-            $this->date = $this->filter['date'];
-        }
-        echo 'gaga';
+        echo $this->getTable($this->connection,$this->filter);
 
         return false;
     }
@@ -133,20 +130,22 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
     }
 
     public function delete_id_handler()
-    {
-        $dbc = $this->connection;
-        $dbc->selectDB($this->config->get('OP_DB'));
-        $model = new $this->model_name($dbc);
-        $model->changeID($this->id,'=');
-        $model->month($this->date,'=');
-        $deleteMsg ='';
-        foreach ($model->find() as $obj) {
-            if ($obj->changeID() == $this->id) {
-                $deleteMsg ='?flash=Deleted+Entry+'.$obj->changeID();
-                $obj->delete();
-            }
-            
+    {//2018-05
+        $deleteMsg ='?flash=Old+Data+For+Review+Only+'.date('m');
+        if(substr($this->date, 6,2) !== date('m')) {
+            $dbc = $this->connection;
+            $dbc->selectDB($this->config->get('OP_DB'));
+            $model = new $this->model_name($dbc);
+            $model->changeID($this->id,'=');
+            $model->month($this->date,'=');
+            foreach ($model->find() as $obj) {
+                if ($obj->changeID() == $this->id) {
+                    $deleteMsg ='?flash=Deleted+Entry+'.$obj->changeID();
+                    $obj->delete();
+                }
+            } 
         }
+
         if ($deleteMsg != '') {
             header('Location: ' . $_SERVER['PHP_SELF'] . $deleteMsg);
         } else {
@@ -182,16 +181,16 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
     }
 
     private function getDateSelector($dbc) {
-        $dates = $dbc->query('SELECT YEAR(`month`) AS Y,MONTH(`month`) AS M 
+        $dates = $dbc->query('SELECT YEAR(`month`) AS Y,MONTH(`month`),`month` AS M 
                                 FROM FCC_MonthlyDiscountChanges 
                                 GROUP BY M,Y ORDER BY Y,M');
-        $selected = date('Yn');
+        $selected = date('Y-m').'-01';
         $opts ='';
         while($row = $dbc->fetch_row($dates)){
             if($row[0] != '') {
                 $name = date('M Y',strtotime($row[0].'-'.$row[1].'-01')); 
-                $value = $row[0].$row[1];
-                $opts .= sprintf('<option %s value="%d">%s</option>',
+                $value = $row[2];
+                $opts .= sprintf('<option %s value="%s">%s</option>',
                         ($value == $selected ? 'selected' : ''),
                             $value, $name);
             }
@@ -199,8 +198,8 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
 
         //sprintf('<td><select class="%s form-control input-sm">%s</select></td>',$obj->$name(),$memTypeOpts);
 
-        $ret = sprintf('<select onchange="redrawList(this, this.value);" class="date form-control input-sm"
-            id="filterDate">%s</select>',
+        $ret = sprintf('<select class="form-control"
+            id="filterDate" onchange="refilter();">%s</select>',
                 $opts);
 
         return $ret;
@@ -215,7 +214,25 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
                         ($name == $this->sortby ? 'selected' : ''),
                             $name, $this->columnNames[$name]);
         }
-        $ret = sprintf('<select class="date form-control input-sm">%s</select>',
+        $ret = sprintf('<select class="form-control"
+            id="filterSort" onchange="refilter();">%s</select>',
+                $opts);
+
+        return $ret;
+    }
+
+    private function getGroupSelector($dbc) {
+        $viewModel = new FCC_MonthlyDiscountChangesViewModel($dbc);
+        $opts = '<option value="No grouping">No grouping</option>';
+        $groups = array('newMemType','oldMemType');
+        foreach ($viewModel->getColumns() as $name => $info) {
+            if (in_array($name, $groups))
+            $opts .= sprintf('<option %s value="%s">%s</option>',
+                        ($name == $this->groupby ? 'selected' : ''),
+                            $name, $this->columnNames[$name]);
+        }
+        $ret = sprintf('<select class="form-control"
+            id="filterGroup" onchange="refilter();">%s</select>',
                 $opts);
 
         return $ret;
@@ -225,6 +242,13 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
     {
         ob_start();
         ?>
+        var filters = {
+            owner: "",
+            store: "",
+            name: "",
+            date: "",
+        };
+
         function saveMemType(memType,t_id){
             var elem = $(this);
             var orig = this.defaultValue;
@@ -250,14 +274,8 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
             });
         }
 
-        function refilter() {
-            filters.date = $('#filterDate').val();
-            pageStart = '';
-          redrawList();
-    };
-
-        function redrawList(filterDate) {
-            data += '&filter=' +filterDate
+        function redrawList() {
+            var data = 'filter=' + encodeURIComponent(JSON.stringify(filters));
             $.ajax({
                 url: 'FCC_DiscountBatchList.php',
                 type: 'get',
@@ -267,6 +285,14 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
             });
         };
 
+        function refilter() {
+            filters.date = $('#filterDate').val();
+            filters.sort = $('#filterSort').val();
+            filters.group = $('#filterGroup').val();
+            pageStart = '';
+            redrawList();
+        };
+
         <?php
         return ob_get_clean();
     }
@@ -274,20 +300,43 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
     public function get_view()
     {
         $dbc = $this->connection;
-        $dbc->selectDB($this->config->get('OP_DB'));
+
+
+        $inputArea = $this->getInputHeader($dbc);
+        $table = $this->getTable($dbc);
+        $this->addScript('../../src/javascript/tablesorter/jquery.tablesorter.min.js');
+        $this->addCssFile('index.css');
+        $this->addOnloadCommand("\$('.tablesorter').tablesorter();");
+
+        return <<<HTML
+        <div id="inputarea">
+            {$inputArea}
+        </div>
+        <div id="displayarea">
+            {$table}
+        </div>
+
+HTML;
+
+    }
+
+    private function getInputHeader($dbc) {
+                $dbc->selectDB($this->config->get('OP_DB'));
         //$model = new $this->model_name($dbc);
 
-        $memTypes = $this->getMemTypes($dbc);
+        $memTypes = $this->getMemTypes($dbc);        
 
-        
 
         $ret = '';
         if (FormLib::get('flash') !== '') {
-            $ret .= '<div class="alert alert-info">' . FormLib::get('flash') . '</div>';
+            $ret .= '<div class="alert alert-info hidden-print">' . FormLib::get('flash') . '</div>';
         }
         $ret .= '<form method="get">';
-        $ret .= '<div class="form-inline">';
+        $ret .= '<div class="form-inline hidden-print">';
         
+        $ret .= '<div class="form-row">';
+
+
         //add a member to the list.
         $ret .= sprintf('<div class="form-group">
                         <label class="control-label">Add Number</label>
@@ -297,7 +346,10 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
 
         $ret .= '<input type="hidden" name="_method" value="put" />';
         $ret .= '<button type="submit" class="btn btn-default">Add Member</button>';
-        
+        $ret .= '</div>';
+
+        $ret .= '<div class="form-row">';
+        $ret .= '<br>';
         //select Month
         $ret .= '<div class="form-group">';
         $ret .= '<label class="control-label">Select Month</label>';
@@ -310,53 +362,89 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
         $ret .= '</select>';
         $ret .='</div> ';
         //group
+        $ret .= '<div class="form-group">';
+        $ret .= '<label class="control-label">Group By</label>';
+        $ret .= $this->getGroupSelector($dbc);
+        $ret .= '</select>';
+        $ret .='</div> ';
 
-
+        $ret .= '</div>';
         $ret .= '</div>';
         $ret .= '</form>';
 
         $ret .= '<hr />';
 
-
-        $table = $this->getTable($dbc);
-        
-        //Main Editing Table;
-        $ret .= sprintf('<div id="displayarea">
-                    %s
-                </div>',$table);
-        // after table
-        //removed this save button because they table saves automatically.
-        //$ret .= '<p><button class="btn btn-default">Save Changes</button></p>';
-        //$ret .= '</form>';
-
-        $this->addOnloadCommand("\$('input:first').focus();\n");
-
         return $ret;
     }
 
-    private function getTable() {
-        $dbc = $this->connection;
+    private function getTable($dbc, $filter=null) {
+        $filters = json_decode($filter, true);
+        if ($filters === null) {
+            $filters = array();
+        }
+        
+        if(array_key_exists('date', $filters)){
+            $newDate = strtotime($filters['date']);
+            $this->date = date('Y-m',$newDate).'-01';
+        }
+        if(array_key_exists('sort', $filters)) {
+            $this->sortby = $filters['sort'];
+        }
+        if(array_key_exists('group', $filters)) {
+            $this->groupby = $filters['group'];
+        }
+
         $dbc->selectDB($this->config->get('OP_DB'));
         $memTypes = $this->getMemTypes($dbc);
+        
+        
         $ret = '<form method="post">';
-        $ret .= '<table class="table table-striped table-bordered">';
-        $ret .= '<thead><tr>';
+        $ret .= '<table class="table-condensed table-striped table-bordered">';
+        $ret .= '<thead>
+        <tr><th colspan="5"><label class="table-label">%s</label></th></tr></thead><thead>
+        <tr>';
         
         foreach ($this->columnNames as $name => $info) {
             $ret .= '<th>' . $info . '</th>';
         }
         $ret .= '</tr></thead>';
         $ret .= '<tbody>';
-        
+
+
         $viewModel = new FCC_MonthlyDiscountChangesViewModel($dbc);
+        //grouping array
+        $retGroup = array();
+        $grouped = ($this->groupby == 'No grouping');
+        if (!$grouped) {
+            $memTypes[2] = '';
+            $memTypes[4] = '';
+            $memTypeNames = array_flip($memTypes);
+            for ($key=0; $key<sizeof($memTypes);$key++) {
+                if($memTypes[$key]!='')
+                    $retGroup[$key] = sprintf($ret,$memTypes[$key]);
+            }
+        } else {
+            $retGroup[0] = sprintf($ret,'All');
+        }
+
+
         $viewModel->month($this->date,'=');
-        foreach ($viewModel->find($this->sortby) as $obj) {
-            $ret .= '<tr>';
+
+        foreach ($viewModel->find(array($this->sortby)) as $obj) {
+            $gb = $this->groupby;
+            if (!$grouped) 
+                $key = $obj->$gb();
+            else
+                $key = 0;
+            ;
+            $row = $retGroup[$key];
+
+            $row .= '<tr>';
             $pk = '';
             foreach ($viewModel->getColumns() as $name => $info) {
                 switch ($name) {
                     case 'oldMemType':
-                        $ret .= sprintf('<td>%s
+                        $row .= sprintf('<td>%s
                                 <input type="hidden" name="%s[]" value="%s"/>
                                 </td>',
                                 $memTypes[$obj->$name()], $obj->$name(), $obj->$name()
@@ -364,7 +452,11 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
                         break;
                     case 'newMemType':
                         $memTypeOpts = $this->arrayToOpts($memTypes, $obj->$name());
-                        $ret .= sprintf('<td><select onchange="saveMemType.call(this, this.value, %d);" class="%s form-control input-sm">%s</select></td>',$pk,$obj->$name(),$memTypeOpts);
+                        $row .= sprintf('<td class="hidden-print" valign="middle"><select onchange="saveMemType.call(this, this.value, %d);" class="%s form-control-sm">%s</select></td>',$pk,$obj->$name(),$memTypeOpts);
+                        $row .= sprintf('<td class="visible-print" valign="middle">%s
+                                <input type="hidden" name="%s[]" value="%s" />
+                                </td>',
+                                $memTypes[$obj->$name()], $name, $obj->$name());
                         break;
                     case 'changeID':
                         $pk = $obj->$name();
@@ -372,7 +464,7 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
                     case'month':
                         break;// donothing
                     default:
-                        $ret .= sprintf('<td>%s
+                        $row .= sprintf('<td>%s</font>
                                 <input type="hidden" name="%s[]" value="%s" />
                                 </td>',
                                 $obj->$name(), $name, $obj->$name()
@@ -380,17 +472,28 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
                         break;
                 }
             }
-            $ret .= '<td>';
+            $row .= '<td class="hidden-print">';
             if ($pk != false) {
-                $ret .= '<a href="?_method=delete&id=' . $pk . '" class="btn btn-danger">'
-                    . COREPOS\Fannie\API\lib\FannieUI::deleteIcon() . '</a>';
+                $row .= '<a href="?_method=delete&id=' . $pk . '" >'
+                   . COREPOS\Fannie\API\lib\FannieUI::deleteIcon() . '</a>';
             }
-            $ret .= '</td>';
-            $ret .= '</tr>';
+            $row .= '</td>';
+            $row .= '</tr>';
+            $retGroup[$key] = $row;
         }
-        $ret .= '</tbody></table>';
+        $ret = '';
+        foreach ($retGroup as $key => $value) {
+            if (substr($value, -7) != '<tbody>') {
+                $ret .= $value.'</tbody></table>';
+            }
+        }
+        //$ret .= '</tbody></table>';
 
         return $ret;
+    }
+
+    private function getTableRow() {
+
     }
 
 

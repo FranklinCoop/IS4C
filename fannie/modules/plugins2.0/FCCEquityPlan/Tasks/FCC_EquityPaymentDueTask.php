@@ -64,10 +64,12 @@ class FCC_EquityPaymentDueTask extends FannieTask
 		$TransDB = $this->config->get('TRANS_DB');
 		$OpDB = $FANNIE_OP_DB;
 		$dbc = FannieDB::get($TransDB);
-		$query = "select e.card_no, e.payments,e.startdate, e.mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id,c.staff
+		$query = "select e.card_no, e.payments,e.startdate, e.mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id,p.equityPaymentPlanID
 					from ".$TransDB.".equity_history_sum e
 					left join ".$OpDB.".custdata c on e.card_no=c.CardNo 
-					left join ".$OpDB.".memDates d on e.card_no=d.card_no where e.card_no < 8000";
+					left join ".$OpDB.".memDates d on e.card_no=d.card_no 
+					left join ".$OpDB.".EquityPaymentPlanAccounts p on e.card_no=p.cardNo 
+					where e.card_no < 8000";
 		$prep = $dbc->prepare($query);
 		$results = $dbc->execute($prep,array());
 		$blueLines = array();
@@ -97,7 +99,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 
 			$blueLine = $row['card_no'].' '.substr($row['FirstName'], 0, 1).'. '.$row['LastName'].' ';
 			$memberLevel = $row['memType'];
-			if ($yearAmt > 0 && $monthAmt>0 && !in_array($memberLevel, array(7,8,9,10))){ 
+			if ($yearAmt > 0 && $monthAmt>0 && $row['equityPaymentPlanID'] != 2){ 
 				if ($memberLevel == 1) { $memberLevel = 0; }
 				$blueLine .= $monthAmt.'/'.$yearAmt.'/'.$remainAmt;
 			} else {

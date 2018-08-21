@@ -185,7 +185,7 @@ class GeneralDayReport extends FannieReportPage
             for ($key=0;$key<sizeof($names);$key++) {
                 $record = array($names[$key],0,sprintf('%.2f',$discounts[$key]));
                 $report[] = $record;
-                $reconciliation['Discounts'] += $discounts[$key];
+                $reconciliation['Discounts'] -= $discounts[$key];
             }
         } else {
             $discQ = $dbc->prepare("SELECT m.memDesc, SUM(d.total) AS Discount,count(*)

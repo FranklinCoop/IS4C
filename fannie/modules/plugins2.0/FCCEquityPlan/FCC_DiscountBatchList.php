@@ -54,6 +54,8 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
         }
         
         $this->__routes[] = 'get<filter>';
+        $this->__routes[] = 'get<generate>';
+        $this->__routes[] = 'get<update>';
         $this->__routes[] = 'post<id><newMemType>';
 
         return parent::preprocess();
@@ -102,6 +104,38 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
     {
         echo $this->getTable($this->connection,$this->filter);
 
+        return false;
+    }
+    public function get_update_handler() {
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
+
+        $updateQ = $dbc->prepare('UPDATE custdata d 
+                                  LEFT JOIN FCC_MonthlyDiscountChanges c ON d.cardNo = c.card_no
+                                  LEFT JOIN memType t ON c.newMemType = t.memtype
+                                  SET d.memType = c.newMemType, d.Discount = t.discount, d.Type = t.custdataType, d.staff = t.staff, d.SSI = t.SSI
+                                  WHERE d.memType != c.newMemType AND c.month = ?');
+        $updateR = $dbc->execute($updateQ,array($this->date));
+
+        echo $this->getTable($this->connection);
+        return false;
+    }
+    public function get_generate_handler() {
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
+
+        $deleteQ = $dbc->prepare("DELETE FROM FCC_MonthlyDiscountChanges WHERE `month` = ?");
+        $date = date('Y-m').'-01';
+        $deleteR = $dbc->execute($deleteQ,array($date));
+        $createQ = $dbc->prepare("INSERT INTO FCC_MonthlyDiscountChanges (`month`,card_no,oldMemType,newMemType)
+                                  SELECT '{$date}', CardNo, memType, memType 
+                                  FROM custdata 
+                                  WHERE memType IN (3,5,6,9)and personNum =1");
+        $createR = $dbc->execute($createQ, array());
+
+
+
+        echo $this->getTable($dbc);
         return false;
     }
 
@@ -293,6 +327,35 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
             redrawList();
         };
 
+        function regenList() {
+            var generate=0;
+            if(confirm("All changes will be lost.\nDo you want to regnerate member update list?")) {
+                generate=1;
+            }
+            var data = 'generate='+generate;
+            $.ajax({
+                url: 'FCC_DiscountBatchList.php',
+                type: 'get',
+                data: data
+            }).done(function(resp) {
+                $('#displayarea').html(resp);
+            });
+        }
+        function updateCuastdata() {
+            var shouldUpdate=0;
+            if(confirm("Update can not be undone.")) {
+                shouldUpdate=1;
+            }
+            var data = 'update='+shouldUpdate;
+            $.ajax({
+                url: 'FCC_DiscountBatchList.php',
+                type: 'get',
+                data: data
+            }).done(function(resp) {
+                $('#displayarea').html(resp);
+            });
+        }
+
         <?php
         return ob_get_clean();
     }
@@ -346,6 +409,10 @@ HTML;
 
         $ret .= '<input type="hidden" name="_method" value="put" />';
         $ret .= '<button type="submit" class="btn btn-default">Add Member</button>';
+       
+        $ret .= '<button type="button" onclick="regenList();" class="btn btn-default">Generate List</button>';
+        
+        $ret .= '<button type="button" onclick="updateCuastdata();" class="btn btn-default">Update Discounts</button>';
         $ret .= '</div>';
 
         $ret .= '<div class="form-row">';
@@ -412,6 +479,7 @@ HTML;
 
 
         $viewModel = new FCC_MonthlyDiscountChangesViewModel($dbc);
+        $viewModel->month($this->date,'=');
         //grouping array
         $retGroup = array();
         $grouped = ($this->groupby == 'No grouping');
@@ -426,9 +494,6 @@ HTML;
         } else {
             $retGroup[0] = sprintf($ret,'All');
         }
-
-
-        $viewModel->month($this->date,'=');
 
         foreach ($viewModel->find(array($this->sortby)) as $obj) {
             $gb = $this->groupby;

@@ -44,7 +44,7 @@ class FCC_MonthlyDiscountChangesViewModel extends ViewModel
     {
 
         return '
-            SELECT m.changeID, m.card_no, c.LastName, c.FirstName, m.oldMemType, m.newMemType
+            SELECT m.changeID, m.card_no, c.LastName, c.FirstName, c.memType as oldMemType, m.newMemType
                   FROM FCC_MonthlyDiscountChanges m left join custdata c on m.card_no = c.CardNo
                   WHERE c.personNum =1 order by c.LastName,c.FirstName';
     }

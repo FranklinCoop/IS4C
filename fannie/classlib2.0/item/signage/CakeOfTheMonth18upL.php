@@ -25,18 +25,19 @@ if (!class_exists('FpdfWithMultiCellCount')) {
     include(dirname(__FILE__) . '/../FpdfWithMultiCellCount.php');
 }
 
-class MemberAlmanac18upL extends \COREPOS\Fannie\API\item\FannieSignage 
+class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage 
 {
     protected $BIG_FONT = 29.37;
     protected $MED_FONT = 9;
     protected $SMALL_FONT = 7;
 
+    protected $fontHead = 'ModestoIOpenPrimary';
     protected $font = 'ModestoOpenInlineFill';
     protected $fontH = 'ModestoOpenInlineFillH';
     protected $fontM = 'ModestoOpenInlineFillM';
 
-    protected $width = 206;
-    protected $height = 83;
+    protected $width = 215;
+    protected $height = 90;
     protected $startX = 85;
     protected $startY = 42;
     protected $borderLineWidth=5;
@@ -46,6 +47,7 @@ class MemberAlmanac18upL extends \COREPOS\Fannie\API\item\FannieSignage
         //define('FPDF_FONTPATH', dirname(__FILE__) . '/../../../src/fpdf/font/');
         define('FPDF_FONTPATH',dirname(__FILE__) . '/../../../src/fpdf/font/proprietary/');
         $pdf = new \FpdfWithMultiCellCount('L', 'pt', 'Letter');
+        $pdf->AddFont('ModestoIOpenPrimary','','ModestoIOpenPrimary.php');
         $pdf->AddFont('ModestoOpenInlineFillH', '', 'ModestoOpen-InlineFillH.php');
         $pdf->AddFont('ModestoOpenInlineFillM', '','ModestoOpen-InlineFillM.php');
         $pdf->AddFont('ModestoOpenInlineFill', '', 'ModestoOpenInlineFill.php');
@@ -75,7 +77,7 @@ class MemberAlmanac18upL extends \COREPOS\Fannie\API\item\FannieSignage
             $info = $this->getExtraInfo($item['upc']);
             $y=$this->startY;
             $x=$this->startX;
-            $textWidth = 116;
+            $textWidth = $this->width - ($this->width*.4) - 4;
 
 
             //draw border
@@ -85,78 +87,84 @@ class MemberAlmanac18upL extends \COREPOS\Fannie\API\item\FannieSignage
             $x += $xOffset*$column;
             $pdf->Rect($x, $y, $this->width, $this->height);
             $pdf->SetLineWidth(1);
-            $pdf->SetTextColor(30,77,44);
+            
+            //CAKE of the month.
+            $fontSize = 15;
+            $y += $this->borderLineWidth +1;
+            $pdf->SetFont($this->fontHead, '',$fontSize);
+            $pdf->SetTextColor(150,113,70);
+            $pdf->SetXY($x,$y);
+            $pdf->Cell($this->width, $fontSize, 'CAKE OF THE MONTH!',0,0,'C');
 
-            //Logo
-            $imagePath = dirname(__FILE__) . '/../../../item/images/MembersOnlySeal.png';
-            $imageWidth = $this->width/3;
-            $imageStartX = $this->startX+$this->borderLineWidth;
-            $pdf->Image($imagePath, $imageStartX+$xOffset*$column, $this->startY+9 + $row*$yOffset, $imageWidth);
+            $pdf->SetTextColor(30,77,44);
+            //Made Right here logo
+            $y += $fontSize -1;
+            $imagePath = dirname(__FILE__) . '/../../../item/images/MadeRightHere.png';
+            $imageWidth = 45;
+            $imageStartX = $this->startX+$this->borderLineWidth +12;
+            $pdf->Image($imagePath, $imageStartX+$xOffset*$column, $y, $imageWidth);
+            //Member Banner
+            $imagePath = dirname(__FILE__) . '/../../../item/images/MembersOnlybanner.png';
+            $imageWidth = $this->width*.4;
+            $imageStartX = $this->startX+2;
+            $pdf->Image($imagePath, $imageStartX+$xOffset*$column, $y+32, $imageWidth);
 
             //price
-            $x += 85; //space from edge to the start of the text elements.
-            $y += 4.5; //space bewtten top and start of first element.
-            $fontSize = 29.37;
+            $x += 87; //space from edge to the start of the text elements.
+            $y += 3; //space bewtten top and start of first element.
+            $fontSize = 24;
             $pdf->SetFont($this->fontM,'',$fontSize);
             $pdf->SetXY($x, $y);
             $pdf->Cell($textWidth, $fontSize, sprintf('$%.2f', $item['normal_price']), 0, 0, 'C');
             //Member Alminac Price
-            $y += $fontSize -2;
-            $fontSize = 6.33;
-            $pdf->SetXY($x, $y);
-            $pdf->SetFont($this->fontM,'',$fontSize);
-            $pdf->Cell($textWidth, $fontSize, "MEMBERS' ALMANAC PRICE!", 0, 0, 'C');
+            $y += $fontSize;
+            $fontSize = 5.75; 
+            $cellSize = 30; // for compression, need to chagne x by this amount and width to make the letters closer.
+            $pdf->SetXY($x+$cellSize/2, $y);
+            $pdf->SetFont($this->fontH,'',$fontSize);
+            $pdf->CellFit($textWidth-$cellSize, $fontSize, "MEMBERS' ALMANAC PRICE!", 0, 0, 'C');
 
             //sale date.
-            $y += $fontSize - .5;
+            $y += $fontSize + .5;
             $fontSize = 7;
+            $cellSize = 53;
             $pdf->SetFont($this->font,'',$fontSize);
-            $pdf->SetXY($x, $y);
+            $pdf->SetXY($x+$cellSize/2, $y);
             $startDate = new \DateTime($item['startDate']);
             $endDate = new \DateTime($item['endDate']);
             $dateString = 'SALE '.$startDate->format('n/d').'-'.$endDate->format('n/d/y');
-            $startDate = new \DateTime($item['startDate']);
-            $endDate = new \DateTime($item['endDate']);
-            $dateString = 'SALE '.$startDate->format('n/d').'-'.$endDate->format('n/d/y');
-
-            $pdf->Cell($textWidth, $fontSize, $startDate, 0, 0, 'C');
+            $pdf->CellFit($textWidth-$cellSize, $fontSize, $dateString, 0, 0, 'C');
 
 
             //desciption
-            $y += $fontSize + .5;
-            $fontSize = 8;
+            $y += $fontSize + 1.5;
+            $fontSize = 9;
             $pdf->SetFont($this->fontH,'',$fontSize);
             $pdf->SetXY($x, $y);
-            $lines = $pdf->MultiCellRet($textWidth, $fontSize, $item['description'], 0, 'C');
-            $blankSpace = ($lines==1) ? $fontSize : 0;
+            $pdf->Cell($textWidth, $fontSize, $item['description'],0, 0, 'C');
+            
             //$pdf->Ln(1);
             //brand
-            $y += $fontSize*$lines;
+            $brand = 'FRANKLIN COMMUNITY CO-OP';
+            $y += $fontSize +1;
             $fontSize = 6.1;
+            $spacing = 5;
             $pdf->SetFont($this->fontM,'',$fontSize);
             $pdf->SetXY($x, $y);            
-            $brand = ($item['brand']) ? $item['brand'] : 'NEED BRAND INFO '.$lines;
+            
             $pdf->Cell($textWidth, $fontSize, $brand, 0, 0, 'C');
 
-
-            //upc
-            $y += $fontSize+$blankSpace-.5;
-            $fontSize = 6;
-            $pdf->SetFont($this->font,'',$fontSize);
-            $pdf->SetXY($x, $y);
-            $pdf->Cell($textWidth, $fontSize, 'UPC: '.$item['upc'], 0,0, 'C');
-
             //reg price
-            $y += $fontSize-.5;
+            $y += $fontSize+2;
             $fontSize = 6.72;
             $pdf->SetFont($this->fontM,'',$fontSize);
-            $pdf->SetXY($x, $y);
-            $pdf->Cell($textWidth/2, $fontSize, sprintf('REG. $%.2f', $info['normal_price']), 0,0, 'L');
+            $pdf->SetXY($x+3, $y);
+            $pdf->Cell($textWidth/2 -3, $fontSize, sprintf('REG. $%.2f', $info['normal_price']), 0,0, 'L');
             //size
             $x += $textWidth/2;
             //$pdf->SetX($this->startX -2 + $xOffset*$column + $this->width/2);
             $pdf->SetXY($x, $y);
-            $pdf->Cell($textWidth/2, $fontSize, $item['size'], 0,0, 'R');
+            $pdf->Cell($textWidth/2 -3, $fontSize, $item['size'], 0,0, 'R');
 
             //$info = $this->getExtraInfo($item['upc']);
             //$pdf->SetX(10 + ($this->width*$column));
@@ -184,7 +192,7 @@ class MemberAlmanac18upL extends \COREPOS\Fannie\API\item\FannieSignage
             $sign++;
         }
 
-        $pdf->Output('MemberAlmanac18upL.pdf', 'I');
+        $pdf->Output('CakeOfTheMonth18upL.pdf', 'I');
         set_time_limit(30);
     }
 

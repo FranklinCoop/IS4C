@@ -22,7 +22,7 @@
 *********************************************************************************/
 namespace COREPOS\Fannie\API\item\signage;
 if (!class_exists('PDF_ImageAlpha')) {
-    include(dirname(__FILE__) . '/../PDF_ImageAlpha.php');
+    include(dirname(__FILE__) . '/../FpdfWithMultiCellCount.php');
 }
 
 class MemberAlmanac8upP extends \COREPOS\Fannie\API\item\FannieSignage 
@@ -95,7 +95,11 @@ class MemberAlmanac8upP extends \COREPOS\Fannie\API\item\FannieSignage
             //sale date.
             $pdf->SetFont($this->font);
             $pdf->SetXY($this->startX + $xOffset*$column, $this->startY+65+$row*$yOffset);
-            $pdf->Cell($this->width, $this->MED_FONT, 'SALE 7/17 - 7/31/18', 0, 0, 'C');
+                        $startDate = new \DateTime($item['startDate']);
+            $endDate = new \DateTime($item['endDate']);
+            $dateString = 'SALE '.$startDate->format('n/d').'-'.$endDate->format('n/d/y');
+
+            $pdf->Cell($this->width, $this->MED_FONT, $dateString, 0, 0, 'C');
 
             //Logo
             $pdf->SetXY(76,137);

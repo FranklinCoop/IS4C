@@ -22,10 +22,10 @@
 *********************************************************************************/
 namespace COREPOS\Fannie\API\item\signage;
 if (!class_exists('PDF_ImageAlpha')) {
-    include(dirname(__FILE__) . '/../PDF_ImageAlpha.php');
+    include(dirname(__FILE__) . '/../FpdfWithMultiCellCount.php');
 }
 
-class MemberAlmanac16upL extends \COREPOS\Fannie\API\item\FannieSignage 
+class MemberAlmanac15upP extends \COREPOS\Fannie\API\item\FannieSignage 
 {
     protected $BIG_FONT = 29.37;
     protected $MED_FONT = 9;
@@ -45,7 +45,7 @@ class MemberAlmanac16upL extends \COREPOS\Fannie\API\item\FannieSignage
         set_time_limit(660);
         //define('FPDF_FONTPATH', dirname(__FILE__) . '/../../../src/fpdf/font/');
         define('FPDF_FONTPATH',dirname(__FILE__) . '/../../../src/fpdf/font/proprietary/');
-        $pdf = new \FPDF('L', 'pt', 'Letter');
+        $pdf = new \FpdfWithMultiCellCount('L', 'pt', 'Letter');
         $pdf->AddFont('ModestoOpenInlineFillH', '', 'ModestoOpen-InlineFillH.php');
         $pdf->AddFont('ModestoOpenInlineFillM', '','ModestoOpen-InlineFillM.php');
         $pdf->AddFont('ModestoOpenInlineFill', '', 'ModestoOpenInlineFill.php');
@@ -95,8 +95,12 @@ class MemberAlmanac16upL extends \COREPOS\Fannie\API\item\FannieSignage
             //sale date.
             $pdf->SetFont($this->font);
             $pdf->SetFontSize(7);
+            $startDate = new \DateTime($item['startDate']);
+            $endDate = new \DateTime($item['endDate']);
+            $dateString = 'SALE '.$startDate->format('n/d').'-'.$endDate->format('n/d/y');
+
             $pdf->SetXY($this->startX + $xOffset*$column, $this->startY+58.7+$row*$yOffset);
-            $pdf->Cell($this->width, 7, 'SALE 7/17 - 7/31/18', 0, 0, 'C');
+            $pdf->Cell($this->width, 7, $dateString, 0, 0, 'C');
 
             //Logo
             $pdf->SetXY(76,137);
@@ -107,14 +111,34 @@ class MemberAlmanac16upL extends \COREPOS\Fannie\API\item\FannieSignage
             //desciption
             $pdf->SetFont($this->fontH,'',8);
             $pdf->SetXY($this->startX+$xOffset*$column, $this->startY + 146.47 + $row*$yOffset);
-            $pdf->MultiCell($this->width, 8, $item['description'], 0, 'C');
-            $pdf->Ln(1);
+            $lines = $pdf->MultiCellRet($this->width, 8, $item['description'], 0, 'C');
+            $blankSpace = ($lines==1) ? 8 : 16;
+            //$pdf->Ln(1);
             //brand
             $pdf->SetFont($this->fontM,'',6.1);
-            $pdf->SetXY($this->startX + $xOffset*$column, $this->startY +163.47 + $row*$yOffset);
-            $brand = ($item['brand']) ? $item['brand'] : 'PLACE HOLDER';
+            $pdf->SetXY($this->startX + $xOffset*$column, $this->startY +147.47 + $blankSpace + $row*$yOffset);
+            $brand = ($item['brand']) ? $item['brand'] : 'NEED BRAND INFO '.$lines;
             $pdf->Cell($this->width, 6.1, $brand, 0, 0, 'C');
 
+
+            /*
+                //desciption
+            $y += $fontSize + .5;
+            $fontSize = 8;
+            $pdf->SetFont($this->fontH,'',$fontSize);
+            $pdf->SetXY($x, $y);
+            $lines = $pdf->MultiCellRet($textWidth, $fontSize, $item['description'], 0, 'C');
+            $blankSpace = ($lines==1) ? $fontSize : 0;
+            //$pdf->Ln(1);
+            //brand
+            $y += $fontSize*$lines;
+            $fontSize = 6.1;
+            $pdf->SetFont($this->fontM,'',$fontSize);
+            $pdf->SetXY($x, $y);            
+            $brand = ($item['brand']) ? $item['brand'] : 'NEED BRAND INFO '.$lines;
+            $pdf->Cell($textWidth, $fontSize, $brand, 0, 0, 'C');
+
+            */
 
 
             //upc

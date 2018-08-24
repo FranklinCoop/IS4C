@@ -80,6 +80,7 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
             emp_no,
             register_no,
             trans_no,
+            SUM(case when upc='DISCOUNT' then total else regPrice end)  AS subTotal,
             MAX(card_no) AS card_no,
             MAX(datetime) AS ts
         FROM $dlog WHERE 1=1 ";
@@ -200,7 +201,7 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
                 </thead>
                 <tbody>';
         $subTotalP = $dbc->prepare("
-            SELECT SUM(regPrice) AS subtotal
+            SELECT SUM(total) AS subtotal
             FROM {$dlog} AS d
             WHERE datetime BETWEEN ? AND ?
                 AND trans_type='T'
@@ -219,7 +220,7 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
             $ret .= '<td>' . $row['emp_no'] . '</td>';
             $ret .= '<td>' . $row['register_no'] . '</td>';
             $ret .= '<td>' . $row['card_no'] . '</td>';
-            if ($num_results < 50) {
+            if ($num_results < 500) {
                 $subTotalArgs = array(
                     date('Y-m-d 00:00:00', strtotime($row['ts'])),
                     date('Y-m-d 23:59:59', strtotime($row['ts'])),
@@ -227,8 +228,8 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
                     $row['register_no'],
                     $row['trans_no'],
                 );
-                $subTotal = $dbc->getValue($subTotalP, $subTotalArgs);
-                $ret .= sprintf('<td>%.2f</td>', $subTotal);
+                //$subTotal = $dbc->getValue($subTotalP, $subTotalArgs);
+                $ret .= sprintf('<td>%.2f</td>', $row['subTotal']);
             } else {
                 $ret .= '<td>n/a</td>';
             }

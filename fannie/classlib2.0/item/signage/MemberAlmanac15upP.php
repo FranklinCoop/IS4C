@@ -113,7 +113,6 @@ class MemberAlmanac15upP extends \COREPOS\Fannie\API\item\FannieSignage
             $pdf->SetXY($this->startX+$xOffset*$column, $this->startY + 146.47 + $row*$yOffset);
             $lines = $pdf->MultiCellRet($this->width, 8, $item['description'], 0, 'C');
             $blankSpace = ($lines==1) ? 8 : 16;
-            //$pdf->Ln(1);
             //brand
             $pdf->SetFont($this->fontM,'',6.1);
             $pdf->SetXY($this->startX + $xOffset*$column, $this->startY +147.47 + $blankSpace + $row*$yOffset);

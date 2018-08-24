@@ -45,7 +45,7 @@ class MemberAlmanac8upP extends \COREPOS\Fannie\API\item\FannieSignage
         set_time_limit(660);
         //define('FPDF_FONTPATH', dirname(__FILE__) . '/../../../src/fpdf/font/');
         define('FPDF_FONTPATH',dirname(__FILE__) . '/../../../src/fpdf/font/proprietary/');
-        $pdf = new \FPDF('L', 'pt', 'Letter');
+        $pdf = new \FpdfWithMultiCellCount('L', 'pt', 'Letter');
         $pdf->AddFont('ModestoOpenInlineFillH', '', 'ModestoOpen-InlineFillH.php');
         $pdf->AddFont('ModestoOpenInlineFillM', '','ModestoOpen-InlineFillM.php');
         $pdf->AddFont('ModestoOpenInlineFill', '', 'ModestoOpenInlineFill.php');
@@ -108,17 +108,25 @@ class MemberAlmanac8upP extends \COREPOS\Fannie\API\item\FannieSignage
             $imageStartX = $this->startX + $this->width/2-$imageWidth/2;
             $pdf->Image($imagePath, $imageStartX+$xOffset*$column, $this->startY +75 + $row*$yOffset, $imageWidth);
 
-            //brand
-            $pdf->SetFont($this->fontM);
-            $pdf->SetXY($this->startX + $xOffset*$column, $this->startY +185 + $row*$yOffset);
-            $brand = ($item['brand']) ? $item['brand'] : 'PLACE HOLDER';
-            $pdf->Cell($this->width, $this->MED_FONT, $brand, 0, 0, 'C');
 
             //desciption
             $pdf->SetFont($this->fontH);
-            $pdf->SetXY($this->startX+$xOffset*$column, $this->startY + 195 + $row*$yOffset);
-            $pdf->MultiCell($this->width, $this->MED_FONT, $item['description'], 0, 'C');
-            $pdf->Ln(1);
+            $pdf->SetXY($this->startX+$xOffset*$column, $this->startY + 185 + $row*$yOffset);
+            $lines = $pdf->MultiCellRet($this->width, $this->MED_FONT, $item['description'], 0, 'C');
+            $blankSpace = ($lines==1) ? $this->MED_FONT : $this->MED_FONT*2;
+            //brand
+            $pdf->SetFont($this->fontM);
+            $pdf->SetXY($this->startX + $xOffset*$column, $this->startY +185 +$blankSpace + $row*$yOffset);
+            $brand = ($item['brand']) ? $item['brand'] : 'PLACE HOLDER';
+            $pdf->Cell($this->width, $this->MED_FONT, $brand, 0, 0, 'C');
+
+
+            
+            //brand
+            $pdf->SetFont($this->fontM,'',6.1);
+            $pdf->SetXY($this->startX + $xOffset*$column, $this->startY +147.47 + $blankSpace + $row*$yOffset);
+            $brand = ($item['brand']) ? $item['brand'] : 'NEED BRAND INFO '.$lines;
+            $pdf->Cell($this->width, 6.1, $brand, 0, 0, 'C');
 
             //upc
             $pdf->SetFont($this->font);

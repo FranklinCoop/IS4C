@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2015 Whole Foods Community Co-op
+    Copyright 2018 Franklin Community co-op
 
     This file is part of CORE-POS.
 
@@ -109,13 +109,15 @@ class FCC_DiscountBatchList extends FannieRESTfulPage
     public function get_update_handler() {
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
+        $rundate = new \DateTime('now');
+        $rundate->modify('first day of last month');
 
         $updateQ = $dbc->prepare('UPDATE custdata d 
                                   LEFT JOIN FCC_MonthlyDiscountChanges c ON d.cardNo = c.card_no
                                   LEFT JOIN memType t ON c.newMemType = t.memtype
                                   SET d.memType = c.newMemType, d.Discount = t.discount, d.Type = t.custdataType, d.staff = t.staff, d.SSI = t.SSI
                                   WHERE d.memType != c.newMemType AND c.month = ?');
-        $updateR = $dbc->execute($updateQ,array($this->date));
+        $updateR = $dbc->execute($updateQ,array($rundate->format('Y-m-d')));
 
         echo $this->getTable($this->connection);
         return false;

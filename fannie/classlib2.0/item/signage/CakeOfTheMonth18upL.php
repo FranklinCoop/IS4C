@@ -38,8 +38,8 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
 
     protected $width = 215;
     protected $height = 90;
-    protected $startX = 85;
-    protected $startY = 42;
+    protected $startX = 75;
+    protected $startY = 60;
     protected $borderLineWidth=5;
     public function drawPDF()
     {
@@ -64,7 +64,7 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
         $xOffset = $this->width + $this->borderLineWidth +1;
         $yOffset = $this->height + $this->borderLineWidth +1;
         foreach ($data as $item) {
-            if ($count % 18 === 0) {
+            if ($count % 15 === 0) {
                 $pdf->AddPage();
                 $sign = 0;
                 //$file = dirname(__FILE__) . '/../../../item/images/MemberAlminac2x4BG.jpg';
@@ -164,7 +164,7 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
             $x += $textWidth/2;
             //$pdf->SetX($this->startX -2 + $xOffset*$column + $this->width/2);
             $pdf->SetXY($x, $y);
-            $pdf->Cell($textWidth/2 -3, $fontSize, $item['size'], 0,0, 'R');
+            $pdf->Cell($textWidth/2 -3, $fontSize, $item['size'].' CAKE', 0,0, 'R');
 
             //$info = $this->getExtraInfo($item['upc']);
             //$pdf->SetX(10 + ($this->width*$column));

@@ -80,7 +80,8 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
             emp_no,
             register_no,
             trans_no,
-            SUM(case when upc='DISCOUNT' then total else regPrice end)  AS subTotal,
+            SUM(case when upc='DISCOUNT' then total
+                     when trans_type IN ('I','D','A') then total else 0 end)  AS subTotal,
             MAX(card_no) AS card_no,
             MAX(datetime) AS ts
         FROM $dlog WHERE 1=1 ";

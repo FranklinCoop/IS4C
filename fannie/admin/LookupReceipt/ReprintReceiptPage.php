@@ -220,7 +220,7 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
             $ret .= '<td>' . $row['emp_no'] . '</td>';
             $ret .= '<td>' . $row['register_no'] . '</td>';
             $ret .= '<td>' . $row['card_no'] . '</td>';
-            if ($num_results < 500) {
+            if ($num_results < 50000) {
                 $subTotalArgs = array(
                     date('Y-m-d 00:00:00', strtotime($row['ts'])),
                     date('Y-m-d 23:59:59', strtotime($row['ts'])),

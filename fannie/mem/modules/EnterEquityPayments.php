@@ -30,7 +30,7 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
 
     function showEditForm($memNum, $country="US")
     {
-        global $FANNIE_URL,$FANNIE_TRANS_DB;
+        global $FANNIE_URL,$FANNIE_TRANS_DB,$FANNIE_OP_DB;
 
         $dbc = $this->db();
         $trans = $FANNIE_TRANS_DB.$dbc->sep();
@@ -51,11 +51,23 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
                                     ORDER BY tdate DESC");
         $paymentsR = $dbc->execute($paymentsQ,array($memNum));
 
-
+        $op = $FANNIE_OP_DB.$dbc->sep();
+        $blueLineQ = $dbc->prepare("SELECT c.blueLine FROM {$op}custdata c WHERE c.CardNo=? AND c.personNum=1");
+        $blueLineR = $dbc->execute($blueLineQ,array($memNum));
+        $blueLine = '';
+        if ($dbc->num_rows($blueLineR) > 0) {
+            $w = $dbc->fetch_row($blueLineR);
+            $blueLine = $w['blueLine'];
+        }
 
         $ret = "<div class=\"panel panel-default\">
             <div class=\"panel-heading\">Equity Payments</div>
             <div class=\"panel-body\">";
+
+        $ret .= '<div class="form-group">';
+        $ret .= '<span class="label primaryBackground">Register Name:</span> ';
+        $ret .= $blueLine.'</div>'; 
+
 
         $ret .= '<div class="form-group">';
         $ret .= '<span class="label primaryBackground">Stock Purchased</span> ';
@@ -117,7 +129,10 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
         $paymentDate = FormLib::get_form_value('paymentDate');
         $paymentAmt = FormLib::get_form_value('payment_amt');
         $paymentNote = FormLib::get_form_value('payment_note');
-        if ($paymentDate != 0 && $paymentAmt!= 0 && $paymentNote !=0) {
+        if ($paymentDate != null || $paymentAmt!= null || $paymentNote !=null) {
+            if($paymentDate == null) {return 'Payment Requires Date';}
+            if($paymentAmt == null) {return 'Payment Requires Amount';}
+            if($paymentNote == null) {return 'Payment Requires Note';}
             $upQ = $dbc->prepare("INSERT INTO {$trans}stockpurchases (card_no,stockPurchase,tdate,trans_num,trans_id, dept)
             VALUES (?,?,?,?,0,992)");
             $upR = $dbc->execute($upQ, array($memNum,$paymentAmt,$paymentDate,$paymentNote));
@@ -125,7 +140,7 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
             if ( $upR === False )
                 return "Error: problem saving payments.";
             else
-                return "";
+                return "Payment Saved!";
         }
 
 

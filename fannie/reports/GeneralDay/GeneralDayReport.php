@@ -177,8 +177,18 @@ class GeneralDayReport extends FannieReportPage
             $reconciliation['Sales'] += $salesW['total'];
         }
         $data[] = $report;
-
-        $discQ = $dbc->prepare("SELECT m.memDesc, SUM(d.total) AS Discount,count(*)
+        // member type hack added for weird istuation at fcc.
+        $report = array();
+        if ($FANNIE_COOP_ID == 'FranklinCoop') {
+            $discounts = $this->calculateDiscounts($dbc,$dlog,$dates);
+            $names = array("Working Member","Staff","Food for All","Senior Discount");
+            for ($key=0;$key<sizeof($names);$key++) {
+                $record = array($names[$key],0,sprintf('%.2f',$discounts[$key]));
+                $report[] = $record;
+                $reconciliation['Discounts'] -= $discounts[$key];
+            }
+        } else {
+            $discQ = $dbc->prepare("SELECT m.memDesc, SUM(d.total) AS Discount,count(*)
                 FROM $dlog d 
                     INNER JOIN memtype m ON d.memType = m.memtype
                 WHERE d.tdate BETWEEN ? AND ?
@@ -187,12 +197,14 @@ class GeneralDayReport extends FannieReportPage
                 AND total <> 0
                 GROUP BY m.memDesc ORDER BY m.memDesc");
         $discR = $dbc->execute($discQ,$dates);
-        $report = array();
+        //$report = array();
         while($discW = $dbc->fetch_row($discR)){
             $record = array($discW['memDesc'],$discW[2],sprintf('%.2f', $discW[1]));
             $report[] = $record;
             $reconciliation['Discounts'] += $discW['Discount'];
         }
+        }
+
         $data[] = $report;
 
         $report = array();
@@ -418,6 +430,63 @@ class GeneralDayReport extends FannieReportPage
         </p>
         </form>
 HTML;
+    }
+
+        private function calculateDiscounts($dbc,$dlog,$args=array()){
+        $discQ =$dbc->prepare(" 
+            SELECT 
+            sum(case 
+                    when upc='DISCOUNT'  and percentDiscount >=10 and memType =3 then -unitPrice* (10/percentDiscount)
+                    when upc='DISCOUNT'  and percentDiscount >= 15 and memType =5 then -unitPrice* (15/percentDiscount)
+                    when upc='DISCOUNT'  and percentDiscount >= 23 and memType =9 then -unitPrice* (8/percentDiscount)
+                    when upc='DISCOUNT'  and percentDiscount = 21 and memType =9 then -unitPrice* (6/percentDiscount)
+                else 0 end) as working_disc,
+            sum(case
+                    when upc='DISCOUNT' and percentDiscount != 0 and memType in (7,8,9,10) then -unitPrice*(15/percentDiscount)
+                else 0 end) as staff_disc,
+            sum(case
+                    when upc='DISCOUNT' and percentDiscount != 0 and memType =6 then -unitPrice* (10/percentDiscount)
+                    when upc='DISCOUNT' and percentDiscount != 0 and memType =10 then -unitPrice* (8/percentDiscount )
+                else 0 end) as food_for_all_disc,
+            sum(case
+                    when upc='DISCOUNT' and percentDiscount >0 and memType in (0,1) then -unitPrice
+                    when upc='DISCOUNT' and (percentDiscount-10)/percentDiscount >0 and memType in (3,6) then -unitPrice*((percentDiscount-10)/percentDiscount)
+                    when upc='DISCOUNT' and (percentDiscount-15)/percentDiscount >0 and memType in (5,7,8) then -unitPrice*((percentDiscount-15)/percentDiscount)
+                    when upc='DISCOUNT' and (percentDiscount-23)/percentDiscount >0 and memType in (9,10) then -unitPrice*((percentDiscount-23)/percentDiscount)
+                    when upc='DISCOUNT' and percentDiscount = 0 then -unitPrice
+                else 0 end) as seinorDisc,
+            sum(case when upc='DISCOUNT' then -unitPrice else 0 end) as total_disc
+            FROM ".$dlog."
+            WHERE `tdate` BETWEEN ? AND ? AND store_id=?;");
+        $discR = $dbc->execute($discQ, $args);
+        
+        $return = array();
+        $discSum = 0;
+        $row = $dbc->fetch_row($discR);
+        
+        $report = array();
+        //correct rounding errors
+        $total =0;
+        for($key=0;$key<=4;$key++) {
+            $info = number_format($row[$key], 2, '.', '');
+            if ($key < 4) {
+                $discSum += $info;
+                $return[$key] = $info;
+            } elseif ($key==4) {
+                $diff = $info-$discSum;
+                $total = $info;
+                if ($diff != 0) { 
+                    $return[2] += $diff;
+                    $discSum += $diff;
+                }
+            }
+        }
+        //final error check returns values for troubleshooting.
+        if ($discSum - $total !=0) {
+            $return = array('Math ERR',$discSum,$return[4],'Math ERR','Math ERR');
+        }
+
+        return $return;
     }
 
     public function helpContent()

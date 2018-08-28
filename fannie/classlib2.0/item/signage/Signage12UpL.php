@@ -25,8 +25,8 @@ namespace COREPOS\Fannie\API\item\signage {
 
 class Signage12UpL extends \COREPOS\Fannie\API\item\FannieSignage 
 {
-    protected $BIG_FONT = 40;
-    protected $MED_FONT = 14;
+    protected $BIG_FONT = 36;
+    protected $MED_FONT = 9;
     protected $SMALL_FONT = 10;
     protected $SMALLER_FONT = 8;
     protected $SMALLEST_FONT = 6;

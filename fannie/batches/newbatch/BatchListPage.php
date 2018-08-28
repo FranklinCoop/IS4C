@@ -34,7 +34,7 @@ if (!function_exists('checkLogin')) {
 class BatchListPage extends FannieRESTfulPage
 {
     protected $must_authenticate = true;
-    protected $auth_classes = array('batches','batches_audited');
+    protected $auth_classes = array('batches','batches_audited','barcodes');
     protected $title = 'Sales Batches Tool';
     protected $header = '';
     protected $debug_routing = false;
@@ -43,6 +43,7 @@ class BatchListPage extends FannieRESTfulPage
     sale and price change batches.';
 
     private $audited = 1;
+    private $limited = 1;
     private $con = null;
 
     function preprocess()
@@ -52,6 +53,9 @@ class BatchListPage extends FannieRESTfulPage
         refreshSession();
         if (validateUserQuiet('batches')) {
             $this->audited = 0;
+            $this->limited = 0;
+        } else if (validateUserQuiet('batches_audited')) {
+            $this->limited = 0;
         }
 
         $this->con = FannieDB::get($FANNIE_OP_DB);
@@ -271,6 +275,7 @@ class BatchListPage extends FannieRESTfulPage
             $storeOpts .= sprintf('<option value="%d">%s</option>',
                 $obj->storeID(), $obj->description());
         }
+        $disabled = ($this->limited == 1) ? 'disabled' : '' ;
 
         return <<<HTML
 <form id="newBatchForm" onsubmit="newBatch(); return false;">
@@ -283,17 +288,17 @@ class BatchListPage extends FannieRESTfulPage
             <label class="col-sm-3">Owner/Super Dept.</label>
         </div>
         <div class="row">
-            <div class="col-sm-2"><select class="form-control" id=newBatchType name="newType">
+            <div class="col-sm-2"><select class="form-control" id=newBatchType name="newType"{$disabled}>
                 {$tOpts}
             </select></div>
-            <div class="col-sm-2"><input class="form-control" type=text placeholder="Batch Name" id=newBatchName name="newName" /></div>
-            <div class="col-sm-2"><input class="form-control date-field" placeholder="Start Date" type=text id=newBatchStartDate name="newStart" /></div>
-            <div class="col-sm-2"><input class="form-control date-field" placeholder="End Date" type=text id=newBatchEndDate name="newEnd" /></div>
-            <div class="col-sm-2"><select class="form-control" id=newBatchOwner name="newOwner">
+            <div class="col-sm-2"><input class="form-control" type=text placeholder="Batch Name" id=newBatchName name="newName" {$disabled}/></div>
+            <div class="col-sm-2"><input class="form-control date-field" placeholder="Start Date" type=text id=newBatchStartDate name="newStart" {$disabled}/></div>
+            <div class="col-sm-2"><input class="form-control date-field" placeholder="End Date" type=text id=newBatchEndDate name="newEnd" {$disabled}/></div>
+            <div class="col-sm-2"><select class="form-control" id=newBatchOwner name="newOwner" {$disabled}>
                 <option value=""></option>
                 {$oOpts}
             </select></div>
-            <div class="col-sm-1"><button type=submit class="btn btn-default">Create Batch</button></div>
+            <div class="col-sm-1"><button type=submit  class="btn btn-default" {$disabled}>Create Batch</button></div>
         </div>
 </form>
         <p></p> <!-- spacer -->
@@ -485,6 +490,7 @@ HTML;
         $save = FannieUI::saveIcon();
         $trash = FannieUI::deleteIcon();
         $safeName =  htmlspecialchars(json_encode($batch['batchName']));
+        $disabled = ($this->limited == 1) ? 'disabled' : '' ;
 
         return <<<HTML
 <tr id="batchRow{$bID}" class="batchRow">
@@ -498,11 +504,11 @@ HTML;
     <td id="owner{$bID}">{$batch['owner']}</td>
     <td id="edit{$bID}">
         <a href="" onclick="editBatchLine({$bID}); return false;"
-            class="batchEditLink btn btn-default btn-xs">{$edit}</a>
+            class="batchEditLink btn btn-default btn-xs" {$disabled}>{$edit}</a>
         <a href="" onclick="saveBatchLine({$bID}); return false;"
-            class="batchSaveLink btn btn-default btn-xs collapse">{$save}</a>
+            class="batchSaveLink btn btn-default btn-xs collapse" {$disabled}>{$save}</a>
     <td><a href="" class="btn btn-danger btn-xs"
-        onclick="deleteBatch({$bID}, {$safeName}); return false;">{$trash}</a>
+        onclick="deleteBatch({$bID}, {$safeName}); return false;" {$disabled}>{$trash}</a>
     </td>
     <td><a href="batchReport.php?batchID={$bID}">Report</a></td>
 </tr>

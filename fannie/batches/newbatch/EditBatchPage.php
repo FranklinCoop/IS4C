@@ -34,7 +34,7 @@ if (!function_exists('checkLogin')) {
 class EditBatchPage extends FannieRESTfulPage
 {
     protected $must_authenticate = true;
-    protected $auth_classes = array('batches','batches_audited');
+    protected $auth_classes = array('batches','batches_audited','barcodes');
     protected $title = 'Sales Batches Tool';
     protected $header = 'Sales Batches Tool';
     protected $enable_linea = true;
@@ -45,13 +45,17 @@ class EditBatchPage extends FannieRESTfulPage
 
     private $audited = 1;
     private $con = null;
+    private $limited = 1;
 
     public function preprocess()
     {
         // maintain user logins longer
         refreshSession();
-        if (validateUserQuiet('batches')) {
+         if (validateUserQuiet('batches')) {
             $this->audited = 0;
+            $this->limited = 0;
+        } else if (validateUserQuiet('batches_audited')) {
+            $this->limited = 0;
         }
 
         // autoclear old data from clipboard table on intial page load
@@ -818,13 +822,13 @@ class EditBatchPage extends FannieRESTfulPage
         $dbc->selectDB($this->config->OP_DB);
         $model = new LikeCodesModel($dbc);
         $lcOpts = $model->toOptions(-1);
-
+        $disabled = ($this->limited == 1) ? 'disabled' : '' ;
         return <<<HTML
 <form class="form-inline" onsubmit="batchEdit.advanceToPrice(); return false;" id="add-item-form">
     <span class="add-by-upc-fields">
         <label class=\"control-label\">UPC</label>
         <input type=text maxlength=13 name="addUPC" id=addItemUPC
-            class="form-control" />
+            class="form-control" {$disabled}/>
     </span>
     <span class="add-by-lc-fields collapse">
         <label class="control-label">Like code</label>
@@ -833,8 +837,8 @@ class EditBatchPage extends FannieRESTfulPage
         {$lcOpts}
         </select>
     </span>
-    <button type=submit value=Add class="btn btn-default">Add</button>
-    <input type=checkbox id=addItemLikeCode onchange="batchEdit.toggleUpcLcInput();" />
+    <button type=submit value=Add class="btn btn-default"{$disabled}>Add</button>
+    <input type=checkbox id=addItemLikeCode onchange="batchEdit.toggleUpcLcInput();" {$disabled}/>
     <label for="addItemLikeCode" class="control-label">Likecode</label>
 </form>
 HTML;
@@ -842,6 +846,7 @@ HTML;
 
     private function addItemPriceInput($upc, $description, $price)
     {
+        $disabled = ($this->limited == 1) ? 'disabled' : '' ;
         return <<<HTML
 <form onsubmit="batchEdit.addItemPrice('{$upc}'); return false;" id="add-price-form" class="form-inline">
     <label>ID</label>: {$upc}
@@ -849,7 +854,7 @@ HTML;
     <label>Normal price</label>: {$price}
     <label>Sale price</label>
     <input class="form-control" type=text id=add-item-price name=price size=5 />
-    <button type=submit value=Add class="btn btn-default">Add</button>
+    <button type=submit value=Add class="btn btn-default" {$disabled}>Add</button>
 </form>
 HTML;
     }
@@ -992,6 +997,7 @@ HTML;
         $res = $dbc->execute($cpCount,array($uid));
         $row = $dbc->fetch_row($res);
         $cpCount = $row[0];
+        $limited = ($this->limited == 1) ? true : false ;
 
         $ret = "<span class=\"newBatchBlack\"><b>Batch name</b>: $name</span> | ";
         $ret .= '<b>Sale Dates</b>: '
@@ -1043,16 +1049,17 @@ HTML;
         if ($cpCount > 0) {
             $ret .= "<a href=\"EditBatchPage.php?id=$id&paste=1\">Paste Items ($cpCount)</a> | ";
         }
-        if ($dtype == 0 || (time() >= $start && time() <= $end)) {
+        if (($dtype == 0 || (time() >= $start && time() <= $end)) && !$limited) {
             $ret .= "<a href=\"\" class=\"{$noprices}\" onclick=\"batchEdit.forceNow($id); return false;\">Force batch</a> | ";
         }
         if ($dtype != 0) {
             $ret .= "<a href=\"\" class=\"{$noprices}\" onclick=\"batchEdit.unsaleNow($id); return false;\">Stop Sale</a> | ";
         }
+        if (!$limited) {
+            $ret .= "<a href=\"\" onclick=\"batchEdit.cutAll($id,$uid); return false;\">Cut All</a> ";
+        }
 
-        $ret .= "<a href=\"\" onclick=\"batchEdit.cutAll($id,$uid); return false;\">Cut All</a> ";
-
-        if ($dtype <= 0) {
+        if ($dtype <= 0  && !$limited) {
             $ret .= " <a href=\"\" class=\"{$noprices}\" onclick=\"batchEdit.trimPcBatch($id); return false;\">Trim Unchanged</a> ";
         } else {
             $ret .= " | <span id=\"edit-limit-link\"><a href=\"\"
@@ -1174,27 +1181,31 @@ HTML;
             $ret .= '<span class="input-group-addon">$</span>';
             $ret .= sprintf('<input text="text" class="form-control" name="price" value="%.2f" />', $fetchW['salePrice']);
             $ret .= '</div></div></td>';
-            $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=editLink{$fetchW['upc']}>
-                <a href=\"\" class=\"edit {$noprices}\" onclick=\"batchEdit.editUpcPrice('{$fetchW['upc']}'); return false;\">
-                    " . \COREPOS\Fannie\API\lib\FannieUI::editIcon() . "</a>
-                <a href=\"\" class=\"save collapse\" onclick=\"batchEdit.saveUpcPrice('{$fetchW['upc']}'); return false;\">
-                    " . \COREPOS\Fannie\API\lib\FannieUI::saveIcon() . "</a>
-                </td>";
-            $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur]><a href=\"\"
-                onclick=\"batchEdit.deleteUPC.call(this, $id, '{$fetchW['upc']}'); return false;\">"
-                . \COREPOS\Fannie\API\lib\FannieUI::deleteIcon() . "</a>
-                </td>";
-            if ($fetchW['isCut'] == 1) {
-                $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=cpLink{$fetchW['upc']}>
-                    <a href=\"\" class=\"unCutLink\" id=\"unCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid, 0); return false;\">Undo</a>
-                    <a href=\"\" class=\"cutLink collapse\" id=\"doCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid, 1); return false;\">Cut</a>
+            
+            if (!$limited) {
+                $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=editLink{$fetchW['upc']}>
+                    <a href=\"\" class=\"edit {$noprices}\" onclick=\"batchEdit.editUpcPrice('{$fetchW['upc']}'); return false;\">
+                       " . \COREPOS\Fannie\API\lib\FannieUI::editIcon() . "</a>
+                    <a href=\"\" class=\"save collapse\" onclick=\"batchEdit.saveUpcPrice('{$fetchW['upc']}'); return false;\">
+                        " . \COREPOS\Fannie\API\lib\FannieUI::saveIcon() . "</a>
                     </td>";
-            } else {
-                $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=cpLink{$fetchW['upc']}>
-                    <a href=\"\" class=\"unCutLink collapse\" id=\"unCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid,0); return false;\">Undo</a>
-                    <a href=\"\" class=\"cutLink\" id=\"doCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid,1); return false;\">Cut</a>
+                $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur]><a href=\"\"
+                    onclick=\"batchEdit.deleteUPC.call(this, $id, '{$fetchW['upc']}'); return false;\">"
+                    . \COREPOS\Fannie\API\lib\FannieUI::deleteIcon() . "</a>
                     </td>";
+                if ($fetchW['isCut'] == 1) {
+                    $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=cpLink{$fetchW['upc']}>
+                        <a href=\"\" class=\"unCutLink\" id=\"unCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid, 0); return false;\">Undo</a>
+                        <a href=\"\" class=\"cutLink collapse\" id=\"doCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid, 1); return false;\">Cut</a>
+                        </td>";
+                } else {
+                    $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=cpLink{$fetchW['upc']}>
+                        <a href=\"\" class=\"unCutLink collapse\" id=\"unCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid,0); return false;\">Undo</a>
+                        <a href=\"\" class=\"cutLink\" id=\"doCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid,1); return false;\">Cut</a>
+                     </td>";
+                }
             }
+
 
             $loc = 'n/a';
             if (!empty($fetchW['locationName'])) {

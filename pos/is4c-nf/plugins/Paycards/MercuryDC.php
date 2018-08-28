@@ -35,6 +35,7 @@ class MercuryDC extends MercuryE2E
         $tranType = 'Credit';
         $cardType = false;
         if ($type == 'DEBIT') {
+            $tranCode = 'EMV'.$tranCode;
             $tranType = 'Debit';
         } elseif ($type == 'EBTFOOD') {
             $tranType = 'EBT';
@@ -82,6 +83,26 @@ class MercuryDC extends MercuryE2E
             } elseif ($this->conf->get('PaycardsDatacapMode') == 3) {
                 $msgXml .= '<MerchantLanguage>French</MerchantLanguage>';
             }
+        } elseif($type == 'DEBIT') {
+            $dcHost = $this->conf->get('PaycardsDatacapLanHost');
+            $dcHost = $this->pickHost(empty($dcHost) ? '127.0.0.1' : $dcHost);
+
+            $msgXml .= '
+            <HostOrIP>' . $dcHost . '</HostOrIP>
+            <SequenceNo>{{SequenceNo}}</SequenceNo>
+            <CollectData>CardholderName</CollectData>
+            <CardType> '.$cardType.' </CardType>
+            <OKAmount>Allow</OKAmount>
+            <PartialAuth>Allow</PartialAuth>';
+            $msgXml .= '
+            <Account>
+                <AcctNo>' . ($prompt ? 'Prompt' : 'SecureDevice') . '</AcctNo>
+            </Account>';
+            if ($this->conf->get('PaycardsDatacapMode') == 2) {
+                $msgXml .= '<MerchantLanguage>English</MerchantLanguage>';
+            } elseif ($this->conf->get('PaycardsDatacapMode') == 3) {
+                $msgXml .= '<MerchantLanguage>French</MerchantLanguage>';
+            }
         } else {
             $msgXml .= '
             <Account>
@@ -92,6 +113,7 @@ class MercuryDC extends MercuryE2E
                 $msgXml .= '<CardType>' . $cardType . '</CardType>';
             }
             if ($type == 'CREDIT') {
+                $msgXml .= '<OKAmount>Allow</OKAmount>';
                 $msgXml .= '<PartialAuth>Allow</PartialAuth>';
             }
             if ($type == 'GIFT') {

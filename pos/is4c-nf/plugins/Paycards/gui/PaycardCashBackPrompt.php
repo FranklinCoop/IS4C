@@ -54,7 +54,7 @@ class PaycardCashBackPrompt extends BasicCorePage
     {
         $this->msg = _("Enter Cash Back");
         $pos_home = MiscLib::base_url().'gui-modules/pos2.php';
-
+        
         $msg = "Please Enter Cash Back";
         $msgTitle = 'Cash Back?';
 
@@ -84,10 +84,9 @@ class PaycardCashBackPrompt extends BasicCorePage
                 } 
                 if (is_numeric($reginput)) {
                     $cashBack = $reginput/100;
-
-                    if ($this->session->get("isMember") && $cashBack > 50) {
+                    if ($this->session->get("isMember") == 1 && $cashBack > 50) {
                         $msg = _("$50.00 limit for members");
-                    } else if ($cashBack > 20) {
+                    } else if ($cashBack > 20 && $this->session->get("isMember") != 1) {
                         $msg = _("$20.00 limit for non-members");
                     } else {
                         $this->session->set("CacheCardCashBack",$cashBack);

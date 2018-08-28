@@ -30,8 +30,43 @@ class SeniorDiscountParser extends Parser
 {
     function check($str)
     {
-        if ($str == "OD") return True;
-        else return False;
+        if (substr($str,-2) == "OD" || $str==="OD"){
+            $strl = substr($str,0,strlen($str)-2);
+            if (substr($str,0,2) == "VD") {
+                return true;
+            } elseif (!is_numeric($strl)) {
+                return false;
+            } elseif ($this->session->get("tenderTotal") != 0) {
+                $this->ret['output'] = DisplayLib::boxMsg(
+                    _("discount not applicable after tender"),
+                    '',
+                    false,
+                    DisplayLib::standardClearButton()
+                );
+            } elseif ($strl > 50) {
+                $this->ret['output'] = DisplayLib::boxMsg(
+                    _("discount exceeds maximum"),
+                    '',
+                    false,
+                    DisplayLib::standardClearButton()
+                );
+            } elseif ($strl < 0) {
+                $this->ret['output'] = DisplayLib::boxMsg(
+                    _("discount cannot be negative"),
+                    '',
+                    false,
+                    DisplayLib::standardClearButton()
+                );
+            } elseif ($strl <= 50 and $strl > 0) {
+                return true;
+            } else {
+                return false;
+            }
+            return true;
+        } elseif ($str === "OD") {
+            return true;
+        }
+        return false;
     }
 
     function parse($str)
@@ -42,17 +77,20 @@ class SeniorDiscountParser extends Parser
             Then returns to the last page.
         */
         $ret = $this->default_json();
-        $disc = 0;
-        $description = '';
+        $discount = substr($str,0,strlen($str)-2);
+        $description = $discount.'% Seinor Discount Applied';
         if (CoreLocal::get('SeniorDiscountFlag')==1) {
             $discount = 0;
             $description = 'Senior Discount Removed';
             CoreLocal::set('SeniorDiscountFlag', 0);
-        } else {
+        } else if ($str === "OD") {
             $discount = CoreLocal::get('seniorDiscountPercent') * 100;
             $description = $discount.'% Seinor Discount Applied';
             CoreLocal::set('SeniorDiscountFlag',1);
+        } else {
+            CoreLocal::set('SeniorDiscountFlag',1);
         }
+        CoreLocal::set('SeniorDiscountAmt',$discount);
         //update discount.
         DiscountModule::updateDiscount(new DiscountModule($discount, 'SeniorDiscount',Ture));
         //adds record of the action.

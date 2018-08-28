@@ -274,6 +274,7 @@ messages from POS?',
           Similar to CachePanEncBlock.
         */
         $conf->set("CacheCardCashBack",0);
+        $conf->set("CardCashBackChecked",false);
 
         /**
           @var ccTermState

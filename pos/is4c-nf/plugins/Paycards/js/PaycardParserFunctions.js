@@ -23,10 +23,13 @@ init = function() {
                 data: "input="+input_str,
                 dataType: "json",
                 cache: false
-            }).done().fail(parserError);
+            }).fail(parserError);
             return
         }
-
+function parserError(xhr, statusText, err)
+{
+    errorLog.show(xhr, statusText, err);
+}
         function submitWrapper(){
             var str = $('#reginput').val();
             $('#reginput').val('');

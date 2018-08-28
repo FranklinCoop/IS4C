@@ -35,7 +35,6 @@ class MercuryDC extends MercuryE2E
         $tranType = 'Credit';
         $cardType = false;
         if ($type == 'DEBIT') {
-            $tranCode = 'EMV'.$tranCode;
             $tranType = 'Debit';
         } elseif ($type == 'EBTFOOD') {
             $tranType = 'EBT';

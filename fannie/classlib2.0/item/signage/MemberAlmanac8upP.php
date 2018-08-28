@@ -121,13 +121,6 @@ class MemberAlmanac8upP extends \COREPOS\Fannie\API\item\FannieSignage
             $pdf->Cell($this->width, $this->MED_FONT, $brand, 0, 0, 'C');
 
 
-            
-            //brand
-            $pdf->SetFont($this->fontM,'',6.1);
-            $pdf->SetXY($this->startX + $xOffset*$column, $this->startY +147.47 + $blankSpace + $row*$yOffset);
-            $brand = ($item['brand']) ? $item['brand'] : 'NEED BRAND INFO '.$lines;
-            $pdf->Cell($this->width, 6.1, $brand, 0, 0, 'C');
-
             //upc
             $pdf->SetFont($this->font);
             $pdf->SetFontSize($this->SMALL_FONT);

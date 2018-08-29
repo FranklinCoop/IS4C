@@ -1,5 +1,4 @@
 <?php
-
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\TransRecord;
 use COREPOS\pos\lib\UdpComm;
@@ -9,7 +8,6 @@ use COREPOS\pos\plugins\Paycards\sql\PaycardVoidRequest;
 use COREPOS\pos\plugins\Paycards\sql\PaycardResponse;
 use COREPOS\pos\plugins\Paycards\xml\BetterXmlData;
 use COREPOS\pos\plugins\Paycards\xml\XmlData;
-
 class MercuryDC extends MercuryE2E
 {
     /**
@@ -31,11 +29,9 @@ class MercuryDC extends MercuryE2E
         } elseif ($this->conf->get("ebt_authcode") != "" && $this->conf->get("ebt_vnum") != "") {
             $tranCode = 'Voucher';
         }
-
         $tranType = 'Credit';
         $cardType = false;
         if ($type == 'DEBIT') {
-            $tranCode = 'EMV'.$tranCode;
             $tranType = 'Debit';
         } elseif ($type == 'EBTFOOD') {
             $tranType = 'EBT';
@@ -46,9 +42,7 @@ class MercuryDC extends MercuryE2E
         } elseif ($type == 'GIFT') {
             $tranType = 'PrePaid';
         }
-
         $request->setManual($prompt ? 1 : 0);
-
         try {
             $request->saveRequest();
         } catch (Exception $ex) {
@@ -58,7 +52,6 @@ class MercuryDC extends MercuryE2E
         }
         $this->conf->set('LastEmvPcId', $request->last_paycard_transaction_id);
         $this->conf->set('LastEmvReqType', 'normal');
-
         // start with fields common to PDCX and EMVX
         $msgXml = $this->beginXmlRequest($request);
         $msgXml .= '<TranCode>' . $tranCode . '</TranCode>
@@ -67,31 +60,10 @@ class MercuryDC extends MercuryE2E
         if ($type == 'EMV') { // add EMV specific fields
             $dcHost = $this->conf->get('PaycardsDatacapLanHost');
             $dcHost = $this->pickHost(empty($dcHost) ? '127.0.0.1' : $dcHost);
-
             $msgXml .= '
             <HostOrIP>' . $dcHost . '</HostOrIP>
             <SequenceNo>{{SequenceNo}}</SequenceNo>
             <CollectData>CardholderName</CollectData>
-            <OKAmount>Allow</OKAmount>
-            <PartialAuth>Allow</PartialAuth>';
-            $msgXml .= '
-            <Account>
-                <AcctNo>' . ($prompt ? 'Prompt' : 'SecureDevice') . '</AcctNo>
-            </Account>';
-            if ($this->conf->get('PaycardsDatacapMode') == 2) {
-                $msgXml .= '<MerchantLanguage>English</MerchantLanguage>';
-            } elseif ($this->conf->get('PaycardsDatacapMode') == 3) {
-                $msgXml .= '<MerchantLanguage>French</MerchantLanguage>';
-            }
-        } elseif($type == 'DEBIT') {
-            $dcHost = $this->conf->get('PaycardsDatacapLanHost');
-            $dcHost = $this->pickHost(empty($dcHost) ? '127.0.0.1' : $dcHost);
-
-            $msgXml .= '
-            <HostOrIP>' . $dcHost . '</HostOrIP>
-            <SequenceNo>{{SequenceNo}}</SequenceNo>
-            <CollectData>CardholderName</CollectData>
-            <CardType> '.$cardType.' </CardType>
             <OKAmount>Allow</OKAmount>
             <PartialAuth>Allow</PartialAuth>';
             $msgXml .= '
@@ -113,7 +85,6 @@ class MercuryDC extends MercuryE2E
                 $msgXml .= '<CardType>' . $cardType . '</CardType>';
             }
             if ($type == 'CREDIT') {
-                $msgXml .= '<OKAmount>Allow</OKAmount>';
                 $msgXml .= '<PartialAuth>Allow</PartialAuth>';
             }
             if ($type == 'GIFT') {
@@ -129,10 +100,8 @@ class MercuryDC extends MercuryE2E
             </TStream>';
         
         $this->last_request = $request;
-
         return $msgXml;
     }
-
     public function switchToRecurring($xml)
     {
         $xml = str_replace('OneTime', 'Recurring', $xml);
@@ -142,10 +111,8 @@ class MercuryDC extends MercuryE2E
             WHERE paycardTransactionID=?';
         $prep = $dbc->prepare($query);
         $res = $dbc->execute($prep, array($this->last_request->last_paycard_transaction_id));
-
         return $res ? $xml : false;
     }
-
     /**
       Prepare an XML request body to void an PDCX
       or EMVX transaction
@@ -158,10 +125,8 @@ class MercuryDC extends MercuryE2E
         $prep = $dbc->prepare('SELECT transNo, registerNo FROM PaycardTransactions WHERE paycardTransactionID=?');
         $row = $dbc->getRow($prep, $pcID);
         $this->conf->set('paycard_trans', $this->conf->get('CashierNo') . '-' . $row['registerNo'] . '-' . $row['transNo']);
-
         $request = new PaycardVoidRequest($this->refnum($this->conf->get('paycard_id')), $dbc);
         $request->setProcessor('MercuryE2E');
-
         $request->last_paycard_transaction_id = $pcID; 
         try {
             $prev = $request->findOriginal();
@@ -169,7 +134,6 @@ class MercuryDC extends MercuryE2E
             $this->conf->set('boxMsg', 'Transaction not found');
             return 'Error';
         }
-
         try {
             $request->saveRequest();
             $this->conf->set('LastEmvPcId', $request->last_paycard_transaction_id);
@@ -178,7 +142,6 @@ class MercuryDC extends MercuryE2E
             $this->setErrorMsg(PaycardLib::PAYCARD_ERR_NOSEND); 
             return 'Error';
         }
-
         /* Determine reversal method based on
            original transaction.
            EMV and Credit are voided
@@ -215,7 +178,6 @@ class MercuryDC extends MercuryE2E
                     break;
             }
         }
-
         // common fields
         $request->setAmount(abs($prev['amount']));
         $msgXml = $this->beginXmlRequest($request);
@@ -266,12 +228,9 @@ class MercuryDC extends MercuryE2E
             <AuthCode>' . $prev['xApprovalNumber'] . '</AuthCode>
             </Transaction>
             </TStream>';
-
         $this->last_request = $request;
-
         return $msgXml;
     }
-
     /**
       Prepare an XML request body for an PDCX
       card balance inquiry
@@ -289,13 +248,11 @@ class MercuryDC extends MercuryE2E
             $mcTerminalID = $this->conf->get('laneno');
         }
         $refNum = $this->refnum($transID);
-
         $live = 1;
         if ($this->conf->get("training") == 1) {
             $live = 0;
             $operatorID = 'test';
         }
-
         $tranType = '';
         $cardType = '';
         if ($type == 'EBTFOOD') {
@@ -307,7 +264,6 @@ class MercuryDC extends MercuryE2E
         } elseif ($type == 'GIFT') {
             $tranType = 'PrePaid';
         }
-
         $msgXml = '<?xml version="1.0"?'.'>
             <TStream>
             <Transaction>
@@ -335,20 +291,16 @@ class MercuryDC extends MercuryE2E
             $msgXml .= '<IpAddress>' . $this->giftServerIP() . '</IpAddress>';
         }
         $msgXml .= '</Transaction></TStream>';
-
         if ($prompt) {
             $msgXml = str_replace('<AcctNo>SecureDevice</AcctNo>',
                 '<AcctNo>Prompt</AcctNo>', $msgXml);
         }
-
         return $msgXml;
     }
-
     public function prepareDataCapGift($mode, $amount, $prompt)
     {
         $request = new PaycardGiftRequest($this->refnum($this->conf->get('paycard_id')), PaycardLib::paycard_db());
         $request->setProcessor('MercuryE2E');
-
         $host = "g1.mercurypay.com";
         if ($this->conf->get("training") == 1) {
             $host = "g1.mercurydev.net";
@@ -360,7 +312,6 @@ class MercuryDC extends MercuryE2E
         $request->setMode($mode);
         $request->setManual($prompt ? 1 : 0);
         $request->setAmount($amount);
-
         try {
             $request->saveRequest();
         } catch (Exception $ex) {
@@ -375,7 +326,6 @@ class MercuryDC extends MercuryE2E
         $this->conf->set('paycard_type', PaycardLib::PAYCARD_TYPE_GIFT);
         $this->conf->set('CacheCardType', 'GIFT');
         $this->conf->set('paycard_mode', $mode);
-
         $msgXml = $this->beginXmlRequest($request);
         $msgXml .= '<TranType>PrePaid</TranType>
             <TranCode>' . $tranCode . '</TranCode>
@@ -387,17 +337,13 @@ class MercuryDC extends MercuryE2E
             <IpPort>9100</IpPort>';
         $msgXml .= '<IpAddress>' . $this->giftServerIP() . '</IpAddress>';
         $msgXml .= '</Transaction></TStream>';
-
         if ($prompt) {
             $msgXml = str_replace('<AcctNo>SecureDevice</AcctNo>',
                 '<AcctNo>Prompt</AcctNo>', $msgXml);
         }
-
         $this->last_request = $request;
-
         return $msgXml;
     }
-
     /**
       Examine XML response from Datacap transaction,
       log results, determine next step
@@ -416,9 +362,7 @@ class MercuryDC extends MercuryE2E
             'curlErr' => 0,
             'curlHTTP' => 200,
         ), PaycardLib::paycard_db());
-
         $xml = new BetterXmlData($xml);
-
         $responseCode = $xml->query('/RStream/CmdResponse/CmdStatus');
         $resultMsg = $responseCode;
         $validResponse = -3;
@@ -446,7 +390,6 @@ class MercuryDC extends MercuryE2E
         if ($xTransID === false) {
             $validResponse = -3;
         }
-
         $issuer = $xml->query('/RStream/TranResponse/CardType');
         $respBalance = $xml->query('/RStream/TranResponse/Amount/Balance');
         $ebtbalance = 0;
@@ -464,9 +407,7 @@ class MercuryDC extends MercuryE2E
             $this->conf->set('GiftBalance', $respBalance);
         }
         $response->setBalance($ebtbalance);
-
         $dbc = Database::tDataConnect();
-
         $tranCode = $xml->query('/RStream/TranResponse/TranCode');
         if (substr($tranCode, 0, 3) == 'EMV') {
             $this->conf->set('EmvSignature', false);
@@ -488,7 +429,6 @@ class MercuryDC extends MercuryE2E
                 $dbc->execute($printP, array(date('Ymd'), date('Y-m-d H:i:s'), $this->conf->get('CashierNo'), $this->conf->get('laneno'), $this->conf->get('transno'), $receiptID, $printData));
             }
         }
-
         // put normalized value in validResponse column
         $normalized = $this->normalizeResponseCode($responseCode, $validResponse);
         $response->setNormalizedCode($normalized);
@@ -497,25 +437,21 @@ class MercuryDC extends MercuryE2E
             $xml->query('/RStream/TranResponse/ProcessData'),
             $xml->query('/RStream/TranResponse/AcqRefData')
         );
-
         try {
             $response->saveResponse();
         } catch (Exception $ex) {
             echo $ex->getMessage() . "\n";
         }
-
         /** handle partial auth **/
         if ($responseCode == 1) {
             $amt = $xml->query('/RStream/TranResponse/Amount/Authorize');
             $this->handlePartial($amt, $request);
         }
-
         $pan = $xml->query('/RStream/TranResponse/AcctNo');
         $respName = $xml->query('/RStream/TranResponse/CardholderName');
         $entryMethod = $xml->query('/RStream/TranResponse/EntryMethod');
         $name = $respName ? $respName : 'Cardholder';
         $request->updateCardInfo($pan, $name, $issuer, $entryMethod);
-
         switch (strtoupper($xml->query('/RStream/CmdResponse/CmdStatus'))) {
             case 'APPROVED':
                 return PaycardLib::PAYCARD_ERR_OK;
@@ -547,10 +483,8 @@ class MercuryDC extends MercuryE2E
                 $this->conf->set("boxMsg","An unknown error occurred<br />at the gateway");
                 TransRecord::addcomment("");    
         }
-
         return PaycardLib::PAYCARD_ERR_PROC;
     }
-
     /**
       Examine XML response from Datacap transaction,
       extract balance and/or error determine next step
@@ -564,9 +498,7 @@ class MercuryDC extends MercuryE2E
         if ($responseCode) {
             $responseCode = $this->responseToNumber($responseCode);
         }
-
         $balance = $xml->get_first('BALANCE');
-
         switch (strtoupper($xml->get_first("CMDSTATUS"))) {
             case 'APPROVED':
                 $this->conf->set('DatacapBalanceCheck', $balance);
@@ -583,10 +515,8 @@ class MercuryDC extends MercuryE2E
                 $this->conf->set("boxMsg","An unknown error occurred<br />at the gateway");
                 TransRecord::addcomment("");    
         }
-
         return PaycardLib::PAYCARD_ERR_PROC;
     }
-
     private function pickHost($hosts)
     {
         // split on any delimiter
@@ -598,7 +528,6 @@ class MercuryDC extends MercuryE2E
             return array_reduce($names, function($c, $i){ return $c . trim($i) . ','; });
         }
     }
-
     private function batchXmlInit($type)
     {
         $termID = $this->getTermID();
@@ -614,4 +543,3 @@ XML;
         return $msg;
     }
 }
-

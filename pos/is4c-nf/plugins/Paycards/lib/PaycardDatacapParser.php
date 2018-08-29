@@ -79,7 +79,8 @@ class PaycardDatacapParser extends Parser
         $log = new LaneLogger();
         $log->debug("PayCardDC Parser: ".$str);
         $ret = $this->default_json();
-        if ($this->conf->get("ttlflag") != 1 && $str !== 'DATACAP' && substr($str, 0, 9) !== 'PVDATACAP') { // must subtotal before running card
+        if ($this->conf->get("ttlflag") != 1 && $str !== 'DATACAP' && substr($str, 0, 9) !== 'PVDATACAP'
+            && substr($str, 0, 11) !=='ACDATACAPGD' && substr($str, 0, 11) !=='AVDATACAPGD') { // must subtotal before running card
             $ret['output'] = PaycardLib::paycardMsgBox("No Total",
                 "Transaction must be totaled before tendering or refunding","[clear] to cancel");
             return $ret;

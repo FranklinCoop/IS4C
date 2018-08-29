@@ -48,84 +48,7 @@ class PaycardEmvCustomerAction extends BasicCorePage
                 $url = $this->page_url.'gui-modules/pos2.php?reginput=DATACAPEMV&repeat=1';
                 $this->change_page($url);
         }
-        $choice = FormLib::get('selectlist', false);
-        if ($choice !== false) {
-            $parser = new PaycardDatacapParser($this->session);
-            switch ($choice) {
-                case 'CAADMIN':
-                    $this->change_page('PaycardEmvCaAdmin.php');
-                    return false;
-                case 'CC':
-                case 'DC':
-                case 'EMV':
-                case 'EF':
-                case 'EC':
-                case 'GD':
-                    $json = $parser->parse('DATACAP' . $choice);
-                    $this->change_page($json['main_frame']);
-                    return false;
-                case 'PVEF':
-                case 'PVEC':
-                case 'PVGD':
-                    $json = $parser->parse('PVDATACAP' . substr($choice, -2));
-                    $this->change_page($json['main_frame']);
-                    return false;
-                case 'ACGD':
-                case 'AVGD':
-                    $json = $parser->parse(substr($choice,0,2) . 'DATACAPGD');
-                    $this->change_page($json['main_frame']);
-                    return false;
-                case 'EBT':
-                    $this->menu = array(
-                        'EF' => 'Food Sale',
-                        'EC' => 'Cash Sale',
-                        'PVEF' => 'Food Balance',
-                        'PVEC' => 'Cash Balance',
-                    );
-                    $this->clearToHome = 0;
-                    break;
-                case 'GIFT':
-                    $this->menu = array(
-                        'GD' => 'Gift Sale',
-                        'ACGD' => 'Activate Card',
-                        'AVGD' => 'Reload Card',
-                        'PVGD' => 'Check Balance',
-                    );
-                    $this->clearToHome = 0;
-                    break;
-                case 'PV':
-                    $this->menu = array(
-                        'PVEF' => 'Food Balance',
-                        'PVEC' => 'Cash Balance',
-                        'PVGD' => 'Gift Balance',
-                    );
-                    $this->clearToHome = 1;
-                    break;
-                case 'CL':
-                default:
-                    if (FormLib::get('clear-to-home')) {
-                        $this->change_page(MiscLib::baseUrl() . 'gui-modules/pos2.php');
-                        return false;
-                    }
-                    break;
-            }
-        }
-        if ($choice === false || $choice === 'CL' || $choice === '') {
-            if ($this->conf->get('PaycardsDatacapMode') == 1) {
-                $this->menu = array(
-                    'EMV' => 'EMV Credit',
-                    //'CC' => 'Credit only',
-                    'DC' => 'Debit only',
-                    'EBT' => 'EBT',
-                    'GIFT' => 'Gift',
-                );
-            } elseif ($this->conf->get('PaycardsDatacapMode') == 2 || $this->conf->get('PaycardsDatacapMode') == 3) {
-                $this->menu = array(
-                    'EMV' => 'EMV Credit/Debit',
-                    'CAADMIN' => 'Admin Functions',
-                );
-            }
-        }
+
         if (FormLib::get('reginput', false) !== false) {
             $input = strtoupper(trim(FormLib::get('reginput')));
             // CL always exits
@@ -154,18 +77,20 @@ class PaycardEmvCustomerAction extends BasicCorePage
             UdpComm::udpSend("termReset");
             echo 'Canceled';
             return false;
-        } // 
+        } // post?
+
+        $this->strmsg='<b>'.$msgTitle.'</b><br>
+                <br><b>'.$msg.'</b><font size=-1>
+                <p>
+                <p>[enter] to continue
+                <br>[clear] ' . _('to cancel') . '
+                </font>"';
 
         return true;
     }
     function head_content() {
         //$this->default_parsewrapper_js();
         //$this->scanner_scale_polling(true);
-        ?>
-        <script type="text/javascript" src="../../../js/selectSubmit.js"></script>
-        <?php
-        $this->addOnloadCommand("selectSubmit('#selectlist', '#selectform')\n");
-        $this->addOnloadCommand("\$('#selectlist').focus();\n");
         $url = $this->page_url."plugins/Paycards/gui/PaycardEmvCustomerAction.php?reginput=";
         
         echo '<script type="text/javascript" src="<?php echo $this->page_url; ?>js/ajax-parser.js"></script>';
@@ -185,48 +110,39 @@ class PaycardEmvCustomerAction extends BasicCorePage
     function body_content(){
         $this->icon = MiscLib::base_url()."graphics/exclaimC.gif";
         $this->input_header('action="PaycardEmvCustomerAction.php" onsubmit="return submitWrapper"');
-          $stem = MiscLib::baseURL() . 'graphics/';
         echo DisplayLib::printheaderb();
-        ?>
-        <div class="baseHeight">
-        <div class="centeredDisplay colored rounded">
-        <span class="larger">process card transaction</span>
-        <form name="selectform" method="post" id="selectform"
-            action="<?php echo AutoLoader::ownURL(); ?>">
-        <input type="hidden" name="clear-to-home" value="<?php echo $this->clearToHome; ?>" />
-        <?php if ($this->conf->get('touchscreen')) { ?>
-        <button type="button" class="pos-button coloredArea"
-            onclick="scrollDown('#selectlist');">
-            <img src="<?php echo $stem; ?>down.png" width="16" height="16" />
-        </button>
-        <?php } ?>
-        <select id="selectlist" name="selectlist" size="5" style="width: 10em;"
-            onblur="$('#selectlist').focus()">
-        <?php
-        $first =true;
-        foreach ($this->menu as $val => $label) {
-            printf('<option %s value="%s">%s</option>',
-                ($first ? 'selected' : ''), $val, $label);
-            $first = false;
+        echo '<div class="baseHeight">';
+
+        echo "<div id=\"boxMsg\" class=\"centeredDisplay\">";
+        echo "<div class=\"boxMsgAlert coloredArea\">";
+        echo CoreLocal::get("alertBar");
+        if (CoreLocal::get('alertBar') == '') {
+            echo 'Alert';
         }
-        ?>
-        </select>
-        <?php if ($this->conf->get('touchscreen')) { ?>
-        <button type="button" class="pos-button coloredArea"
-            onclick="scrollUp('#selectlist');">
-            <img src="<?php echo $stem; ?>up.png" width="16" height="16" />
-        </button>
-        <?php } ?>
-        <p>
-            <button class="pos-button" type="submit">Select [enter]</button>
-            <button class="pos-button" type="submit" onclick="$('#selectlist').val('');">
-                Cancel [clear]
-            </button>
-        </p>
-        </div>
-        </form>
-        </div>
-        <?php
+        echo"</div>";
+        echo "
+            <div class=\"boxMsgBody\">
+                <div class=\"msgicon\"><img src=\"$this->icon\" /></div>
+                <div class=\"msgtext\">"
+                . $this->strmsg . "
+                </div>
+                <div class=\"clear\"></div>
+            </div>";
+        if (!empty($buttons) && is_array($buttons)) {
+            echo'<div class="boxMsgBody boxMsgButtons">';
+            foreach ($$this->buttons as $label => $action) {
+                $label = preg_replace('/(\[.+?\])/', '<span class="smaller">\1</span>', $label);
+                $color = preg_match('/\[clear\]/i', $label) ? 'errorColoredArea' : 'coloredArea';
+                echo sprintf('<button type="button" class="pos-button %s" 
+                        onclick="%s">%s</button>',
+                        $color, $action, $label);
+            }
+        echo '</div>';
+        }
+        echo "</div>"; // close #boxMsg
+
+        echo '</div>';
+
 
         echo '<div id="footer">';
         echo DisplayLib::printfooter();

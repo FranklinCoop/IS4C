@@ -21,24 +21,32 @@
 
 *********************************************************************************/
 
-class DailySettlementModel extends BasicModel {
-
-    protected $name = 'dailySettlement';
-    protected $preferred_db = 'plugin:OverShortDatabase';
-
-    protected $columns = array(
-    'id' => array('type'=>'INT','primary_key'=>True, 'increment'=>True),
-    'date' => array('type'=>'VARCHAR(10)'),
-    'lineNo' => array('type'=>'INT'),
-    'lineName' => array('type'=>'VARCHAR(50)'),
-    'acctNo' => array('type'=>'VARCHAR(30)',),
-    'amt' => array('type'=>'MONEY'),
-    'count' => array('type'=>'MONEY',),
-    'total' => array('type'=>'MONEY',),
-    'diff' => array('type'=>'MONEY',),
-    'storeID' => array('type'=>'TINYINT'),
-    );
-
-    protected $unique = array('id');
+require(dirname(__FILE__) . '/../../../../config.php');
+if (!class_exists('FannieAPI')) {
+    include(__DIR__ . '/../../../../classlib2.0/FannieAPI.php');
 }
 
+class SettlementModule {
+    private $numCols = 0;
+    private $colNames = array();
+    private $numRows = 0;
+    private $rowData;
+
+public function getNumCols() {
+    return $this->numCols;
+}
+
+public function getNumRows() {
+    return $this->numRows;
+}
+
+public function getColNames() {
+    return $this->colNames;
+}
+
+public function getRowData() {
+    return $this->rowData;
+}
+
+
+}

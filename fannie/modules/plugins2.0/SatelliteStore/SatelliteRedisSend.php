@@ -51,8 +51,17 @@ class SatelliteRedisSend extends FannieTask
         $my_db = $conf['SatelliteDB'];
         $myID = $conf['SatelliteStoreID'];
         $redis_host = $conf['SatelliteRedis'];
+        
+        try { //when the vpn goes down the lock files stays with an error from here.
+            $remote = FannieDB::get($this->config->get('TRANS_DB'));
+        } catch (Exception $e) {
+            echo $this->cronMsg('Task Unlock Enganged');
+            $this->unlock();
+            echo $this->cronMsg("Connection Error ".$e);
+        }
+        
+        
 
-        $remote = FannieDB::get($this->config->get('TRANS_DB'));
         if (!$remote->isConnected()) {
             echo $this->cronMsg("No connection");
             echo $this->cronMsg('Task Unlock Enganged');

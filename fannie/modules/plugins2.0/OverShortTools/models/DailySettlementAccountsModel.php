@@ -21,16 +21,19 @@
 
 *********************************************************************************/
 
-class DailySettlementAccountsModel extends BasicModel {
+class DailySettlementFormatingModel extends BasicModel {
 
-    protected $name = 'dailySettlementAccounts';
+    protected $name = 'dailySettlementFormating';
     protected $preferred_db = 'plugin:OverShortDatabase';
 
     protected $columns = array(
-    'lineName' => array('type'=>'VARCHAR(30)','primary_key'=>True),
-    'acctNo' => array('type'=>'VARCHAR(20)','default'=>''),
-    'lineOrder' => array('type'=>'INT','default'=>0),
-    'operation' => array('type'=>'VARCHAR(10)','default'=>''),
-    'storeID' => array('type'=>'INT','primary_key'=>true),
+    'lineNo' => array('type'=>'INT', 'primary_key'=>True),
+    'lineName' => array('type'=>'VARCHAR(20'),
+    'acctNo' => array('type'=>'VARCHAR(20'),
+    'amt' => array('type'=>'VARCHAR(20'),
+    'count' => array('type'=>'VARCHAR(20'),
+    'total' => array('type'=>'VARCHAR(20'),
+    'diff' => array('type'=>'VARCHAR(20'),
+    'storeID' => array('type'=>'VARCHAR(20'),
     );
 }

@@ -42,6 +42,7 @@ class OverShortSettlementPage extends FannieRESTfulPage
     public function preprocess()
     {
         $this->__routes[] = 'get<date>';
+        $this->__routes[] = 'post<id><value>';
         return parent::preprocess();
     }
 
@@ -54,7 +55,29 @@ class OverShortSettlementPage extends FannieRESTfulPage
 
         return false;
 
-}
+   }
+
+    public function post_id_value_handler()
+    {
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
+        $json = array('msg'=>'');
+
+        $model = new DailySettlements($dbc);
+        $model->id($this->id);
+        foreach ($model->find() as $obj) {
+            $obj->count($this->value);
+            $obj->diff($obj->amt() - $this->value);
+        }
+        $saved = $model->save();
+
+        if (!$saved) {
+            $json['msg'] = 'Error saving membership status';
+        }
+        echo json_encode($json);
+
+        return false;
+    }
 
 
 
@@ -68,6 +91,19 @@ class OverShortSettlementPage extends FannieRESTfulPage
             name: "",
             date: "",
         };
+
+        function saveValue(value,t_id){
+            var elem = $(this);
+            var orig = this.defaultValue;
+            $.ajax({url:'OverShortSettlementPage.php',
+                cache: false,
+                type: 'post',
+                dataType: 'json',
+                data: 'id='+t_id+'&value='+value
+            }).done(function(data){
+                showBootstrapPopover(elem, orig, data.msg);
+            });
+        }
 
         function saveMemType(memType,t_id){
             var elem = $(this);
@@ -193,22 +229,43 @@ HTML;
     private function getTable($dbc, $date) {
         $store = 1;
         $ret = 'Pick a Day';
+        $columnNames = array('1','2','3','4','5','6');
+                $ret = '<form method="post">';
+        $ret .= '<table class="table table-bordered">';
+        $ret .= sprintf('<thead>
+        <tr><th colspan="5"><label class="table-label">%s</label></th></tr></thead><thead>
+        <tr>',$date);
+        
+
 
         if($date != '') {
             $tableData = new FCCSettlementModule($dbc,'trans_archive.bigArchive',$date,$store);
-            //$model = $tableData->getRowData();
+            $model = $tableData->getTable($dbc,'trans_archive.bigArchive',$date,$store);
             $columnNames = $tableData->getColNames();
-            $ret = '<form method="post">';
-            $ret .= '<table class="table-condensed table-striped table-bordered"><tr>';
-            
-            foreach ($columnNames as $name => $info) {
-                $ret .= '<th>' . $info . '</th>';
+                    foreach ($columnNames as $name => $info) {
+            $ret .= '<th>' . $info . '</th>';
+        }
+        $ret .= '</tr></thead>';
+                    $ret .= '<tbody>';
+        foreach ($model->find() as $obj) {
+            $pk = null;
+            $ret .= '<tr>';
+            foreach ($model->getColumns() as $name => $info) {
+                    $ret .= sprintf($tableData->getCellFormat($obj->lineNo(),$name),
+                        $obj->$name(),$obj->id,$name,$obj->$name());
+                
             }
-            $ret .= '</tr><thead>';
-            $ret .= '<tbody>';
+            $ret .= '</tr>';
         }
 
+        $ret .= '</tbody>';
+        }
+
+
+
+
         return $ret;
+
     }
 
 

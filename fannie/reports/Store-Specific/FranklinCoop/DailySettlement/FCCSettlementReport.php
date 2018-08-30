@@ -63,7 +63,7 @@ class FCCSettlementReport extends FannieReportPage
 
 		$total_tax = "SELECT
 		sum(case when upc='TAXLINEITEM' and numflag =1  then regPrice else 0 end) as sales_tax_total,
-		sum(case when upc='TAXLINEITEM' and numflag =2 then regPrice else 0 end) as sales_tax_total
+		sum(case when upc='TAXLINEITEM' and numflag =2 then regPrice else 0 end) as meals_tax_total
 		FROM ".$dlog."
 		WHERE `datetime` BETWEEN ? AND ? AND store_id=2;
 		";
@@ -112,8 +112,8 @@ class FCCSettlementReport extends FannieReportPage
 				"Gift Cards Sold", "Paid In", "Working Discount", "Staff Discount", "Senior Discount", "Food For All Disc", "Credit Card Total", "Debit Card Total", "SNAP Total",
 				"SNAP Cash Total", "Gift Card Total", "Paper Gift Total", "In Store Charge Total",
 				"Paid Out Total", "Store Coupon Total", "Manufactures Coupon Total");
-		$row[1] = $row_tax[1]; //sales tax
-		$row[2] = $row_tax[0]; //meals tax
+		$row[1] = $row_tax[0]; //sales tax
+		$row[2] = $row_tax[1]; //meals tax
 		$row[7] = $row_discounts[0]; //working member discount
 		$row[8] = $row_discounts[1]; //staff discount
 		$row[9] = $row_discounts[2]; //Senior Discount

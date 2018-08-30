@@ -27,14 +27,25 @@ if (!class_exists('FannieAPI')) {
 }
 
 class SettlementModule {
-    private $numCols = 0;
-    private $colNames = array();
-    private $numRows = 0;
-    private $rowData;
+    protected $numCols = 0;
+    protected $colNames = array('1','2','3');
+    protected $colPrint = array(true,true,false);
+    protected $rowFormat = array();
+    protected $numRows = 0;
+    protected $rowData;
+
+public function getRowFormat(){
+    return $this->rowFormat;
+}
+
+public function getColPrint(){
+    return $this->colPrint;
+}
 
 public function getNumCols() {
     return $this->numCols;
 }
+
 
 public function getNumRows() {
     return $this->numRows;
@@ -48,5 +59,8 @@ public function getRowData() {
     return $this->rowData;
 }
 
+public function setRowData($newData){
+    $this->rowData = $newData;
+}
 
 }

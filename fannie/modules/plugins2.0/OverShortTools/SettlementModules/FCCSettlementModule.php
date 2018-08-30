@@ -27,10 +27,13 @@ if (!class_exists('FannieAPI')) {
 }
 
 class FCCSettlementModule extends SettlementModule {
-    private $numCols = 6;
-    private $colNames = array('{$store} Market Daily Settlement','(Account Number)','(POS)','(count)','(Totals)','(O/S)');
-    private $numRows = 41;
-    private $rowData;
+    protected $numCols = 6;
+    protected $colNames = array('Market Daily Settlement','(Account Number)','(POS)','(count)','(Totals)','(Diff)');
+    protected $colPrint = array(true,true,false,true,true,false);
+    protected $numRows = 40;
+    protected $rowData;
+    protected $cellFormats = array();
+
 
 
     function __construct($dbc,$dlog,$date,$store) {
@@ -42,7 +45,15 @@ class FCCSettlementModule extends SettlementModule {
             $model->date($date,'=');
             $model->storeID($store,'=');
         }
-        //$this->$rowData = $model;
+        $this->rowData = $model;
+        $this->cellFormats = $this->rowFormat();
+    }
+
+    public function getTable($dbc,$dlog,$date,$store) {
+        $model = new DailySettlementModel($dbc);
+        $model->date($date,'=');
+        $model->storeID($store,'=');
+        return $model;
     }
 
 
@@ -67,10 +78,6 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
     return $model;
 }
 
-public function getRowData() {
-    return $this->rowData;
-}
-
 private function genRowData($dbc,$dlog,$args) {
     $ret = array();
     $row = array();
@@ -79,7 +86,7 @@ private function genRowData($dbc,$dlog,$args) {
     $row[] = 'SALES TOTALS';
     $row[] = '';
     $row[] = $value;
-    $row[] = 0;
+    $row[] = $value;
     $row[] = $value;
     $row[] = 0;
     $ret[] = $row;
@@ -93,7 +100,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $accountNumbers[$key];
         $row[] = $values[$key];
         $row[] = $values[$key];
-        $row[] = 0;
+        $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
         $ret[] = $row;
     }
@@ -110,7 +117,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $accountNumbers[$key];
         $row[] = $values[$key];
         $row[] = $values[$key];
-        $row[] = 0;
+        $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
         $ret[] = $row;
     }
@@ -125,7 +132,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $accountNumbers[$key];
         $row[] = $values[$key];
         $row[] = $values[$key];
-        $row[] = 0;
+        $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
         $ret[] = $row;
     }
@@ -142,7 +149,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = 0;
         $row[] = 0;
-        $row[] = 0;
+        $row[] = $values[$key];
         $ret[] = $row;
     }
 
@@ -157,7 +164,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = 0;
         $row[] = 0;
-        $row[] = 0;
+        $row[] = $values[$key];
         $ret[] = $row;
     }
 
@@ -172,7 +179,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = 0;
         $row[] = 0;
-        $row[] = 0;
+        $row[] = $values[$key];
         $ret[] = $row;
     }
 
@@ -188,7 +195,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $accountNumbers[$key];
         $row[] = $values[$key];
         $row[] = 0;
-        $row[] = 0;
+        $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
         $ret[] = $row;
     }
@@ -381,5 +388,100 @@ private function getTaxTotals($dbc,$dlog,$args) {
         $row = $dbc->fetch_row($result);
         return $row[0];
     }
+
+    public function getCellFormat($lineNo,$name) {
+        $rowNo = $this->cellFormats[$lineNo];
+        $formatType = $this->rowFormayTypes($rowNo);
+        $ret ='';
+        switch ($formatType[$name]) {
+            case 'false':      
+                break;
+            case 'dark':
+                $ret = '<td id="%s %d %s %s" bgcolor="#A9A9A9"></td>';
+                break;
+            case 'entry':
+                $ret = '<td><input type="number" class="form-control" value="%s" 
+                        onchange="saveValue.call(this, this.value, %d);" id ="%s",$name="%s"/></td">';
+                break;
+            default:
+                $ret = '<td>%s</font>
+                                <input id=%d type="hidden" name="%s[]" value="%s" />
+                                </td>';
+                break;
+        }
+        return $ret;
+    }
+
+    private function rowFormayTypes($type){
+        $ret =array();
+        switch ($type) {
+            case 'totalRow':
+                $ret = array('id'=>'false',
+                    'date' =>'false',
+                    'lineNo' => 'false',
+                    'lineName'=>'',
+                    'acctNo' => 'dark',
+                    'amt' => '',
+                    'count' => 'dark',
+                    'total' => '',
+                    'diff' => '',
+                    'storeID' => 'false');
+                break;
+            case 'entryRow':
+                $ret = array('id'=>'false',
+                    'date' =>'false',
+                    'lineNo' => 'false',
+                    'lineName'=>'',
+                    'acctNo' => '',
+                    'amt' => '',
+                    'count' => 'entry',
+                    'total' => 'dark',
+                    'diff' => '',
+                    'storeID' => 'false');
+                break;
+            case 'totalEnteryRow':
+                $ret = array('id'=>'false',
+                    'date' =>'false',
+                    'lineNo' => 'false',
+                    'lineName'=>'',
+                    'acctNo' => 'dark',
+                    'amt' => '',
+                    'count' => 'dark',
+                    'total' => 'entry',
+                    'diff' => '',
+                    'storeID' => 'false');
+                break;
+            case 'blankRow':
+                $ret = array('id'=>'false',
+                    'date' =>'false',
+                    'lineNo' => 'false',
+                    'lineName'=>'dark',
+                    'acctNo' => 'dark',
+                    'amt' => 'dark',
+                    'count' => 'dark',
+                    'total' => 'dark',
+                    'diff' => 'dark',
+                    'storeID' => '');
+                break;
+            default:
+                # code...
+                break;
+        }
+        return $ret;
+    }
+
+    private function rowFormat(){
+        $formmating = array('totalRow','entryRow','entryRow','totalRow',
+                            'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
+                            'entryRow','entryRow','entryRow','entryRow','totalRow',
+                            'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
+                            'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
+                            'entryRow','entryRow','entryRow','totalRow',
+                            'blankRow','totalRow','totalEnteryRow','totalRow'
+                        );
+
+        return $formmating;
+    }
+
 
 }

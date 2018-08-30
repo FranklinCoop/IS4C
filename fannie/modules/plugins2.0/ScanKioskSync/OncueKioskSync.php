@@ -27,12 +27,16 @@ include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 
 class OncueKioskSync extends SyncKiosk {
 	
-	public function syncKiosk() {
+	public function __construct() {
 		global $FANNIE_ROOT, $FANNIE_PLUGIN_SETTINGS;
 		
 		$sucess = 1;
-		$pdoLi = new PDO('sqlite:'.$FANNIE_ROOT.'modules/plugins2.0/ScanKioskSync/db/items.db')
-				or die("can't connect to $liDb");
+		try {
+			$pdoLi = new PDO('sqlite:'.$FANNIE_ROOT.'modules/plugins2.0/ScanKioskSync/db/items.db');
+		} catch (Exception $e) {
+			$retString = 'Sqlite Connection Failed:'.$e->getMessage();	
+		}
+
 		$retString = "Useing Oncue Sync Module<br>";
 		$retString .= $this->makeSQLiteTable($pdoLi);
 		$retString .= $this->insertTableData($pdoLi);

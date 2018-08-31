@@ -192,7 +192,7 @@ class PatronageOverDatesReport extends FannieReportPage
         }
 
         if (isset($mdata['99999'])) {
-            $this->non_member = $mdata['99999'];
+            $this->non_member[] = $mdata['99999'];
         }
 
         // Compose the rows of the report in a 2D array.

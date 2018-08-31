@@ -59,20 +59,24 @@ class OverShortSettlementPage extends FannieRESTfulPage
 
     public function post_id_value_handler()
     {
-        $dbc = $this->connection;
-        $dbc->selectDB($this->config->get('OP_DB'));
+        GLOBAL $FANNIE_PLUGIN_SETTINGS;
+        $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
         $json = array('msg'=>'');
 
-        $model = new DailySettlements($dbc);
+
+        $model = new DailySettlementModel($dbc);
         $model->id($this->id);
-        foreach ($model->find() as $obj) {
-            $obj->count($this->value);
-            $obj->diff($obj->amt() - $this->value);
-        }
+        $obj = $model->find();
+        $amt = $obj[0]->amt();
+
+        $model = new DailySettlementModel($dbc);
+        $model->id($this->id);
+        $model->count($this->value);
+        $model->diff($amt - $this->value);
         $saved = $model->save();
 
         if (!$saved) {
-            $json['msg'] = 'Error saving membership status';
+            $json['msg'] = 'Error saving count';
         }
         echo json_encode($json);
 
@@ -105,64 +109,6 @@ class OverShortSettlementPage extends FannieRESTfulPage
             });
         }
 
-        function saveMemType(memType,t_id){
-            var elem = $(this);
-            var orig = this.defaultValue;
-            $.ajax({url:'OverShortSettlementPage.php',
-                cache: false,
-                type: 'post',
-                data: 'id='+t_id+'&newMemType='+memType,
-                dataType: 'json'
-            }).done(function(data){
-                showBootstrapPopover(elem, orig, data.msg);
-            });
-        }
-        function setNewDate(newDate){
-            var elem = $(this);
-            var orig = this.defaultValue;
-            $.ajax({url:'OverShortSettlementPage.php',
-                cache: false,
-                type: 'get',
-                data: 'newDate='+newDate,
-                dataType: 'json'
-            }).done(function(data){
-                showBootstrapPopover(elem, orig, data.msg);
-            });
-        }
-
-        function redrawList() {
-            var data = 'filter=' + encodeURIComponent(JSON.stringify(filters));
-            $.ajax({
-                url: 'OverShortSettlementPage.php',
-                type: 'get',
-                data: data
-            }).done(function(resp) {
-                $('#displayarea').html(resp);
-            });
-        };
-
-        function refilter() {
-            filters.date = $('#filterDate').val();
-            filters.sort = $('#filterSort').val();
-            filters.group = $('#filterGroup').val();
-            pageStart = '';
-            redrawList();
-        };
-
-        function regenList() {
-            var generate=0;
-            if(confirm("All changes will be lost.\nDo you want to regnerate member update list?")) {
-                generate=1;
-            }
-            var data = 'generate='+generate;
-            $.ajax({
-                url: 'OverShortSettlementPage.php',
-                type: 'get',
-                data: data
-            }).done(function(resp) {
-                $('#displayarea').html(resp);
-            });
-        }
         function selectDay() {
             var data = 'date='+$('#date').val();
             $.ajax({
@@ -230,7 +176,7 @@ HTML;
         $store = 1;
         $ret = 'Pick a Day';
         $columnNames = array('1','2','3','4','5','6');
-                $ret = '<form method="post">';
+        $ret = '<form method="post">';
         $ret .= '<table class="table table-bordered">';
         $ret .= sprintf('<thead>
         <tr><th colspan="5"><label class="table-label">%s</label></th></tr></thead><thead>
@@ -252,7 +198,7 @@ HTML;
             $ret .= '<tr>';
             foreach ($model->getColumns() as $name => $info) {
                     $ret .= sprintf($tableData->getCellFormat($obj->lineNo(),$name),
-                        $obj->$name(),$obj->id,$name,$obj->$name());
+                        $obj->$name(),$obj->id(),$name,$obj->$name());
                 
             }
             $ret .= '</tr>';

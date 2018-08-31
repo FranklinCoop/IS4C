@@ -400,12 +400,13 @@ private function getTaxTotals($dbc,$dlog,$args) {
                 $ret = '<td id="%s %d %s %s" bgcolor="#A9A9A9"></td>';
                 break;
             case 'entry':
-                $ret = '<td><input type="number" class="form-control" value="%s" 
-                        onchange="saveValue.call(this, this.value, %d);" id ="%s",$name="%s"/></td">';
+                $ret = '<td><input type="text" class="form-control" value="%s" 
+                        onchange="saveValue.call(this, this.value, %d);" id="%s" name="%s"/></td">';
+                        //onchange="saveType.call(this, this.value, %d);" 
                 break;
             default:
                 $ret = '<td>%s</font>
-                                <input id=%d type="hidden" name="%s[]" value="%s" />
+                                <input type="hidden" name="%d" id="%s"  value="%s" />
                                 </td>';
                 break;
         }

@@ -213,15 +213,19 @@ private function genRowData($dbc,$dlog,$args) {
     $accountNumbers = array('','','','(419G900)');
     $total = $ret[0][2] + $ret[3][2] + $ret[11][2] - $ret[4][2] - $ret[16][2] - $ret[23][2] - $ret[32][2] -$ret[36][2];
     $deposit = $this->getDeposit($dbc,$dlog,$args);
-    $values = array(0,$total,$deposit,$total-$deposit);
+    $rowBlank = array(0,0,0,0);
+    $rowTotal = array($total,$total,$total,0);
+    $rowDepost = array($deposit[0],$deposit[1],$deposit[1],0);
+    $rowOS = array($deposit[0] - $total,0,$deposit[1] - $total,0);
+    $values = array($rowBlank,$rowTotal,$rowDepost,$rowOS);
     $totalRow = 0;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
-        $row[] = $rowNames[$key];
-        $row[] = $accountNumbers[$key];
-        $row[] = $values[$key];
-        $row[] = 0;
-        $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
+        $row[] = $rowNames[$key]; //name
+        $row[] = $accountNumbers[$key]; //acct
+        $row[] = $values[$key][0]; //pos
+        $row[] = $values[$key][1]; // count
+        $row[] = $values[$key][2]; //total
         $row[] = 0;
         $row[] = $totalRow;
         $ret[] = $row;
@@ -342,6 +346,8 @@ private function getTaxTotals($dbc,$dlog,$args) {
             sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
             sum(case when trans_subtype='GD' AND trans_type ='T' then -total else 0 end) as gift_card_total
             FROM {$dlog} WHERE `datetime` BETWEEN ? AND ? AND store_id=? AND trans_status != 'X'");
+        
+        
         /*
         $query = $dbc->prepare("SELECT 
             sum(case when p.`issuer` = 'DEBIT' and trans_subtype='DC' then p.amount else 0 end) as DEBIT,
@@ -360,9 +366,28 @@ private function getTaxTotals($dbc,$dlog,$args) {
         */
         $result = $dbc->execute($query,$args);
         $row = $dbc->fetch_row($result);
+        
+        
         $return = array();
         for ($key=0;$key<$dbc->numFields($result);$key++) {
             $return[] = $row[$key];
+        }
+
+        $amexQ = $dbc->prepare("SELECT 
+            sum(case when p.`issuer` = 'AMEX' and trans_subtype='CC' then p.amount else 0 end) as AMEX
+            FROM {$dlog} t LEFT JOIN core_trans.PaycardTransactions p on p.registerNo = t.register_no
+            AND p.transNo = t.trans_no AND p.empNo = t.emp_no AND p.paycardTransactionID = t.numFlag
+            WHERE t.trans_type ='T' AND t.trans_subtype IN ('CC','DC','EC','EF','GD')
+            AND t.`datetime` BETWEEN ? AND ? AND t.store_id =?
+            AND p.`issuer` != '0'                 AND p.httpCode=200
+            AND p.xResultCode = 1 and t.trans_status <>'X'");
+
+        $amexR = $dbc->execute($amexQ, $args);
+        $amexW = $dbc->fetch_row($amexR);
+
+        if($amexW[0]) {
+            $return[0] -= $amexW[0];
+            $return[1] = $amexW[0];
         }
         $return[] = array_sum($return);
         return $return;
@@ -408,12 +433,23 @@ private function getTaxTotals($dbc,$dlog,$args) {
     }
 
     private function getDeposit($dbc,$dlog,$args) {
-        $query = $dbc->prepare("SELECT -sum(case when t.trans_subtype IN ('CA','CK') then t.total else 0 end) as depositTotal
+        $posQ = $dbc->prepare("SELECT -sum(case when t.trans_subtype IN ('CA','CK') then t.total else 0 end) as depositTotal
             FROM {$dlog} t
             WHERE t.`datetime` between ? and ? and t.store_id =? AND trans_status != 'X'");
-        $result = $dbc->execute($query,$args);
-        $row = $dbc->fetch_row($result);
-        return $row[0];
+        $posR = $dbc->execute($posQ,$args);
+        $posW = $dbc->fetch_row($posR);
+
+        $qDate = new DateTime($args[0]);
+        $countQ = $dbc->prepare("SELECT SUM(amt) AS deposit
+                                FROM dailyCounts 
+                                WHERE `date` = ? AND storeID = ? AND tender_type in ('CA','CK') 
+                                GROUP BY `date`");
+        $countR = $dbc->execute($countQ,array($qDate->format('Y-m-d'), $args[2]));
+        $countW = $dbc->fetch_row($countR);
+
+        
+        $return = array($posW[0],$countW[0]);
+        return $return;
     }
 
     public function getCellFormat($lineNo,$name) {

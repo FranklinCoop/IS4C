@@ -40,10 +40,14 @@ class FCCSettlementModule extends SettlementModule {
         $model = new DailySettlementModel($dbc);
         $model->date($date,'=');
         $model->storeID($store,'=');
-        if (!$model->find()) {
+        $today = date('Y-m-d');
+        if (!$model->find() && $date < $today) {
             $model = $this->populateAccountTable($dbc,$dlog,$store,$date);
             $model->date($date,'=');
             $model->storeID($store,'=');
+            
+        } else {
+
         }
         $this->rowData = $model;
         $this->cellFormats = $this->rowFormat();
@@ -61,7 +65,13 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
     $date1 = $date.' 00:00:00';
     $date2 = $date.' 23:59:59';
     $args = array($date1,$date2,$store);
+    $lastIDQ = $dbc->prepare("SELECT `id` FROM dailySettlement ORDER BY `id` DESC LIMIT 1");
+    $lastIDR = $dbc->execute($lastIDQ, array());
+    $lastIDVal = $dbc->fetch_row($lastIDR)[0];
+    $lastID = (is_null($lastIDVal)) ? 0 : $lastIDVal ;
+
     $model = new DailySettlementModel($dbc);
+
     $tableData = $this->genRowData($dbc,$dlog,$args);
     foreach ($tableData as $rowID => $rowArr) {
         $model->date($date);
@@ -72,6 +82,7 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
         $model->count($rowArr[3]);
         $model->total($rowArr[4]);
         $model->diff($rowArr[5]);
+        $model->totalRow($lastID+$rowArr[6]);
         $model->storeID($store);
         $model->save();
     }
@@ -83,17 +94,20 @@ private function genRowData($dbc,$dlog,$args) {
     $row = array();
     //Sales Totals
     $value = $this->getSalesTotals($dbc,$dlog,$args);
+    $totalRow = 1;
     $row[] = 'SALES TOTALS';
     $row[] = '';
     $row[] = $value;
     $row[] = $value;
     $row[] = $value;
     $row[] = 0;
+    $row[] = $totalRow;
     $ret[] = $row;
     //Tax Section
     $rowNames = array('PLUS SALES TAX Collected','PLUS SALES TAX Collected','TOTAL TAX');
     $accountNumbers = array('(2450A990)','(2400M990)','');
     $values = $this->getTaxTotals($dbc,$dlog,$args);
+    $totalRow = 4;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -102,6 +116,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
+        $row[] = $totalRow;
         $ret[] = $row;
     }
 
@@ -111,6 +126,7 @@ private function genRowData($dbc,$dlog,$args) {
                       'PAYPAL TIPS','DELIVERY FEE','PLUS R/A OTHER (PAID-IN)','TOTAL R/A');
     $accountNumbers = array('(4060G900)','(2500A990)','(2800A990)','aditional entry','(5255G500)','(5255G500)','aditional entry','');
     $values = $this->getRATotals($dbc,$dlog,$args);
+    $totalRow = 12;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -119,6 +135,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
+        $row[] = $totalRow;
         $ret[] = $row;
     }
 
@@ -126,6 +143,7 @@ private function genRowData($dbc,$dlog,$args) {
     $rowNames = array('LESS Working Discount','LESS Staff Discount','LESS Senior Discount','LESS Food for All Discount','TOTAL DISCOUNTS');
     $accountNumbers = array('(4160G900)','(4150G900)','(4130G900)','(4110G900)','');
     $values = $this->getDiscountTotals($dbc,$dlog,$args);
+    $totalRow = 17;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -134,6 +152,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
+        $row[] = $totalRow;
         $ret[] = $row;
     }
 
@@ -142,6 +161,7 @@ private function genRowData($dbc,$dlog,$args) {
                       'LESS SNAP / EBT: Cash','LESS GIFT CARD Redeemed','TOTAL CARD MEDIA');
     $accountNumbers = array('(1025A990)','(1025A990)','(1025A990)','(1025A990)','(1025A990)','(2500A990)','');
     $values = $this->getCardTotals($dbc,$dlog,$args);
+    $totalRow = 24;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -150,6 +170,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = 0;
         $row[] = 0;
         $row[] = $values[$key];
+        $row[] = $totalRow;
         $ret[] = $row;
     }
 
@@ -157,6 +178,7 @@ private function genRowData($dbc,$dlog,$args) {
     $rowNames = array('LESS Paper GIFT CERT','LESS Staff GIFT CERT','LESS Greenfield $ GIFT CERT','BUZZ REWARDS','r CREDITS','PAYPAL','LESS STORE CHARGE','LESS PAID OUT','TOTAL Other Credits');
     $accountNumbers = array('(2500A990)','(7800G990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');
     $values = $this->getOtherTotals($dbc,$dlog,$args);
+    $totalRow = 33;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -165,6 +187,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = 0;
         $row[] = 0;
         $row[] = $values[$key];
+        $row[] = $totalRow;
         $ret[] = $row;
     }
 
@@ -172,6 +195,7 @@ private function genRowData($dbc,$dlog,$args) {
     $rowNames = array('LESS STORE COUPON','LESS CO-OP DEALS COUPONS','LESS OTHER VENDOR COUPONS','TOTAL COUPON');
     $accountNumbers = array('(4170G900)','(1210A990)','(1215A990)','');
     $values = $this->getCouponTotals($dbc,$dlog,$args);
+    $totalRow = 0;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -180,6 +204,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = 0;
         $row[] = 0;
         $row[] = $values[$key];
+        $row[] = $totalRow;
         $ret[] = $row;
     }
 
@@ -189,6 +214,7 @@ private function genRowData($dbc,$dlog,$args) {
     $total = $ret[0][2] + $ret[3][2] + $ret[11][2] - $ret[4][2] - $ret[16][2] - $ret[23][2] - $ret[32][2] -$ret[36][2];
     $deposit = $this->getDeposit($dbc,$dlog,$args);
     $values = array(0,$total,$deposit,$total-$deposit);
+    $totalRow = 0;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -197,6 +223,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = 0;
         $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
+        $row[] = $totalRow;
         $ret[] = $row;
     }
 
@@ -400,14 +427,14 @@ private function getTaxTotals($dbc,$dlog,$args) {
                 $ret = '<td id="%s %d %s %s" bgcolor="#A9A9A9"></td>';
                 break;
             case 'entry':
-                $ret = '<td><input type="text" class="form-control" value="%s" 
-                        onchange="saveValue.call(this, this.value, %d);" id="%s" name="%s"/></td">';
-                        //onchange="saveType.call(this, this.value, %d);" 
+                $ret = '<td id="%s%d" data-value="%s"><input type="text" class="form-control" value="%s" 
+                        onchange="saveValue.call(this, this.value, %d);"/></td">';
+                        // name id value value id 
                 break;
             default:
-                $ret = '<td>%s</font>
-                                <input type="hidden" name="%d" id="%s"  value="%s" />
-                                </td>';
+                $ret = '<td id="%s%d" data-value="%s">%s
+                                <input type="hidden" id="%d"/>
+                                </td>'; //name id value value
                 break;
         }
         return $ret;
@@ -426,6 +453,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'count' => 'dark',
                     'total' => '',
                     'diff' => '',
+                    'totalRow' =>'false',
                     'storeID' => 'false');
                 break;
             case 'entryRow':
@@ -438,6 +466,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'count' => 'entry',
                     'total' => 'dark',
                     'diff' => '',
+                    'totalRow' =>'false',
                     'storeID' => 'false');
                 break;
             case 'totalEnteryRow':
@@ -450,6 +479,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'count' => 'dark',
                     'total' => 'entry',
                     'diff' => '',
+                    'totalRow' =>'false',
                     'storeID' => 'false');
                 break;
             case 'blankRow':
@@ -462,6 +492,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'count' => 'dark',
                     'total' => 'dark',
                     'diff' => 'dark',
+                    'totalRow' =>'false',
                     'storeID' => '');
                 break;
             default:

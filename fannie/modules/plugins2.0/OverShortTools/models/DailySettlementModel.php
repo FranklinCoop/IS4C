@@ -36,6 +36,7 @@ class DailySettlementModel extends BasicModel {
     'count' => array('type'=>'MONEY',),
     'total' => array('type'=>'MONEY',),
     'diff' => array('type'=>'MONEY',),
+    'totalRow' => array('type'=>'INT'),
     'storeID' => array('type'=>'TINYINT'),
     );
 

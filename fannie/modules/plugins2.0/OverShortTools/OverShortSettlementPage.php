@@ -38,6 +38,7 @@ class OverShortSettlementPage extends FannieRESTfulPage
     public $themed = true;
     
     protected $model_name = 'DailySettlements';
+    protected $loadedDate = '';
 
     public function preprocess()
     {
@@ -49,6 +50,7 @@ class OverShortSettlementPage extends FannieRESTfulPage
     public function get_date_handler()
     {
         //$date = FormLib::get('date');]
+        $this->loadedDate = $this->date;
         GLOBAL $FANNIE_PLUGIN_SETTINGS;
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
         echo $this->getTable($dbc,$this->date);
@@ -68,11 +70,27 @@ class OverShortSettlementPage extends FannieRESTfulPage
         $model->id($this->id);
         $obj = $model->find();
         $amt = $obj[0]->amt();
+        $count = $obj[0]->count();
+        $totalID = $obj[0]->totalRow();
+
+        $model = new DailySettlementModel($dbc);
+        $model->id($totalID,'=');
+        $obj = $model->find();
+        $total = $obj[0]->total();
+        $posTotal = $obj[0]->amt();
+        $newTotal = $total-$count+$this->value;
+
+        $model = new DailySettlementModel($dbc);
+        $model->id($totalID);
+        $model->total($newTotal);
+        $model->diff($newTotal - $posTotal);
+        $model->save();
+
 
         $model = new DailySettlementModel($dbc);
         $model->id($this->id);
         $model->count($this->value);
-        $model->diff($amt - $this->value);
+        $model->diff($this->value - $amt);
         $saved = $model->save();
 
         if (!$saved) {
@@ -105,6 +123,11 @@ class OverShortSettlementPage extends FannieRESTfulPage
                 dataType: 'json',
                 data: 'id='+t_id+'&value='+value
             }).done(function(data){
+                var amt = $("#amt"+t_id).data("value");
+                var diff = value - amt;
+                $("#diff"+t_id).attr("data-value",diff);
+                $("#count"+t_id).attr("data-value",value);
+                $("#diff"+t_id).empty().append(diff);
                 showBootstrapPopover(elem, orig, data.msg);
             });
         }
@@ -173,20 +196,22 @@ HTML;
     }
 
     private function getTable($dbc, $date) {
+        GLOBAL $FANNIE_PLUGIN_SETTINGS;
         $store = 1;
         $ret = 'Pick a Day';
         $columnNames = array('1','2','3','4','5','6');
         $ret = '<form method="post">';
-        $ret .= '<table class="table table-bordered">';
+        $ret .= '<table id="dataTable" class="table table-bordered">';
         $ret .= sprintf('<thead>
         <tr><th colspan="5"><label class="table-label">%s</label></th></tr></thead><thead>
         <tr>',$date);
         
-
+        $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
+        $dlog = DTransactionsModel::selectDTrans($date);
 
         if($date != '') {
-            $tableData = new FCCSettlementModule($dbc,'trans_archive.bigArchive',$date,$store);
-            $model = $tableData->getTable($dbc,'trans_archive.bigArchive',$date,$store);
+            $tableData = new FCCSettlementModule($dbc,'core_trans.transarchive',$date,$store);
+            $model = $tableData->getTable($dbc,$dlog,$date,$store);
             $columnNames = $tableData->getColNames();
                     foreach ($columnNames as $name => $info) {
             $ret .= '<th>' . $info . '</th>';
@@ -194,11 +219,13 @@ HTML;
         $ret .= '</tr></thead>';
                     $ret .= '<tbody>';
         foreach ($model->find() as $obj) {
-            $pk = null;
+            $objID = $obj->id();
             $ret .= '<tr>';
             foreach ($model->getColumns() as $name => $info) {
-                    $ret .= sprintf($tableData->getCellFormat($obj->lineNo(),$name),
-                        $obj->$name(),$obj->id(),$name,$obj->$name());
+                $value = $obj->$name();
+                $ret .= sprintf($tableData->getCellFormat($obj->lineNo(),$name),
+                        $name,$objID,$value,$value,$objID);
+                    //name,ID, value, id,id, name, value
                 
             }
             $ret .= '</tr>';

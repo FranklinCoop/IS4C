@@ -83,18 +83,117 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
         $model->total($rowArr[4]);
         $model->diff($rowArr[5]);
         $model->totalRow($lastID+$rowArr[6]);
+        $model->diffShow($lastID+$rowArr[7]);
+        $model->diffWith($lastID+$rowArr[8]);
         $model->storeID($store);
         $model->save();
     }
     return $model;
 }
 
+//should return a json object.
+    public static function updateCell($dbc, $value, $cellID) {
+        $json = array('msg'=>'','secID'=>0, 'secTotal' => 0, 'secDiff'=>0, 'diff'=>0,
+                        'grandTotalID'=>0,'grandTotal'=>0,'grandDiff'=>0);
+
+
+        $model = new DailySettlementModel($dbc);
+        $model->id($cellID);
+        $obj = $model->find();
+        $amt = $obj[0]->amt();
+        $count = $obj[0]->count();
+        $totalID = $obj[0]->totalRow();
+
+        // section totals updated
+        $model = new DailySettlementModel($dbc);
+        $model->id($totalID,'=');
+        $obj = $model->find();
+        $total = $obj[0]->total();
+        $posTotal = $obj[0]->amt();
+        $newTotal = $total-$count+$value;
+        $json['secID'] = $totalID;
+        $json['secTotal'] = round($newTotal,2);
+        $json['secDiff'] = round($newTotal - $posTotal,2);
+        $grandTotalID = $obj[0]->totalRow();
+
+        $model = new DailySettlementModel($dbc);
+        $model->id($totalID);
+        $model->total($newTotal);
+        $model->diff($newTotal - $posTotal);
+        $model->save();
+
+        //uptade the footer totals.
+        $model = new DailySettlementModel($dbc);
+        $model->totalRow($grandTotalID,'=');
+        $newGrandTotal = 0;
+        foreach ($model->find() as $obj) { 
+            switch ($obj->lineNo()) {
+                case '0':
+                case '3':
+                case '11':
+                    $newGrandTotal += $obj->total();
+                    break;
+                case '4':
+                    break; //do nothing;
+                default:
+                    $newGrandTotal -= $obj->total();
+                    break;
+            }
+        }
+
+
+        $model = new DailySettlementModel($dbc);
+        $model->id($grandTotalID,'=');
+        $objs = $model->find();
+        $obj = $objs[0];
+        $diffWithID = $obj->diffWith();
+        $diffID = $obj->diffShow();
+
+        $model = new DailySettlementModel($dbc);
+        $model->id($diffWithID,'=');
+        $objs = $model->find();
+        $obj = $objs[0];
+        $grandDiff = $obj->total() - $newGrandTotal;
+
+        $model = new DailySettlementModel($dbc);
+        $model->id($grandTotalID);
+        $model->total($newGrandTotal);
+        $model->diff($grandDiff);
+        $model->save();
+
+        $model = new DailySettlementModel($dbc);
+        $model->id($diffID);
+        $model->total($grandDiff);
+        $model->save();
+
+
+        
+
+        $json['grandTotalID'] = $grandTotalID;
+        $json['grandTotal'] = round($newGrandTotal,2);
+        $json['diffID'] = $diffID;
+        $json['grandDiff'] = round($grandDiff,2);
+
+        //update line item.
+        $model = new DailySettlementModel($dbc);
+        $model->id($cellID);
+        $model->count($value);
+        $model->diff($value - $amt);
+        $saved = $model->save();
+        $json['diff'] = round($value-$amt,2);
+
+        if (!$saved) {
+            $json['msg'] = 'Error saving count';
+        }
+        return $json;
+    }
+
 private function genRowData($dbc,$dlog,$args) {
     $ret = array();
     $row = array();
     //Sales Totals
     $value = $this->getSalesTotals($dbc,$dlog,$args);
-    $totalRow = 1;
+    $totalRow = 39;
     $row[] = 'SALES TOTALS';
     $row[] = '';
     $row[] = $value;
@@ -102,6 +201,8 @@ private function genRowData($dbc,$dlog,$args) {
     $row[] = $value;
     $row[] = 0;
     $row[] = $totalRow;
+    $row[] = 0;
+    $row[] = 0;
     $ret[] = $row;
     //Tax Section
     $rowNames = array('PLUS SALES TAX Collected','PLUS SALES TAX Collected','TOTAL TAX');
@@ -116,7 +217,9 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
-        $row[] = $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
+        $row[] = 0;
+        $row[] = 0;
         $ret[] = $row;
     }
 
@@ -133,9 +236,11 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $accountNumbers[$key];
         $row[] = $values[$key];
         $row[] = $values[$key];
-        $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
+        $row[] = ($key == sizeof($values) -1 || $key==0) ? $values[$key] : 0;
         $row[] = 0;
-        $row[] = $totalRow;
+        $row[] = ($key == sizeof($values) -1 || $key==0) ? 39 : $totalRow;
+        $row[] = 0;
+        $row[] = 0;
         $ret[] = $row;
     }
 
@@ -152,7 +257,9 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
-        $row[] = $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
+        $row[] = 0;
+        $row[] = 0;
         $ret[] = $row;
     }
 
@@ -169,8 +276,10 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = 0;
         $row[] = 0;
-        $row[] = $values[$key];
-        $row[] = $totalRow;
+        $row[] = -$values[$key];
+        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
+        $row[] = 0;
+        $row[] = 0;
         $ret[] = $row;
     }
 
@@ -186,8 +295,10 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = 0;
         $row[] = 0;
-        $row[] = $values[$key];
-        $row[] = $totalRow;
+        $row[] = -$values[$key];
+        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
+        $row[] = 0;
+        $row[] = 0;
         $ret[] = $row;
     }
 
@@ -195,7 +306,7 @@ private function genRowData($dbc,$dlog,$args) {
     $rowNames = array('LESS STORE COUPON','LESS CO-OP DEALS COUPONS','LESS OTHER VENDOR COUPONS','TOTAL COUPON');
     $accountNumbers = array('(4170G900)','(1210A990)','(1215A990)','');
     $values = $this->getCouponTotals($dbc,$dlog,$args);
-    $totalRow = 0;
+    $totalRow = 37;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -203,21 +314,26 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = 0;
         $row[] = 0;
-        $row[] = $values[$key];
-        $row[] = $totalRow;
+        $row[] = -$values[$key];
+        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
+        $row[] = 0;
+        $row[] = 0;
         $ret[] = $row;
     }
 
     //Total & overshort section
     $rowNames = array('','TOTAL','BANK DEPOSIT','OVER / SHORT');
     $accountNumbers = array('','','','(419G900)');
-    $total = $ret[0][2] + $ret[3][2] + $ret[11][2] - $ret[4][2] - $ret[16][2] - $ret[23][2] - $ret[32][2] -$ret[36][2];
+    $total = $ret[0][2] + $ret[3][2] + $ret[11][2] - $ret[16][2] - $ret[23][2] - $ret[32][2] - $ret[36][2];
+    $ctTotal = $ret[0][4] + $ret[3][4] + $ret[11][4] - $ret[16][4] - $ret[23][4] - $ret[32][4] - $ret[36][4];
     $deposit = $this->getDeposit($dbc,$dlog,$args);
     $rowBlank = array(0,0,0,0);
-    $rowTotal = array($total,$total,$total,0);
+    $rowTotal = array($total,$ctTotal,$ctTotal,0);
     $rowDepost = array($deposit[0],$deposit[1],$deposit[1],0);
-    $rowOS = array($deposit[0] - $total,0,$deposit[1] - $total,0);
+    $rowOS = array($deposit[0] - $total,0,$deposit[1] - $ctTotal,0);
     $values = array($rowBlank,$rowTotal,$rowDepost,$rowOS);
+    $diffShows = array(0,41,41,0);
+    $diffWiths = array(0,40,39,0);
     $totalRow = 0;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
@@ -227,7 +343,9 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key][1]; // count
         $row[] = $values[$key][2]; //total
         $row[] = 0;
-        $row[] = $totalRow;
+        $row[] = $totalRow[$key];
+        $row[] = $diffShows[$key];
+        $row[] = $diffWiths[$key];
         $ret[] = $row;
     }
 
@@ -279,7 +397,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
         for ($key=0;$key<$dbc->numFields($result);$key++) {
             $return[] = $row[$key];
         }
-        $return[] = array_sum($return);
+        $return[] = array_sum($return)-$return[0];
         return $return;
     }
 
@@ -367,11 +485,6 @@ private function getTaxTotals($dbc,$dlog,$args) {
         $result = $dbc->execute($query,$args);
         $row = $dbc->fetch_row($result);
         
-        
-        $return = array();
-        for ($key=0;$key<$dbc->numFields($result);$key++) {
-            $return[] = $row[$key];
-        }
 
         $amexQ = $dbc->prepare("SELECT 
             sum(case when p.`issuer` = 'AMEX' and trans_subtype='CC' then p.amount else 0 end) as AMEX
@@ -384,11 +497,18 @@ private function getTaxTotals($dbc,$dlog,$args) {
 
         $amexR = $dbc->execute($amexQ, $args);
         $amexW = $dbc->fetch_row($amexR);
-
-        if($amexW[0]) {
-            $return[0] -= $amexW[0];
-            $return[1] = $amexW[0];
+        $amexTotal = ($amexW) ? $amexW[0] : 0 ;
+        
+        $return = array();
+        for ($key=0;$key<$dbc->numFields($result);$key++) {
+            if ($key == 0)
+                $return[] = $row[$key] - $amexTotal;
+            elseif ($key == 1)
+                $return[] = $amexTotal;
+            else
+                $return[] = $row[$key];
         }
+
         $return[] = array_sum($return);
         return $return;
     }
@@ -433,19 +553,22 @@ private function getTaxTotals($dbc,$dlog,$args) {
     }
 
     private function getDeposit($dbc,$dlog,$args) {
+        $return = array();
         $posQ = $dbc->prepare("SELECT -sum(case when t.trans_subtype IN ('CA','CK') then t.total else 0 end) as depositTotal
             FROM {$dlog} t
             WHERE t.`datetime` between ? and ? and t.store_id =? AND trans_status != 'X'");
         $posR = $dbc->execute($posQ,$args);
         $posW = $dbc->fetch_row($posR);
+        $return[] = $posW[0];
 
         $qDate = new DateTime($args[0]);
-        $countQ = $dbc->prepare("SELECT SUM(amt) AS deposit
+        $countQ = $dbc->prepare("SELECT SUM(amt)-250*COUNT(*)/2 AS deposit
                                 FROM dailyCounts 
                                 WHERE `date` = ? AND storeID = ? AND tender_type in ('CA','CK') 
                                 GROUP BY `date`");
         $countR = $dbc->execute($countQ,array($qDate->format('Y-m-d'), $args[2]));
         $countW = $dbc->fetch_row($countR);
+        $return[] = $countW[0];
 
         
         $return = array($posW[0],$countW[0]);
@@ -460,16 +583,26 @@ private function getTaxTotals($dbc,$dlog,$args) {
             case 'false':      
                 break;
             case 'dark':
-                $ret = '<td id="%s %d %s %s" bgcolor="#A9A9A9"></td>';
+                $ret = '<td id="{$name}{$objID}" bgcolor="#A9A9A9"></td>';
                 break;
             case 'entry':
-                $ret = '<td id="%s%d" data-value="%s"><input type="text" class="form-control" value="%s" 
-                        onchange="saveValue.call(this, this.value, %d);"/></td">';
+                $ret = '<td id="{$name}{$objID}" data-value={$value} data-totalid="{$totalID}"><input type="number" class="form-control" value="{$value}" 
+                        onchange="saveValue.call(this, this.value, {$objID});"/></td">';
+                        // name id value value id 
+                break;
+            case 'total':
+                $ret = '<td id="{$name}{$objID}" data-value={$value} data-totalid="total39">{$value}
+                                <input type="hidden"/>
+                                </td>'; //name id value value
+                break;
+            case 'totalEntry':
+                $ret = '<td id="{$name}{$objID}" data-value={$value}><input type="number" class="form-control" value="{$value}" 
+                        onchange="saveValue.call(this, this.value, {$objID});"/></td">';
                         // name id value value id 
                 break;
             default:
-                $ret = '<td id="%s%d" data-value="%s">%s
-                                <input type="hidden" id="%d"/>
+                $ret = '<td id="{$name}{$objID}" data-value={$value}>{$value}
+                                <input type="hidden"/>
                                 </td>'; //name id value value
                 break;
         }
@@ -487,9 +620,11 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'acctNo' => 'dark',
                     'amt' => '',
                     'count' => 'dark',
-                    'total' => '',
+                    'total' => 'total',
                     'diff' => '',
                     'totalRow' =>'false',
+                    'diffShow' => 'false',
+                    'diffWith' => 'false',
                     'storeID' => 'false');
                 break;
             case 'entryRow':
@@ -503,6 +638,8 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'total' => 'dark',
                     'diff' => '',
                     'totalRow' =>'false',
+                    'diffShow' => 'false',
+                    'diffWith' => 'false',
                     'storeID' => 'false');
                 break;
             case 'totalEnteryRow':
@@ -513,9 +650,11 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'acctNo' => 'dark',
                     'amt' => '',
                     'count' => 'dark',
-                    'total' => 'entry',
+                    'total' => 'totalEntry',
                     'diff' => '',
                     'totalRow' =>'false',
+                    'diffShow' => 'false',
+                    'diffWith' => 'false',
                     'storeID' => 'false');
                 break;
             case 'blankRow':
@@ -529,7 +668,9 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'total' => 'dark',
                     'diff' => 'dark',
                     'totalRow' =>'false',
-                    'storeID' => '');
+                    'diffShow' => 'false',
+                    'diffWith' => 'false',
+                    'storeID' => 'false');
                 break;
             default:
                 # code...

@@ -37,6 +37,8 @@ class DailySettlementModel extends BasicModel {
     'total' => array('type'=>'MONEY',),
     'diff' => array('type'=>'MONEY',),
     'totalRow' => array('type'=>'INT'),
+    'diffShow' => array('type'=>'INT'), // the location to display diff
+    'diffWith' => array('type'=>'VARCHAR(30'), // the cell to diff with.
     'storeID' => array('type'=>'TINYINT'),
     );
 

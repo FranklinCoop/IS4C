@@ -38,66 +38,35 @@ class OverShortSettlementPage extends FannieRESTfulPage
     public $themed = true;
     
     protected $model_name = 'DailySettlements';
-    protected $loadedDate = '';
+    protected static $tableData;
+    protected static $loadedDate = '';
 
     public function preprocess()
     {
-        $this->__routes[] = 'get<date>';
+        $this->__routes[] = 'post<date><store>';
         $this->__routes[] = 'post<id><value>';
         return parent::preprocess();
     }
 
-    public function get_date_handler()
+    public function post_date_store_handler()
     {
         //$date = FormLib::get('date');]
-        $this->loadedDate = $this->date;
         GLOBAL $FANNIE_PLUGIN_SETTINGS;
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
-        echo $this->getTable($dbc,$this->date);
+        echo $this->getTable($dbc,$this->date,$this->store);
 
         return false;
 
    }
 
+
     public function post_id_value_handler()
     {
         GLOBAL $FANNIE_PLUGIN_SETTINGS;
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
-        $json = array('msg'=>'');
+        $json = FCCSettlementModule::updateCell($dbc,$this->value,$this->id);
 
-
-        $model = new DailySettlementModel($dbc);
-        $model->id($this->id);
-        $obj = $model->find();
-        $amt = $obj[0]->amt();
-        $count = $obj[0]->count();
-        $totalID = $obj[0]->totalRow();
-
-        $model = new DailySettlementModel($dbc);
-        $model->id($totalID,'=');
-        $obj = $model->find();
-        $total = $obj[0]->total();
-        $posTotal = $obj[0]->amt();
-        $newTotal = $total-$count+$this->value;
-
-        $model = new DailySettlementModel($dbc);
-        $model->id($totalID);
-        $model->total($newTotal);
-        $model->diff($newTotal - $posTotal);
-        $model->save();
-
-
-        $model = new DailySettlementModel($dbc);
-        $model->id($this->id);
-        $model->count($this->value);
-        $model->diff($this->value - $amt);
-        $saved = $model->save();
-
-        if (!$saved) {
-            $json['msg'] = 'Error saving count';
-        }
         echo json_encode($json);
-
         return false;
     }
 
@@ -123,20 +92,55 @@ class OverShortSettlementPage extends FannieRESTfulPage
                 dataType: 'json',
                 data: 'id='+t_id+'&value='+value
             }).done(function(data){
-                var amt = $("#amt"+t_id).data("value");
-                var diff = value - amt;
-                $("#diff"+t_id).attr("data-value",diff);
+                var secID = data.secID;
+                var grandID = data.grandTotalID;
+                var diffID = data.diffID;
+                var secTotal = data.secTotal;
+
+                $("#diff"+t_id).attr("data-value",data.diff);
                 $("#count"+t_id).attr("data-value",value);
-                $("#diff"+t_id).empty().append(diff);
+                $("#diff"+t_id).empty().append(data.diff);
+
+                $("#total"+secID).attr("data-value",data.secTotal);
+                $("#diff"+secID).attr("data-value",data.secDiff);
+                $("#total"+diffID).attr("data-value",data.grandDiff);
+                $("#total"+secID).empty().append(data.secTotal);
+                $("#diff"+secID).empty().append(data.secDiff);
+                $("#total"+diffID).empty().append(data.grandDiff);
+
+                
+                $("#total"+grandID).attr("data-value",data.grandTotal);
+                $("#total"+grandID).empty().append(data.grandTotal);
+
+
                 showBootstrapPopover(elem, orig, data.msg);
             });
         }
 
-        function selectDay() {
-            var data = 'date='+$('#date').val();
+        function setdate()
+        {
+            var dataStr = $('#osForm').serialize();
+            dataStr += '&action=date';
+            $('#date').val('');
+            $('#forms').html('');
+            $('#loading-bar').show();
             $.ajax({
                 url: 'OverShortSettlementPage.php',
-                type: 'get',
+                data: dataStr,
+            success: function(data){
+                $('#loading-bar').hide();
+                $('#forms').html(data);
+            }
+            });
+        }
+
+        function selectDay() {
+            var setdate = $('#date').val();
+            var store = $('#storeID').val();
+            var data = 'date='+setdate+'&store='+store;
+            $.ajax({
+                url: 'OverShortSettlementPage.php',
+                type: 'post',
                 data: data
             }).done(function(resp) {
                 $('#displayarea').html(resp);
@@ -153,51 +157,51 @@ class OverShortSettlementPage extends FannieRESTfulPage
 
 
         $inputArea = $this->getInputHeader($dbc);
-        $table = $this->getTable($dbc,'');
-        $this->addScript('../../src/javascript/tablesorter/jquery.tablesorter.min.js');
-        $this->addCssFile('index.css');
-        $this->addOnloadCommand("\$('.tablesorter').tablesorter();");
+        $table = $this->getTable($dbc,'',1);
 
-        return <<<HTML
+        ob_start();
+        ?>
         <div id="inputarea">
-            {$inputArea}
+            <?php echo $inputArea; ?>
+        </div>
+        <div id="loading-bar" class="collapse">
+            <?php echo \COREPOS\Fannie\API\lib\FannieUI::loadingBar(); ?>
         </div>
         <div id="displayarea">
-            {$table}
+            <?php echo $table; ?>
         </div>
-
-HTML;
+        <?php
+        return ob_get_clean();
 
     }
 
     private function getInputHeader($dbc) {
         $dbc->selectDB($this->config->get('OP_DB'));
         $storePicker = FormLib::storePicker('store',false); 
+        $storeSelect = str_replace('<select ', '<select id="storeID"', $storePicker['html']);
 
 
         $ret = '';
+        $ret = '<form style="margin-top:1.0em;"" id="osForm" onsubmit="selectDay(); return false;">';
         if (FormLib::get('flash') !== '') {
             $ret .= '<div class="alert alert-info hidden-print">' . FormLib::get('flash') . '</div>';
         }
-        $ret .= '<form method="get">';
         $ret .= '<div class="form-inline hidden-print">';
-        $ret .= '<div class="form-row">';
+        $ret .=  '<label>Date</label>';
+        $ret .= '<input class="form-control date-field" type=text id="date" name="date" />';
+        $ret .=  '<label>Store</label>';
+        $ret .= $storeSelect;
         
-        $ret .= '<input class="form-control date-field" type=text id=date name=arg />';
-        $ret .= $storePicker['html'];
-
-        $ret .= '<input type="hidden" name="_method" value="get" />';
-        $ret .= '<button type="button" onclick="selectDay();" class="btn btn-default">Set</button>';
+        $ret .= '<input type="hidden" name="_method" value="put" />';
+        $ret .= '<button type="submit" class="btn btn-default">Set</button>';
         $ret .= '</div></div>';
-        $ret .= '</form>';
 
         $ret .= '<hr />';
         return $ret;
     }
 
-    private function getTable($dbc, $date) {
+    private function getTable($dbc, $date,$store) {
         GLOBAL $FANNIE_PLUGIN_SETTINGS;
-        $store = 1;
         $ret = 'Pick a Day';
         $columnNames = array('1','2','3','4','5','6');
         $ret = '<form method="post">';
@@ -220,11 +224,16 @@ HTML;
                     $ret .= '<tbody>';
         foreach ($model->find() as $obj) {
             $objID = $obj->id();
+            $totalID = $obj->totalRow();
             $ret .= '<tr>';
             foreach ($model->getColumns() as $name => $info) {
                 $value = $obj->$name();
-                $ret .= sprintf($tableData->getCellFormat($obj->lineNo(),$name),
-                        $name,$objID,$value,$value,$objID);
+                $str = $tableData->getCellFormat($obj->lineNo(),$name);
+                $str = str_replace('{$value}', $value, $str);
+                $str = str_replace('{$totalID}', $totalID, $str);
+                $str = str_replace('{$objID}', $objID, $str);
+                $str = str_replace('{$name}', $name, $str);
+                $ret .= $str;
                     //name,ID, value, id,id, name, value
                 
             }
@@ -233,7 +242,7 @@ HTML;
 
         $ret .= '</tbody>';
         }
-
+        $ret .= '</form>';
 
 
 

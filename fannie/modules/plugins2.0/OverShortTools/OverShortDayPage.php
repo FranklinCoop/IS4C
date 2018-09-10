@@ -197,8 +197,8 @@ class OverShortDayPage extends FanniePage
                 $tender_info[$w['trans_subtype']]['perEmp'][$w[1]] = $w['total'];
             }
 
-            $noteP = $dbc->prepare('SELECT note FROM dailyNotes WHERE emp_no=? AND date=? AND storeID=?');
-            $scaP = $dbc->prepare('SELECT amt FROM dailyCounts WHERE date=? AND emp_no=? AND storeID=?
+            $noteP = $dbc->prepare('SELECT note FROM dailyNotes WHERE emp_no=? AND `date`=? AND storeID=?');
+            $scaP = $dbc->prepare('SELECT amt FROM dailyCounts WHERE `date`=? AND emp_no=? AND storeID=?
                             AND tender_type=\'SCA\'');
             $countP = $dbc->prepare("select amt from dailyCounts where date=? and emp_no=? and tender_type=? AND storeID=?");
 
@@ -208,7 +208,7 @@ class OverShortDayPage extends FanniePage
                 $perCashierCountTotal = 0;
                 $perCashierOSTotal = 0;
 
-                $noteR = $dbc->execute($noteP, array($emp_no, $date, $store));
+                $noteR = $dbc->execute($noteP, array($date, $emp_no, $store));
                 $noteW = $dbc->fetchRow($noteR);
                 $note = stripslashes($noteW[0]);
 

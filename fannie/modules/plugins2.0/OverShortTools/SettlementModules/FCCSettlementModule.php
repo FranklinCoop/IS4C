@@ -29,7 +29,19 @@ if (!class_exists('FannieAPI')) {
 class FCCSettlementModule extends SettlementModule {
     protected $numCols = 6;
     protected $colNames = array('Market Daily Settlement','(Account Number)','(POS)','(count)','(Totals)','(Diff)');
-    protected $colPrint = array(true,true,false,true,true,false);
+    public $colPrint = array('id'=>'false',
+                    'date' => false,
+                    'lineNo' => false,
+                    'lineName'=> true,
+                    'acctNo' => true,
+                    'amt' => false,
+                    'count' => true,
+                    'total' => true,
+                    'diff' => false,
+                    'totalRow' =>false,
+                    'diffShow' => false,
+                    'diffWith' => false,
+                    'storeID' => false);
     protected $numRows = 40;
     protected $rowData;
     protected $cellFormats = array();
@@ -59,6 +71,18 @@ class FCCSettlementModule extends SettlementModule {
         $model->storeID($store,'=');
         return $model;
     }
+
+    public function getColNames() {
+        $hiddenPrint = array('(POS)','(Diff)');
+        $return = '';
+        foreach ($this->colNames as $key => $name) {
+            if (in_array($name, $hiddenPrint))
+                $return .= '<th class="hidden-print">' . $name . '</th>';
+            else
+               $return .= '<th>' . $name . '</th>'; 
+        }
+        return $return;
+    }  
 
 
 private function populateAccountTable($dbc,$dlog,$store,$date){
@@ -90,6 +114,51 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
     }
     return $model;
 }
+
+    public static function updateTotalCell($dbc, $value, $cellID) {
+        $json = array('msg'=>'','secID'=>0, 'secTotal' => 0, 'secDiff'=>0, 'diff'=>0,
+                        'grandTotalID'=>0,'grandTotal'=>0,'grandDiff'=>0);
+        $model = new DailySettlementModel($dbc);
+        $model->id($cellID);
+        $obj = $model->find();
+        $amt = $obj[0]->amt();
+        $count = $obj[0]->count();
+        $diffWithID = $obj[0]->diffWith();
+        $diffShowID = $obj[0]->diffShow();
+        $secDiff = $value - $obj[0]->amt();
+
+
+        $model->total($value);
+        $model->save();
+
+        $model = new DailySettlementModel($dbc);
+        $model->id($diffWithID);
+        $objs = $model->find();
+        $obj = $objs[0];
+        $overshort = $value - $obj->total();
+
+        $model = new DailySettlementModel($dbc);
+        $model->id($diffShowID);
+        $model->total($overshort);
+
+        $model->save();
+
+        $json['secID'] = $cellID;
+        $json['secTotal'] = round($value,2);
+        $json['secDiff'] = round($secDiff,2);
+
+        $json['grandTotalID'] = $diffShowID;
+        $json['grandTotal'] = round($overshort,2);
+
+        //update line item.
+        $model = new DailySettlementModel($dbc);
+        $model->id($cellID);
+        $model->count($value);
+        $model->diff($value - $amt);
+        $saved = $model->save();
+
+        return $json;
+    }
 
 //should return a json object.
     public static function updateCell($dbc, $value, $cellID) {
@@ -343,7 +412,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key][1]; // count
         $row[] = $values[$key][2]; //total
         $row[] = 0;
-        $row[] = $totalRow[$key];
+        $row[] = $totalRow;
         $row[] = $diffShows[$key];
         $row[] = $diffWiths[$key];
         $ret[] = $row;
@@ -354,7 +423,7 @@ private function genRowData($dbc,$dlog,$args) {
 
 private function getSalesTotals($dbc,$dlog,$args) {
     $query = $dbc->prepare("SELECT 
-        sum(case when department!=0 and trans_type !='T' and department NOT IN (992,990,994,995,902) and upc!='0000000001930' AND trans_status != 'X' then total else 0 end) as dept_sales_total
+        sum(case when department!=0 and trans_type !='T' and department NOT IN (992,990,994,995,902,924) and upc NOT IN (1930,6901,6900) AND trans_status != 'X' then total else 0 end) as dept_sales_total
         FROM {$dlog}
         WHERE `datetime` BETWEEN ? AND ? AND store_id=?");
     $result = $dbc->execute($query,$args);
@@ -562,10 +631,10 @@ private function getTaxTotals($dbc,$dlog,$args) {
         $return[] = $posW[0];
 
         $qDate = new DateTime($args[0]);
-        $countQ = $dbc->prepare("SELECT SUM(amt)-250*COUNT(*)/2 AS deposit
+        $countQ = $dbc->prepare("SELECT SUM(case when tender_type='CA' then amt - 250.00
+                                            when tender_type='CK' then amt else 0 end)
                                 FROM dailyCounts 
-                                WHERE `date` = ? AND storeID = ? AND tender_type in ('CA','CK') 
-                                GROUP BY `date`");
+                                WHERE `date` = ? AND storeID = ? AND tender_type in ('CA','CK')");
         $countR = $dbc->execute($countQ,array($qDate->format('Y-m-d'), $args[2]));
         $countW = $dbc->fetch_row($countR);
         $return[] = $countW[0];
@@ -579,11 +648,12 @@ private function getTaxTotals($dbc,$dlog,$args) {
         $rowNo = $this->cellFormats[$lineNo];
         $formatType = $this->rowFormayTypes($rowNo);
         $ret ='';
+        $hiddenPrint = ($this->colPrint[$name]) ? '' : 'class="hidden-print"';
         switch ($formatType[$name]) {
             case 'false':      
                 break;
             case 'dark':
-                $ret = '<td id="{$name}{$objID}" bgcolor="#A9A9A9"></td>';
+                $ret = '<td '.$hiddenPrint.'id="{$name}{$objID}" bgcolor="#A9A9A9"></td>';
                 break;
             case 'entry':
                 $ret = '<td id="{$name}{$objID}" data-value={$value} data-totalid="{$totalID}"><input type="number" class="form-control" value="{$value}" 
@@ -597,11 +667,11 @@ private function getTaxTotals($dbc,$dlog,$args) {
                 break;
             case 'totalEntry':
                 $ret = '<td id="{$name}{$objID}" data-value={$value}><input type="number" class="form-control" value="{$value}" 
-                        onchange="saveValue.call(this, this.value, {$objID});"/></td">';
+                        onchange="saveTotal.call(this, this.value, {$objID});"/></td">';
                         // name id value value id 
                 break;
             default:
-                $ret = '<td id="{$name}{$objID}" data-value={$value}>{$value}
+                $ret = '<td '.$hiddenPrint.' id="{$name}{$objID}" data-value={$value}>{$value}
                                 <input type="hidden"/>
                                 </td>'; //name id value value
                 break;

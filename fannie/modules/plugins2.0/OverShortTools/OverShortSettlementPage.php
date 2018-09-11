@@ -45,6 +45,7 @@ class OverShortSettlementPage extends FannieRESTfulPage
     {
         $this->__routes[] = 'post<date><store>';
         $this->__routes[] = 'post<id><value>';
+        $this->__routes[] = 'post<id><total>';
         return parent::preprocess();
     }
 
@@ -70,6 +71,16 @@ class OverShortSettlementPage extends FannieRESTfulPage
         return false;
     }
 
+    public function post_id_total_handler()
+    {
+        GLOBAL $FANNIE_PLUGIN_SETTINGS;
+        $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
+        $json = FCCSettlementModule::updateTotalCell($dbc,$this->total,$this->id);
+
+        echo json_encode($json);
+        return false;
+    }
+
 
 
     function javascript_content()
@@ -82,6 +93,37 @@ class OverShortSettlementPage extends FannieRESTfulPage
             name: "",
             date: "",
         };
+
+        function saveTotal(value,t_id) {
+            var elem = $(this);
+            var orig = this.defaultValue;
+            $.ajax({url:'OverShortSettlementPage.php',
+                cache: false,
+                type: 'post',
+                dataType: 'json',
+                data: 'id='+t_id+'&total='+value
+            }).done(function(data){
+                var secID = data.secID;
+                var grandID = data.grandTotalID;
+                var diffID = data.diffID;
+                var secTotal = data.secTotal;
+
+                $("#diff"+t_id).attr("data-value",data.diff);
+                $("#count"+t_id).attr("data-value",value);
+                $("#diff"+t_id).empty().append(data.diff);
+
+                $("#total"+secID).attr("data-value",data.secTotal);
+                $("#diff"+secID).attr("data-value",data.secDiff);
+                $("#diff"+secID).empty().append(data.secDiff);
+
+                
+                $("#total"+grandID).attr("data-value",data.grandTotal);
+                $("#total"+grandID).empty().append(data.grandTotal);
+
+
+                showBootstrapPopover(elem, orig, data.msg);
+            });
+        }
 
         function saveValue(value,t_id){
             var elem = $(this);
@@ -216,12 +258,10 @@ class OverShortSettlementPage extends FannieRESTfulPage
         if($date != '') {
             $tableData = new FCCSettlementModule($dbc,'core_trans.transarchive',$date,$store);
             $model = $tableData->getTable($dbc,$dlog,$date,$store);
-            $columnNames = $tableData->getColNames();
-                    foreach ($columnNames as $name => $info) {
-            $ret .= '<th>' . $info . '</th>';
-        }
+            $ret .= $tableData->getColNames();
+        
         $ret .= '</tr></thead>';
-                    $ret .= '<tbody>';
+        $ret .= '<tbody>';
         foreach ($model->find() as $obj) {
             $objID = $obj->id();
             $totalID = $obj->totalRow();

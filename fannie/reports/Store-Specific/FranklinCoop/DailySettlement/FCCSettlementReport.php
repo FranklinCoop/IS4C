@@ -65,14 +65,14 @@ class FCCSettlementReport extends FannieReportPage
 		sum(case when upc='TAXLINEITEM' and numflag =1  then regPrice else 0 end) as sales_tax_total,
 		sum(case when upc='TAXLINEITEM' and numflag =2 then regPrice else 0 end) as meals_tax_total
 		FROM ".$dlog."
-		WHERE `datetime` BETWEEN ? AND ? AND store_id=2;
+		WHERE `datetime` BETWEEN ? AND ? AND store_id=2 and trans_status !='X';
 		";
 
 
 		$total_sales = '';
 
 		$total_sales = "SELECT 
-		sum(case when department!=0 and trans_type !='T' and department NOT IN (992,990,994,995,902) and upc!='0000000001930' then total else 0 end) as dept_sales_total,
+		sum(case when department!=0 and trans_type !='T' and department NOT IN (992,990,994,995,902,964) and upc!='0000000001930' then total else 0 end) as dept_sales_total,
 		'ERR' as sales_tax_total,
 		'ERR' as meals_tax_total,
 		sum(case when department='992' then total else 0 end) as member_payment_total,
@@ -94,7 +94,7 @@ class FCCSettlementReport extends FannieReportPage
 		sum(case when trans_subtype='IC' AND trans_type ='T' then -total else 0 end) as store_coupon_total,
 		sum(case when trans_subtype='CP' OR trans_subtype='MC' AND trans_type ='T' then -total else 0 end) as mfg_coupon_total
 		FROM ".$dlog."
-		WHERE `datetime` BETWEEN ? AND ? AND store_id=2;";
+		WHERE `datetime` BETWEEN ? AND ? AND store_id=2 and trans_status !='X'";
 
 		$prep = $dbc->prepare($total_sales);
 		$result = $dbc->execute($prep,$dates);
@@ -153,7 +153,7 @@ class FCCSettlementReport extends FannieReportPage
     			else 0 end) as seinorDisc,
 			sum(case when upc='DISCOUNT' then -unitPrice else 0 end) as total_disc
 			FROM ".$dlog."
-			WHERE `datetime` BETWEEN ? AND ? AND store_id=2;");
+			WHERE `datetime` BETWEEN ? AND ? AND store_id=2 and trans_status !='X'");
 		$discR = $dbc->execute($discQ, $args);
 		
 		$return = array();

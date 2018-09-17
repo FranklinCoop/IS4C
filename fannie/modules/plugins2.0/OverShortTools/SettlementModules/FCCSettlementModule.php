@@ -29,8 +29,9 @@ if (!class_exists('FannieAPI')) {
 class FCCSettlementModule extends SettlementModule {
     protected $numCols = 6;
     protected $colNames = array('Market Daily Settlement','(Account Number)','(POS)','(count)','(Totals)','(Diff)');
-    public $colPrint = array('id'=>'false',
+    protected static $colPrint = array('id'=>'false',
                     'date' => false,
+                    'storeID' => false,
                     'lineNo' => false,
                     'lineName'=> true,
                     'acctNo' => true,
@@ -41,7 +42,7 @@ class FCCSettlementModule extends SettlementModule {
                     'totalRow' =>false,
                     'diffShow' => false,
                     'diffWith' => false,
-                    'storeID' => false);
+                    'reportOrder' => false);
     protected $numRows = 40;
     protected $rowData;
     protected $cellFormats = array();
@@ -58,6 +59,10 @@ class FCCSettlementModule extends SettlementModule {
             $model->date($date,'=');
             $model->storeID($store,'=');
             
+            $noteModel = new DailySettlementNotesModel($dbc);
+            $noteModel->date($date);
+            $noteModel->storeID($store);
+            $noteModel->save();
         } else {
 
         }
@@ -272,10 +277,12 @@ private function genRowData($dbc,$dlog,$args) {
     $row[] = $totalRow;
     $row[] = 0;
     $row[] = 0;
+    $row[] = 0;
     $ret[] = $row;
     //Tax Section
     $rowNames = array('PLUS SALES TAX Collected','PLUS SALES TAX Collected','TOTAL TAX');
     $accountNumbers = array('(2450A990)','(2400M990)','');
+    $reportOrder = array(1,2,3);
     $values = $this->getTaxTotals($dbc,$dlog,$args);
     $totalRow = 4;
     for ($key=0;$key<sizeof($values);$key++){
@@ -289,6 +296,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
+        $row[] = $reportOrder[$key];
         $ret[] = $row;
     }
 
@@ -297,6 +305,7 @@ private function genRowData($dbc,$dlog,$args) {
     $rowNames = array('TRASH STICKER SALES','PLUS GIFT CARD Sold','PLUS MEMBER EQUITY Payment','PLUS CHARGE Payment',
                       'PAYPAL TIPS','DELIVERY FEE','PLUS R/A OTHER (PAID-IN)','TOTAL R/A');
     $accountNumbers = array('(4060G900)','(2500A990)','(2800A990)','aditional entry','(5255G500)','(5255G500)','aditional entry','');
+    $reportOrder = array(4,5,6,7,8,9,10,11);
     $values = $this->getRATotals($dbc,$dlog,$args);
     $totalRow = 12;
     for ($key=0;$key<sizeof($values);$key++){
@@ -310,12 +319,14 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = ($key == sizeof($values) -1 || $key==0) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
+        $row[] = $reportOrder[$key];
         $ret[] = $row;
     }
 
     //Discount Section
     $rowNames = array('LESS Working Discount','LESS Staff Discount','LESS Senior Discount','LESS Food for All Discount','TOTAL DISCOUNTS');
     $accountNumbers = array('(4160G900)','(4150G900)','(4130G900)','(4110G900)','');
+    $reportOrder = array(12,13,14,15,16);
     $values = $this->getDiscountTotals($dbc,$dlog,$args);
     $totalRow = 17;
     for ($key=0;$key<sizeof($values);$key++){
@@ -329,13 +340,15 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
+        $row[] = $reportOrder[$key];
         $ret[] = $row;
     }
 
     //Card Media Section
-    $rowNames = array('VISA/MASTER/DISCOVER','LESS AMEX','LESS DEBIT','LESS SNAP / EBT: Food',
-                      'LESS SNAP / EBT: Cash','LESS GIFT CARD Redeemed','TOTAL CARD MEDIA');
+    $rowNames = array('LESS AMEX','LESS DEBIT','LESS SNAP / EBT: Cash','LESS SNAP / EBT: Food',
+                      'VISA/MASTER/DISCOVER','LESS GIFT CARD Redeemed','TOTAL CARD MEDIA');
     $accountNumbers = array('(1025A990)','(1025A990)','(1025A990)','(1025A990)','(1025A990)','(2500A990)','');
+    $reportOrder = array(17,18,19,20,21,22,23);
     $values = $this->getCardTotals($dbc,$dlog,$args);
     $totalRow = 24;
     for ($key=0;$key<sizeof($values);$key++){
@@ -349,12 +362,14 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
+        $row[] = $reportOrder[$key];
         $ret[] = $row;
     }
 
     // other tenders
     $rowNames = array('LESS Paper GIFT CERT','LESS Staff GIFT CERT','LESS Greenfield $ GIFT CERT','BUZZ REWARDS','r CREDITS','PAYPAL','LESS STORE CHARGE','LESS PAID OUT','TOTAL Other Credits');
     $accountNumbers = array('(2500A990)','(7800G990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');
+    $reportOrder = array(24,25,26,27,28,29,30,31,32);
     $values = $this->getOtherTotals($dbc,$dlog,$args);
     $totalRow = 33;
     for ($key=0;$key<sizeof($values);$key++){
@@ -368,12 +383,14 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
+        $row[] = $reportOrder[$key];
         $ret[] = $row;
     }
 
     //coupon section
     $rowNames = array('LESS STORE COUPON','LESS CO-OP DEALS COUPONS','LESS OTHER VENDOR COUPONS','TOTAL COUPON');
     $accountNumbers = array('(4170G900)','(1210A990)','(1215A990)','');
+    $reportOrder = array(33,34,35,36);
     $values = $this->getCouponTotals($dbc,$dlog,$args);
     $totalRow = 37;
     for ($key=0;$key<sizeof($values);$key++){
@@ -387,12 +404,14 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
+        $row[] = $reportOrder[$key];
         $ret[] = $row;
     }
 
     //Total & overshort section
     $rowNames = array('','TOTAL','BANK DEPOSIT','OVER / SHORT');
     $accountNumbers = array('','','','(419G900)');
+    $reportOrder = array(37,38,39,40);
     $total = $ret[0][2] + $ret[3][2] + $ret[11][2] - $ret[16][2] - $ret[23][2] - $ret[32][2] - $ret[36][2];
     $ctTotal = $ret[0][4] + $ret[3][4] + $ret[11][4] - $ret[16][4] - $ret[23][4] - $ret[32][4] - $ret[36][4];
     $deposit = $this->getDeposit($dbc,$dlog,$args);
@@ -415,6 +434,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $totalRow;
         $row[] = $diffShows[$key];
         $row[] = $diffWiths[$key];
+        $row[] = $reportOrder[$key];
         $ret[] = $row;
     }
 
@@ -526,11 +546,12 @@ private function getTaxTotals($dbc,$dlog,$args) {
 }
 
     private function getCardTotals($dbc,$dlog,$args){
-        $query = $dbc->prepare("SELECT  sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
+        $query = $dbc->prepare("SELECT
             0 as AmexTotal,
             sum(case when trans_subtype='DC' AND trans_type ='T' then -total else 0 end) as debit_total,
-            sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
             sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
+            sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
+            sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
             sum(case when trans_subtype='GD' AND trans_type ='T' then -total else 0 end) as gift_card_total
             FROM {$dlog} WHERE `datetime` BETWEEN ? AND ? AND store_id=? AND trans_status != 'X'");
         
@@ -570,9 +591,9 @@ private function getTaxTotals($dbc,$dlog,$args) {
         
         $return = array();
         for ($key=0;$key<$dbc->numFields($result);$key++) {
-            if ($key == 0)
+            if ($key == 4)
                 $return[] = $row[$key] - $amexTotal;
-            elseif ($key == 1)
+            elseif ($key == 0)
                 $return[] = $amexTotal;
             else
                 $return[] = $row[$key];
@@ -648,7 +669,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
         $rowNo = $this->cellFormats[$lineNo];
         $formatType = $this->rowFormayTypes($rowNo);
         $ret ='';
-        $hiddenPrint = ($this->colPrint[$name]) ? '' : 'class="hidden-print"';
+        $hiddenPrint = (static::$colPrint[$name]) ? '' : 'class="hidden-print"';
         switch ($formatType[$name]) {
             case 'false':      
                 break;
@@ -695,7 +716,8 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'totalRow' =>'false',
                     'diffShow' => 'false',
                     'diffWith' => 'false',
-                    'storeID' => 'false');
+                    'storeID' => 'false',
+                    'reportOrder' => 'false');
                 break;
             case 'entryRow':
                 $ret = array('id'=>'false',
@@ -710,7 +732,8 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'totalRow' =>'false',
                     'diffShow' => 'false',
                     'diffWith' => 'false',
-                    'storeID' => 'false');
+                    'storeID' => 'false',
+                    'reportOrder' => 'false');
                 break;
             case 'totalEnteryRow':
                 $ret = array('id'=>'false',
@@ -725,7 +748,8 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'totalRow' =>'false',
                     'diffShow' => 'false',
                     'diffWith' => 'false',
-                    'storeID' => 'false');
+                    'storeID' => 'false',
+                    'reportOrder' => 'false');
                 break;
             case 'blankRow':
                 $ret = array('id'=>'false',
@@ -740,7 +764,8 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'totalRow' =>'false',
                     'diffShow' => 'false',
                     'diffWith' => 'false',
-                    'storeID' => 'false');
+                    'storeID' => 'false',
+                    'reportOrder' => 'false');
                 break;
             default:
                 # code...

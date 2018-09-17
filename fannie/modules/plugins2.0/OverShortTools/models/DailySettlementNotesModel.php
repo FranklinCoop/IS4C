@@ -21,28 +21,17 @@
 
 *********************************************************************************/
 
-class DailySettlementModel extends BasicModel {
+class DailySettlementNotesModel extends BasicModel {
 
-    protected $name = 'dailySettlement';
+    protected $name = 'dailySettlementNotes';
     protected $preferred_db = 'plugin:OverShortDatabase';
 
     protected $columns = array(
-    'id' => array('type'=>'INT','primary_key'=>True, 'increment'=>True),
-    'date' => array('type'=>'DATE'),
-    'storeID' => array('type'=>'TINYINT'),
-    'lineNo' => array('type'=>'INT'),
-    'lineName' => array('type'=>'VARCHAR(50)'),
-    'acctNo' => array('type'=>'VARCHAR(30)',),
-    'amt' => array('type'=>'MONEY'),
-    'count' => array('type'=>'MONEY',),
-    'total' => array('type'=>'MONEY',),
-    'diff' => array('type'=>'MONEY',),
-    'totalRow' => array('type'=>'INT'),
-    'diffShow' => array('type'=>'INT'), // the location to display diff
-    'diffWith' => array('type'=>'VARCHAR(30'), // the cell to diff with.
-    'reportOrder' => array('type'=>'INT'),
+    'id' => array('type' => 'INT','primary_key'=>true, 'auto-increment'=>true),
+    'date' => array('type'=>'date'),
+    'storeID' => array('type'=>'INT'),
+    'notes' => array('type'=>'TEXT'),
     );
 
     protected $unique = array('id');
 }
-

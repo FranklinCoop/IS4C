@@ -43,19 +43,39 @@ class OverShortSettlementPage extends FannieRESTfulPage
 
     public function preprocess()
     {
+        $this->__routes[] = 'get<date><store><pdf>';
         $this->__routes[] = 'post<date><store>';
         $this->__routes[] = 'post<id><value>';
         $this->__routes[] = 'post<id><total>';
+        $this->__routes[] = 'post<id><notes>';
         return parent::preprocess();
     }
 
     public function post_date_store_handler()
     {
         //$date = FormLib::get('date');]
-        GLOBAL $FANNIE_PLUGIN_SETTINGS;
-        $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
-        echo $this->getTable($dbc,$this->date,$this->store);
+        if (FormLib::get('pdf')==='print') {
+            echo '<html>we in here </html>';
+        } else {
+            GLOBAL $FANNIE_PLUGIN_SETTINGS;
+            $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
+            echo $this->getTable($dbc,$this->date,$this->store);
+        }
+        return false;
 
+   }
+    public function get_date_store_pdf_handler()
+    {
+        //$date = FormLib::get('date');]
+        GLOBAL $FANNIE_PLUGIN_SETTINGS;
+        $date = FormLib::get_form_value('date');
+        $store = 1;
+        $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
+        $pdf = new SettlementReportPDF($dbc,$date,1);
+        $pdf->drawPDF();
+
+        echo '<html>we in here </html>';
+     
         return false;
 
    }
@@ -81,6 +101,23 @@ class OverShortSettlementPage extends FannieRESTfulPage
         return false;
     }
 
+    public function post_id_notes_handler()
+    {
+        GLOBAL $FANNIE_PLUGIN_SETTINGS;
+        $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
+        $json = array('msg'=>'');
+
+        $model = new DailySettlementNotesModel($dbc);
+        $model->id($this->id);
+        $model->notes($this->notes);
+        $saved = $model->save();
+
+        if (!$saved)
+            $json['msg'] = "didn't save bro.";
+
+        echo json_encode($json);
+        return false;
+    }
 
 
     function javascript_content()
@@ -93,6 +130,19 @@ class OverShortSettlementPage extends FannieRESTfulPage
             name: "",
             date: "",
         };
+
+        function saveNotes(value,t_id) {
+            var elem = $(this);
+            var orig = this.defaultValue;
+            $.ajax({url:'OverShortSettlementPage.php',
+                cache: false,
+                type: 'post',
+                dataType: 'json',
+                data: 'id='+t_id+'&notes='+value
+            }).done(function(data){
+                showBootstrapPopover(elem, orig, data.msg);
+            });
+        }
 
         function saveTotal(value,t_id) {
             var elem = $(this);
@@ -212,6 +262,7 @@ class OverShortSettlementPage extends FannieRESTfulPage
         <div id="displayarea">
             <?php echo $table; ?>
         </div>
+
         <?php
         return ob_get_clean();
 
@@ -220,11 +271,11 @@ class OverShortSettlementPage extends FannieRESTfulPage
     private function getInputHeader($dbc) {
         $dbc->selectDB($this->config->get('OP_DB'));
         $storePicker = FormLib::storePicker('store',false); 
-        $storeSelect = str_replace('<select ', '<select id="storeID"', $storePicker['html']);
+        $storeSelect = str_replace('<select ', '<select id="storeID" ', $storePicker['html']);
 
 
         $ret = '';
-        $ret = '<form style="margin-top:1.0em;"" id="osForm" onsubmit="selectDay(); return false;">';
+        $ret = '<form style="margin-top:1.0em;"" id="osForm" >';
         if (FormLib::get('flash') !== '') {
             $ret .= '<div class="alert alert-info hidden-print">' . FormLib::get('flash') . '</div>';
         }
@@ -234,8 +285,8 @@ class OverShortSettlementPage extends FannieRESTfulPage
         $ret .=  '<label>Store</label>';
         $ret .= $storeSelect;
         
-        $ret .= '<input type="hidden" name="_method" value="put" />';
-        $ret .= '<button type="submit" class="btn btn-default">Set</button>';
+        $ret .= '<button type="button" onclick="selectDay();"  class="btn btn-default">Set</button>';
+        $ret .= '<button type="submit" name="pdf" value="print" class="btn btn-default">Report</button>';
         $ret .= '</div></div>';
 
         $ret .= '<hr />';
@@ -256,31 +307,41 @@ class OverShortSettlementPage extends FannieRESTfulPage
         $dlog = DTransactionsModel::selectDTrans($date);
 
         if($date != '') {
-            $tableData = new FCCSettlementModule($dbc,'core_trans.transarchive',$date,$store);
+            $tableData = new FCCSettlementModule($dbc,$dlog,$date,$store);
             $model = $tableData->getTable($dbc,$dlog,$date,$store);
             $ret .= $tableData->getColNames();
         
-        $ret .= '</tr></thead>';
-        $ret .= '<tbody>';
-        foreach ($model->find() as $obj) {
-            $objID = $obj->id();
-            $totalID = $obj->totalRow();
-            $ret .= '<tr>';
-            foreach ($model->getColumns() as $name => $info) {
-                $value = $obj->$name();
-                $str = $tableData->getCellFormat($obj->lineNo(),$name);
-                $str = str_replace('{$value}', $value, $str);
-                $str = str_replace('{$totalID}', $totalID, $str);
-                $str = str_replace('{$objID}', $objID, $str);
-                $str = str_replace('{$name}', $name, $str);
-                $ret .= $str;
+            $ret .= '</tr></thead>';
+            $ret .= '<tbody>';
+            foreach ($model->find() as $obj) {
+                $objID = $obj->id();
+                $totalID = $obj->totalRow();
+                $ret .= '<tr>';
+                foreach ($model->getColumns() as $name => $info) {
+                    $value = $obj->$name();
+                    $str = $tableData->getCellFormat($obj->lineNo(),$name);
+                    $str = str_replace('{$value}', $value, $str);
+                    $str = str_replace('{$totalID}', $totalID, $str);
+                    $str = str_replace('{$objID}', $objID, $str);
+                    $str = str_replace('{$name}', $name, $str);
+                    $ret .= $str;
                     //name,ID, value, id,id, name, value
-                
+                }  
+                $ret .= '</tr>';
             }
-            $ret .= '</tr>';
-        }
+            $notesModel = new DailySettlementNotesModel($dbc);
+            $notesModel->date($date,'=');
+            $notesModel->storeID($store,'=');
+            $notesRes = $notesModel->find();
+            if($notesRes) {
+                $notes = $notesRes[0];
+                $note = $notes->notes();
+                $id = $notes->id();
+                $ret .= "<tr><td>Notes</td><td colspan=5</td>";
+                $ret .= "<textarea class='form-control' onchange='saveNotes.call(this, this.value, $id);'' rows=5 cols=35 id='note'>$note</textarea></td></tr>";
+            }
 
-        $ret .= '</tbody>';
+            $ret .= '</tbody>';
         }
         $ret .= '</form>';
 

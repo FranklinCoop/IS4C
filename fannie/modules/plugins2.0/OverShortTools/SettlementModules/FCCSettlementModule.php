@@ -721,7 +721,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
                 $ret = array(true,false,false,true);      
                 break;
             case 'entryRow':
-                $ret = array(true,true,true,true);
+                $ret = array(true,true,true,false);
                 break;
             case 'totalEnteryRow':
                 $ret = array(true,false,false,true);

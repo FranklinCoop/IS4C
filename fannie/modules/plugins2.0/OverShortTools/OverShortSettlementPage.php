@@ -71,7 +71,8 @@ class OverShortSettlementPage extends FannieRESTfulPage
         $date = FormLib::get_form_value('date');
         $store = 1;
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
-        $pdf = new SettlementReportPDF($dbc,$date,1);
+        $dlog = DTransactionsModel::selectDTrans($date);
+        $pdf = new SettlementReportPDF($dbc,$date,$this->store,$dlog);
         $pdf->drawPDF();
 
         echo '<html>we in here </html>';

@@ -67,7 +67,7 @@ class FCCSettlementModule extends SettlementModule {
 
         }
         $this->rowData = $model;
-        $this->cellFormats = $this->rowFormat();
+        $this->cellFormats = static::rowFormat();
     }
 
     public function getTable($dbc,$dlog,$date,$store) {
@@ -281,7 +281,9 @@ private function genRowData($dbc,$dlog,$args) {
     $ret[] = $row;
     //Tax Section
     $rowNames = array('PLUS SALES TAX Collected','PLUS SALES TAX Collected','TOTAL TAX');
-    $accountNumbers = array('(2450A990)','(2400M990)','');
+    $gfmAcctNo = array('(2450A990)','(2400G990)','');
+    $mccAcctNo = array('(2450A990)','(2400M990)','');
+    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(1,2,3);
     $values = $this->getTaxTotals($dbc,$dlog,$args);
     $totalRow = 4;
@@ -304,7 +306,9 @@ private function genRowData($dbc,$dlog,$args) {
     //R/A section
     $rowNames = array('TRASH STICKER SALES','PLUS GIFT CARD Sold','PLUS MEMBER EQUITY Payment','PLUS CHARGE Payment',
                       'PAYPAL TIPS','DELIVERY FEE','PLUS R/A OTHER (PAID-IN)','TOTAL R/A');
-    $accountNumbers = array('(4060G900)','(2500A990)','(2800A990)','aditional entry','(5255G500)','(5255G500)','aditional entry','');
+    $gfmAcctNo = array('(4060G900)','(2500A990)','(2800A990)','aditional entry','(5255G500)','(5255G500)','aditional entry','');
+    $mccAcctNo = array('(4060M900)','(2500A990)','(2800A990)','aditional entry','(5255M500)','(5255M500)','aditional entry','');
+    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(4,5,6,7,8,9,10,11);
     $values = $this->getRATotals($dbc,$dlog,$args);
     $totalRow = 12;
@@ -325,7 +329,9 @@ private function genRowData($dbc,$dlog,$args) {
 
     //Discount Section
     $rowNames = array('LESS Working Discount','LESS Staff Discount','LESS Senior Discount','LESS Food for All Discount','TOTAL DISCOUNTS');
-    $accountNumbers = array('(4160G900)','(4150G900)','(4130G900)','(4110G900)','');
+    $gfmAcctNo = array('(4160G900)','(4150G900)','(4130G900)','(4110G900)','');
+    $mccAcctNo = array('(4160M900)','(4150M900)','(4130M900)','(4110M900)','');
+    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(12,13,14,15,16);
     $values = $this->getDiscountTotals($dbc,$dlog,$args);
     $totalRow = 17;
@@ -368,7 +374,9 @@ private function genRowData($dbc,$dlog,$args) {
 
     // other tenders
     $rowNames = array('LESS Paper GIFT CERT','LESS Staff GIFT CERT','LESS Greenfield $ GIFT CERT','BUZZ REWARDS','r CREDITS','PAYPAL','LESS STORE CHARGE','LESS PAID OUT','TOTAL Other Credits');
-    $accountNumbers = array('(2500A990)','(7800G990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');
+    $gfmAcctNo = array('(2500A990)','(7800G990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');
+    $mccAcctNo = array('(2500A990)','(7800M990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');$
+    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(24,25,26,27,28,29,30,31,32);
     $values = $this->getOtherTotals($dbc,$dlog,$args);
     $totalRow = 33;
@@ -389,7 +397,9 @@ private function genRowData($dbc,$dlog,$args) {
 
     //coupon section
     $rowNames = array('LESS STORE COUPON','LESS CO-OP DEALS COUPONS','LESS OTHER VENDOR COUPONS','TOTAL COUPON');
-    $accountNumbers = array('(4170G900)','(1210A990)','(1215A990)','');
+    $gfmAcctNo = array('(4170G900)','(1210A990)','(1215A990)','');
+    $mccAcctNo = array('(4170M900)','(1210A990)','(1215A990)','');
+    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(33,34,35,36);
     $values = $this->getCouponTotals($dbc,$dlog,$args);
     $totalRow = 37;
@@ -410,7 +420,9 @@ private function genRowData($dbc,$dlog,$args) {
 
     //Total & overshort section
     $rowNames = array('','TOTAL','BANK DEPOSIT','OVER / SHORT');
-    $accountNumbers = array('','','','(419G900)');
+    $gfmAcctNo = array('','','','(419G900)');
+    $mccAcctNo = array('','','','(419M900)');
+    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(37,38,39,40);
     $total = $ret[0][2] + $ret[3][2] + $ret[11][2] - $ret[16][2] - $ret[23][2] - $ret[32][2] - $ret[36][2];
     $ctTotal = $ret[0][4] + $ret[3][4] + $ret[11][4] - $ret[16][4] - $ret[23][4] - $ret[32][4] - $ret[36][4];
@@ -667,7 +679,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
 
     public function getCellFormat($lineNo,$name) {
         $rowNo = $this->cellFormats[$lineNo];
-        $formatType = $this->rowFormayTypes($rowNo);
+        $formatType = static::rowFormayTypes($rowNo);
         $ret ='';
         $hiddenPrint = (static::$colPrint[$name]) ? '' : 'class="hidden-print"';
         switch ($formatType[$name]) {
@@ -700,7 +712,33 @@ private function getTaxTotals($dbc,$dlog,$args) {
         return $ret;
     }
 
-    private function rowFormayTypes($type){
+    public static function getRowReportFormat($lineNo){
+        $formatType = static::rowFormat();
+        $ret = array();
+        switch ($formatType[$lineNo]) {
+            case 'totalRow':
+                $ret = array(true,false,false,true);      
+                break;
+            case 'entryRow':
+                $ret = array(true,true,true,true);
+                break;
+            case 'totalEnteryRow':
+                $ret = array(true,false,false,true);
+                break;
+            case 'blankRow':
+                $ret = array(false,false,false,false);
+                break;
+            case 'overshortRow':
+                $ret = array(true,true,false,true);
+                break;
+            default:
+                $ret = array(true,false,false,false);
+                break;
+        }
+        return $ret;
+    }
+
+    private static function rowFormayTypes($type){
         $ret =array();
         switch ($type) {
             case 'totalRow':
@@ -767,6 +805,22 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'storeID' => 'false',
                     'reportOrder' => 'false');
                 break;
+            case 'overshortRow':
+                $ret = array('id'=>'false',
+                    'date' =>'false',
+                    'lineNo' => 'false',
+                    'lineName'=>'dark',
+                    'acctNo' => '',
+                    'amt' => 'dark',
+                    'count' => 'dark',
+                    'total' => 'dark',
+                    'diff' => 'dark',
+                    'totalRow' =>'false',
+                    'diffShow' => 'false',
+                    'diffWith' => 'false',
+                    'storeID' => 'false',
+                    'reportOrder' => 'false');
+                break;
             default:
                 # code...
                 break;
@@ -774,14 +828,14 @@ private function getTaxTotals($dbc,$dlog,$args) {
         return $ret;
     }
 
-    private function rowFormat(){
+    private static function rowFormat(){
         $formmating = array('totalRow','entryRow','entryRow','totalRow',
                             'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
                             'entryRow','entryRow','entryRow','entryRow','totalRow',
                             'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
                             'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
                             'entryRow','entryRow','entryRow','totalRow',
-                            'blankRow','totalRow','totalEnteryRow','totalRow'
+                            'blankRow','totalRow','totalEnteryRow','overshortRow'
                         );
 
         return $formmating;

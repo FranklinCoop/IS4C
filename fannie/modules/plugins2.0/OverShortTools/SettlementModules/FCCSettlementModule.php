@@ -281,9 +281,9 @@ private function genRowData($dbc,$dlog,$args) {
     $row[] = 0;
     $ret[] = $row;
     //Tax Section
-    $rowNames = array('PLUS SALES TAX Collected','PLUS MEALS TAX Collected','TOTAL TAX');
-    $gfmAcctNo = array('(2450A990)','(2400G990)','');
-    $mccAcctNo = array('(2450A990)','(2400M990)','');
+    $rowNames = array('PLUS MEALS TAX Collected','PLUS SALES TAX Collected','TOTAL TAX');
+    $gfmAcctNo = array('(2400G990)','(2450A990)','');
+    $mccAcctNo = array('(2400M990)','(2450A990)','');
     $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(1,2,3);
     $values = $this->getTaxTotals($dbc,$dlog,$args);

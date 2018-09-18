@@ -114,6 +114,7 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
         $model->totalRow($lastID+$rowArr[6]);
         $model->diffShow($lastID+$rowArr[7]);
         $model->diffWith($lastID+$rowArr[8]);
+        $model->reportOrder($rowID);
         $model->storeID($store);
         $model->save();
     }

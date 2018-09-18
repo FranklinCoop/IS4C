@@ -269,7 +269,7 @@ private function genRowData($dbc,$dlog,$args) {
     //Sales Totals
     $value = $this->getSalesTotals($dbc,$dlog,$args);
     $totalRow = 39;
-    $row[] = 'SALES TOTALS';
+    $row[] = 'DEPT SALES TOTALS';
     $row[] = '';
     $row[] = $value;
     $row[] = $value;
@@ -281,7 +281,7 @@ private function genRowData($dbc,$dlog,$args) {
     $row[] = 0;
     $ret[] = $row;
     //Tax Section
-    $rowNames = array('PLUS SALES TAX Collected','PLUS SALES TAX Collected','TOTAL TAX');
+    $rowNames = array('PLUS SALES TAX Collected','PLUS MEALS TAX Collected','TOTAL TAX');
     $gfmAcctNo = array('(2450A990)','(2400G990)','');
     $mccAcctNo = array('(2450A990)','(2400M990)','');
     $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;

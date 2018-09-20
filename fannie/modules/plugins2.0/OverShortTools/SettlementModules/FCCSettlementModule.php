@@ -121,6 +121,48 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
     return $model;
 }
 
+    public function recalculatePosTotals($dbc,$dlog,$date,$store){
+        $model = new DailySettlementModel($dbc);
+        $model->date($date,'=');
+        $model->storeID($store,'=');
+        $today = date('Y-m-d');
+        // create model if day has no entry or update values
+        if (!$model->find() && $date < $today) {
+            $model = $this->populateAccountTable($dbc,$dlog,$store,$date);
+            $model->date($date,'=');
+            $model->storeID($store,'=');
+            
+            $noteModel = new DailySettlementNotesModel($dbc);
+            $noteModel->date($date);
+            $noteModel->storeID($store);
+            $noteModel->save();
+        } else {
+            $date1 = $date.' 00:00:00';
+            $date2 = $date.' 23:59:59';
+            $args = array($date1,$date2,$store);
+
+            $tableData = $this->genRowData($dbc,$dlog,$args);
+            $saveModel = new DailySettlementNotesModel($dbc);
+            foreach ($model->find() as $obj) {
+                $rowArr = $tableData[$obj->lineNo()];
+                $saveModel->id($obj->id());
+                //$model->total($rowArr[4]);
+                $saveModel->amt($rowArr[2]);
+                $saveModel->diff($obj->amt() - $rowArr[2]);
+                //$model->totalRow($lastID+$rowArr[6]);
+                //$model->diffShow($lastID+$rowArr[7]);
+                //$model->diffWith($lastID+$rowArr[8]);
+                //$model->reportOrder($rowID);
+                //$model->storeID($store);
+                $saveModel->save();
+            }
+            
+        }
+
+        $this->rowData = $model;
+
+    }
+
     public static function updateTotalCell($dbc, $value, $cellID) {
         $json = array('msg'=>'','secID'=>0, 'secTotal' => 0, 'secDiff'=>0, 'diff'=>0,
                         'grandTotalID'=>0,'grandTotal'=>0,'grandDiff'=>0);
@@ -205,11 +247,9 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
             switch ($obj->lineNo()) {
                 case '0':
                 case '3':
-                case '11':
+                case '10':
                     $newGrandTotal += $obj->total();
                     break;
-                case '4':
-                    break; //do nothing;
                 default:
                     $newGrandTotal -= $obj->total();
                     break;
@@ -264,11 +304,12 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
     }
 
 private function genRowData($dbc,$dlog,$args) {
+    $store = $args[2];
     $ret = array();
     $row = array();
     //Sales Totals
     $value = $this->getSalesTotals($dbc,$dlog,$args);
-    $totalRow = 39;
+    $totalRow = 38;
     $row[] = 'DEPT SALES TOTALS';
     $row[] = '';
     $row[] = $value;
@@ -296,7 +337,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
-        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -305,23 +346,23 @@ private function genRowData($dbc,$dlog,$args) {
 
 
     //R/A section
-    $rowNames = array('TRASH STICKER SALES','PLUS GIFT CARD Sold','PLUS MEMBER EQUITY Payment','PLUS CHARGE Payment',
+    $rowNames = array('PLUS GIFT CARD Sold','PLUS MEMBER EQUITY Payment','PLUS CHARGE Payment',
                       'PAYPAL TIPS','DELIVERY FEE','PLUS R/A OTHER (PAID-IN)','TOTAL R/A');
-    $gfmAcctNo = array('(4060G900)','(2500A990)','(2800A990)','aditional entry','(5255G500)','(5255G500)','aditional entry','');
-    $mccAcctNo = array('(4060M900)','(2500A990)','(2800A990)','aditional entry','(5255M500)','(5255M500)','aditional entry','');
+    $gfmAcctNo = array('(2500A990)','(2800A990)','aditional entry','(5255G500)','(5255G500)','aditional entry','');
+    $mccAcctNo = array('(2500A990)','(2800A990)','aditional entry','(5255M500)','(5255M500)','aditional entry','');
     $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
-    $reportOrder = array(4,5,6,7,8,9,10,11);
+    $reportOrder = array(4,5,6,7,8,9,10);
     $values = $this->getRATotals($dbc,$dlog,$args);
-    $totalRow = 12;
+    $totalRow = 11;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
         $row[] = $accountNumbers[$key];
         $row[] = $values[$key];
         $row[] = $values[$key];
-        $row[] = ($key == sizeof($values) -1 || $key==0) ? $values[$key] : 0;
+        $row[] = $values[$key];
         $row[] = 0;
-        $row[] = ($key == sizeof($values) -1 || $key==0) ? 39 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -333,9 +374,9 @@ private function genRowData($dbc,$dlog,$args) {
     $gfmAcctNo = array('(4160G900)','(4150G900)','(4130G900)','(4110G900)','');
     $mccAcctNo = array('(4160M900)','(4150M900)','(4130M900)','(4110M900)','');
     $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
-    $reportOrder = array(12,13,14,15,16);
+    $reportOrder = array(11,12,13,14,15);
     $values = $this->getDiscountTotals($dbc,$dlog,$args);
-    $totalRow = 17;
+    $totalRow = 16;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -344,7 +385,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = $values[$key];
         $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
-        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -355,9 +396,9 @@ private function genRowData($dbc,$dlog,$args) {
     $rowNames = array('LESS AMEX','LESS DEBIT','LESS SNAP / EBT: Cash','LESS SNAP / EBT: Food',
                       'VISA/MASTER/DISCOVER','LESS GIFT CARD Redeemed','TOTAL CARD MEDIA');
     $accountNumbers = array('(1025A990)','(1025A990)','(1025A990)','(1025A990)','(1025A990)','(2500A990)','');
-    $reportOrder = array(17,18,19,20,21,22,23);
+    $reportOrder = array(16,17,18,19,20,21,22);
     $values = $this->getCardTotals($dbc,$dlog,$args);
-    $totalRow = 24;
+    $totalRow = 23;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -366,7 +407,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = 0;
         $row[] = 0;
         $row[] = -$values[$key];
-        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -378,9 +419,9 @@ private function genRowData($dbc,$dlog,$args) {
     $gfmAcctNo = array('(2500A990)','(7800G990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');
     $mccAcctNo = array('(2500A990)','(7800M990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');$
     $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
-    $reportOrder = array(24,25,26,27,28,29,30,31,32);
+    $reportOrder = array(23,24,25,26,27,28,29,30,31);
     $values = $this->getOtherTotals($dbc,$dlog,$args);
-    $totalRow = 33;
+    $totalRow = 32;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -389,7 +430,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = 0;
         $row[] = 0;
         $row[] = -$values[$key];
-        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -401,9 +442,9 @@ private function genRowData($dbc,$dlog,$args) {
     $gfmAcctNo = array('(4170G900)','(1210A990)','(1215A990)','');
     $mccAcctNo = array('(4170M900)','(1210A990)','(1215A990)','');
     $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
-    $reportOrder = array(33,34,35,36);
+    $reportOrder = array(32,33,34,35);
     $values = $this->getCouponTotals($dbc,$dlog,$args);
-    $totalRow = 37;
+    $totalRow = 36;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -412,7 +453,7 @@ private function genRowData($dbc,$dlog,$args) {
         $row[] = 0;
         $row[] = 0;
         $row[] = -$values[$key];
-        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -424,17 +465,17 @@ private function genRowData($dbc,$dlog,$args) {
     $gfmAcctNo = array('','','','(419G900)');
     $mccAcctNo = array('','','','(419M900)');
     $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
-    $reportOrder = array(37,38,39,40);
-    $total = $ret[0][2] + $ret[3][2] + $ret[11][2] - $ret[16][2] - $ret[23][2] - $ret[32][2] - $ret[36][2];
-    $ctTotal = $ret[0][4] + $ret[3][4] + $ret[11][4] - $ret[16][4] - $ret[23][4] - $ret[32][4] - $ret[36][4];
+    $reportOrder = array(36,37,38,39);
+    $total = $ret[0][2] + $ret[3][2] + $ret[10][2] - $ret[15][2] - $ret[22][2]-$ret[31][2] - $ret[35][2];
+    $ctTotal = $ret[0][4] + $ret[3][4] + $ret[10][4] - $ret[15][4] - $ret[22][4]-$ret[31][4] - $ret[35][4];
     $deposit = $this->getDeposit($dbc,$dlog,$args);
     $rowBlank = array(0,0,0,0);
     $rowTotal = array($total,$ctTotal,$ctTotal,0);
     $rowDepost = array($deposit[0],$deposit[1],$deposit[1],0);
     $rowOS = array($deposit[0] - $total,0,$deposit[1] - $ctTotal,0);
     $values = array($rowBlank,$rowTotal,$rowDepost,$rowOS);
-    $diffShows = array(0,41,41,0);
-    $diffWiths = array(0,40,39,0);
+    $diffShows = array(0,40,40,0);
+    $diffWiths = array(0,39,38,0);
     $totalRow = 0;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
@@ -456,9 +497,10 @@ private function genRowData($dbc,$dlog,$args) {
 
 private function getSalesTotals($dbc,$dlog,$args) {
     $query = $dbc->prepare("SELECT 
-        sum(case when department!=0 and trans_type !='T' and department NOT IN (992,990,994,995,902,924) and upc NOT IN (1930,6901,6900) AND trans_status != 'X' then total else 0 end) as dept_sales_total
-        FROM {$dlog}
-        WHERE `datetime` BETWEEN ? AND ? AND store_id=?");
+                sum(t.total) as dept_sales_total
+                FROM {$dlog} t JOIN core_op.superdepts s on t.department = s.dept_ID
+                WHERE t.`datetime` BETWEEN ? AND ? AND t.store_id=?
+                AND t.trans_type IN ('I','D') and s.superID < 15 and trans_status !='X';");
     $result = $dbc->execute($query,$args);
     $return = 'ERR';
     $row = $dbc->fetch_row($result);
@@ -484,22 +526,22 @@ private function getTaxTotals($dbc,$dlog,$args) {
 
     private function getRATotals($dbc,$dlog,$args) {
         $query = $dbc->prepare("SELECT 
-        sum(case when t.department = 960 then t.total else 0 end) as trashStickersTotal,
-        sum(case when t.department = 902 then t.total else 0 end) as gift_sales_total,
-        sum(case when t.department = 992 then t.total else 0 end) as member_payment_total,
-        sum(case when t.department = 990 then t.total else 0 end) as charge_payment_total,
-        sum(case when t.upc = 6901 then t.total else 0 end) as paypal_tips_total,
-        sum(case when t.upc = 6900 then t.total else 0 end) as paypal_delivery_total,
-        sum(case when t.department = 995 then t.total else 0 end) as paid_in_total
-        from {$dlog} t
-        where t.`datetime` between ? and ? and t.store_id =? AND trans_status != 'X'");
+            SUM(case when t.department = 902 then t.total else 0 end) as gift_sales_total,
+            SUM(case when t.department = 992 then t.total else 0 end) as member_payment_total,
+            SUM(case when t.department = 990 then t.total else 0 end) as charge_payment_total,
+            SUM(case when t.upc = 6901 then t.total else 0 end) as paypal_tips_total,
+            SUM(case when t.upc = 6900 then t.total else 0 end) as paypal_delivery_total,
+            SUM(CASE WHEN t.department NOT IN (902,992,990,994) AND t.upc NOT IN (6900,6901) THEN t.total ELSE 0 END) AS paid_in_total
+            FROM {$dlog} t JOIN core_op.superdepts s ON t.department = s.dept_ID
+            WHERE t.`datetime` BETWEEN ? AND ? AND t.store_id =? AND trans_status != 'X'
+            AND t.trans_type IN ('D','I') AND s.superID = 15");
         $result = $dbc->execute($query,$args);
         $row = $dbc->fetch_row($result);
         $return = array();
         for ($key=0;$key<$dbc->numFields($result);$key++) {
             $return[] = $row[$key];
         }
-        $return[] = array_sum($return)-$return[0];
+        $return[] = array_sum($return);
         return $return;
     }
 
@@ -814,8 +856,8 @@ private function getTaxTotals($dbc,$dlog,$args) {
                     'acctNo' => '',
                     'amt' => 'dark',
                     'count' => 'dark',
-                    'total' => 'dark',
-                    'diff' => 'dark',
+                    'total' => '',
+                    'diff' => '',
                     'totalRow' =>'false',
                     'diffShow' => 'false',
                     'diffWith' => 'false',
@@ -831,7 +873,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
 
     private static function rowFormat(){
         $formmating = array('totalRow','entryRow','entryRow','totalRow',
-                            'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
+                            'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
                             'entryRow','entryRow','entryRow','entryRow','totalRow',
                             'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
                             'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',

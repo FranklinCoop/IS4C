@@ -44,6 +44,7 @@ class OverShortSettlementPage extends FannieRESTfulPage
     public function preprocess()
     {
         $this->__routes[] = 'get<date><store><pdf>';
+        $this->__routes[] = 'post<date><store><recalc>';
         $this->__routes[] = 'post<date><store>';
         $this->__routes[] = 'post<id><value>';
         $this->__routes[] = 'post<id><total>';
@@ -79,8 +80,18 @@ class OverShortSettlementPage extends FannieRESTfulPage
      
         return false;
 
-   }
+    }
 
+
+
+    public function post_date_store_recalc_handler() {
+        GLOBAL $FANNIE_PLUGIN_SETTINGS;
+        $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
+        $dlog = DTransactionsModel::selectDTrans($this->date);
+        $controller = new FCCSettlementModule($dbc,$dlog,$this->date,$this->store);
+        $controller->recalculatePosTotals($dbc,$dlog,$this->date,1);
+        echo $this->getTable($dbc,$this->date,$this->store);
+    }
 
     public function post_id_value_handler()
     {
@@ -210,19 +221,21 @@ class OverShortSettlementPage extends FannieRESTfulPage
             });
         }
 
-        function setdate()
+        function reCalc()
         {
-            var dataStr = $('#osForm').serialize();
-            dataStr += '&action=date';
-            $('#date').val('');
-            $('#forms').html('');
+            var setdate = $('#date').val();
+            var store = $('#storeID').val();
+            var action = $('#recalc').val();
+            var data = 'date='+setdate+'&store='+store+'&recalc'+action;
             $('#loading-bar').show();
+            $('#displayarea').html('');
             $.ajax({
                 url: 'OverShortSettlementPage.php',
-                data: dataStr,
-            success: function(data){
+                type: 'post',
+                data: data,
+            success: function(resp){
                 $('#loading-bar').hide();
-                $('#forms').html(data);
+                $('#displayarea').html(resp);
             }
             });
         }
@@ -231,11 +244,13 @@ class OverShortSettlementPage extends FannieRESTfulPage
             var setdate = $('#date').val();
             var store = $('#storeID').val();
             var data = 'date='+setdate+'&store='+store;
+            $('#loading-bar').show();
             $.ajax({
                 url: 'OverShortSettlementPage.php',
                 type: 'post',
                 data: data
             }).done(function(resp) {
+                $('#loading-bar').hide();
                 $('#displayarea').html(resp);
             });
         }
@@ -288,6 +303,7 @@ class OverShortSettlementPage extends FannieRESTfulPage
         
         $ret .= '<button type="button" onclick="selectDay();"  class="btn btn-default">Set</button>';
         $ret .= '<button type="submit" name="pdf" value="print" class="btn btn-default">Report</button>';
+        //$ret .= '<button type="button" name="recalc" value="1" onclick="reCalc();" class="btn btn-default">Recalculate POS Totals</buttons>';
         $ret .= '</div></div>';
 
         $ret .= '<hr />';

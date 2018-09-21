@@ -49,7 +49,7 @@ class SettlementReportPDF {
         $storeName = $picker['names'][$store];
         $query = $dbc->prepare("SELECT lineName,acctNo,`count`,total
                   FROM dailySettlement
-                  WHERE `date`=? AND storeID=? AND lineNo !=4
+                  WHERE `date`=? AND storeID=?
                   ORDER BY reportOrder;");
         $result = $dbc->execute($query,array($date,$store));
         $report = array();
@@ -96,7 +96,7 @@ class SettlementReportPDF {
                     FROM {$dlog} t 
                     JOIN core_op.superdepts s ON t.department = s.dept_ID 
                     JOIN core_op.departments d on s.dept_ID = d.dept_no
-                    WHERE t.trans_type IN ('I','D') AND s.superID = 15
+                    WHERE t.trans_type IN ('I','D') AND s.superID > 14
                     AND t.`datetime` BETWEEN ? AND ?
                     AND t.store_id = ? AND trans_status != 'X'
                     GROUP BY t.department");
@@ -141,14 +141,8 @@ class SettlementReportPDF {
                 case 1:
                     $lineFormat = array(true,true,true,true);
                     break;
-                case 2:
-                case 3:
-                case 4:
-                case 5:
-                    $lineFormat = FCCSettlementModule::getRowReportFormat($lineNo-2);
-                    break;
                 default:
-                    $lineFormat = FCCSettlementModule::getRowReportFormat($lineNo-1);
+                    $lineFormat = FCCSettlementModule::getRowReportFormat($lineNo-2);
                     break;
             }
             //$lineFormat = ($lineNo < 4) ? FCCSettlementModule::getRowReportFormat($lineNo+2) : FCCSettlementModule::getRowReportFormat($lineNo+3) ;

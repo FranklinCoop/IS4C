@@ -153,6 +153,33 @@ class ObfSummaryReport extends ObfWeeklyReportV2
         '9,17' => 9218.78,
     );
 
+    protected $PLAN_SALES_Q4_2018 = array(
+        '1,6' => 52231.00,      // Hillside Produce
+        '2,10' => 11840.47,     // Hillside Deli
+        '2,11' => 32186.37,
+        '2,16' => 13122.16,
+        '3,1' => 25854.77,      // Hillside Grocery
+        '3,4' => 62910.11,
+        '3,5' => 23815.64,
+        '3,7' => 199.76,
+        '3,8' => 17596.82,
+        '3,9' => 2746.91,
+        '3,13' => 15123.69,
+        '3,17' => 26546.32,
+        '7,6' => 20708.00,      // Denfeld Produce
+        '8,10' => 4654.99,      // Denfeld Deli
+        '8,11' => 14037.15,
+        '8,16' => 5481.86,
+        '9,1' => 9226.50,       // Denfeld Grocery
+        '9,4' => 27735.16,
+        '9,5' => 9627.56,
+        '9,7' => 92.79,
+        '9,8' => 6468.55,
+        '9,9' => 1133.08,
+        '9,13' => 5236.49,
+        '9,17' => 9504.87,
+    );
+
     private $laborPercent = array(
         1 => 8.31,
         2 => 22.41,
@@ -167,9 +194,64 @@ class ObfSummaryReport extends ObfWeeklyReportV2
         11 => 0.53,
     );
 
+    private function weekToYM($weekID)
+    {
+        $prep = $this->connection->prepare('SELECT startDate
+            FROM ' . FannieDB::fqn('ObfWeeks', 'plugin:ObfDatabaseV2') . '
+            WHERE obfWeekID=?');
+        $date = $this->connection->getValue($prep, array($weekID));
+        $nowNext = array(0, 0);
+        $stamp = strtotime($date);
+        $cur = strtotime($date);
+        for ($i=0; $i<7; $i++) {
+            if (date('n', $cur) == date('n', $stamp)) {
+                $nowNext[0]++;
+            } else {
+                $nowNext[1]++;
+            }
+            $stamp = mktime(0, 0, 0, date('n', $stamp), date('j', $stamp)+1, date('Y', $stamp));
+        }
+        if ($nowNext[0] > $nowNext[1]) {
+            $stamp = $cur;
+        }
+
+        return array(date('Y', $stamp), date('n', $stamp));
+    }
+
     private function getPlanSales($weekID)
     {
-        if ($weekID >= 188) {
+        if ($weekID >= 218) {
+            $prep = $this->connection->prepare("
+                SELECT l.obfCategoryID, s.superID, (1+l.growthTarget)*s.lastYearSales AS plan
+                FROM " . FannieDB::fqn('ObfLabor', 'plugin:ObfDatabaseV2') . " AS l
+                    INNER JOIN " . FannieDB::fqn('ObfCategories', 'plugin:ObfDatabaseV2') . " AS c ON l.obfCategoryID=c.obfCategoryID
+                    INNER JOIN " . FannieDB::fqn('ObfSalesCache', 'plugin:ObfDatabaseV2') . " AS s
+                        ON c.obfCategoryID=s.obfCategoryID AND l.obfWeekID=s.obfWeekID
+                WHERE l.obfWeekID=?");
+            $res = $this->connection->execute($prep, array($weekID));
+            $ret = array();
+            while ($row = $this->connection->fetchRow($res)) {
+                $key = $row['obfCategoryID'] . ',' . $row['superID'];
+                $ret[$key] = $row['plan'];
+            }
+            return $ret;
+        } elseif ($weekID >= 214) {
+            list($year, $month) = $this->weekToYM($weekID);
+            $prep = $this->connection->prepare('SELECT c.obfCategoryID, m.superID, p.planGoal
+                FROM ' . FannieDB::fqn('ObfCategories', 'plugin:ObfDatabaseV2') . ' AS c
+                INNER JOIN ' . FannieDB::fqn('ObfCategorySuperDeptMap', 'plugin:ObfDatabaseV2') . ' AS m ON c.obfCategoryID=m.obfCategoryID
+                INNER JOIN ' . FannieDB::fqn('ObfPlans', 'plugin:ObfDatabaseV2') . ' AS p ON c.storeID=p.storeID AND m.superID=p.superID
+                WHERE c.hasSales=1 and month=? and year=?');
+            $res = $this->connection->execute($prep, array($month, $year)); 
+            $days = date('t', mktime(0,0,0,$month,1,$year));
+            while ($row = $this->connection->fetchRow($res)) {
+                $key = $row['obfCategoryID'] . ',' . $row['superID'];
+                $ret[$key] = ($row['planGoal'] / $days) * 7;
+            }
+            return $ret;
+        } elseif ($weekID >= 201) {
+            return $this->PLAN_SALES_Q4_2018;
+        } elseif ($weekID >= 188) {
             return $this->PLAN_SALES_Q3_2018;
         } elseif ($weekID >= 175) {
             return $this->PLAN_SALES_Q2_2018;
@@ -305,8 +387,10 @@ class ObfSummaryReport extends ObfWeeklyReportV2
                         $quarter = array('actual'=>0, 'lastYear'=>0, 'plan'=>0, 'trans'=>0, 'ly_trans'=>0);
                     }
                     $ou_weeks = ($week->obfWeekID() - $this->getOuStart($week->obfWeekID())) + 1;
-                    $qtd_dept_plan += ($proj * $ou_weeks);
+                    $ou_plan = $this->getPlanRange($this->getOuStart($week->obfWeekID()), $week->obfWeekID(), $category->obfCategoryID(), $row['superID']);
+                    //$qtd_dept_plan += ($proj * $ou_weeks);
                     $qtd_dept_sales += $quarter['actual'];
+                    $qtd_dept_plan += $ou_plan;
                     $total_trans->quarterThisYear = $quarter['trans'];
                     $total_trans->quarterLastYear = $quarter['ly_trans'];
 
@@ -324,8 +408,10 @@ class ObfSummaryReport extends ObfWeeklyReportV2
                     $dept_proj += $proj;
                     $total_sales->quarterProjected += ($proj * $ou_weeks);
                     $total_sales->quarterActual += $quarter['actual'];
-                    $qtd_sales_ou += ($quarter['actual'] - ($proj * $ou_weeks));
-                    $qtd_dept_ou += ($quarter['actual'] - ($proj * $ou_weeks));
+                    //$qtd_sales_ou += ($quarter['actual'] - ($proj * $ou_weeks));
+                    //$qtd_dept_ou += ($quarter['actual'] - ($proj * $ou_weeks));
+                    $qtd_sales_ou += ($quarter['actual'] - ($ou_plan));
+                    $qtd_dept_ou += ($quarter['actual'] - ($ou_plan));
                 }
 
                 $labor->obfCategoryID($category->obfCategoryID());

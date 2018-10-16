@@ -113,7 +113,7 @@ class HouseCouponEditor extends FanniePage
                 $hci->upc($upc);
                 $hci->save();
             }
-            $this->connection->finishTransaction();
+            $this->connection->commitTransaction();
             header('Location: ' . filter_input(INPUT_SERVER, 'PHP_SELF') . '?edit_id=' . $hci->coupID());
             return false;
         } elseif (FormLib::get_form_value('edit_id','') !== '') {
@@ -432,6 +432,8 @@ class HouseCouponEditor extends FanniePage
             'PS'=>'Per-Set Discount',
             'BG'=>'BOGO (Buy one get one)',
             'BQ'=>'BOGO (Qty limited)',
+            'BH'=>'BOHO (Buy one get one 1/2 off)',
+            'BM'=>'BOHO (Buy one get one 1/2 off, mixed items)',
             '%'=>'Percent Discount (End of transaction)',
             '%B' => 'Percent Discount (Coupon discount OR member discount)',
             '%I'=>'Percent Discount (Specific Items)',

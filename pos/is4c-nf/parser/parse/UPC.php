@@ -203,7 +203,10 @@ class UPC extends Parser
             $row['description'] = $row['formatted_name'];
         }
 
-        $this->checkInUse($row);
+        $ret = $this->checkInUse($row, $ret);
+        if ($ret['main_frame']) {
+            return $ret;
+        }
 
         /**
           Apply special department handlers
@@ -399,7 +402,7 @@ class UPC extends Parser
            assigned cannot calculate a proper quantity.
         */
         if ($scaleStickerItem) {
-            if ($discountObject->isSale() && $scale == 1 && $row['normal_price'] != 0) {
+            if ($discountObject->isSale() && $scale == 1 && $row['normal_price'] != 0 && $this->session->get('VariableNoSalePrice') != 1) {
                 $quantity = MiscLib::truncate2($scaleprice / $row["normal_price"]);
             } elseif ($scale == 1 && $row['normal_price'] != 0) {
                 $quantity = MiscLib::truncate2($scaleprice / $row["normal_price"]);
@@ -790,20 +793,33 @@ class UPC extends Parser
         return $row;
     }
 
-    private function checkInUse($row)
+    private function checkInUse($row, $ret)
     {
         /* Implementation of inUse flag
-         *   if the flag is not set, display a warning dialog noting this
+         *   if the flag is not set and it's likely a keyed item
+         *   display a warning dialog noting this
          *   and allowing the sale to be confirmed or canceled
          */
         if ($row["inUse"] == 0) {
-            TransRecord::addLogRecord(array(
-                'upc' => $row['upc'],
-                'description' => $row['description'],
-                'department' => $row['department'],
-                'charflag' => 'IU',
-            ));
+            if (substr($row['upc'], 0, 6) == '000000' && $this->session->get('msgrepeat') == 0) {
+                $this->session->set("strEntered",$row["upc"]);
+                $this->session->set("boxMsg", _("Not an active item: ") . $row['description']);
+                $this->session->set('boxMsgButtons', array(
+                    _('Confirm Sale [enter]') => '$(\'#reginput\').val(\'\');submitWrapper();',
+                    _('Cancel [clear]') => '$(\'#reginput\').val(\'CL\');submitWrapper();',
+                ));
+                $ret['main_frame'] = MiscLib::baseURL() . "gui-modules/boxMsg2.php?quiet=1";
+            } else {
+                TransRecord::addLogRecord(array(
+                    'upc' => $row['upc'],
+                    'description' => $row['description'],
+                    'department' => $row['department'],
+                    'charflag' => 'IU',
+                ));
+            }
         }
+
+        return $ret;
     }
 
     private function enforceSaleLimit($dbc, $row, $quantity)

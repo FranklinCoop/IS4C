@@ -26,6 +26,7 @@ use COREPOS\pos\lib\Bitmap;
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\MiscLib;
 use COREPOS\pos\lib\PrintHandlers\PrintHandler;
+use COREPOS\pos\lib\PrintHandlers\ESCNetRawHandler;
 use COREPOS\pos\lib\ReceiptBuilding\Messages\StoreChargeMessage;
 use COREPOS\pos\lib\Tenders;
 use \CoreLocal;
@@ -57,13 +58,19 @@ static public function writeLine($text)
     if (CoreLocal::get("print") != 0) {
 
         $printerPort = CoreLocal::get('printerPort');
-        /* check fails on LTP1: in PHP4
-           suppress open errors and check result
-           instead
-        */
-        $fptr = fopen(CoreLocal::get("printerPort"), "w");
-        fwrite($fptr, $text);
-        fclose($fptr);
+        if (substr($printerPort, 0, 6) == "tcp://") {
+            $net = new ESCNetRawHandler();
+            $net->setTarget(substr($printerPort, 6));
+            $net->writeLine($text);
+        } else {
+            /* check fails on LTP1: in PHP4
+               suppress open errors and check result
+               instead
+            */
+            $fptr = fopen(CoreLocal::get("printerPort"), "w");
+            fwrite($fptr, $text);
+            fclose($fptr);
+        }
     }
 }
 
@@ -736,7 +743,7 @@ static private $msgMods = array(
 static private function getTypeMap()
 {
     $typeMap = array();
-    foreach(self::messageMods() as $class){
+    foreach(self::messageMods(false) as $class){
         if (in_array($class, self::$msgMods)) {
             $class = 'COREPOS\\pos\\lib\\ReceiptBuilding\\Messages\\' . $class;
         }
@@ -787,7 +794,7 @@ static private function receiptFooters($receipt, $ref)
     return $receipt;
 }
 
-static private function messageModFooters($receipt, $where, $ref, $reprint)
+static private function messageModFooters($receipt, $where, $ref, $reprint, $nth)
 {
     // check if message mods have data
     // and add them to the receipt
@@ -810,7 +817,7 @@ static private function validateMessageMods($where) {
     $modQ = "SELECT ";
     $selectMods = array();
     $returnMods = array();
-    foreach(self::messageMods() as $class){
+    foreach(self::messageMods($nth) as $class){
         if (in_array($class, self::$msgMods)) {
             $class = 'COREPOS\\pos\\lib\\ReceiptBuilding\\Messages\\' . $class;
         }
@@ -830,19 +837,30 @@ static private function validateMessageMods($where) {
         $modR = $dbc->query($modQ);
         $row = array();
         if ($dbc->numRows($modR) > 0) $row = $dbc->fetchRow($modR);
-        foreach($selectMods as $class => $mod){
-            if (!isset($row[$class])) continue; 
-            $returnMods[$class]= array($class=>$mod, 'val'=>$row[$class]);
+        foreach($selectMods as $class => $obj){
+            if (!isset($row[$class])) continue;    
+            if ($obj->paper_only)
+                $receipt['print'] .= $obj->message($row[$class], $ref, $reprint);
+            else
+                $receipt['any'] .= $obj->message($row[$class], $ref, $reprint);
         }
     }
-    return $returnMods;
 
+    return $receipt;
 }
 
-static private function messageMods()
+static private function messageMods($nth)
 {
     $messageMods = CoreLocal::get('ReceiptMessageMods');
     if (!is_array($messageMods)) $messageMods = array();
+    if ($nth) {
+        $add = CoreLocal::get('NthReceiptMods');
+        if (is_array($add)) {
+            foreach ($add as $a) {
+                $messageMods[] = $a;
+            }
+        }
+    }
 
     return $messageMods;
 }
@@ -879,6 +897,14 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
 
     $noreceipt = (CoreLocal::get("receiptToggle")==1 ? 0 : 1);
     $ignoreNR = array("ccSlip");
+    $nthReceipt = false;
+    if (!$reprint && $arg1 == 'full') {
+        $nthReceipt = self::nthReceipt();
+        if ($nthReceipt) {
+            $ignoreNR[] = 'full';
+            $email = false;
+        }
+    }
 
     // find receipt types, or segments, provided via modules
     $typeMap = self::getTypeMap();
@@ -928,7 +954,7 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
     
             $receipt = self::memberFooter($receipt, $ref);
             $receipt = self::receiptFooters($receipt, $ref);
-            $receipt = self::messageModFooters($receipt, $where, $ref, $reprint);
+            $receipt = self::messageModFooters($receipt, $where, $ref, $reprint, $nthReceipt);
 
             if (CoreLocal::get('memberID') != CoreLocal::get('defaultNonMem')) {
                 $memMessages = self::memReceiptMessages(CoreLocal::get("memberID"));
@@ -962,38 +988,18 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
     // skip signature slips if using electronic signature capture (unless it's a reprint)
     if ((is_array($tmap) && isset($tmap['MI']) && $tmap['MI'] != 'SignedStoreChargeTender') || $reprint) {
         if (CoreLocal::get("chargeTotal") != 0 && ((CoreLocal::get("End") == 1 && !$second) || $reprint)) {
+            /** PLACEHOLDER: deal with charge stuff via StoreChargeMessage
+            $msg = new StoreChargeMessage();
+            $msg->setPrintHandler(self::$PRINT);
+            */
             if (is_array($receipt)) {
                 $receipt['print'] .= self::printChargeFooterStore($dateTimeStamp, $ref, $chargeProgram);
+                // $receipt['print'] .= $msg->standalone_receipt($ref);
             } else {
                 $receipt .= self::printChargeFooterStore($dateTimeStamp, $ref, $chargeProgram);
+                // $receipt .= $msg->standalone_receipt($ref);
             }
         }
-    }
-
-    /*
-     Check which standalone mods should print.
-    */
-    $validSlips = array();
-    foreach (self::validateMessageMods($where) as $modClass => $mod) {
-        if ($mod['val'] !=0) {
-            $modObj = $mod[$modClass];
-            $validSlips[$modObj->standalone_receipt_type] = $modObj;
-        } 
-    }
-    /*
-     Finds slips neede for each tender.
-    */
-    foreach ($tmap as $tender => $tenderClass) {
-        if (!class_exists($tenderClass)) { // try namespaced version
-            $tenderClass = 'COREPOS\\pos\\lib\\Tenders\\' . $tenderClass;
-        }
-        $tenderObject = new $tenderClass($tender,0);
-        $slipType = $tenderObject->getSlip();
-        if (isset($typeMap[$slipType]) && isset($validSlips[$slipType])) {
-            $mod = $validSlips[$slipType];
-            $receipt = self::cutReceipt($receipt, $second);
-            $receipt .= $mod->standalone_receipt($ref);
-        } 
     }
             
     $receipt = self::cutReceipt($receipt, $second);
@@ -1170,6 +1176,17 @@ static public function emailReceiptMod()
     }
 
     return self::$EMAIL;
+}
+
+static private function nthReceipt()
+{
+    if (CoreLocal::get('nthReceipt') > 0 && CoreLocal::get('nthReceipt') < 1) {
+        return lcg_value() < CoreLocal::get('nthReceipt');
+    } elseif (CoreLocal::get('nthReceipt') > 0 && CoreLocal::get('standalone') == 0) {
+        return (CoreLocal::get('transno') % CoreLocal::get('nthReceipt')) === 0;
+    }
+
+    return false;
 }
 
 }

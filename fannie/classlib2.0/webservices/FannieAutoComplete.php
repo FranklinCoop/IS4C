@@ -24,6 +24,7 @@
 namespace COREPOS\Fannie\API\webservices; 
 use COREPOS\Fannie\API\data\DataCache;
 use COREPOS\Fannie\API\member\MemberREST;
+use COREPOS\Fannie\API\item\ItemText;
 use \FannieDB;
 use \FannieConfig;
 
@@ -63,7 +64,10 @@ class FannieAutoComplete extends FannieWebService
                 $res = false;
                 if (!is_numeric($args->search)) {
                     $prep = $dbc->prepare('SELECT p.upc,
-                                            p.description
+                                            p.description AS posDesc,
+                                            p.size,
+                                            ' . ItemText::longBrandSQL() . ',
+                                            ' . ItemText::longDescriptionSQL() . '
                                            FROM products AS p
                                             LEFT JOIN productUser AS u ON u.upc=p.upc
                                            WHERE p.description LIKE ?
@@ -78,18 +82,28 @@ class FannieAutoComplete extends FannieWebService
                 } elseif (ltrim($args->search, '0') != '') {
                     $prep = $dbc->prepare('
                         SELECT p.upc,
-                            p.upc AS description
+                            p.upc AS description,
+                            p.upc AS posDesc,
+                            \'\' AS brand,
+                            \'\' AS size
                         FROM products AS p
                         WHERE p.upc LIKE ?
                         GROUP BY p.upc');
                     $res = $dbc->execute($prep, array('%'.$args->search . '%'));
                 }
+                $wide = (isset($args->wide) && $args->wide) ? true : false;
                 while ($res && $row = $dbc->fetch_row($res)) {
+                    $bigLabel = (!empty($row['brand']) ? $row['brand'] . ' ' : '') . $row['description'];
+                    if ($row['size']) {
+                        $bigLabel .= ' (' . $row['size'] . ')';
+                    }
                     $ret[] = array(
-                        'label' => $row['description'],
+                        'label' => $wide ? $bigLabel : $row['posDesc'],
                         'value' => $row['upc'],
                     );
                 }
+
+                return $ret;
 
             case 'brand':
                 $prep = $dbc->prepare('SELECT brand

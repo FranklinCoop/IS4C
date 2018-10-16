@@ -90,7 +90,7 @@ HTML;
         $dbc = FannieDB::get($FANNIE_OP_DB);
 
         $ret = $this->backBtn()."<br/><br/>";
-        $tableA = "<table class=\"table table-striped table-bordered table-condensed\">
+        $tableA = "<table class=\"table table-bordered table-condensed\">
             <thead><th>VID</th><th>Vendor</th><th>Rate</th><th>Excluded</th></thead><tbody>";
         $prep = $dbc->prepare("SELECT s.vid,s.rate,v.vendorName,s.exclude
             FROM vendorReviewSchedule AS s
@@ -101,7 +101,8 @@ HTML;
         while ($row = $dbc->fetchRow($res)) {
             $vid = $row['vid'];
             $rate = $row['rate'];
-            $tableA .= "<tr><td>{$vid}</td>";
+            $class = ($row['exclude'])? 'alert-danger' : '';
+            $tableA .= "<tr class='$class'><td>{$vid}</td>";
             $tableA .= "<td>{$row['vendorName']}</td>";
             $tableA .= "<td>
                 <a href=\"#\" onClick=\"setRate({$vid},{$rate});\" id=\"{$vid}vid\">{$rate}</a>
@@ -284,11 +285,13 @@ HTML;
                     ";
                 $score = sprintf("%d%%",$v['score']*100);
                 $vid = $v['vid'];
-                $table .= "<tr><td class='vid'>{$vid}</td>";
-                $table .= "<td>{$v['name']}</td>";
-                $table .= "<td>{$grade}</td>";
-                $table .= "<td>{$v['total']}</td>";
-                $table .= "<td>{$score}</td>";
+                if ($v['total'] > 0) {
+                    $table .= "<tr><td class='vid'>{$vid}</td>";
+                    $table .= "<td>{$v['name']}</td>";
+                    $table .= "<td>{$grade}</td>";
+                    $table .= "<td>{$v['total']}</td>";
+                    $table .= "<td>{$score}</td>";
+                }
             }
         }
         $table .= "</tbody></table>";
@@ -430,16 +433,16 @@ HTML;
                 $action = '<td class="alert alert-warning" align="center">Batch found in log</td>';
             } else {
                 $action = "<td class='btn btn-default btn-sm' style='width:100%;
-                    border: 1px solid lightgreen;' onClick='addBatch({$bid}); return false;'>
+                    border: 1px solid orange;' onClick='addBatch({$bid}); return false;'>
                     + Add to log</td>";
             }
             $bData .= "
-                <label class='text-success'>New Batch</label>
+                <label class='text-info'>New Batch</label>
                 <div class='batchTable'>
-                <table class='table table-condensed table-striped alert-success'>
+                <table class='table table-condensed table-striped small'>
                     <thead><th>Name</th><th>BatchID</th><th>Owner</th><th>BatchType</th><th></td></thead>
                     <tbody>
-                        <tr><td><a href=\"{$bidLn}\" target=\"_blank\">{$bid}</a></td><td>{$name}</td><td>{$owner}</td><td>{$type}</td>
+                        <tr><td><a href=\"{$bidLn}\" target=\"_blank\" class=\"bid\">{$bid}</a></td><td>{$name}</td><td>{$owner}</td><td>{$type}</td>
                         {$action}
                         </tr>
                     </tbody>
@@ -450,12 +453,12 @@ HTML;
         /*
             tableA = unforced batches | tableB = forced.
         */
-        $pAllBtn = "<button class='btn btn-default btn-xs' style='border: 3px solid lightgreen;'
+        $pAllBtn = "<button class='btn btn-default btn-xs' style='border: 1px solid orange;'
             onClick='printAll(); return false;'>Print All</button>";
-        $tableA = "<table class='table table-condensed table-striped alert-warning'><thead><tr>
+        $tableA = "<table class='table table-condensed table-striped small'><thead><tr>
             <th>BatchID</th><th>Batch Name</th><th>VID</th><th>Vendor</th><th>Uploaded</th>
             <th>Comments</th><th></th><th>{$pAllBtn}</th><tr></thead><tbody>";
-        $tableB = "<table class='table table-condensed table-striped small alert-info'><thead><tr>
+        $tableB = "<table class='table table-condensed table-striped small'><thead><tr>
             <th>BatchID</th><th>Batch Name</th><th>VID</th><th>Vendor</th><th>Forced On</th>
             <th>user</th><tr></thead><tbody>";
         $args = array();
@@ -491,7 +494,7 @@ HTML;
                     '/>{$row['comments']}</textarea></td>";
                 $action = '';
                 if ($row['printed'] == 0) {
-                    $action = "<td class='btn btn-default btn-wide' style='border: 1px solid lightgreen;'
+                    $action = "<td class='btn btn-default btn-wide' style='border: 1px solid orange;'
                         onClick='printBatch($curBid); return false;'>Print</td>";
                 } else {
                     $action = "<td class='btn btn-default btn-wide' style='border: 1px solid tomato;'
@@ -527,16 +530,18 @@ HTML;
         <div class="panel-body">
             <form method="get" class="form-inline">
                 <div class="form-group">
-                    <input type="number" class="form-control" name="bid" value="{$bid}"
-                        autofocus placeholder="Enter Batch ID" style="max-width: 150px;"/>
+                    <input type="text" class="form-control" name="bid" value="{$bid}"
+                        autofocus placeholder="Enter Batch ID" />
                     <input type="hidden" name="batchLog" value="1"/>
+                </div>
+                <div class="form-group">
                     <button type="submit" class="btn btn-default" value="1" name="getBatch">Load Batch</button>
                 </div>
                 <div id="alert"><div id="resp"></div></div>
             </form>
         </div>
         {$bData}
-        <label class="text-warning">Un-Forced Batches</label>
+        <label class="text-info">Staged Batches</label>
         <div class="batchTable">
             {$tableA}
         </div>
@@ -614,7 +619,7 @@ HTML;
                 $pr->reset();
                 $pr->upc($obj->upc());
                 if ($pr->load()) {
-                    $table .= '<td>'.$pr->reviewed().'</td>';
+                    $table .= '<td class="reviewed">'.$pr->reviewed().'</td>';
                 } else {
                     $table .= '<td><i class="text-danger">no review date</i></td>';
                 }
@@ -887,6 +892,24 @@ $(document).ready( function() {
     clickStar();
 });
 
+var pigeonholes = {};
+var colors = ['white','orange','tomato','purple','cyan','lightblue','yellowgreen'];
+var x = 0;
+$('td.reviewed').each(function(){
+    var date = $(this).text();
+    if (date in pigeonholes) {
+    } else {
+        pigeonholes[date] = colors[x]; 
+        x++;
+    }
+});
+$('td.reviewed').each(function(){
+    var date = $(this).text();
+    if (date in pigeonholes) {
+        $(this).css('background','linear-gradient(to right, white, 80%, '+pigeonholes[date]+')');
+    }
+});
+
 function deleteRow(id)
 {
     var url = "ProdReviewPage.php?batchLog=1&deleteRow=1&id="+id;
@@ -973,7 +996,7 @@ function editable()
 {
     $('.editable').change(function() {
         var path = window.location.pathname;
-        var bid = $(this).closest('tr').find('.bid').text();
+        var bid = $(this).closest('tr').find('a').text();
         var comment = $(this).closest('tr').find('.editable').val();
         $.ajax({
             type: 'post',
@@ -1023,6 +1046,14 @@ function fadeAlerts()
     public function css_content()
     {
         return <<<HTML
+.panel-default {
+    border: none;
+}
+table.alert-info,
+table.alert-primary,
+table.alert-success {
+    background: #e0e0e0;
+}
 textarea { resize: vertical }
 .input-addon-btn {
     width: 100%;

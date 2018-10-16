@@ -506,7 +506,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
 
         echo '<div class="row form-group">
                 <label class="control-label col-sm-2">Task Error Severity resulting in emails</label>
-                <div class="col-sm-3">' . installSelectField('FANNIE_TASK_THRESHOLD', $FANNIE_TASK_THRESHOLD, $taskOpts, 99, false)
+                <div class="col-sm-3">' . installSelectField('FANNIE_TASK_THRESHOLD', $FANNIE_TASK_THRESHOLD, $taskOpts, 0, false)
             . '</div></div>';
 
         echo '<p>
@@ -678,6 +678,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'MemContactModel',
         'MemContactPrefsModel',
         'MetaProductRulesModel',
+        'MovementTagsModel',
         'NarrowTagsModel',
         'OriginsModel',
         'OriginCountryModel',
@@ -696,7 +697,9 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'ProdExtraModel',
         'ProdFlagsModel',
         'ProductAttributesModel',
+        'ProductCostChangesModel',
         'ProdPhysicalLocationModel',
+        'ProdReviewModel',
         'ProdUpdateModel',
         'ProdDepartmentHistoryModel',
         'ProdCostHistoryModel',
@@ -705,6 +708,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'PurchaseOrderItemsModel',
         'PurchaseOrderNotesModel',
         'ReasoncodesModel',
+        'SalesLiftsModel',
         'ScaleItemsModel',
         'ScaleLabelsModel',
         'ServiceScalesModel',
@@ -811,6 +815,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'PaycardTransactionsModel',
         'SpecialOrdersModel',
         'SpecialOrderDeptMapModel',
+        'SpecialOrderEditsModel',
         'SpecialOrderHistoryModel',
         'SpecialOrderMemDiscountsModel',
         'PendingSpecialOrderModel',

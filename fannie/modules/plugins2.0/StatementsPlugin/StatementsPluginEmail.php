@@ -99,8 +99,12 @@ class StatementsPluginEmail extends FannieRESTfulPage
             $mail->Body = $html;
             $mail->AltBody = $body;
             $mail->addAddress($primary['email']);
-            $mail->addBCC('bcarlson@wholefoods.coop');
+            if ($primary['email'] == 'carmen.lesavage@gmail.com') {
+                $mail->addCC('lesavagefamily@aol.com');
+            }
+            $mail->addBCC('aborgren@wholefoods.coop');
             $mail->addBCC('andy@wholefoods.coop');
+            $mail->addBCC('awade@wholefoods.coop');
             $mail->send();
             $this->sent[$name] = $primary['email'];
         }
@@ -384,12 +388,12 @@ class StatementsPluginEmail extends FannieRESTfulPage
             $mail->Body = $html;
             $mail->AltBody = $body;
             $mail->addAddress($primary['email']);
-            $mail->addBCC('bcarlson@wholefoods.coop');
+            $mail->addBCC('aborgren@wholefoods.coop');
             $mail->addBCC('andy@wholefoods.coop');
             $mail->send();
             $this->sent[$name] = $primary['email'];
 
-            $docfile = "/var/www/cgi-bin/docfile/docfile/" . $card_no;
+            $docfile = __DIR__ . "/noauto/docfile/" . $card_no;
             if (!file_exists($docfile)) {
                 mkdir($docfile);
             }

@@ -51,6 +51,7 @@ Replaces nightly.lanesync.php and/or lanesync.api.php';
         'houseCouponItems',
         'houseVirtualCoupons',
         'custPreferences',
+        'taxrates',
     );
 
     public function run()
@@ -71,7 +72,7 @@ Replaces nightly.lanesync.php and/or lanesync.api.php';
             /**
             @severity: error message may indicate lane down or connectivity problem
             */
-            $severity = strstr($result['messages'], 'Error:') ? FannieTask::TASK_LARGE_ERROR : FannieTask::TASK_NO_ERROR;
+            $severity = strstr($result['messages'], 'Error:') ? FannieLogger::CRITICAL : FannieLogger::INFO;
             $this->cronMsg($result['messages'], $severity);
         }
     }

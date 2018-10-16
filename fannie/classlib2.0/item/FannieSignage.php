@@ -223,6 +223,8 @@ class FannieSignage
     {
         $query = 'SELECT s.upc,
                     s.description,
+                    s.description AS posDescription,
+                    s.normal_price,
                     s.brand,
                     s.units,
                     s.size,
@@ -718,7 +720,7 @@ class FannieSignage
         }
 
         $url = FannieConfig::factory()->get('URL');
-        $ret = '<table class="table tablesorter tablesorter-core">';
+        $ret = '<table class="table tablesorter tablesorter-core" id="printSignTable">';
         $ret .= '<thead>';
         $ret .= '<tr>
             <th>UPC</th><th>Brand</th><th>Description</th><th>Price</th><th>Origin</th>
@@ -907,7 +909,7 @@ class FannieSignage
             return '5/$5';
         } elseif ($price > 0 && substr($price, -3) == '.00' && $price <= 5.00) {
             $mult = 2;
-            while (($mult+1)*$price <= 10) {
+            while (substr(sprintf('%.2f', $mult*$price), -3) != '.00') {
                 $mult++;
             }
             return sprintf('%d/$%d', $mult, round($mult*$price));
@@ -1118,6 +1120,8 @@ class FannieSignage
         if ($date == '') {
             return false;
         } elseif (substr($date,0,10) == '0000-00-00') {
+            return false;
+        } elseif (substr($date,0,10) == '1900-01-01') {
             return false;
         }
 

@@ -44,15 +44,18 @@ class PaycardDatacapParser extends Parser
     private $valid = array(
         'DATACAP',
         'DATACAPEMV',
+        'DATACAPEMVTIP',
         'DATACAPCC',
         'DATACAPCCAUTO',
         'DATACAPDC',
         'DATACAPEF',
         'DATACAPEC',
+        'DATACAPWI',
         'DATACAPGD',
         'PVDATACAPGD',
         'PVDATACAPEF',
         'PVDATACAPEC',
+        'PVDATACAPWI',
         'ACDATACAPGD',
         'AVDATACAPGD',
         'DATACAPRECUR',
@@ -110,6 +113,10 @@ class PaycardDatacapParser extends Parser
                 $this->conf->set('CacheCardType', 'EMV');
                 $this->conf->set('CacheCardCashBack', 0);
                 break;
+            case 'DATACAPEMVTIP': 
+                $this->conf->set('CacheCardType', 'EMVTIP');
+                $this->conf->set('CacheCardCashBack', 0);
+                break;
             case 'DATACAPCC':
                 $this->conf->set('CacheCardType', 'CREDIT');
                 $this->conf->set('CacheCardCashBack', 0);
@@ -150,6 +157,10 @@ class PaycardDatacapParser extends Parser
                 }
                 $this->conf->set('CacheCardType', 'EBTCASH');
                 break;
+            case 'DATACAPWI':
+                $this->conf->set('CacheCardType', 'EWIC');
+                $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvWic.php';
+                break;
             case 'DATACAPGD':
                 $this->conf->set('CacheCardType', 'GIFT');
                 $this->conf->set('paycard_type', PaycardLib::PAYCARD_TYPE_GIFT);
@@ -168,6 +179,11 @@ class PaycardDatacapParser extends Parser
                 break;
             case 'PVDATACAPEC':
                 $this->conf->set('CacheCardType', 'EBTCASH');
+                $this->conf->set('paycard_mode', PaycardLib::PAYCARD_MODE_BALANCE);
+                $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvBalance.php';
+                break;
+            case 'PVDATACAPWI':
+                $this->conf->set('CacheCardType', 'EWIC');
                 $this->conf->set('paycard_mode', PaycardLib::PAYCARD_MODE_BALANCE);
                 $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvBalance.php';
                 break;

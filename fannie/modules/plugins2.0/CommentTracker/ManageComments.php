@@ -45,6 +45,13 @@ class ManageComments extends FannieRESTfulPage
         $comment = new CommentsModel($this->connection);
         $comment->commentID($this->id);
         $comment->categoryID($this->catID);
+        if ($this->catID > 0) {
+            $comment->primaryNotified(0);
+            $comment->ccNotified(0);
+        } else {
+            $comment->primaryNotified(1);
+            $comment->ccNotified(1);
+        }
         $comment->save();
 
         echo 'OK';
@@ -93,7 +100,7 @@ class ManageComments extends FannieRESTfulPage
             $this->connection->commitTransaction();
         }
 
-        $tags = array_map(function($t) { return "<a href=\"ManageTags.php?tag={$t}\">{$t}</a>"; }, $tags);
+        $tags = array_map(function($t) { return "<a href=\"ManageTags.php?all=1&tag={$t}\">{$t}</a>"; }, $tags);
         $tags = implode(' ', $tags);
 
         echo $tags;
@@ -151,11 +158,12 @@ class ManageComments extends FannieRESTfulPage
         $response->tdate(date('Y-m-d H:i:s'));
         $response->userID(FannieAuth::getUID($this->current_user));
         $msg = trim(FormLib::get('response'));
+        $noSend = FormLib::get('noEmail', false);
         if ($msg != '') {
-            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            if (!$noSend && filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $response->sent(1);
                 $mail = new PHPMailer();
-                $mail->From = 'info@wholefoods.coop';
+                $mail->From = ($this->current_user ? $this->current_user : 'info'). '@wholefoods.coop';
                 $mail->FromName = 'Whole Foods Co-op';
                 $mail->addAddress($email);
                 $mail->Subject = 'WFC Comment Response';
@@ -185,8 +193,9 @@ class ManageComments extends FannieRESTfulPage
         $this->connection->selectDB($settings['CommentDB']);
         $comment = new CommentsModel($this->connection);
         $comment->categoryID(FormLib::get('cat'));
-        $comment->publishable(FormLib::get('pub') ? 1 : 0);
+        $comment->publishable(1);
         $comment->appropriate(FormLib::get('appr') ? 1 : 0);
+        $comment->name(FormLib::get('name'));
         $comment->email(FormLib::get('email'));
         $comment->phone(FormLib::get('phone'));
         $comment->comment(FormLib::get('comment'));
@@ -230,14 +239,13 @@ class ManageComments extends FannieRESTfulPage
         <select name="cat" class="form-control">{$opts}</select>
     </div>
     <div class="form-group">
-        <label>Publication Allowed
-        <input type="checkbox" name="pub" value="1" checked />
-        </label>
-    </div>
-    <div class="form-group">
         <label>Appropriate
         <input type="checkbox" name="appr" value="1" checked />
         </label>
+    </div>
+    <div class="form-group">
+        <label>Name</label>
+        <input type="text" name="name" placeholder="If known..." class="form-control" />
     </div>
     <div class="form-group">
         <label>Email Address for Response</label>
@@ -270,7 +278,7 @@ HTML;
                 CASE WHEN c.categoryID=0 THEN 'n/a'
                     WHEN c.categoryID=-1 THEN 'Spam'
                     ELSE t.name 
-                END AS name
+                END AS categoryName
             FROM {$prefix}Comments AS c
                 LEFT JOIN {$prefix}Categories AS t ON t.categoryID=c.categoryID
             WHERE c.commentID=?";
@@ -306,7 +314,7 @@ HTML;
         while ($tagW = $this->connection->fetchRow($tagR)) {
             $myTags[] = $tagW['tag'];
         }
-        $tagLinks = array_map(function ($t) { return "<a href=\"ManageComments.php?tag={$t}\">{$t}</a>"; }, $myTags);
+        $tagLinks = array_map(function ($t) { return "<a href=\"ManageComments.php?all=1&tag={$t}\">{$t}</a>"; }, $myTags);
         $tagLinks = implode(', ', $tagLinks);
         $myTags = implode(', ', $myTags);
 
@@ -333,11 +341,10 @@ HTML;
                 $k == $comment['posNeg'] ? 'selected' : '', $k, $v);
         }
 
-        $publishAllowed = $comment['publishable'] ? 'Yes' : 'No';
         $appropriateCheck = $comment['appropriate'] ? 'checked' : '';
         $comment['comment'] = nl2br($comment['comment']);
         $source = $comment['fromPaper'] ? 'Manual entry' : 'Website';
-        $this->addScript('js/manageComments.js');
+        $this->addScript('js/manageComments.js?date=20180607');
         if ($comment['email']) {
             $comment['email'] .= sprintf(' (<a href="ManageComments.php?email=%s">All Comments</a>)', $comment['email']);
             $this->addOnloadCommand("manageComments.sendMsg();");
@@ -362,13 +369,13 @@ HTML;
             onchange="manageComments.saveCategory({$this->id}, this.value);" class="form-control">{$opts}</select></td>
     </tr>
     <tr>
+        <th>Name</th><td>{$comment['name']}</td>
+    </tr>
+    <tr>
         <th>Email Address</th><td>{$comment['email']}</td>
     </tr>
     <tr>
         <th>Phone Number</th><td>{$comment['phone']}</td>
-    </tr>
-    <tr>
-        <th>Publication Allowed</th><td>{$publishAllowed}</td>
     </tr>
     <tr>
         <th>Appropriate</th><td><input type="checkbox" {$appropriateCheck}
@@ -396,6 +403,12 @@ HTML;
         <div class="panel-heading">Enter Response</div>
         <div class="panel-body">
             <div id="sending-msg" class="alert alert-info">Nothing will be emailed to the customer</div>
+            <p>
+                <label>
+                <input type="checkbox" id="noEmail" name="noEmail" value="1" />
+                Responded another way. Do not email the customer.
+                </label>
+            </p>
             <p>
                 <textarea id="resp-ta" name="response" class="form-control" rows="10"></textarea>
             </p>
@@ -447,16 +460,17 @@ HTML;
             FROM {$prefix}Comments AS c
                 LEFT JOIN {$prefix}Categories AS t ON t.categoryID=c.categoryID
                 LEFT JOIN {$prefix}Responses AS r ON r.commentID=c.commentID
+                LEFT JOIN {$prefix}CategoryUserMap AS m ON c.categoryID=m.categoryID
                 {$tagTable}
-            WHERE 1=1 ";
-        $args = array();
+            WHERE m.userID=? ";
+        $args = array(FannieAuth::getUID($this->current_user));
         if (FormLib::get('category', false)) {
             $query .= ' AND c.categoryID=?';
             $args[] = FormLib::get('category');
         } else {
             $query .= ' AND c.categoryID >= 0';
         }
-        if (!FormLib::get('all', false)) {
+        if (!FormLib::get('all', false) && !FormLib::get('tag', false)) {
             $query .= ' AND r.commentID IS NULL';
         }
         $hidden = '';
@@ -494,7 +508,7 @@ HTML;
             . (!FormLib::get('all', false) ? 'selected' : '')
             . '>Comments w/o Responses</option>'
             . '<option value="1" '
-            . (FormLib::get('all', false) ? 'selected' : '')
+            . (FormLib::get('all', false) || FormLib::get('tag', false) ? 'selected' : '')
             . '>All Comments</option>';
 
         $categories = new CategoriesModel($this->connection);
@@ -505,6 +519,7 @@ HTML;
         $opts .= '<option value="-1" ' . ($curCat == -1 ? 'selected' : '') . '>Spam</option>';
 
         $this->addOnloadCommand("\$('.filter-select').change(function(){ location='ManageComments.php?' + $('.filter-select').serialize(); });");
+        $admin = FannieAuth::validateUserQuiet('CommentAdmin') ? '' : 'collapse';
 
         return <<<HTML
 <p class="form-inline">
@@ -519,7 +534,15 @@ HTML;
     </select>
     {$hidden}
     |
+    <span class="{$admin}">
     <a href="CommentCategories.php">Manage Categories</a>
+    |
+    </span>
+    <a href="SearchComments.php">Search</a>
+    <span class="{$admin}">
+    |
+    <a href="ResponsivenessReport.php">Metrics</a>
+    </span>
 </p>
 <table class="table table-bordered">
 <thead>

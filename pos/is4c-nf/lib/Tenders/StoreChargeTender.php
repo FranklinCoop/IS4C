@@ -23,6 +23,7 @@
 
 namespace COREPOS\pos\lib\Tenders;
 use COREPOS\pos\lib\CoreState;
+use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DisplayLib;
 use COREPOS\pos\lib\MiscLib;
 use \CoreLocal;
@@ -108,5 +109,13 @@ class StoreChargeTender extends TenderModule
         return true;
     }
 
+    public function add()
+    {
+        Database::queueJob(array(
+            'class' => 'COREPOS\\Fannie\\API\\jobs\\ArUpdate',
+            'data' => array('id' => CoreLocal::get('memberID')),
+        ));
+        parent::add();
+    }
 }
 

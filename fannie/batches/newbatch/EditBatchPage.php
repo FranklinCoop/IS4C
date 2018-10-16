@@ -155,6 +155,9 @@ class EditBatchPage extends FannieRESTfulPage
         $batch = new BatchesModel($dbc);
         $batch->batchID($id);
         $batch->load();
+        if ($batch->discountType() <= 0) {
+            return false;
+        }
         $overlapP = $dbc->prepare('
             SELECT b.batchName,
                 b.startDate,
@@ -172,15 +175,17 @@ class EditBatchPage extends FannieRESTfulPage
         $args = array(
             $id,
             $upc,
-            date('Y-m-d', strtotime($batch->startDate())),
-            date('Y-m-d', strtotime($batch->endDate())),
         );
+        $stamp = strtotime($batch->startDate());
+        $args[] = $stamp ? date('Y-m-d', $stamp) : '1900-01-01';
+        $stamp = strtotime($batch->endDate());
+        $args[] = $stamp ? date('Y-m-d', $stamp) : '1900-01-01';
         $overlapR = $dbc->execute($overlapP, $args);
-        if ($batch->discountType() > 0 && $dbc->numRows($overlapR) > 0) {
+        if ($dbc->numRows($overlapR) > 0) {
             return $dbc->fetchRow($overlapR);
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     protected function post_id_addUPC_handler()
@@ -344,6 +349,9 @@ class EditBatchPage extends FannieRESTfulPage
         $selP = $dbc->prepare($selQ);
         $selR = $dbc->execute($selP, $args);
         $upc = "";
+        $insP = $dbc->prepare("INSERT INTO batchBarcodes
+            (upc,description,normal_price,brand,sku,size,units,vendor,batchID)
+            VALUES (?,?,?,?,?,?,?,?,?)");
         $tag_count = 0;
         $source = $this->config->get('TAG_DATA_SOURCE');
         if (empty($source) || !class_exists($source)) {
@@ -833,7 +841,7 @@ class EditBatchPage extends FannieRESTfulPage
     <span class="add-by-lc-fields collapse">
         <label class="control-label">Like code</label>
         <input type=text id=addItemLC name="addLC" size=4 value=1 class="form-control" disabled />
-        <select id=lcselect onchange="\$('#addItemLC').val(this.value);" class="form-control" disabled>
+        <select id=lcselect onchange="\$('#addItemLC').val(this.value);" class="form-control chosen-select" disabled>
         {$lcOpts}
         </select>
     </span>
@@ -865,6 +873,10 @@ HTML;
         $dbc = $this->connection;
         $uid = getUID($this->current_user);
         $uid = ltrim($uid,'0');
+        $authorized = false;
+        if (FannieAuth::validateUserQuiet('admin')) {
+            $authorized = true;
+        }
 
         $orderby = '';
         switch($order) {
@@ -957,12 +969,16 @@ HTML;
                 b.quantity,
                 b.pricemethod,
                 p.brand,
-                NULL AS locationName
+                NULL AS locationName,
+                r.maxPrice,
+                r.priceRuleID,
+                r.priceRuleTypeID
             FROM batchList AS b
                 " . DTrans::joinProducts('b') . "
                 LEFT JOIN likeCodes AS l ON b.upc = {$joinColumn}
                 LEFT JOIN batchCutPaste AS c ON b.upc=c.upc AND b.batchID=c.batchID
                 LEFT JOIN FloorSectionsListView as f on b.upc=f.upc and f.storeID=?
+                LEFT JOIN PriceRules AS r ON p.price_rule_id=r.priceRuleID
             WHERE b.batchID = ?
             $orderby";
         $fetchArgs[] = $store_location;
@@ -1061,6 +1077,11 @@ HTML;
 
         if ($dtype <= 0  && !$limited) {
             $ret .= " <a href=\"\" class=\"{$noprices}\" onclick=\"batchEdit.trimPcBatch($id); return false;\">Trim Unchanged</a> ";
+
+        $ret .= "<a href=\"\" onclick=\"batchEdit.cutAll($id,$uid); return false;\">Cut All</a> ";
+
+        if ($dtype <= 0) {
+            $ret .= " | <a href=\"\" class=\"{$noprices}\" onclick=\"batchEdit.trimPcBatch($id); return false;\">Trim Unchanged</a> ";
         } else {
             $ret .= " | <span id=\"edit-limit-link\"><a href=\"\"
                 onclick=\"batchEdit.editTransLimit(); return false;\">" . ($hasLimit ? 'Edit' : 'Add' ) . " Limit</a></span>";
@@ -1069,6 +1090,10 @@ HTML;
         }
         $ret .= " | <a data-toggle='modal' data-target='#myModal'>Batch History</a>";
         $ret .= '</span>';
+        if ($authorized === true && $type == 4) {
+            $ret .= " | <a href='' onclick='batchEdit.logBatch($id); return false;'>
+                <span class='btn-info'>Admin</span>: Stage Price Change</a>";
+        }
 
         /**
           Insert extra fields to manage partial day batch
@@ -1134,6 +1159,8 @@ HTML;
 
         $colors = array('#ffffff','#ffffcc');
         $cur = 0;
+        $upcFields = '';
+        $upcs = '';
         while ($fetchW = $dbc->fetchRow($fetchR)) {
             $cur = ($cur + 1) % 2;
             $ret .= "<tr>";
@@ -1144,6 +1171,8 @@ HTML;
                 $ret .= " <a href=\"\" onclick=\"\$('.lc-item-{$likecode}').toggle(); return false;\">[+]</a>";
                 $ret .= "</td>";
             } else {
+                $upcFields .= sprintf('<input type="hidden" name="u[]" value="%s" />', $fetchW['upc']);
+                $upcs .= $fetchW['upc'] . "\n";
                 $conflict = '';
                 if ($dtype != 0) {
                     $overlapR = $dbc->execute($overlapP, array_merge(array($fetchW['upc'], $id), $overlap_args));
@@ -1157,15 +1186,24 @@ HTML;
                                                 $overlap['batchName']);
                     }
                 }
+                if ($fetchW['priceRuleID'] != NULL && $fetchW['maxPrice'] > 0) {
+                    $mp = $fetchW['maxPrice'];
+                    $sp = $fetchW['salePrice'];
+                    if ($sp < $mp && $fetchW['priceRuleTypeID'] == 10) {
+                        $conflict .= '<a href="#" class="btn btn-warning btn-xs"
+                            title="Sale price falls below MAP restriction. Minimum Price: $'.$mp.'">
+                            <span class="glyphicon glyphicon-exclamation-sign"></span></span>';
+                    }
+                }
                 $ret .= "<td bgcolor=$colors[$cur]><a href=\"{$FANNIE_URL}item/ItemEditorPage.php?searchupc={$fetchW['upc']}\"
                     target=\"_new{$fetchW['upc']}\">{$fetchW['upc']}</a>{$conflict}</td>";
             }
             $ret .= "<td bgcolor=$colors[$cur]>{$fetchW['brand']}</td>";
             $ret .= "<td bgcolor=$colors[$cur]>{$fetchW['description']}</td>";
-            $ret .= "<td bgcolor=$colors[$cur]>{$fetchW['normal_price']}</td>";
+            $ret .= "<td bgcolor=$colors[$cur] class=\"price\">{$fetchW['normal_price']}</td>";
             $qtystr = ($fetchW['pricemethod']>0 && is_numeric($fetchW['quantity']) && $fetchW['quantity'] > 0) ? $fetchW['quantity'] . " for " : "";
             $qty = is_numeric($fetchW['quantity']) && $fetchW['quantity'] > 0 ? $fetchW['quantity'] : 1;
-            $ret .= "<td bgcolor=$colors[$cur] class=\"{$noprices}\">";
+            $ret .= "<td bgcolor=$colors[$cur] class=\"{$noprices} saleprice\">";
             $ret .= '<span id="editable-text-' . $fetchW['upc'] . '">';
             $ret .= '<span class="editable-' . $fetchW['upc'] . ($qty == 1 ? ' collapse ' : '') . '"'
                     . ' id="item-qty-' . $fetchW['upc'] . '" data-name="qty">'
@@ -1181,31 +1219,27 @@ HTML;
             $ret .= '<span class="input-group-addon">$</span>';
             $ret .= sprintf('<input text="text" class="form-control" name="price" value="%.2f" />', $fetchW['salePrice']);
             $ret .= '</div></div></td>';
-            
-            if (!$limited) {
-                $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=editLink{$fetchW['upc']}>
-                    <a href=\"\" class=\"edit {$noprices}\" onclick=\"batchEdit.editUpcPrice('{$fetchW['upc']}'); return false;\">
-                       " . \COREPOS\Fannie\API\lib\FannieUI::editIcon() . "</a>
-                    <a href=\"\" class=\"save collapse\" onclick=\"batchEdit.saveUpcPrice('{$fetchW['upc']}'); return false;\">
-                        " . \COREPOS\Fannie\API\lib\FannieUI::saveIcon() . "</a>
+            $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=editLink{$fetchW['upc']}>
+                <a href=\"\" class=\"edit {$noprices}\" onclick=\"batchEdit.editUpcPrice('{$fetchW['upc']}'); return false;\">
+                    " . \COREPOS\Fannie\API\lib\FannieUI::editIcon() . "</a>
+                <a href=\"\" class=\"save collapse\" onclick=\"batchEdit.saveUpcPrice('{$fetchW['upc']}'); return false;\">
+                    " . \COREPOS\Fannie\API\lib\FannieUI::saveIcon() . "</a>
+                </td>";
+            $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur]><a href=\"\"
+                onclick=\"batchEdit.deleteUPC.call(this, $id, '{$fetchW['upc']}'); return false;\">"
+                . \COREPOS\Fannie\API\lib\FannieUI::deleteIcon() . "</a>
+                </td>";
+            if ($fetchW['isCut'] == 1) {
+                $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=cpLink{$fetchW['upc']}>
+                    <a href=\"\" class=\"unCutLink\" id=\"unCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid, 0); return false;\">Undo</a>
+                    <a href=\"\" class=\"cutLink collapse\" id=\"doCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid, 1); return false;\">Cut</a>
                     </td>";
-                $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur]><a href=\"\"
-                    onclick=\"batchEdit.deleteUPC.call(this, $id, '{$fetchW['upc']}'); return false;\">"
-                    . \COREPOS\Fannie\API\lib\FannieUI::deleteIcon() . "</a>
+            } else {
+                $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=cpLink{$fetchW['upc']}>
+                    <a href=\"\" class=\"unCutLink collapse\" id=\"unCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid,0); return false;\">Undo</a>
+                    <a href=\"\" class=\"cutLink\" id=\"doCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid,1); return false;\">Cut</a>
                     </td>";
-                if ($fetchW['isCut'] == 1) {
-                    $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=cpLink{$fetchW['upc']}>
-                        <a href=\"\" class=\"unCutLink\" id=\"unCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid, 0); return false;\">Undo</a>
-                        <a href=\"\" class=\"cutLink collapse\" id=\"doCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid, 1); return false;\">Cut</a>
-                        </td>";
-                } else {
-                    $ret .= "<td class=\"hidden-print\" bgcolor=$colors[$cur] id=cpLink{$fetchW['upc']}>
-                        <a href=\"\" class=\"unCutLink collapse\" id=\"unCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid,0); return false;\">Undo</a>
-                        <a href=\"\" class=\"cutLink\" id=\"doCut{$fetchW['upc']}\" onclick=\"batchEdit.cutItem('{$fetchW['upc']}',$id,$uid,1); return false;\">Cut</a>
-                     </td>";
-                }
             }
-
 
             $loc = 'n/a';
             if (!empty($fetchW['locationName'])) {
@@ -1228,6 +1262,13 @@ HTML;
         if ($dbc->numRows($fetchR) > 0) {
             $ret .= '<p>
                 <a href="BatchImportExportPage.php?id=' . $id . '">Export as JSON</a>
+                | <a href="" onclick="$(\'#previousPromos\').submit(); return false;">Previous Promos</a>
+                | <a href="" onclick="$(\'#searchForm\').submit(); return false;">Search These</a>
+                <form method="post" id="previousPromos" action="../../reports/from-search/PreviousPromos/PreviousPromosReport.php">
+                ' . $upcFields . '</form>
+                <form method="post" id="searchForm" action="../../item/AdvancedItemSearch.php">
+                <input type="hidden" name="extern" value="1" />
+                <input type="hidden" name="upcs" value="' . $upcs . '" />
                 </p>';
         }
 
@@ -1276,7 +1317,7 @@ HTML;
         return $ret;
     }
 
-    private function pairedTableBody($dbc, $result)
+    private function pairedTableBody($dbc, $result, $down=true)
     {
         $colors = array('#ffffff','#ffffcc');
         $cur = 0;
@@ -1295,10 +1336,12 @@ HTML;
                 $ret .= "<td bgcolor=$colors[$cur]><a href={$FANNIE_URL}item/ItemEditorPage.php?searchupc=$fetchW[0] target=_new$fetchW[0]>$fetchW[0]</a></td>";
             }
             $ret .= "<td bgcolor=$colors[$cur]>$fetchW[1]</td>";
+            $showDown = $down ? '' : 'collapse';
+            $showUp = $down ? 'collapse' : '';
             $ret .= "<td bgcolor=$colors[$cur]>
-                <a href=\"\" class=\"down-arrow\" onclick=\"batchEdit.swapQualifierToDiscount(this, '$fetchW[0]'); return false;\">
+                <a href=\"\" class=\"down-arrow {$showDown}\" onclick=\"batchEdit.swapQualifierToDiscount(this, '$fetchW[0]'); return false;\">
                     <img src=\"{$FANNIE_URL}src/img/buttons/arrow_down.gif\" alt=\"Make Discount Item\" /></a>
-                <a href=\"\" class=\"up-arrow collapse\" onclick=\"batchEdit.swapDiscountToQualifier(this, '$fetchW[0]'); return false;\">
+                <a href=\"\" class=\"up-arrow {$showUp}\" onclick=\"batchEdit.swapDiscountToQualifier(this, '$fetchW[0]'); return false;\">
                     <img src=\"{$FANNIE_URL}src/img/buttons/arrow_up.gif\" alt=\"Make Qualifying Item\" />
                     </a>
                 </td>";
@@ -1408,7 +1451,7 @@ HTML;
 
         $ret .= '<table class="table" id="discount-table">';
         $ret .= '<tr><th colspan="4">Discount Item(s)</th></tr>';
-        $ret .= $this->pairedTableBody($dbc, $fetchR);
+        $ret .= $this->pairedTableBody($dbc, $fetchR, false);
         $ret .= "</table>";
 
         return $ret;
@@ -1471,7 +1514,9 @@ HTML;
 
     public function get_id_view()
     {
-        $this->addScript('edit.js?20160105');
+        $this->addScript($this->config->get('URL') . 'src/javascript/chosen/chosen.jquery.min.js');
+        $this->addCssFile($this->config->get('URL') . 'src/javascript/chosen/bootstrap-chosen.css');
+        $this->addScript('edit.js?20180523');
         $this->addCssFile('index.css');
         $this->addOnloadCommand('$(\'#addItemUPC\').focus()');
         $this->addOnloadCommand("enableLinea('#addItemUPC');\n");

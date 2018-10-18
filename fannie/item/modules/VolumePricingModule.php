@@ -71,25 +71,46 @@ class VolumePricingModule extends \COREPOS\Fannie\API\item\ItemModule
         return $ret;
     }
 
+    private function getStores()
+    {
+        $store_model = new StoresModel($this->db());
+        $store_model->hasOwnItems(1);
+        $stores = array();
+        foreach ($store_model->find('storeID') as $obj) {
+            $stores[$obj->storeID()] = $obj;
+        }
+        if (count($stores) == 0) {
+            $store_model->storeID(1);
+            $store_model->description('DEFAULT STORE');
+            $stores[1] = $store_model;
+        }
+
+        return $stores;
+    }
+
     public function SaveFormData($upc)
     {
         $upc = BarcodeLib::padUPC($upc);
         $dbc = $this->db();
 
-        $model = new ProductsModel($dbc);
-        $model->upc($upc);
-        $model->store_id(1);
+        $stores = $this->getStores();
+        $r1 = false;
+        foreach ($stores as $key => $store) {
+            $model = new ProductsModel($dbc);
+            $model->upc($upc);
+            $model->store_id($store->storeID());
 
-        $method = FormLib::get_form_value('vp_method',0);
-        $qty = FormLib::get_form_value('vp_qty',0);
-        $price = FormLib::get_form_value('vp_price',0);
-        $mixmatch = FormLib::get_form_value('vp_mm',0);
+            $method = FormLib::get_form_value('vp_method',0);
+            $qty = FormLib::get_form_value('vp_qty',0);
+            $price = FormLib::get_form_value('vp_price',0);
+            $mixmatch = FormLib::get_form_value('vp_mm',0);
 
-        $model->pricemethod($method);
-        $model->quantity($qty);
-        $model->groupprice($price);
-        $model->mixmatchcode($mixmatch);
-        $r1 = $model->save();
+            $model->pricemethod($method);
+            $model->quantity($qty);
+            $model->groupprice($price);
+            $model->mixmatchcode($mixmatch);
+            $r1 = $model->save();
+        }
 
         if ($r1 === false) {
             return false;

@@ -36,17 +36,17 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
     protected $fontH = 'ModestoOpenInlineFillH';
     protected $fontM = 'ModestoOpenInlineFillM';
 
-    protected $width = 215;
-    protected $height = 90;
-    protected $startX = 75;
-    protected $startY = 60;
+    protected $width = 288;
+    protected $height = 124;
+    protected $startX = 18;
+    protected $startY = 25;
     protected $borderLineWidth=5;
     public function drawPDF()
     {
         set_time_limit(660);
         //define('FPDF_FONTPATH', dirname(__FILE__) . '/../../../src/fpdf/font/');
         define('FPDF_FONTPATH',dirname(__FILE__) . '/../../../src/fpdf/font/proprietary/');
-        $pdf = new \FpdfWithMultiCellCount('L', 'pt', 'Letter');
+        $pdf = new \FpdfWithMultiCellCount('P', 'pt', 'Letter');
         $pdf->AddFont('ModestoIOpenPrimary','','ModestoIOpenPrimary.php');
         $pdf->AddFont('ModestoOpenInlineFillH', '', 'ModestoOpen-InlineFillH.php');
         $pdf->AddFont('ModestoOpenInlineFillM', '','ModestoOpen-InlineFillM.php');
@@ -64,7 +64,7 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
         $xOffset = $this->width + $this->borderLineWidth +1;
         $yOffset = $this->height + $this->borderLineWidth +1;
         foreach ($data as $item) {
-            if ($count % 15 === 0) {
+            if ($count % 10 === 0) {
                 $pdf->AddPage();
                 $sign = 0;
                 //$file = dirname(__FILE__) . '/../../../item/images/MemberAlminac2x4BG.jpg';
@@ -72,8 +72,8 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
                 //    $pdf->Image($file, 45, 55, 700);
                 //}
             }
-            $row = floor($sign / 3);
-            $column = $sign % 3;
+            $row = floor($sign / 2);
+            $column = $sign % 2;
             $info = $this->getExtraInfo($item['upc']);
             $y=$this->startY;
             $x=$this->startX;
@@ -89,7 +89,7 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
             $pdf->SetLineWidth(1);
             
             //CAKE of the month.
-            $fontSize = 15;
+            $fontSize = 21;
             $y += $this->borderLineWidth +1;
             $pdf->SetFont($this->fontHead, '',$fontSize);
             $pdf->SetTextColor(150,113,70);
@@ -98,27 +98,27 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
 
             $pdf->SetTextColor(30,77,44);
             //Made Right here logo
-            $y += $fontSize -1;
+            $y += $fontSize +2;
             $imagePath = dirname(__FILE__) . '/../../../item/images/MadeRightHere.png';
-            $imageWidth = 45;
-            $imageStartX = $this->startX+$this->borderLineWidth +12;
+            $imageWidth = 61;
+            $imageStartX = $this->startX+$this->borderLineWidth +19;
             $pdf->Image($imagePath, $imageStartX+$xOffset*$column, $y, $imageWidth);
             //Member Banner
             $imagePath = dirname(__FILE__) . '/../../../item/images/MembersOnlybanner.png';
-            $imageWidth = $this->width*.4;
+            $imageWidth = $this->width*.40;
             $imageStartX = $this->startX+2;
-            $pdf->Image($imagePath, $imageStartX+$xOffset*$column, $y+32, $imageWidth);
+            $pdf->Image($imagePath, $imageStartX+$xOffset*$column, $y+43, $imageWidth);
 
             //price
-            $x += 87; //space from edge to the start of the text elements.
+            $x += 116; //space from edge to the start of the text elements.
             $y += 3; //space bewtten top and start of first element.
-            $fontSize = 24;
+            $fontSize = 26;
             $pdf->SetFont($this->fontM,'',$fontSize);
             $pdf->SetXY($x, $y);
             $pdf->Cell($textWidth, $fontSize, sprintf('$%.2f', $item['normal_price']), 0, 0, 'C');
             //Member Alminac Price
             $y += $fontSize;
-            $fontSize = 5.75; 
+            $fontSize = 8.75; 
             $cellSize = 30; // for compression, need to chagne x by this amount and width to make the letters closer.
             $pdf->SetXY($x+$cellSize/2, $y);
             $pdf->SetFont($this->fontH,'',$fontSize);
@@ -126,7 +126,7 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
 
             //sale date.
             $y += $fontSize + .5;
-            $fontSize = 7;
+            $fontSize = 9;
             $cellSize = 53;
             $pdf->SetFont($this->font,'',$fontSize);
             $pdf->SetXY($x+$cellSize/2, $y);
@@ -138,7 +138,7 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
 
             //desciption
             $y += $fontSize + 1.5;
-            $fontSize = 9;
+            $fontSize = 11;
             $pdf->SetFont($this->fontH,'',$fontSize);
             $pdf->SetXY($x, $y);
             $pdf->Cell($textWidth, $fontSize, $item['description'],0, 0, 'C');
@@ -147,7 +147,7 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
             //brand
             $brand = 'FRANKLIN COMMUNITY CO-OP';
             $y += $fontSize +1;
-            $fontSize = 6.1;
+            $fontSize = 8.1;
             $spacing = 5;
             $pdf->SetFont($this->fontM,'',$fontSize);
             $pdf->SetXY($x, $y);            
@@ -156,7 +156,7 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
 
             //reg price
             $y += $fontSize+2;
-            $fontSize = 6.72;
+            $fontSize = 8.72;
             $pdf->SetFont($this->fontM,'',$fontSize);
             $pdf->SetXY($x+3, $y);
             $pdf->Cell($textWidth/2 -3, $fontSize, sprintf('REG. $%.2f', $info['normal_price']), 0,0, 'L');

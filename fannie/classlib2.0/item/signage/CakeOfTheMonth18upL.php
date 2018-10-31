@@ -138,7 +138,7 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
 
             //desciption
             $y += $fontSize + 1.5;
-            $fontSize = 11;
+            $fontSize = 10;
             $pdf->SetFont($this->fontH,'',$fontSize);
             $pdf->SetXY($x, $y);
             $pdf->Cell($textWidth, $fontSize, $item['description'],0, 0, 'C');

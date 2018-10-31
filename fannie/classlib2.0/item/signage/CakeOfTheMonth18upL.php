@@ -138,11 +138,12 @@ class CakeOfTheMonth18upL extends \COREPOS\Fannie\API\item\FannieSignage
 
             //desciption
             $y += $fontSize + 1.5;
-            $fontSize = 10;
+            $fontSize = 11;
             $pdf->SetFont($this->fontH,'',$fontSize);
             $pdf->SetXY($x, $y);
-            $lines = $pdf->MultiCellRet($textWidth, $fontSize, $item['description'],0, 0, 'C');
+            $lines = $pdf->MultiCellRet($textWidth, $fontSize, $item['description'],0, 'C');
             $blankSpace = ($lines==1) ? $fontSize : 0;
+            //$pdf->Cell($textWidth/2, $fontSize, sprintf('REG. $%.2f', $info['normal_price']), 0,0, 'L');
             //MultiCellRet
             
             //$pdf->Ln(1);

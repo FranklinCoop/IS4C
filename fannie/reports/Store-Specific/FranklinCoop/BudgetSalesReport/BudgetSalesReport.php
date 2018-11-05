@@ -434,7 +434,7 @@ class BudgetSalesReport extends FannieReportPage
 		$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate,1), SUM(b.budget) 
 			FROM gfm_approach.daily_dept_sales_budget b
 			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
-			JOIN core_op.superdeptnames s on s.superID = m.superDeptNo
+			JOIN core_op.superDeptNames s on s.superID = m.superDeptNo
 			WHERE b.budgetDate BETWEEN ? AND ? AND m.storeNo = ?
 			GROUP BY WEEK(b.budgetDate, 1)");
 		$budgetR = $dbc->execute($budgetQ, $args);

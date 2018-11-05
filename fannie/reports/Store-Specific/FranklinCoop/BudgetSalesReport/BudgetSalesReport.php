@@ -47,7 +47,7 @@ class BudgetSalesReport extends FannieReportPage
     protected $showCharts = true;
 
     public $totalsChart = array();
-    //public $ = array();
+    public $deptCharts = array();
 
 	function report_description_content() {
 		return(array('<p>Budget vs sales report</p>'));
@@ -60,7 +60,7 @@ class BudgetSalesReport extends FannieReportPage
         if ($this->content_function == 'report_content' && $this->report_format == 'html') {
             $this->addScript('../../../../src/javascript/Chart.min.js');
             $this->addScript('../../../../src/javascript/CoreChart.js');
-            $this->addScript('budgetSales.js?=20181031');
+            $this->addScript('budgetSales.js?=20181105');
         }
 
         return true;
@@ -109,6 +109,7 @@ class BudgetSalesReport extends FannieReportPage
 		for ($i=0; $i < count($report); $i++) { 
 			$table = $report[$i];
 			$chart = array();
+			$charts = array();
 			$labels = array();
 			$data = array();
 			$salesBudget = array();
@@ -116,28 +117,35 @@ class BudgetSalesReport extends FannieReportPage
 			$pySales = array();
 			for ($j=0; $j < count($table); $j++) { 
 				$row = $table[$j];
-				//if ($j== ceil((sizeof($report)/2))) {
+				if ($j== ceil((sizeof($report)/2))) {
 					$row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f',(1 - $row[3]/$row[2])*100).'%' ;
 				    $row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f',(1 - $row[1]/$row[2])*100).'%' ;
 				    $data[] = $row;
-				//}
+				}
 
 				//$row[] = sprintf('%.2f',(1 - $row[3]/$row[2])*100).'%';
 				//$row[] = sprintf('%.2f',(1 - $row[1]/$row[2])*100).'%';
 				//$table[$j] = $row;
 				// format for the chart here because the javascript seems slow.
-				if ($i==0) {
-					$lables[] = $row[0];
-					$salesBudget[] = $row[1];
-					$cySales[] = ($row[2]==0) ? null : $row[2];
-					$pySales[] = $row[3];
-				}
+				
+				$labels[] = $row[0];
+				$salesBudget[] = $row[1];
+				$cySales[] = ($row[2]==0) ? null : $row[2];
+				$pySales[] = $row[3];
+
+
 			}
-			$chart[] = $lables;
+			$chart[] = $labels;
 			$chart[] = $salesBudget;
 			$chart[] = $cySales;
 			$chart[] = $pySales;
-			if($i==0){$this->totalsChart = $chart;}
+
+			//$this->deptCharts[] = $chart;
+			if($i==0){
+				$this->totalsChart = $chart;
+			} else {
+				$this->deptCharts[] = $chart;
+			}
 			$report[$i] = $data;
 		}
 
@@ -282,6 +290,7 @@ class BudgetSalesReport extends FannieReportPage
 			JOIN core_op.superdepts s on t.department = s.dept_ID
 			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
 			AND t.trans_type IN ('D', 'I') AND s.superID < 14
+			AND WEEK(t.tdate) != WEEK(NOW())
 			group by s.superID,WEEK(t.tdate) order by s.superID");
         $salesR = $dbc->execute($salesQ, $args);
 
@@ -313,6 +322,7 @@ class BudgetSalesReport extends FannieReportPage
         	$report[] = $record;
 
         }
+        $data[] = $report; // deal with the last value.
 
 
 
@@ -342,6 +352,13 @@ class BudgetSalesReport extends FannieReportPage
         	if(array_key_exists($i,$report)){ $report[$i] = array_merge($report[$i],$record); }
         	$i++;
         }
+        if ($i < sizeof($report)) {
+      		while ($i < sizeof($report)){
+      			$report[$i] = array_merge($report[$i],array(0)); ;
+       			$i++;
+       		}	
+       	}
+        $data[$currentDept-1] = $report; // loop doesn't assign the last set.
         
         $nextDept = 2;
         $currentDept = 1;
@@ -362,7 +379,7 @@ class BudgetSalesReport extends FannieReportPage
         	if(array_key_exists($i,$report)){ $report[$i] = array_merge($report[$i],$record); }
         	$i++;
         }
-
+        $data[$currentDept-1] = $report; // loop doesn't assign the last set.
 
         /*
         
@@ -461,6 +478,7 @@ class BudgetSalesReport extends FannieReportPage
 			FROM core_trans.dlog_90_view t
 			JOIN core_op.superdepts s on t.department = s .dept_ID
 			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
+			AND WEEK(t.tdate) != WEEK(NOW())
 			AND t.trans_type IN ('D', 'I') AND s.superID < 14
 			GROUP BY WEEK(CAST(t.`tdate` AS DATE))");
 		$salesR = $dbc->execute($salesQ, $args);
@@ -581,18 +599,14 @@ class BudgetSalesReport extends FannieReportPage
         $default = parent::report_content();
 
         if ($this->report_format == 'html') {
-            $default .= '<div class="row">
-                <div class="col-sm-10"><canvas id="dailyCanvas"></canvas></div>
-                </div><div class="row">
-                <div class="col-sm-10"><canvas id="totalCanvas"></canvas></div>
-                </div>';
             $default .= '
             <script type="text/javascript">
     			var totalsChart = '. json_encode($this->totalsChart) .';
+    			var deptCharts = '.json_encode($this->deptCharts) .';
 			</script>';
 
             $this->addOnloadCommand('budgetSales.totals('.(count($this->report_headers)-2).');');
-            //$this->addOnloadCommand('chartAll('.(count($this->report_headers)-1).')');
+            $this->addOnloadCommand('budgetSales.chartAll('.(count($this->report_headers)-2).')');
         }
 
         return $default;

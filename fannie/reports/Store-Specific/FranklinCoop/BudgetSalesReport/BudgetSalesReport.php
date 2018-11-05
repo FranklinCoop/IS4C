@@ -38,9 +38,16 @@ class BudgetSalesReport extends FannieReportPage
     protected $sortable = false;
     protected $no_sort_but_style = true;
     protected $new_tablesorter = true;
+    protected $multi_report_mode = true;
 
-    protected $report_headers = array('Dept Name','OverShort','LastYear','Budget');
+    protected $report_headers = array('Dept Name','Budget','This Year','Last Year', '% Change', '% Budget');
     protected $required_fields = array('date1','date2');
+    protected $deptGroups = array('Default','Bakery','PFD', 'Grocery','Bulk','Beer', 'Perishable','Perishable','Perishable','Perishable', 
+    	'Produce', 'Wellness', 'Wellness', 'Wellness', 'Wellness');
+    protected $showCharts = true;
+
+    public $totalsChart = array();
+    //public $ = array();
 
 	function report_description_content() {
 		return(array('<p>Budget vs sales report</p>'));
@@ -51,8 +58,9 @@ class BudgetSalesReport extends FannieReportPage
         parent::preprocess();
         // custom: needs graphing JS/CSS
         if ($this->content_function == 'report_content' && $this->report_format == 'html') {
-            $this->addScript('../../src/javascript/Chart.min.js');
-            $this->addScript('../../src/javascript/CoreChart.js');
+            $this->addScript('../../../../src/javascript/Chart.min.js');
+            $this->addScript('../../../../src/javascript/CoreChart.js');
+            $this->addScript('budgetSales.js?=20181031');
         }
 
         return true;
@@ -68,75 +76,299 @@ class BudgetSalesReport extends FannieReportPage
 		$superDepts = FormLib::get_form_value('buyer','');
 		$store = FormLib::get('store', 0);
 
-		//$startThisYear = DateTime::createFromFormat($d1,'Y-m-d');
 		$startThisYear = DateTime::createFromFormat('Y-m-d' ,$d1);
+   		$startThisYear->modify('-4 weeks');
 		$startDay = $startThisYear->format('l');
 		$startLastYear = DateTime::createFromFormat('Y-m-d' ,$d1);
-		$startLastYear->modify('-1 year');
+		$startLastYear->modify('-52 weeks');
 		$startLastYear->modify('next ' . $startDay);
+		$startLastYear->modify('-4 weeks');
 		$endThisYear = DateTime::createFromFormat('Y-m-d' ,$d2);
+		$endThisYear->modify('+5 weeks');
 		$endDay = $endThisYear->format('l');
 		$endLastYear = DateTime::createFromFormat('Y-m-d' ,$d2);
-		$endLastYear->modify('-1 year');
+		$endLastYear->modify('+5 weeks');
+		$endLastYear->modify('-52 weeks');
 		$endLastYear->modify('next ' . $endDay);
 
 		$dlog = DTransactionsModel::selectDTrans($d1,$d2);
 
-		$args = array($startThisYear->format('Y-m-d'), $endThisYear->format('Y-m-d'),$store);
-		$budgetQ = $dbc->prepare("SELECT  MAX(s.super_name) as deptName, SUM(b.budget) as budget
-			FROM gfm_approach.daily_dept_sales_budget b
-			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
-			JOIN core_op.superdeptnames s on s.superID = m.superDeptNo
-		WHERE b.budgetDate BETWEEN ? AND ? AND m.storeNo = ? GROUP BY b.sageAcctNo");
-        $budgetR = $dbc->execute($budgetQ,$args);
-        
-		$report = $this->getFiscalYearBalnce($endThisYear, $dbc, $store);
-        $i = 0;
-    	while($row = $dbc->fetchRow($budgetR)){
-        	$record = array();
-        	//$record[] = $row[0];
-        	$record[] = sprintf('%.2f',$row[1]);
-        	$report[$i] = array_merge($report[$i],$record);
-            $i++;
-        }
+		$report = array();
+		
+		$report[] = $this->getStoreTotals($dbc,$store,$d1,$d2);
 
-        $args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
-        $lastYearQ = $dbc->prepare('SELECT MAX(m.superDeptNo) as superDept ,SUM(s.creditAmt) as deptSales 
-        	FROM gfm_approach.daily_sales_sage s
-			JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
-			where `date` between ? AND ? AND m.storeNo = ? group by s.accountID');
-        $lastYearR = $dbc->execute($lastYearQ,$args);
-       	
-       	$i=0;
-        while($row = $dbc->fetchRow($lastYearR)){
-        	$record = array();
-        	//$record[] = $row[0];
-        	$record[] = sprintf('%.2f',$row[1]);
-        	$report[$i] = array_merge($report[$i],$record);
-            $i++;
-        }
+		//$this->totalsChart = $this->getStoreTotals($dbc,$store,$d1,$d2);
 
-        $args = array($d1.' 00:00:00', $d2.' 23:59:59', $store);
-        $salesQ = $dbc->prepare("SELECT s.superID, sum(t.total) 
-			FROM core_trans.transarchive t
-			JOIN core_op.superdepts s on t.department = s .dept_ID
-			WHERE t.`datetime` BETWEEN ? AND ? AND t.store_id = ?
-			AND t.trans_type IN ('D', 'I')
-			group by s.superID");
-        $salesR = $dbc->execute($salesQ, $args);
+		$report = array_merge($report, $this->getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear));
 
-        $i=0;
-        while($row = $dbc->fetchRow($salesR)){
-        	$record = array();
-        	$record[] = $row[0];
-        	$record[] = sprintf('%.2f',$row[1]);
-        	$report[$i] = array_merge($report[$i],$record);
-            $i++;
-        }
+		for ($i=0; $i < count($report); $i++) { 
+			$table = $report[$i];
+			$chart = array();
+			$labels = array();
+			$data = array();
+			$salesBudget = array();
+			$cySales = array();
+			$pySales = array();
+			for ($j=0; $j < count($table); $j++) { 
+				$row = $table[$j];
+				//if ($j== ceil((sizeof($report)/2))) {
+					$row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f',(1 - $row[3]/$row[2])*100).'%' ;
+				    $row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f',(1 - $row[1]/$row[2])*100).'%' ;
+				    $data[] = $row;
+				//}
 
+				//$row[] = sprintf('%.2f',(1 - $row[3]/$row[2])*100).'%';
+				//$row[] = sprintf('%.2f',(1 - $row[1]/$row[2])*100).'%';
+				//$table[$j] = $row;
+				// format for the chart here because the javascript seems slow.
+				if ($i==0) {
+					$lables[] = $row[0];
+					$salesBudget[] = $row[1];
+					$cySales[] = ($row[2]==0) ? null : $row[2];
+					$pySales[] = $row[3];
+				}
+			}
+			$chart[] = $lables;
+			$chart[] = $salesBudget;
+			$chart[] = $cySales;
+			$chart[] = $pySales;
+			if($i==0){$this->totalsChart = $chart;}
+			$report[$i] = $data;
+		}
 
 
 		return $report;
+	}
+
+	private function departmentTotals($dbc,$store,$date1,$date2, $deptarments='All') {
+		$startThisYear = DateTime::createFromFormat('Y-m-d' ,$date1);
+   		$startThisYear->modify('-4 weeks');
+		$startDay = $startThisYear->format('l');
+		$startLastYear = DateTime::createFromFormat('Y-m-d' ,$date1);
+		$startLastYear->modify('-52 weeks');
+		$startLastYear->modify('next ' . $startDay);
+		$startLastYear->modify('-4 weeks');
+		$endThisYear = DateTime::createFromFormat('Y-m-d' ,$date2);
+		$endThisYear->modify('+5 weeks');
+		$endDay = $endThisYear->format('l');
+		$endLastYear = DateTime::createFromFormat('Y-m-d' ,$date2);
+		$endLastYear->modify('+5 weeks');
+		$endLastYear->modify('-52 weeks');
+		$endLastYear->modify('next ' . $endDay);
+
+		$report = array();
+		$deptarments = array(2,3,4,6,7,8,9,10,11,12,13,14);
+		foreach ($deptarments as $key => $department) {
+			$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate, 1), SUM(b.budget),m.superDeptNo
+				FROM gfm_approach.daily_dept_sales_budget b
+				JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
+				WHERE b.budgetDate BETWEEN ? AND ?  AND m.storeNo = ?
+				GROUP BY m.superDeptNo,WEEK(b.budgetDate, 1) ORDER BY m.superDeptNo");
+        	$budgetR = $dbc->execute($budgetQ,$args);
+
+        	$args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
+        	$lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`, 1) ,SUM(s.creditAmt) as deptSales, m.superDeptNo 
+        		FROM gfm_approach.daily_sales_sage s
+				JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
+				where `date` between ? AND ? AND m.storeNo = ? group by m.superDeptNo, WEEK(s.`date`, 1) order by m.superDeptNo');
+        	$lastYearR = $dbc->execute($lastYearQ,$args);
+
+        	$args = array($startThisYear->format('Y-m-d').' 00:00:00', $endThisYear->format('Y-m-d').' 23:59:59', $store);
+        	$salesQ = $dbc->prepare("SELECT WEEK(t.tdate, 1), sum(t.total), s.superID
+				FROM core_trans.dlog_90_view t
+				JOIN core_op.superdepts s on t.department = s.dept_ID
+				WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
+				AND t.trans_type IN ('D', 'I') AND s.superID < 14
+				group by s.superID,WEEK(t.tdate, 1) order by s.superID");
+        	$salesR = $dbc->execute($salesQ, $args);
+
+        	$table = $this->createBlankTable($startThisYear,$endThisYear);
+        	$i = 0;
+        	while ($budgetW = $dbc->fetchRow($budgetW)) {
+        		$row = $table[$i];
+        		for ($j=$i; $j<sizeof($table )-$i;$j++){
+        			if ($row[0] == $budgetW[0]) {
+        				$row[] = $budget[1];
+        				$i++;
+        				continue;
+        			} else {
+        				$row = $table[$j];
+        			}
+        		}
+
+        	}
+
+        	$report[] = $table;
+		}
+		
+		return $report;
+
+		/*
+		$budgetQ .= "SELECT WEEK(b.budgetDate,1), SUM(b.budget) 
+			FROM gfm_approach.daily_dept_sales_budget b
+			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
+			JOIN core_op.superdeptnames s on s.superID = m.superDeptNo
+			WHERE b.budgetDate BETWEEN ? AND ? AND m.storeNo = ?
+			GROUP BY WEEK(b.budgetDate, 1)";
+		$lastYearQ .="";
+		$salesQ .="";
+
+		if ($department == 'All') {
+			$budgetQ .= "";
+			$lastYearQ .="";
+			$salesQ .="";
+		} else {
+			switch ($department) {
+				case '6':
+				case '7':
+				case '8':
+				case '9': // perishable.
+					$budgetQ .= " AND s.superID IN (6,7,8,9)";
+					$lastYearQ .=" AND s.superID IN (6,7,8,9)";
+					$salesQ .=" AND s.superID IN (6,7,8,9)";
+				case '11':
+				case '12':
+				case '13': //wellness
+					$budgetQ .= " AND s.superID IN (11,12,13)";
+					$lastYearQ .=" AND m.superDeptNo IN (11,12,13)";
+					$salesQ .=" AND s.superID IN (11,12,13)";
+					break;
+				default:
+					$budgetQ .= " AND s.superID = ".$department;
+					$lastYearQ .=" AND m.superDeptNo = ".$department;
+					$salesQ .=" AND s.superID = ".$department;
+					break;
+			}
+		}
+*/
+	}
+
+	private function createBlankTable($start, $end){
+		$table = array();
+		while ($start->diff($end)->d != 0) {
+			$row = array($start->format('M'));
+			$table[] = $row;
+			$start->modify('+7 days');
+		}
+		return $table;
+	}
+
+	private function getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear) {
+		$report = array();
+		$data = array();
+		$args = array($startThisYear->format('Y-m-d'), $endThisYear->format('Y-m-d'),$store);
+		$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate, 1), SUM(b.budget),m.superDeptNo
+			FROM gfm_approach.daily_dept_sales_budget b
+			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
+			WHERE b.budgetDate BETWEEN ? AND ?  AND m.storeNo = ?
+			GROUP BY m.superDeptNo,WEEK(b.budgetDate, 1) ORDER BY m.superDeptNo");
+        $budgetR = $dbc->execute($budgetQ,$args);
+
+        $args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
+        $lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`, 1) ,SUM(s.creditAmt) as deptSales, m.superDeptNo 
+        	FROM gfm_approach.daily_sales_sage s
+			JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
+			where `date` between ? AND ? AND m.storeNo = ? group by m.superDeptNo, WEEK(s.`date`, 1) order by m.superDeptNo');
+        $lastYearR = $dbc->execute($lastYearQ,$args);
+
+        $args = array($startThisYear->format('Y-m-d').' 00:00:00', $endThisYear->format('Y-m-d').' 23:59:59', $store);
+        $salesQ = $dbc->prepare("SELECT WEEK(t.tdate, 1), sum(t.total), s.superID
+			FROM core_trans.dlog_90_view t
+			JOIN core_op.superdepts s on t.department = s.dept_ID
+			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
+			AND t.trans_type IN ('D', 'I') AND s.superID < 14
+			group by s.superID,WEEK(t.tdate, 1) order by s.superID");
+        $salesR = $dbc->execute($salesQ, $args);
+
+        $i=0;
+        $nextDept = 2; // starts at 2 assuming the first dept is 1
+        //$report = array();
+        while($budgetW = $dbc->fetchRow($budgetR)){
+        	//echo '<script>console.log("'.$nextDept.' : '.$budgetW[2].'");</script>';
+        	//Checking what department we are in by dept_no
+        	if($budgetW[2] == $nextDept){	
+        		$data[] = $report;
+        		$report = array();
+        		$nextDept = $budgetW[2] + 1;
+        		if($store == 1 && $nextDept == 5) {$nextDept = 6;};
+        		//$data[] = $report;
+        		//$report = $data[$nextDept];
+        		//$report = array();
+        	}
+        	$record = array();
+       
+        	// calculate the date start from the numaric date
+        	$graphDate = new DateTime();
+			$graphDate->setISODate(date('Y'),$budgetW[0]);
+			$record[] = $graphDate->format('m-d');
+        	//$record[] = sprintf('%.2f',$budgetW[2]);
+        	$record[] = sprintf('%.2f',$budgetW[1]);
+        	//$record[] = sprintf('%.2f',$lastYearW[2]);
+        	$report[] = $record;
+
+        }
+
+
+
+        $nextDept = 2;
+        $currentDept = 1;
+        $report = $data[0]; // start with the dept 1 report.
+        $i=0;
+        while($salesW = $dbc->fetchRow($salesR)){
+        	echo '<script>console.log(" SALES:'.$nextDept.' : '.$salesW[2].'");</script>';
+        	if($salesW[2] == $nextDept){	
+        		if ($i < sizeof($report)) {
+        			while ($i < sizeof($report)){
+        				$report[$i] = array_merge($report[$i],array(0)); ;
+        				$i++;
+        			}	
+        		}
+        		$data[$currentDept - 1] = $report;
+        		$report = $data[$currentDept];
+        		//$report = $data[$nextDept - 1];
+        		$nextDept = $salesW[2] + 1;
+        		if($store == 1 && $nextDept == 5) {$nextDept = 6;}; // this is a cludge to take out beer for greenfield.
+        		$currentDept = ($store == 1 && $nextDept > 4) ? $nextDept - 2 : $nextDept -1;
+        		$i = 0;
+        	}
+        	$record = array();
+        	$record[] = sprintf('%.2f',$salesW[1]);
+        	if(array_key_exists($i,$report)){ $report[$i] = array_merge($report[$i],$record); }
+        	$i++;
+        }
+        
+        $nextDept = 2;
+        $currentDept = 1;
+        $report = $data[0]; // start with the dept 1 report.
+        $i=0;
+        while($lastYearW = $dbc->fetchRow($lastYearR)){
+        	if($lastYearW[2] == $nextDept){	
+        		$data[$currentDept - 1] = $report;
+        		$report = $data[$currentDept];
+        		//$report = $data[$nextDept - 1];
+        		$nextDept = $lastYearW[2] + 1;
+        		if($store == 1 && $nextDept == 5) {$nextDept = 6;}; // this is a cludge to take out beer for greenfield.
+        		$currentDept = ($store == 1 && $nextDept > 4) ? $nextDept - 2 : $nextDept -1;
+        		$i = 0;
+        	}
+        	$record = array();
+        	$record[] = sprintf('%.2f',$lastYearW[1]);
+        	if(array_key_exists($i,$report)){ $report[$i] = array_merge($report[$i],$record); }
+        	$i++;
+        }
+
+
+        /*
+        
+			$record = array();
+			//$record[] = $row[0];
+			$record[] = (array_key_exists(1, $row)) ? $row[1] :  0;
+			//$record[] = $row[1];
+			if(array_key_exists($i,$data)){ $data[$i] = array_merge($data[$i],$record); }
+		
+        */
+
+        return $data;
 	}
 
 	function getFiscalYearBalnce($date,$dbc, $store) {
@@ -180,36 +412,136 @@ class BudgetSalesReport extends FannieReportPage
 		return $return;
    	}
 
+   	private function getStoreTotals($dbc,$store,$date1,$date2) {
+   		$startThisYear = DateTime::createFromFormat('Y-m-d' ,$date1);
+   		$startThisYear->modify('-4 weeks');
+		$startDay = $startThisYear->format('l');
+		$startLastYear = DateTime::createFromFormat('Y-m-d' ,$date1);
+		$startLastYear->modify('-52 weeks');
+		$startLastYear->modify('next ' . $startDay);
+		$startLastYear->modify('-4 weeks');
+		$endThisYear = DateTime::createFromFormat('Y-m-d' ,$date2);
+		$endThisYear->modify('+5 weeks');
+		$endDay = $endThisYear->format('l');
+		$endLastYear = DateTime::createFromFormat('Y-m-d' ,$date2);
+		$endLastYear->modify('+5 weeks');
+		$endLastYear->modify('-52 weeks');
+		$endLastYear->modify('next ' . $endDay);
+		
+
+		$data = array();
+		$args = array($startThisYear->format('Y-m-d'), $endThisYear->format('Y-m-d'),$store);
+		$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate,1), SUM(b.budget) 
+			FROM gfm_approach.daily_dept_sales_budget b
+			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
+			JOIN core_op.superdeptnames s on s.superID = m.superDeptNo
+			WHERE b.budgetDate BETWEEN ? AND ? AND m.storeNo = ?
+			GROUP BY WEEK(b.budgetDate, 1)");
+		$budgetR = $dbc->execute($budgetQ, $args);
+		while($row = $dbc->fetchRow($budgetR)) {
+			$record = array();
+			$graphDate = new DateTime();
+			$graphDate->setISODate(date('Y'),$row[0]);
+			$record[] = $graphDate->format('m-d');
+			$record[] = $row[1];
+			$data[] = $record;
+		}
+
+		$startThisYear->setTime(00,00,00);
+		$endThisYear->setTime(23,59,58);
+		$args = array($startThisYear->format('Y-m-d H:i:s'), $endThisYear->format('Y-m-d H:i:s'),$store);
+		$salesQ = $dbc->prepare("SELECT WEEK(CAST(t.`tdate` AS DATE),1), sum(t.total) 
+			FROM core_trans.dlog_90_view t
+			JOIN core_op.superdepts s on t.department = s .dept_ID
+			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
+			AND t.trans_type IN ('D', 'I') AND s.superID < 14
+			GROUP BY WEEK(CAST(t.`tdate` AS DATE),1)");
+		$salesR = $dbc->execute($salesQ, $args);
+
+		$i = 0;
+		while($row = $dbc->fetchRow($salesR)) {
+			$record = array();
+			//$record[] = $row[0];
+			$record[] = (array_key_exists(1, $row)) ? $row[1] : 'wtf' ;
+			if(array_key_exists($i,$data)){$data[$i] = array_merge($data[$i],$record);}
+			$i++;
+		}
+
+		$args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
+		$salesLastQ = $dbc->prepare("SELECT WEEK(s.`date`,1) ,SUM(s.creditAmt) as deptSales FROM gfm_approach.daily_sales_sage s
+			JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
+			WHERE `date` BETWEEN ? AND ? AND m.storeNo = ?
+			GROUP BY WEEK(s.`date`,1)");
+		$salesTotalR = $dbc->execute($salesLastQ,$args);
+
+		// add the zeros for the future weeks
+		while ($i < $dbc->numRows($salesTotalR)) {
+				$record = array();
+				$record[] = 0;
+				if(array_key_exists($i,$data)){$data[$i] = array_merge($data[$i],$record);}
+			    $i++;
+		}
+
+		$i = 0;
+		while($row = $dbc->fetchRow($salesTotalR)) {
+			$record = array();
+			//$record[] = $row[0];
+			$record[] = (array_key_exists(1, $row)) ? $row[1] :  0;
+			//$record[] = $row[1];
+			if(array_key_exists($i,$data)){ $data[$i] = array_merge($data[$i],$record); }
+			$i++;
+		}
+
+		return $data;
+   	}
+
 	function calculate_footers($data)
     {
-		/*switch($this->multi_counter){
-		case 1:
-			$this->report_headers[0] = 'Tenders';
-			break;
-		case 2:
-			$this->report_headers[0] = 'Sales';
-			break;
-		case 3:
-			$this->report_headers[0] = 'Discounts';
-			break;
-		case 4:
-			$this->report_headers[0] = 'Tax';
-			break;
-		case 5:
-			$this->report_headers = array('Type','Trans','Items','Avg. Items','Amount','Avg. Amount');
-			return array();
-			break;
-		case 6:
-			$this->report_headers = array('Mem#','Equity Type', 'Amount');
-			break;
-		}
-		$sumQty = 0.0;
-		$sumSales = 0.0;
-		foreach($data as $row){
-			$sumQty += $row[1];
-			$sumSales += $row[2];
-		}
-		return array(null,$sumQty,$sumSales);*/
+		$store = FormLib::get('store', 0);
+		switch($this->multi_counter){
+        case 1:
+            $this->report_headers[0] = 'Totals';
+            break;
+        case 2:
+            $this->report_headers[0] = 'Bakery';
+            break;
+        case 3:
+            $this->report_headers[0] = 'PFD';
+            break;
+        case 4:
+        	$this->report_headers[0] = 'Grocery: Dry Goods';
+            break;
+        case 5:
+        	$this->report_headers[0] = 'Grocery: Bulk';
+            break;
+        case 6:
+            $this->report_headers[0] = ($store == 1) ? 'Perishable: Cheese' : 'Grocery: Beer' ;
+            break;
+        case 7:
+            $this->report_headers[0] = ($store == 1) ? 'Perishable: Dairy' : 'Perishable: Cheese' ;
+            break;
+        case 8:
+            $this->report_headers[0] = ($store == 1) ? 'Perishable: Frozen' : 'Perishable: Dairy' ;
+            break;
+        case 9:
+            $this->report_headers[0] = ($store == 1) ? 'Perishable: Meat' : 'Perishable: Frozen' ;
+            break;
+        case 10:
+            $this->report_headers[0] = ($store == 1) ? 'Produce' : 'Perishable: Meat' ;
+            break;
+        case 11:
+            $this->report_headers[0] = ($store == 1) ? 'Wellness: Body Care' : 'Produce' ;
+            break;
+        case 12:
+            $this->report_headers[0] = ($store == 1) ? 'Wellness: Gen Merch' : 'Wellness: Body Care' ;
+            break;
+        case 13:
+            $this->report_headers[0] = ($store == 1) ? 'Wellness: Supplements' : 'Wellness: Gen Merch' ;
+            break;
+        case 14:
+        	$this->report_headers[0] = 'Wellness: Gen Merch';
+        	break;
+        }
 		return array();
 	}
 
@@ -247,36 +579,19 @@ class BudgetSalesReport extends FannieReportPage
                 </div><div class="row">
                 <div class="col-sm-10"><canvas id="totalCanvas"></canvas></div>
                 </div>';
+            $default .= '
+            <script type="text/javascript">
+    			var totalsChart = '. json_encode($this->totalsChart) .';
+			</script>';
 
-            $this->addOnloadCommand('chartAll('.(count($this->report_headers)-1).')');
+            $this->addOnloadCommand('budgetSales.totals('.(count($this->report_headers)-2).');');
+            //$this->addOnloadCommand('chartAll('.(count($this->report_headers)-1).')');
         }
 
         return $default;
     }
 
-        public function javascriptContent()
-    {
-        if ($this->report_format != 'html') {
-            return;
-        }
 
-        return <<<JAVASCRIPT
-function chartAll(totalCol) {
-    var xLabels = $('td.reportColumn0').toArray().map(x => x.innerHTML.trim());
-    var totals = $('td.reportColumn' + totalCol).toArray().map(x => Number(x.innerHTML.trim()));
-    var daily = [];
-    var dailyLabels = [];
-    for (var i=1; i<totalCol; i++) {
-        dailyLabels.push($('th.reportColumn'+i).first().text().trim());
-        var yData = $('td.reportColumn' + i).toArray().map(x => Number(x.innerHTML.trim()));
-        daily.push(yData);
-    }
-
-    CoreChart.lineChart('dailyCanvas', xLabels, daily, dailyLabels);
-    CoreChart.lineChart('totalCanvas', xLabels, [totals], ["Total"]);
-}
-JAVASCRIPT;
-    }
 
 	function form_content()
     {

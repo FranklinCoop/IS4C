@@ -81,15 +81,20 @@ class BudgetSalesReport extends FannieReportPage
 		$startDay = $startThisYear->format('l');
 		$startLastYear = DateTime::createFromFormat('Y-m-d' ,$d1);
 		$startLastYear->modify('-52 weeks');
-		$startLastYear->modify('next ' . $startDay);
+		//$startLastYear->modify('last ' . $startDay);
 		$startLastYear->modify('-4 weeks');
 		$endThisYear = DateTime::createFromFormat('Y-m-d' ,$d2);
-		$endThisYear->modify('+5 weeks');
+		$endThisYear->modify('+4 weeks');
 		$endDay = $endThisYear->format('l');
 		$endLastYear = DateTime::createFromFormat('Y-m-d' ,$d2);
-		$endLastYear->modify('+5 weeks');
+		$endLastYear->modify('+4 weeks');
 		$endLastYear->modify('-52 weeks');
-		$endLastYear->modify('next ' . $endDay);
+		//$endLastYear->modify('last ' . $endDay);
+
+		echo '<script>console.log(" Start:'.$startThisYear->format('W D : Y-m-d').' - END: '
+				.$endThisYear->format('W D : Y-m-d').'");</script>';
+		echo '<script>console.log(" Start:'.$startLastYear->format('W D : Y-m-d').' - END: '
+				.$endLastYear->format('W D : Y-m-d').'");</script>';
 
 		$dlog = DTransactionsModel::selectDTrans($d1,$d2);
 
@@ -159,27 +164,27 @@ class BudgetSalesReport extends FannieReportPage
 		$report = array();
 		$deptarments = array(2,3,4,6,7,8,9,10,11,12,13,14);
 		foreach ($deptarments as $key => $department) {
-			$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate, 1), SUM(b.budget),m.superDeptNo
+			$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate), SUM(b.budget),m.superDeptNo
 				FROM gfm_approach.daily_dept_sales_budget b
 				JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
 				WHERE b.budgetDate BETWEEN ? AND ?  AND m.storeNo = ?
-				GROUP BY m.superDeptNo,WEEK(b.budgetDate, 1) ORDER BY m.superDeptNo");
+				GROUP BY m.superDeptNo,WEEK(b.budgetDate) ORDER BY m.superDeptNo");
         	$budgetR = $dbc->execute($budgetQ,$args);
 
         	$args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
-        	$lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`, 1) ,SUM(s.creditAmt) as deptSales, m.superDeptNo 
+        	$lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`) ,SUM(s.creditAmt) as deptSales, m.superDeptNo 
         		FROM gfm_approach.daily_sales_sage s
 				JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
-				where `date` between ? AND ? AND m.storeNo = ? group by m.superDeptNo, WEEK(s.`date`, 1) order by m.superDeptNo');
+				where `date` between ? AND ? AND m.storeNo = ? group by m.superDeptNo, WEEK(s.`date`) order by m.superDeptNo');
         	$lastYearR = $dbc->execute($lastYearQ,$args);
 
         	$args = array($startThisYear->format('Y-m-d').' 00:00:00', $endThisYear->format('Y-m-d').' 23:59:59', $store);
-        	$salesQ = $dbc->prepare("SELECT WEEK(t.tdate, 1), sum(t.total), s.superID
+        	$salesQ = $dbc->prepare("SELECT WEEK(t.tdate), sum(t.total), s.superID
 				FROM core_trans.dlog_90_view t
 				JOIN core_op.superdepts s on t.department = s.dept_ID
 				WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
 				AND t.trans_type IN ('D', 'I') AND s.superID < 14
-				group by s.superID,WEEK(t.tdate, 1) order by s.superID");
+				group by s.superID,WEEK(t.tdate) order by s.superID");
         	$salesR = $dbc->execute($salesQ, $args);
 
         	$table = $this->createBlankTable($startThisYear,$endThisYear);
@@ -257,27 +262,27 @@ class BudgetSalesReport extends FannieReportPage
 		$report = array();
 		$data = array();
 		$args = array($startThisYear->format('Y-m-d'), $endThisYear->format('Y-m-d'),$store);
-		$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate, 1), SUM(b.budget),m.superDeptNo
+		$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate), SUM(b.budget),m.superDeptNo
 			FROM gfm_approach.daily_dept_sales_budget b
 			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
 			WHERE b.budgetDate BETWEEN ? AND ?  AND m.storeNo = ?
-			GROUP BY m.superDeptNo,WEEK(b.budgetDate, 1) ORDER BY m.superDeptNo");
+			GROUP BY m.superDeptNo,WEEK(b.budgetDate) ORDER BY m.superDeptNo");
         $budgetR = $dbc->execute($budgetQ,$args);
 
         $args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
-        $lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`, 1) ,SUM(s.creditAmt) as deptSales, m.superDeptNo 
+        $lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`) ,SUM(s.creditAmt) as deptSales, m.superDeptNo 
         	FROM gfm_approach.daily_sales_sage s
 			JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
-			where `date` between ? AND ? AND m.storeNo = ? group by m.superDeptNo, WEEK(s.`date`, 1) order by m.superDeptNo');
+			where `date` between ? AND ? AND m.storeNo = ? group by m.superDeptNo, WEEK(s.`date`) order by m.superDeptNo');
         $lastYearR = $dbc->execute($lastYearQ,$args);
 
         $args = array($startThisYear->format('Y-m-d').' 00:00:00', $endThisYear->format('Y-m-d').' 23:59:59', $store);
-        $salesQ = $dbc->prepare("SELECT WEEK(t.tdate, 1), sum(t.total), s.superID
+        $salesQ = $dbc->prepare("SELECT WEEK(t.tdate), sum(t.total), s.superID
 			FROM core_trans.dlog_90_view t
 			JOIN core_op.superdepts s on t.department = s.dept_ID
 			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
 			AND t.trans_type IN ('D', 'I') AND s.superID < 14
-			group by s.superID,WEEK(t.tdate, 1) order by s.superID");
+			group by s.superID,WEEK(t.tdate) order by s.superID");
         $salesR = $dbc->execute($salesQ, $args);
 
         $i=0;
@@ -298,8 +303,9 @@ class BudgetSalesReport extends FannieReportPage
         	$record = array();
        
         	// calculate the date start from the numaric date
-        	$graphDate = new DateTime();
-			$graphDate->setISODate(date('Y'),$budgetW[0]);
+			$graphDate = new DateTime();
+			$graphDate->setISODate(date('Y'),$budgetW[0]+1);
+			$graphDate->modify('last Sunday');
 			$record[] = $graphDate->format('m-d');
         	//$record[] = sprintf('%.2f',$budgetW[2]);
         	$record[] = sprintf('%.2f',$budgetW[1]);
@@ -315,7 +321,7 @@ class BudgetSalesReport extends FannieReportPage
         $report = $data[0]; // start with the dept 1 report.
         $i=0;
         while($salesW = $dbc->fetchRow($salesR)){
-        	echo '<script>console.log(" SALES:'.$nextDept.' : '.$salesW[2].'");</script>';
+        	//echo '<script>console.log(" SALES:'.$nextDept.' : '.$salesW[2].'");</script>';
         	if($salesW[2] == $nextDept){	
         		if ($i < sizeof($report)) {
         			while ($i < sizeof($report)){
@@ -421,27 +427,28 @@ class BudgetSalesReport extends FannieReportPage
 		$startLastYear->modify('next ' . $startDay);
 		$startLastYear->modify('-4 weeks');
 		$endThisYear = DateTime::createFromFormat('Y-m-d' ,$date2);
-		$endThisYear->modify('+5 weeks');
+		$endThisYear->modify('+4 weeks');
 		$endDay = $endThisYear->format('l');
 		$endLastYear = DateTime::createFromFormat('Y-m-d' ,$date2);
-		$endLastYear->modify('+5 weeks');
+		$endLastYear->modify('+4 weeks');
 		$endLastYear->modify('-52 weeks');
 		$endLastYear->modify('next ' . $endDay);
 		
 
 		$data = array();
 		$args = array($startThisYear->format('Y-m-d'), $endThisYear->format('Y-m-d'),$store);
-		$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate,1), SUM(b.budget) 
+		$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate), SUM(b.budget) 
 			FROM gfm_approach.daily_dept_sales_budget b
 			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
 			JOIN core_op.superDeptNames s on s.superID = m.superDeptNo
 			WHERE b.budgetDate BETWEEN ? AND ? AND m.storeNo = ?
-			GROUP BY WEEK(b.budgetDate, 1)");
+			GROUP BY WEEK(b.budgetDate)");
 		$budgetR = $dbc->execute($budgetQ, $args);
 		while($row = $dbc->fetchRow($budgetR)) {
 			$record = array();
 			$graphDate = new DateTime();
-			$graphDate->setISODate(date('Y'),$row[0]);
+			$graphDate->setISODate(date('Y'),$row[0]+1);
+			$graphDate->modify('last Sunday');
 			$record[] = $graphDate->format('m-d');
 			$record[] = $row[1];
 			$data[] = $record;
@@ -450,12 +457,12 @@ class BudgetSalesReport extends FannieReportPage
 		$startThisYear->setTime(00,00,00);
 		$endThisYear->setTime(23,59,58);
 		$args = array($startThisYear->format('Y-m-d H:i:s'), $endThisYear->format('Y-m-d H:i:s'),$store);
-		$salesQ = $dbc->prepare("SELECT WEEK(CAST(t.`tdate` AS DATE),1), sum(t.total) 
+		$salesQ = $dbc->prepare("SELECT WEEK(CAST(t.`tdate` AS DATE)), sum(t.total) 
 			FROM core_trans.dlog_90_view t
 			JOIN core_op.superdepts s on t.department = s .dept_ID
 			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
 			AND t.trans_type IN ('D', 'I') AND s.superID < 14
-			GROUP BY WEEK(CAST(t.`tdate` AS DATE),1)");
+			GROUP BY WEEK(CAST(t.`tdate` AS DATE))");
 		$salesR = $dbc->execute($salesQ, $args);
 
 		$i = 0;
@@ -468,10 +475,10 @@ class BudgetSalesReport extends FannieReportPage
 		}
 
 		$args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
-		$salesLastQ = $dbc->prepare("SELECT WEEK(s.`date`,1) ,SUM(s.creditAmt) as deptSales FROM gfm_approach.daily_sales_sage s
+		$salesLastQ = $dbc->prepare("SELECT WEEK(s.`date`) ,SUM(s.creditAmt) as deptSales FROM gfm_approach.daily_sales_sage s
 			JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
 			WHERE `date` BETWEEN ? AND ? AND m.storeNo = ?
-			GROUP BY WEEK(s.`date`,1)");
+			GROUP BY WEEK(s.`date`)");
 		$salesTotalR = $dbc->execute($salesLastQ,$args);
 
 		// add the zeros for the future weeks

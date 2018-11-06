@@ -36,7 +36,7 @@ var CoreChart = (function () {
         return ret;
     };
 
-    var lineDataSets = function(lineData, lineLabels) {
+    var lineDataSets = function(lineData, lineLabels,borderDash=false) {
         var datasets = [];
         for (var i=0; i<lineData.length; i++) {
             var set = {
@@ -46,7 +46,8 @@ var CoreChart = (function () {
                 backgroundColor: colors[i],
                 pointBackgroundColor: colors[i],
                 pointBorderColor: colors[i],
-                borderColor: colors[i]
+                borderColor: colors[i],
+                borderDash: borderDash[i]
             };
             datasets.push(set);
         }
@@ -54,14 +55,15 @@ var CoreChart = (function () {
         return datasets;
     };
 
-    mod.lineChart = function(elementID, xLabels, lineData, lineLabels) {
+    mod.lineChart = function(elementID, xLabels, lineData, lineLabels, borderDash=false) {
         var ctx = document.getElementById(elementID);
         var line = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: xLabels,
-                datasets: lineDataSets(lineData, lineLabels)
-            }
+                datasets: lineDataSets(lineData, lineLabels, borderDash)
+            },
+            options: {}
         });
     };
 

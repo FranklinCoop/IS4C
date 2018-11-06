@@ -117,7 +117,7 @@ class BudgetSalesReport extends FannieReportPage
 			$pySales = array();
 			for ($j=0; $j < count($table); $j++) { 
 				$row = $table[$j];
-				if ($j== ceil((sizeof($report)/2))) {
+				if ($j== floor((sizeof($table)/2))) {
 					$row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f',(1 - $row[3]/$row[2])*100).'%' ;
 				    $row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f',(1 - $row[1]/$row[2])*100).'%' ;
 				    $data[] = $row;

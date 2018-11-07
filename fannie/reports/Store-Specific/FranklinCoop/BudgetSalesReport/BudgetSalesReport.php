@@ -352,7 +352,7 @@ class BudgetSalesReport extends FannieReportPage
    		$salesTotalQ = $dbc->prepare("");
 
    		$salesTotalQ = $dbc->prepare("SELECT SUM(t.total), s.superID FROM core_trans.dlog_90_view t
-			JOIN core_op.superDepts s on t.department=s.dept_ID
+			JOIN core_op.superdepts s on t.department=s.dept_ID
 			WHERE  t.tdate BETWEEN ? AND ? AND t.store_id = ?
 			AND t.trans_type IN ('D', 'I') AND s.superID<15
 			GROUP BY s.superID ORDER BY s.superID");

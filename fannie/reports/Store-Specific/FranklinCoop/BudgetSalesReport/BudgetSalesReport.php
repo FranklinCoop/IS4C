@@ -45,9 +45,8 @@ class BudgetSalesReport extends FannieReportPage
   	
     protected $deptNames = array(0 => 'Store Totals', 1 => 'Bakery', 2=> 'PFD', 3=>'Grocery', 4=>'Bulk', 5=>'Cheese', 6=>'Dairy', 7=>'Frozen',
     	8=>'Meat',9=>'Produce', 10=>'Body Care', 11 =>'Genral Merch', 12=>'Supplements');
-    protected $tableNames = array(0=>'Totals', 1=> '',3=>'',4=>'',5=>'',6=>'Perishable',7=>'',8=>'Wellness');
-    protected $deptCanvases = array('Bakery','PFD', 'Grocery', 'Bulk', 'Perishable', 'Perishable', 'Perishable',
-    	'Perishable','Produce', 'Wellness','Wellness','Wellness');
+    protected $tableNames = array(0=>'Totals', 1=> '', 2=>'',3=>'',4=>'',5=>'',6=>'Perishable',7=>'',8=>'Wellness');
+    protected $deptCanvases = array('Bakery','PFD', 'Grocery', 'Bulk', 'Perishable', 'Perishable', 'Perishable', 'Perishable','Produce', 'Wellness','Wellness','Wellness');
     protected $canvasPos = array(2,3, 4, 5, 6, 6, 6,
     	6,7, 8,8,8);
     protected $showCharts = true;
@@ -66,7 +65,7 @@ class BudgetSalesReport extends FannieReportPage
         if ($this->content_function == 'report_content' && $this->report_format == 'html') {
             $this->addScript('../../../../src/javascript/Chart.min.js');
             $this->addScript('../../../../src/javascript/CoreChart.js');
-            $this->addScript('budgetSales.js?=20181106');
+            $this->addScript('budgetSales.js');
         }
 
         return true;
@@ -88,7 +87,7 @@ class BudgetSalesReport extends FannieReportPage
 		$startDay = $startThisYear->format('l');
 		$startLastYear = DateTime::createFromFormat('Y-m-d' ,$d1);
 		$startLastYear->modify('-52 weeks');
-		//$startLastYear->modify('last ' . $startDay);
+		$startLastYear->modify('next ' . $startDay);
 		$startLastYear->modify('-4 weeks');
 		$endThisYear = DateTime::createFromFormat('Y-m-d' ,$d2);
 		$endThisYear->modify('+4 weeks');
@@ -96,7 +95,7 @@ class BudgetSalesReport extends FannieReportPage
 		$endLastYear = DateTime::createFromFormat('Y-m-d' ,$d2);
 		$endLastYear->modify('+4 weeks');
 		$endLastYear->modify('-52 weeks');
-		//$endLastYear->modify('last ' . $endDay);
+		$endLastYear->modify('next ' . $endDay);
 
 		//echo '<script>console.log("Super: '.$superDepts.'");</script>';
 		//echo '<script>console.log(" Start:'.$startLastYear->format('W D : Y-m-d').' - END: '
@@ -106,15 +105,23 @@ class BudgetSalesReport extends FannieReportPage
 
 		$report = array();
 		
-		$report[] = $this->getStoreTotals($dbc,$store,$d1,$d2);
+		//$report[] = $this->getStoreTotals($dbc,$store,$d1,$d2);
 
 		//$this->totalsChart = $this->getStoreTotals($dbc,$store,$d1,$d2);
+		$report = $this->getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear);
 
 		//$report = array_merge($report, $this->departmentTotals($dbc,$store,$d1,$d2, $superDepts));
-		$report = array_merge($report, $this->getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear));
+		//$report = array_merge($report, $this->getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear));
 
 		$return = array();
 		$tableNo = 0;
+		$totalBudget = 0;
+		$totalThisYear = 0;
+		$totalLastYear = 0;
+		$tpyLine = array(0,0,0,0,0,0,0,0,0);
+		$tcyLine = array(0,0,0,0,0,0,0,0,0);
+		$tbdLine = array(0,0,0,0,0,0,0,0,0);
+		$tLabels = array();
 		for ($i=0; $i < count($report); $i++) { 
 			$table = $report[$i];
 			$chart = array();
@@ -131,15 +138,27 @@ class BudgetSalesReport extends FannieReportPage
 				$salesBudget[] = $row[1];
 				$cySales[] = ($row[2]==0) ? null : $row[2];
 				$pySales[] = $row[3];
+				if($i==0) 
+					$tLabels[] = $row[0];
+				$tbdLine[$j] += $row[1];
+				$tcyLine[$j] = ($row[2]==0) ? null : $tcyLine[$j]+$row[2];
+				$tpyLine[$j] += $row[3];
 
 				if ($j== floor((sizeof($table)/2))) {
-					$row[0] = $this->deptNames[$i];
+					//sum for the total table;
+					$totalBudget += $row[1];
+					$totalThisYear += $row[2];
+					$totalLastYear += $row[3];
+
+					
+					$row[0] = $this->deptNames[$i+1];
 					$row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f%%',(1 - $row[3]/$row[2])*100) ;
 				    $row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f%%',(1 - $row[1]/$row[2])*100) ;
 				    $row[1] = '$'.number_format($row[1],2);
 				    $row[2] = '$'.number_format($row[2],2);
 				    $row[3] = '$'.number_format($row[3],2);
 				    $data[] = $row;
+
 				}
 
 				//$row[] = sprintf('%.2f',(1 - $row[3]/$row[2])*100).'%';
@@ -154,14 +173,15 @@ class BudgetSalesReport extends FannieReportPage
 			$chart[] = $pySales;
 
 			//$this->deptCharts[] = $chart;
-			if($i==0){
-				$this->totalsChart = $chart;
-			} else {
+			//if($i==0){
+			//	$this->totalsChart = $chart;
+			//} else {
 				$this->deptCharts[] = $chart;
-			}
-			if(in_array($i, array(6,7,8))){
+			//}
+			//combine the preishable and wellness sub departments
+			if(in_array($i, array(5,6,7))){
 				$return[$tableNo-1] = array_merge($return[$tableNo-1], $data);
-			} elseif (in_array($i, array(11,12))) {
+			} elseif (in_array($i, array(10,11))) {
 				$return[$tableNo-1] = array_merge($return[$tableNo-1], $data);
 			} else {
 				$return[$tableNo] = $data;
@@ -169,8 +189,18 @@ class BudgetSalesReport extends FannieReportPage
 			}
 
 		}
+		$chart = array();
+		$chart[] = $tLabels;
+		$chart[] = $tbdLine;
+		$chart[] = $tcyLine;
+		$chart[] = $tpyLine;
+		$this->totalsChart = $chart;
+		//echo '<script>console.log("Budget: '.$totalBudget.'This: '.$totalThisYear.'Last: '.$totalLastYear.'");</script>';
 
-
+		$totalBudgetDiff = sprintf('%.2f%%',(1-$totalBudget/$totalThisYear)*100);
+		$totalLastYearDiff = sprintf('%.2f%%',(1-$totalLastYear/$totalThisYear)*100);
+		$totals = array('Store Totals','$'.number_format($totalBudget,2), '$'.number_format($totalThisYear,2),'$'.number_format($totalLastYear,2),$totalBudgetDiff,$totalLastYearDiff);
+		$return = array_merge(array(array($totals)),$return);	
 		return $return;
 	}
 
@@ -183,10 +213,10 @@ class BudgetSalesReport extends FannieReportPage
 		$startLastYear->modify('next ' . $startDay);
 		$startLastYear->modify('-4 weeks');
 		$endThisYear = DateTime::createFromFormat('Y-m-d' ,$date2);
-		$endThisYear->modify('+5 weeks');
+		$endThisYear->modify('+4 weeks');
 		$endDay = $endThisYear->format('l');
 		$endLastYear = DateTime::createFromFormat('Y-m-d' ,$date2);
-		$endLastYear->modify('+5 weeks');
+		$endLastYear->modify('+4 weeks');
 		$endLastYear->modify('-52 weeks');
 		$endLastYear->modify('next ' . $endDay);
 		
@@ -266,7 +296,7 @@ class BudgetSalesReport extends FannieReportPage
         	// calculate the date start from the numaric date
 			$graphDate = new DateTime();
 			$graphDate->setISODate(date('Y'),$budgetW[0]+1);
-			$graphDate->modify('last Sunday');
+			$graphDate->modify('last Saturday');
 			$record[] = $graphDate->format('m-d');
         	//$record[] = sprintf('%.2f',$budgetW[2]);
         	$record[] = sprintf('%.2f',$budgetW[1]);
@@ -404,7 +434,7 @@ class BudgetSalesReport extends FannieReportPage
         	// calculate the date start from the numaric date
 			$graphDate = new DateTime();
 			$graphDate->setISODate(date('Y'),$budgetW[0]+1);
-			$graphDate->modify('last Sunday');
+			$graphDate->modify('this Saturday');
 			$record[] = $graphDate->format('m-d');
         	//$record[] = sprintf('%.2f',$budgetW[2]);
         	$record[] = $budgetW[1];//number_format($budgetW[1],2);//sprintf('$%.2f',$budgetW[1]);
@@ -493,6 +523,8 @@ class BudgetSalesReport extends FannieReportPage
        		$date->modify('first day of october last year');
    		}
    		$args = array($date->format('Y-m-d'), $endDate->format('Y-m-d'),$store);
+   		$salesTotalQ = $dbc->prepare("");
+
    		$salesTotalQ = $dbc->prepare("SELECT s.superID, sum(t.total) 
 			FROM core_trans.transarchive t
 			JOIN core_op.superdepts s on t.department = s .dept_ID
@@ -555,7 +587,7 @@ class BudgetSalesReport extends FannieReportPage
 			$record = array();
 			$graphDate = new DateTime();
 			$graphDate->setISODate(date('Y'),$row[0]+1);
-			$graphDate->modify('last Sunday');
+			$graphDate->modify('tihs Saturday');
 			$record[] = $graphDate->format('m-d');
 			$record[] = $row[1];
 			$data[] = $record;
@@ -619,7 +651,9 @@ class BudgetSalesReport extends FannieReportPage
 		if($this->tableNames[$this->multi_counter] != '') {
 			$budgetQty=0.0;
 			$thisQty=0.0;
-			$lastQty=0.0; 
+			$lastQty=0.0;
+			$budgetDiff = 0;
+			$lastDiff = 0;
 			foreach($data as $key => $row){
             	$number = str_replace(',', '', ltrim($row[1],'$'));
             	$budgetQty += $number;
@@ -628,9 +662,12 @@ class BudgetSalesReport extends FannieReportPage
             	$number = str_replace(',', '', ltrim($row[3],'$'));
             	$lastQty += $number;
        	 	}
-
-       	 	$budgetDiff = (1 - floatval($budgetQty)/floatval($thisQty)) * 100;
-       	 	$lastDiff = (1 - floatval($lastQty) / floatval($thisQty))*100;
+       	 	if($thisQty != 0) {
+       	 		$budgetDiff = (1 - floatval($budgetQty)/floatval($thisQty)) * 100;
+       	 		$lastDiff = (1 - floatval($lastQty) / floatval($thisQty))*100;
+       	 	}
+       	 	
+       	 	
        	 	return array('Totals','$'.number_format($budgetQty,2),
        	 				 '$'.number_format($thisQty,2),'$'.number_format($lastQty,2),
        	 				 number_format($lastDiff,2).'%',number_format($budgetDiff,2).'%');
@@ -673,6 +710,7 @@ class BudgetSalesReport extends FannieReportPage
     			var deptCharts = '.json_encode($this->deptCharts) .';
     			var deptCanvases ='.json_encode($this->deptCanvases).';
     			var canvasPos = '.json_encode($this->canvasPos).';
+    			var chartTitles = '.json_encode($this->deptNames).';
 			</script>';
 
             $this->addOnloadCommand('budgetSales.totals('.(count($this->report_headers)-2).');');

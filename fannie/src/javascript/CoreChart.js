@@ -55,15 +55,26 @@ var CoreChart = (function () {
         return datasets;
     };
 
-    mod.lineChart = function(elementID, xLabels, lineData, lineLabels, borderDash=false) {
+    mod.fullLineChart = function(elementID, xLabels, lineData, lineLabels, borderDash, title) {
+        var ctx = document.getElementById(elementID);
+        var line = new Chart(ctx, {
+            type: 'line',
+            options: {title},
+            data: {
+                labels: xLabels,
+                datasets: lineDataSets(lineData, lineLabels, borderDash)
+            }
+        });
+    };
+
+    mod.lineChart = function(elementID, xLabels, lineData, lineLabels) {
         var ctx = document.getElementById(elementID);
         var line = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: xLabels,
-                datasets: lineDataSets(lineData, lineLabels, borderDash)
+                datasets: lineDataSets(lineData, lineLabels)
             },
-            options: {}
         });
     };
 

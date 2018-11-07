@@ -27,7 +27,7 @@ var budgetSales = (function ($) {
 
     mod.chartAll = function(totalCol) {
     	var dailyLabels = ["Budget","This Year","Last Year"];
-    	console.log(deptCharts);
+    	//console.log(deptCharts);
     	for (var i = deptCharts.length - 1; i >= 0; i--) {
     		var chart = deptCharts[i];
     		console.log(chart);
@@ -41,11 +41,14 @@ var budgetSales = (function ($) {
         		daily.push(line);
         	}
         	//var yData
-        	$(`#reportTable${i+2}`).after(`<div class="col-sm-6 col-sm-offset-3"><canvas id="canvas${i}"></canvas></div>`);
-    		CoreChart.lineChart(`canvas${i}`, xLabels, daily, dailyLabels, borderDash);
-
+        	console.log(deptCanvases[i-1]);
+        	var canvas = deptCanvases[i-1];
+        	var printUnder = canvasPos[i];
+        	$(`#reportTable${printUnder}`).after(`<div class="col-sm-6 col-sm-offset-3"><canvas id="${canvas}"></canvas></div>`);
+    		CoreChart.lineChart(`${canvas}`, xLabels, daily, dailyLabels, borderDash);
     	}
     }
+
 
     return mod;
 

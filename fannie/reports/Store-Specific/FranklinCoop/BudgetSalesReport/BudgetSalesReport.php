@@ -42,8 +42,14 @@ class BudgetSalesReport extends FannieReportPage
 
     protected $report_headers = array('Dept Name','Budget','This Year','Last Year', '% Change', '% Budget');
     protected $required_fields = array('date1','date2');
-    protected $deptGroups = array('Default','Bakery','PFD', 'Grocery','Bulk','Beer', 'Perishable','Perishable','Perishable','Perishable', 
-    	'Produce', 'Wellness', 'Wellness', 'Wellness', 'Wellness');
+  	
+    protected $deptNames = array(0 => 'Store Totals', 1 => 'Bakery', 2=> 'PFD', 3=>'Grocery', 4=>'Bulk', 5=>'Cheese', 6=>'Dairy', 7=>'Frozen',
+    	8=>'Meat',9=>'Produce', 10=>'Body Care', 11 =>'Genral Merch', 12=>'Supplements');
+    protected $tableNames = array(0=>'Totals', 1=> '',3=>'',4=>'',5=>'',6=>'Perishable',7=>'',8=>'Wellness');
+    protected $deptCanvases = array('Bakery','PFD', 'Grocery', 'Bulk', 'Perishable', 'Perishable', 'Perishable',
+    	'Perishable','Produce', 'Wellness','Wellness','Wellness');
+    protected $canvasPos = array(2,3, 4, 5, 6, 6, 6,
+    	6,7, 8,8,8);
     protected $showCharts = true;
 
     public $totalsChart = array();
@@ -60,7 +66,7 @@ class BudgetSalesReport extends FannieReportPage
         if ($this->content_function == 'report_content' && $this->report_format == 'html') {
             $this->addScript('../../../../src/javascript/Chart.min.js');
             $this->addScript('../../../../src/javascript/CoreChart.js');
-            $this->addScript('budgetSales.js?=20181105');
+            $this->addScript('budgetSales.js?=20181106');
         }
 
         return true;
@@ -75,6 +81,7 @@ class BudgetSalesReport extends FannieReportPage
 		$d2 = FormLib::get_form_value('date2',date('Y-m-d'));
 		$superDepts = FormLib::get_form_value('buyer','');
 		$store = FormLib::get('store', 0);
+		$superDepts = (!$superDepts) ? 'All' : $superDepts;
 
 		$startThisYear = DateTime::createFromFormat('Y-m-d' ,$d1);
    		$startThisYear->modify('-4 weeks');
@@ -91,10 +98,9 @@ class BudgetSalesReport extends FannieReportPage
 		$endLastYear->modify('-52 weeks');
 		//$endLastYear->modify('last ' . $endDay);
 
-		echo '<script>console.log(" Start:'.$startThisYear->format('W D : Y-m-d').' - END: '
-				.$endThisYear->format('W D : Y-m-d').'");</script>';
-		echo '<script>console.log(" Start:'.$startLastYear->format('W D : Y-m-d').' - END: '
-				.$endLastYear->format('W D : Y-m-d').'");</script>';
+		//echo '<script>console.log("Super: '.$superDepts.'");</script>';
+		//echo '<script>console.log(" Start:'.$startLastYear->format('W D : Y-m-d').' - END: '
+		//		.$endLastYear->format('W D : Y-m-d').'");</script>';
 
 		$dlog = DTransactionsModel::selectDTrans($d1,$d2);
 
@@ -104,8 +110,11 @@ class BudgetSalesReport extends FannieReportPage
 
 		//$this->totalsChart = $this->getStoreTotals($dbc,$store,$d1,$d2);
 
+		//$report = array_merge($report, $this->departmentTotals($dbc,$store,$d1,$d2, $superDepts));
 		$report = array_merge($report, $this->getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear));
 
+		$return = array();
+		$tableNo = 0;
 		for ($i=0; $i < count($report); $i++) { 
 			$table = $report[$i];
 			$chart = array();
@@ -116,22 +125,26 @@ class BudgetSalesReport extends FannieReportPage
 			$cySales = array();
 			$pySales = array();
 			for ($j=0; $j < count($table); $j++) { 
+				// format for the chart here because the javascript seems slow.
 				$row = $table[$j];
+				$labels[] = $row[0];
+				$salesBudget[] = $row[1];
+				$cySales[] = ($row[2]==0) ? null : $row[2];
+				$pySales[] = $row[3];
+
 				if ($j== floor((sizeof($table)/2))) {
-					$row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f',(1 - $row[3]/$row[2])*100).'%' ;
-				    $row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f',(1 - $row[1]/$row[2])*100).'%' ;
+					$row[0] = $this->deptNames[$i];
+					$row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f%%',(1 - $row[3]/$row[2])*100) ;
+				    $row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f%%',(1 - $row[1]/$row[2])*100) ;
+				    $row[1] = '$'.number_format($row[1],2);
+				    $row[2] = '$'.number_format($row[2],2);
+				    $row[3] = '$'.number_format($row[3],2);
 				    $data[] = $row;
 				}
 
 				//$row[] = sprintf('%.2f',(1 - $row[3]/$row[2])*100).'%';
 				//$row[] = sprintf('%.2f',(1 - $row[1]/$row[2])*100).'%';
 				//$table[$j] = $row;
-				// format for the chart here because the javascript seems slow.
-				
-				$labels[] = $row[0];
-				$salesBudget[] = $row[1];
-				$cySales[] = ($row[2]==0) ? null : $row[2];
-				$pySales[] = $row[3];
 
 
 			}
@@ -146,14 +159,22 @@ class BudgetSalesReport extends FannieReportPage
 			} else {
 				$this->deptCharts[] = $chart;
 			}
-			$report[$i] = $data;
+			if(in_array($i, array(6,7,8))){
+				$return[$tableNo-1] = array_merge($return[$tableNo-1], $data);
+			} elseif (in_array($i, array(11,12))) {
+				$return[$tableNo-1] = array_merge($return[$tableNo-1], $data);
+			} else {
+				$return[$tableNo] = $data;
+				$tableNo++;
+			}
+
 		}
 
 
-		return $report;
+		return $return;
 	}
 
-	private function departmentTotals($dbc,$store,$date1,$date2, $deptarments='All') {
+	private function departmentTotals($dbc,$store,$date1,$date2, $superDepts='All') {
 		$startThisYear = DateTime::createFromFormat('Y-m-d' ,$date1);
    		$startThisYear->modify('-4 weeks');
 		$startDay = $startThisYear->format('l');
@@ -168,76 +189,33 @@ class BudgetSalesReport extends FannieReportPage
 		$endLastYear->modify('+5 weeks');
 		$endLastYear->modify('-52 weeks');
 		$endLastYear->modify('next ' . $endDay);
-
-		$report = array();
-		$deptarments = array(2,3,4,6,7,8,9,10,11,12,13,14);
-		foreach ($deptarments as $key => $department) {
-			$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate), SUM(b.budget),m.superDeptNo
-				FROM gfm_approach.daily_dept_sales_budget b
-				JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
-				WHERE b.budgetDate BETWEEN ? AND ?  AND m.storeNo = ?
-				GROUP BY m.superDeptNo,WEEK(b.budgetDate) ORDER BY m.superDeptNo");
-        	$budgetR = $dbc->execute($budgetQ,$args);
-
-        	$args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
-        	$lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`) ,SUM(s.creditAmt) as deptSales, m.superDeptNo 
-        		FROM gfm_approach.daily_sales_sage s
-				JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
-				where `date` between ? AND ? AND m.storeNo = ? group by m.superDeptNo, WEEK(s.`date`) order by m.superDeptNo');
-        	$lastYearR = $dbc->execute($lastYearQ,$args);
-
-        	$args = array($startThisYear->format('Y-m-d').' 00:00:00', $endThisYear->format('Y-m-d').' 23:59:59', $store);
-        	$salesQ = $dbc->prepare("SELECT WEEK(t.tdate), sum(t.total), s.superID
-				FROM core_trans.dlog_90_view t
-				JOIN core_op.superdepts s on t.department = s.dept_ID
-				WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
-				AND t.trans_type IN ('D', 'I') AND s.superID < 14
-				group by s.superID,WEEK(t.tdate) order by s.superID");
-        	$salesR = $dbc->execute($salesQ, $args);
-
-        	$table = $this->createBlankTable($startThisYear,$endThisYear);
-        	$i = 0;
-        	while ($budgetW = $dbc->fetchRow($budgetW)) {
-        		$row = $table[$i];
-        		for ($j=$i; $j<sizeof($table )-$i;$j++){
-        			if ($row[0] == $budgetW[0]) {
-        				$row[] = $budget[1];
-        				$i++;
-        				continue;
-        			} else {
-        				$row = $table[$j];
-        			}
-        		}
-
-        	}
-
-        	$report[] = $table;
-		}
 		
-		return $report;
-
-		/*
-		$budgetQ .= "SELECT WEEK(b.budgetDate,1), SUM(b.budget) 
+		echo '<script>console.log("Super: '.$superDepts.'");</script>';
+		$budgetQ = "SELECT WEEK(b.budgetDate), SUM(b.budget) 
 			FROM gfm_approach.daily_dept_sales_budget b
 			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
 			JOIN core_op.superdeptnames s on s.superID = m.superDeptNo
-			WHERE b.budgetDate BETWEEN ? AND ? AND m.storeNo = ?
-			GROUP BY WEEK(b.budgetDate, 1)";
-		$lastYearQ .="";
-		$salesQ .="";
+			WHERE b.budgetDate BETWEEN ? AND ? AND m.storeNo = ?";
+		$lastYearQ = "SELECT WEEK(s.`date`) ,SUM(s.creditAmt) as deptSales, m.superDeptNo 
+        	FROM gfm_approach.daily_sales_sage s
+			JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
+			where `date` between ? AND ? AND m.storeNo = ?";
+		$salesQ = "SELECT WEEK(t.tdate), sum(t.total), s.superID
+			FROM core_trans.dlog_90_view t
+			JOIN core_op.superdepts s on t.department = s.dept_ID
+			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
+			AND t.trans_type IN ('D', 'I')";
 
-		if ($department == 'All') {
-			$budgetQ .= "";
-			$lastYearQ .="";
-			$salesQ .="";
+		if ($superDepts == 'All' || $superDepts == -1) {
+			$salesQ .= 'AND s.superID < 14'; 
 		} else {
-			switch ($department) {
+			switch ($superDepts) {
 				case '6':
 				case '7':
 				case '8':
 				case '9': // perishable.
 					$budgetQ .= " AND s.superID IN (6,7,8,9)";
-					$lastYearQ .=" AND s.superID IN (6,7,8,9)";
+					$lastYearQ .=" AND m.superDeptNo IN (6,7,8,9)";
 					$salesQ .=" AND s.superID IN (6,7,8,9)";
 				case '11':
 				case '12':
@@ -253,47 +231,21 @@ class BudgetSalesReport extends FannieReportPage
 					break;
 			}
 		}
-*/
-	}
+		$budgetQ .= "GROUP BY m.superDeptNo,WEEK(b.budgetDate) ORDER BY m.superDeptNo";
+		$lastYearQ .= "GROUP BY m.superDeptNo, WEEK(s.`date`) ORDER BY m.superDeptNo";
+		$salesQ .= "AND WEEK(t.tdate) != WEEK(NOW()) GROUP BY s.superID,WEEK(t.tdate) ORDER BY s.superID";
 
-	private function createBlankTable($start, $end){
-		$table = array();
-		while ($start->diff($end)->d != 0) {
-			$row = array($start->format('M'));
-			$table[] = $row;
-			$start->modify('+7 days');
-		}
-		return $table;
-	}
-
-	private function getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear) {
-		$report = array();
-		$data = array();
 		$args = array($startThisYear->format('Y-m-d'), $endThisYear->format('Y-m-d'),$store);
-		$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate), SUM(b.budget),m.superDeptNo
-			FROM gfm_approach.daily_dept_sales_budget b
-			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
-			WHERE b.budgetDate BETWEEN ? AND ?  AND m.storeNo = ?
-			GROUP BY m.superDeptNo,WEEK(b.budgetDate) ORDER BY m.superDeptNo");
-        $budgetR = $dbc->execute($budgetQ,$args);
+		$budgetR = $dbc->execute($budgetQ,$args);
 
-        $args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
-        $lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`) ,SUM(s.creditAmt) as deptSales, m.superDeptNo 
-        	FROM gfm_approach.daily_sales_sage s
-			JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
-			where `date` between ? AND ? AND m.storeNo = ? group by m.superDeptNo, WEEK(s.`date`) order by m.superDeptNo');
-        $lastYearR = $dbc->execute($lastYearQ,$args);
+		$args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);		
+		$lastYearR = $dbc->execute($lastYearQ,$args);
 
         $args = array($startThisYear->format('Y-m-d').' 00:00:00', $endThisYear->format('Y-m-d').' 23:59:59', $store);
-        $salesQ = $dbc->prepare("SELECT WEEK(t.tdate), sum(t.total), s.superID
-			FROM core_trans.dlog_90_view t
-			JOIN core_op.superdepts s on t.department = s.dept_ID
-			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
-			AND t.trans_type IN ('D', 'I') AND s.superID < 14
-			AND WEEK(t.tdate) != WEEK(NOW())
-			group by s.superID,WEEK(t.tdate) order by s.superID");
         $salesR = $dbc->execute($salesQ, $args);
 
+        $data = array();
+        $report = array();
         $i=0;
         $nextDept = 2; // starts at 2 assuming the first dept is 1
         //$report = array();
@@ -348,7 +300,7 @@ class BudgetSalesReport extends FannieReportPage
         		$i = 0;
         	}
         	$record = array();
-        	$record[] = sprintf('%.2f',$salesW[1]);
+        	$record[] = number_format($salesW[1],2,'.',',');
         	if(array_key_exists($i,$report)){ $report[$i] = array_merge($report[$i],$record); }
         	$i++;
         }
@@ -376,6 +328,144 @@ class BudgetSalesReport extends FannieReportPage
         	}
         	$record = array();
         	$record[] = sprintf('%.2f',$lastYearW[1]);
+        	if(array_key_exists($i,$report)){ $report[$i] = array_merge($report[$i],$record); }
+        	$i++;
+        }
+        $data[$currentDept-1] = $report; // loop doesn't assign the last set.
+
+        /*
+        
+			$record = array();
+			//$record[] = $row[0];
+			$record[] = (array_key_exists(1, $row)) ? $row[1] :  0;
+			//$record[] = $row[1];
+			if(array_key_exists($i,$data)){ $data[$i] = array_merge($data[$i],$record); }
+		
+        */
+
+        return $data;
+	}
+
+	private function createBlankTable($start, $end){
+		$table = array();
+		while ($start->diff($end)->d != 0) {
+			$row = array($start->format('M'));
+			$table[] = $row;
+			$start->modify('+7 days');
+		}
+		return $table;
+	}
+
+	private function getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear) {
+		$report = array();
+		$data = array();
+		$args = array($startThisYear->format('Y-m-d'), $endThisYear->format('Y-m-d'),$store);
+		$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate), SUM(b.budget),m.superDeptNo
+			FROM gfm_approach.daily_dept_sales_budget b
+			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
+			WHERE b.budgetDate BETWEEN ? AND ?  AND m.storeNo = ?
+			GROUP BY m.superDeptNo,WEEK(b.budgetDate) ORDER BY m.superDeptNo");
+        $budgetR = $dbc->execute($budgetQ,$args);
+
+        $args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
+        $lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`) ,SUM(s.creditAmt) as deptSales, m.superDeptNo 
+        	FROM gfm_approach.daily_sales_sage s
+			JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
+			WHERE `date` BETWEEN ? AND ? AND m.storeNo = ? GROUP BY m.superDeptNo, WEEK(s.`date`) ORDER BY m.superDeptNo');
+        $lastYearR = $dbc->execute($lastYearQ,$args);
+
+        $args = array($startThisYear->format('Y-m-d').' 00:00:00', $endThisYear->format('Y-m-d').' 23:59:59', $store);
+        $salesQ = $dbc->prepare("SELECT WEEK(t.tdate), sum(t.total), s.superID
+			FROM core_trans.dlog_90_view t
+			JOIN core_op.superdepts s on t.department = s.dept_ID
+			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
+			AND t.trans_type IN ('D', 'I') AND s.superID < 14
+			AND WEEK(t.tdate) != WEEK(NOW())
+			GROUP BY s.superID,WEEK(t.tdate) ORDER BY s.superID");
+        $salesR = $dbc->execute($salesQ, $args);
+
+        $i=0;
+        $nextDept = 2; // starts at 2 assuming the first dept is 1
+        //$report = array();
+        while($budgetW = $dbc->fetchRow($budgetR)){
+        	//echo '<script>console.log("'.$nextDept.' : '.$budgetW[2].'");</script>';
+        	//Checking what department we are in by dept_no
+        	if($budgetW[2] == $nextDept){	
+        		$data[] = $report;
+        		$report = array();
+        		$nextDept = $budgetW[2] + 1;
+        		if($store == 1 && $nextDept == 5) {$nextDept = 6;};
+        		//$data[] = $report;
+        		//$report = $data[$nextDept];
+        		//$report = array();
+        	}
+        	$record = array();
+       
+        	// calculate the date start from the numaric date
+			$graphDate = new DateTime();
+			$graphDate->setISODate(date('Y'),$budgetW[0]+1);
+			$graphDate->modify('last Sunday');
+			$record[] = $graphDate->format('m-d');
+        	//$record[] = sprintf('%.2f',$budgetW[2]);
+        	$record[] = $budgetW[1];//number_format($budgetW[1],2);//sprintf('$%.2f',$budgetW[1]);
+        	//$record[] = sprintf('%.2f',$lastYearW[2]);
+        	$report[] = $record;
+
+        }
+        $data[] = $report; // deal with the last value.
+
+
+
+        $nextDept = 2;
+        $currentDept = 1;
+        $report = $data[0]; // start with the dept 1 report.
+        $i=0;
+        while($salesW = $dbc->fetchRow($salesR)){
+        	//echo '<script>console.log(" SALES:'.$nextDept.' : '.$salesW[2].'");</script>';
+        	if($salesW[2] == $nextDept){	
+        		if ($i < sizeof($report)) {
+        			while ($i < sizeof($report)){
+        				$report[$i] = array_merge($report[$i],array(0)); ;
+        				$i++;
+        			}	
+        		}
+        		$data[$currentDept - 1] = $report;
+        		$report = $data[$currentDept];
+        		//$report = $data[$nextDept - 1];
+        		$nextDept = $salesW[2] + 1;
+        		if($store == 1 && $nextDept == 5) {$nextDept = 6;}; // this is a cludge to take out beer for greenfield.
+        		$currentDept = ($store == 1 && $nextDept > 4) ? $nextDept - 2 : $nextDept -1;
+        		$i = 0;
+        	}
+        	$record = array();
+        	$record[] = $salesW[1];//sprintf('%.2f',$salesW[1]);
+        	if(array_key_exists($i,$report)){ $report[$i] = array_merge($report[$i],$record); }
+        	$i++;
+        }
+        if ($i < sizeof($report)) {
+      		while ($i < sizeof($report)){
+      			$report[$i] = array_merge($report[$i],array(0)); ;
+       			$i++;
+       		}	
+       	}
+        $data[$currentDept-1] = $report; // loop doesn't assign the last set.
+        
+        $nextDept = 2;
+        $currentDept = 1;
+        $report = $data[0]; // start with the dept 1 report.
+        $i=0;
+        while($lastYearW = $dbc->fetchRow($lastYearR)){
+        	if($lastYearW[2] == $nextDept){	
+        		$data[$currentDept - 1] = $report;
+        		$report = $data[$currentDept];
+        		//$report = $data[$nextDept - 1];
+        		$nextDept = $lastYearW[2] + 1;
+        		if($store == 1 && $nextDept == 5) {$nextDept = 6;}; // this is a cludge to take out beer for greenfield.
+        		$currentDept = ($store == 1 && $nextDept > 4) ? $nextDept - 2 : $nextDept -1;
+        		$i = 0;
+        	}
+        	$record = array();
+        	$record[] = $lastYearW[1];//sprintf('%.2f',$lastYearW[1]);
         	if(array_key_exists($i,$report)){ $report[$i] = array_merge($report[$i],$record); }
         	$i++;
         }
@@ -523,50 +613,28 @@ class BudgetSalesReport extends FannieReportPage
 	function calculate_footers($data)
     {
 		$store = FormLib::get('store', 0);
-		switch($this->multi_counter){
-        case 1:
-            $this->report_headers[0] = 'Totals';
-            break;
-        case 2:
-            $this->report_headers[0] = 'Bakery';
-            break;
-        case 3:
-            $this->report_headers[0] = 'PFD';
-            break;
-        case 4:
-        	$this->report_headers[0] = 'Grocery: Dry Goods';
-            break;
-        case 5:
-        	$this->report_headers[0] = 'Grocery: Bulk';
-            break;
-        case 6:
-            $this->report_headers[0] = ($store == 1) ? 'Perishable: Cheese' : 'Grocery: Beer' ;
-            break;
-        case 7:
-            $this->report_headers[0] = ($store == 1) ? 'Perishable: Dairy' : 'Perishable: Cheese' ;
-            break;
-        case 8:
-            $this->report_headers[0] = ($store == 1) ? 'Perishable: Frozen' : 'Perishable: Dairy' ;
-            break;
-        case 9:
-            $this->report_headers[0] = ($store == 1) ? 'Perishable: Meat' : 'Perishable: Frozen' ;
-            break;
-        case 10:
-            $this->report_headers[0] = ($store == 1) ? 'Produce' : 'Perishable: Meat' ;
-            break;
-        case 11:
-            $this->report_headers[0] = ($store == 1) ? 'Wellness: Body Care' : 'Produce' ;
-            break;
-        case 12:
-            $this->report_headers[0] = ($store == 1) ? 'Wellness: Gen Merch' : 'Wellness: Body Care' ;
-            break;
-        case 13:
-            $this->report_headers[0] = ($store == 1) ? 'Wellness: Supplements' : 'Wellness: Gen Merch' ;
-            break;
-        case 14:
-        	$this->report_headers[0] = 'Wellness: Gen Merch';
-        	break;
-        }
+		//switch($this->multi_counter){
+		$this->report_headers[0] = $this->tableNames[$this->multi_counter];
+
+		if($this->tableNames[$this->multi_counter] != '') {
+			$budgetQty=0.0;
+			$thisQty=0.0;
+			$lastQty=0.0; 
+			foreach($data as $key => $row){
+            	$number = str_replace(',', '', ltrim($row[1],'$'));
+            	$budgetQty += $number;
+            	$number = str_replace(',', '', ltrim($row[2],'$'));
+            	$thisQty += $number;
+            	$number = str_replace(',', '', ltrim($row[3],'$'));
+            	$lastQty += $number;
+       	 	}
+
+       	 	$budgetDiff = (1 - floatval($budgetQty)/floatval($thisQty)) * 100;
+       	 	$lastDiff = (1 - floatval($lastQty) / floatval($thisQty))*100;
+       	 	return array('Totals','$'.number_format($budgetQty,2),
+       	 				 '$'.number_format($thisQty,2),'$'.number_format($lastQty,2),
+       	 				 number_format($lastDiff,2).'%',number_format($budgetDiff,2).'%');
+		}
 		return array();
 	}
 
@@ -603,6 +671,8 @@ class BudgetSalesReport extends FannieReportPage
             <script type="text/javascript">
     			var totalsChart = '. json_encode($this->totalsChart) .';
     			var deptCharts = '.json_encode($this->deptCharts) .';
+    			var deptCanvases ='.json_encode($this->deptCanvases).';
+    			var canvasPos = '.json_encode($this->canvasPos).';
 			</script>';
 
             $this->addOnloadCommand('budgetSales.totals('.(count($this->report_headers)-2).');');
@@ -616,12 +686,14 @@ class BudgetSalesReport extends FannieReportPage
 
 	function form_content()
     {
-        ob_start();
-        ?>
-        <form action=BudgetSalesReport.php method=get>
+    	/*
         <div class="form-group">
            <?php echo $this->superOpts('buyer'); ?>
         </div>
+        */
+        ob_start();
+        ?>
+        <form action=BudgetSalesReport.php method=get>
         <div>
         	<Label>Store</Label>
         	<?php $ret=FormLib::storePicker();echo $ret['html']; ?>

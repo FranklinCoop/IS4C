@@ -153,7 +153,7 @@ class BudgetSalesReport extends FannieReportPage
 
 					//$newRow = array();
 					//$row[0] = $this->deptNames[$i+1];
-					$row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f%%',(1 - $row[3]/$row[2])*100) ;
+					$row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f%%',($row[3]/$row[2])*100) ;
 				    $row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f%%',(1 - $row[1]/$row[2])*100) ;
 				    $newRow[] = $this->deptNames[$i+1];
 				    $newRow[] = '$'.number_format($row[2],2);
@@ -204,7 +204,7 @@ class BudgetSalesReport extends FannieReportPage
 		$totalLastYearDiff = 0;
 		$totalBudgetDiff = 0;
 		if($totalThisYear !=0) {
-			$totalBudgetDiff = sprintf('%.2f%%',(1-$totalBudget/$totalThisYear)*100);
+			$totalBudgetDiff = sprintf('%.2f%%',($totalBudget/$totalThisYear)*100);
 			$totalLastYearDiff = sprintf('%.2f%%',(1-$totalLastYear/$totalThisYear)*100);
 		}
 		
@@ -500,7 +500,7 @@ class BudgetSalesReport extends FannieReportPage
             	$yearBal += $number;
        	 	}
        	 	if($thisQty != 0) {
-       	 		$budgetDiff = number_format((1 - floatval($budgetQty)/floatval($thisQty))*100).'%';
+       	 		$budgetDiff = number_format((floatval($budgetQty)/floatval($thisQty))*100).'%';
        	 		$lastDiff = number_format((1 - floatval($lastQty) / floatval($thisQty))*100).'%';
        	 	}
        	 	$budgetQty = '$'.number_format($budgetQty,2);

@@ -153,8 +153,8 @@ class BudgetSalesReport extends FannieReportPage
 
 					//$newRow = array();
 					//$row[0] = $this->deptNames[$i+1];
-					$row[] = (!array_key_exists(3, $row) || $row[3] ==0) ? 0 : sprintf('%.2f%%',($row[2]/$row[3])*100) ;
-				    $row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f%%',(1 - $row[1]/$row[2])*100) ;
+					$row[] = (!array_key_exists(1, $row) || $row[1] ==0) ? 0 : sprintf('%.2f%%',($row[2]/$row[1])*100) ;
+				    $row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f%%',(1 - $row[3]/$row[2])*100) ;
 				    $newRow[] = $this->deptNames[$i+1];
 				    $newRow[] = '$'.number_format($row[2],2);
 				    $newRow[] = '$'.number_format($row[1],2);

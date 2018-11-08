@@ -161,7 +161,7 @@ class BudgetSalesReport extends FannieReportPage
 				    $newRow[] = $row[4];
 				    $newRow[] = '$'.number_format($row[3],2);
 				    $newRow[] = $row[5];
-				    $newRow[] = $yearTotals[$i+1];
+				    $newRow[] = '$'.number_format($yearTotals[$i+1],2);
 				    $data[] = $newRow;
 
 				}
@@ -208,7 +208,7 @@ class BudgetSalesReport extends FannieReportPage
 			$totalLastYearDiff = sprintf('%.2f%%',(1-$totalLastYear/$totalThisYear)*100);
 		}
 		
-		$totals = array('Store Totals','$'.number_format($totalThisYear,2),'$'.number_format($totalBudget,2),$totalBudgetDiff, '$'.number_format($totalLastYear,2),$totalLastYearDiff, $yearTotals[0]);
+		$totals = array('Store Totals','$'.number_format($totalThisYear,2),'$'.number_format($totalBudget,2),$totalBudgetDiff, '$'.number_format($totalLastYear,2),$totalLastYearDiff, '$'.number_format($yearTotals[0],2));
 		$return = array_merge(array(array($totals)),$return);
 
 		return $return;
@@ -496,7 +496,8 @@ class BudgetSalesReport extends FannieReportPage
             	$thisQty += $number;
             	$number = str_replace(',', '', ltrim($row[4],'$'));
             	$lastQty += $number;
-            	$yearBal = $row[6];
+            	$number = str_replace(',', '', ltrim($row[6],'$'));
+            	$yearBal += $number;
        	 	}
        	 	if($thisQty != 0) {
        	 		$budgetDiff = number_format((1 - floatval($budgetQty)/floatval($thisQty))*100).'%';
@@ -505,7 +506,7 @@ class BudgetSalesReport extends FannieReportPage
        	 	$budgetQty = '$'.number_format($budgetQty,2);
        	 	$thisQty = '$'.number_format($thisQty,2);
        	 	$lastQty = '$'.number_format($lastQty,2);
- 
+ 			$yearBal = '$'.number_format($yearBal,2);
        	 	
        	 	return array('Totals',$thisQty,$budgetQty,$budgetDiff,$lastQty,$lastDiff,$yearBal);
 		}

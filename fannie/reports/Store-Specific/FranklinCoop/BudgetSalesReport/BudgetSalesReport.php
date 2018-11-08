@@ -101,14 +101,14 @@ class BudgetSalesReport extends FannieReportPage
 		//echo '<script>console.log(" Start:'.$startLastYear->format('W D : Y-m-d').' - END: '
 		//		.$endLastYear->format('W D : Y-m-d').'");</script>';
 
-		$dlog = DTransactionsModel::selectDTrans($d1,$d2);
+		$dlog = DTransactionsModel::selectDLog($startThisYear->format('Y-m-d'),$endThisYear->format('Y-m-d'));
 		$report = array();
 		
 		//$report[] = $this->getStoreTotals($dbc,$store,$d1,$d2);
 
 		//$this->totalsChart = $this->getStoreTotals($dbc,$store,$d1,$d2);
-		$report = $this->getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear);
-		$yearTotals = $this->getFiscalYearBalnce(DateTime::createFromFormat('Y-m-d' ,$d2),$dbc,$store);
+		$report = $this->getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear, $dlog);
+		$yearTotals = $this->getFiscalYearBalnce(DateTime::createFromFormat('Y-m-d' ,$d2),$dbc,$store, $dlog);
 
 
 		//$report = array_merge($report, $this->departmentTotals($dbc,$store,$d1,$d2, $superDepts));
@@ -201,9 +201,13 @@ class BudgetSalesReport extends FannieReportPage
 		$chart[] = $tpyLine;
 		$this->totalsChart = $chart;
 		//echo '<script>console.log("Budget: '.$totalBudget.'This: '.$totalThisYear.'Last: '.$totalLastYear.'");</script>';
-
-		$totalBudgetDiff = sprintf('%.2f%%',(1-$totalBudget/$totalThisYear)*100);
-		$totalLastYearDiff = sprintf('%.2f%%',(1-$totalLastYear/$totalThisYear)*100);
+		$totalLastYearDiff = 0;
+		$totalBudgetDiff = 0;
+		if($totalThisYear !=0) {
+			$totalBudgetDiff = sprintf('%.2f%%',(1-$totalBudget/$totalThisYear)*100);
+			$totalLastYearDiff = sprintf('%.2f%%',(1-$totalLastYear/$totalThisYear)*100);
+		}
+		
 		$totals = array('Store Totals','$'.number_format($totalThisYear,2),'$'.number_format($totalBudget,2),$totalBudgetDiff, '$'.number_format($totalLastYear,2),$totalLastYearDiff, $yearTotals[0]);
 		$return = array_merge(array(array($totals)),$return);
 
@@ -211,7 +215,7 @@ class BudgetSalesReport extends FannieReportPage
 	}
 
 
-	private function getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear) {
+	private function getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear, $dlog) {
 		$report = array();
 		$data = array();
 		$args = array($startThisYear->format('Y-m-d'), $endThisYear->format('Y-m-d'),$store);
@@ -231,7 +235,7 @@ class BudgetSalesReport extends FannieReportPage
 
         $args = array($startThisYear->format('Y-m-d').' 00:00:00', $endThisYear->format('Y-m-d').' 23:59:59', $store);
         $salesQ = $dbc->prepare("SELECT WEEK(t.tdate), sum(t.total), s.superID
-			FROM core_trans.dlog_90_view t
+			FROM {$dlog} t
 			JOIN core_op.superdepts s on t.department = s.dept_ID
 			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
 			AND t.trans_type IN ('D', 'I') AND s.superID < 14
@@ -339,7 +343,7 @@ class BudgetSalesReport extends FannieReportPage
         return $data;
 	}
 
-	function getFiscalYearBalnce($date,$dbc, $store) {
+	function getFiscalYearBalnce($date,$dbc, $store, $dlog) {
 		$endDate = new DateTime($date->format('Y-m-d'));
 		if($date->format('n') >= 10) {
        		$date->modify('first day of october');
@@ -351,7 +355,7 @@ class BudgetSalesReport extends FannieReportPage
    		$args = array($date->format('Y-m-d H:i:s'), $endDate->format('Y-m-d H:i:s'),$store);
    		$salesTotalQ = $dbc->prepare("");
 
-   		$salesTotalQ = $dbc->prepare("SELECT SUM(t.total), s.superID FROM core_trans.dlog_90_view t
+   		$salesTotalQ = $dbc->prepare("SELECT SUM(t.total), s.superID FROM {$dlog} t
 			JOIN core_op.superdepts s on t.department=s.dept_ID
 			WHERE  t.tdate BETWEEN ? AND ? AND t.store_id = ?
 			AND t.trans_type IN ('D', 'I') AND s.superID<15
@@ -495,14 +499,15 @@ class BudgetSalesReport extends FannieReportPage
             	$yearBal = $row[6];
        	 	}
        	 	if($thisQty != 0) {
-       	 		$budgetDiff = (1 - floatval($budgetQty)/floatval($thisQty)) * 100;
-       	 		$lastDiff = (1 - floatval($lastQty) / floatval($thisQty))*100;
+       	 		$budgetDiff = number_format((1 - floatval($budgetQty)/floatval($thisQty))*100).'%';
+       	 		$lastDiff = number_format((1 - floatval($lastQty) / floatval($thisQty))*100).'%';
        	 	}
+       	 	$budgetQty = '$'.number_format($budgetQty,2);
+       	 	$thisQty = '$'.number_format($thisQty,2);
+       	 	$lastQty = '$'.number_format($lastQty,2);
+ 
        	 	
-       	 	
-       	 	return array('Totals','$'.number_format($budgetQty,2),
-       	 				 '$'.number_format($thisQty,2),'$'.number_format($lastQty,2),
-       	 				 number_format($lastDiff,2).'%',number_format($budgetDiff,2).'%',$yearBal);
+       	 	return array('Totals',$thisQty,$budgetQty,$budgetDiff,$lastQty,$lastDiff,$yearBal);
 		}
 
 		return array();

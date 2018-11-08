@@ -490,9 +490,9 @@ class BudgetSalesReport extends FannieReportPage
 			$lastDiff = 0;
 			$yearBal = 0;
 			foreach($data as $key => $row){
-            	$number = str_replace(',', '', ltrim($row[1],'$'));
-            	$budgetQty += $number;
             	$number = str_replace(',', '', ltrim($row[2],'$'));
+            	$budgetQty += $number;
+            	$number = str_replace(',', '', ltrim($row[1],'$'));
             	$thisQty += $number;
             	$number = str_replace(',', '', ltrim($row[4],'$'));
             	$lastQty += $number;

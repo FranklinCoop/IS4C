@@ -53,6 +53,9 @@ class BudgetSalesReport extends FannieReportPage
 
     public $totalsChart = array();
     public $deptCharts = array();
+    public $custChart = array();
+    public $basketChart = array();
+    public $customerCount = 0;
 
 	function report_description_content() {
 		return(array('<p>Budget vs sales report</p>'));
@@ -86,16 +89,16 @@ class BudgetSalesReport extends FannieReportPage
    		$startThisYear->modify('-4 weeks');
 		$startDay = $startThisYear->format('l');
 		$startLastYear = DateTime::createFromFormat('Y-m-d' ,$d1);
-		$startLastYear->modify('-52 weeks');
+		$startLastYear->modify('-1 year');
 		$startLastYear->modify('next ' . $startDay);
 		$startLastYear->modify('-4 weeks');
 		$endThisYear = DateTime::createFromFormat('Y-m-d' ,$d2);
-		$endThisYear->modify('+4 weeks');
+		$endThisYear->modify('+3 weeks');
 		$endDay = $endThisYear->format('l');
 		$endLastYear = DateTime::createFromFormat('Y-m-d' ,$d2);
-		$endLastYear->modify('+4 weeks');
-		$endLastYear->modify('-52 weeks');
-		$endLastYear->modify('next ' . $endDay);
+		$endLastYear->modify('+3 weeks');
+		$endLastYear->modify('-1 year');
+		$endLastYear->modify('last ' . $endDay);
 
 		//echo '<script>console.log("Super: '.$superDepts.'");</script>';
 		//echo '<script>console.log(" Start:'.$startLastYear->format('W D : Y-m-d').' - END: '
@@ -109,7 +112,7 @@ class BudgetSalesReport extends FannieReportPage
 		//$this->totalsChart = $this->getStoreTotals($dbc,$store,$d1,$d2);
 		$report = $this->getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear, $dlog);
 		$yearTotals = $this->getFiscalYearBalnce(DateTime::createFromFormat('Y-m-d' ,$d2),$dbc,$store, $dlog);
-
+		$this->getCustomerCount($dbc,$store,$d1,$d2, $dlog);
 
 		//$report = array_merge($report, $this->departmentTotals($dbc,$store,$d1,$d2, $superDepts));
 		//$report = array_merge($report, $this->getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear));
@@ -119,9 +122,9 @@ class BudgetSalesReport extends FannieReportPage
 		$totalBudget = 0;
 		$totalThisYear = 0;
 		$totalLastYear = 0;
-		$tpyLine = array(0,0,0,0,0,0,0,0,0);
-		$tcyLine = array(0,0,0,0,0,0,0,0,0);
-		$tbdLine = array(0,0,0,0,0,0,0,0,0);
+		$tpyLine = array();
+		$tcyLine = array();
+		$tbdLine = array();
 		$tLabels = array();
 		for ($i=0; $i < count($report); $i++) { 
 			$table = $report[$i];
@@ -139,11 +142,16 @@ class BudgetSalesReport extends FannieReportPage
 				$salesBudget[] = $row[1];
 				$cySales[] = ($row[2]==0) ? null : $row[2];
 				$pySales[] = $row[3];
-				if($i==0) 
+				if($i==0) {
 					$tLabels[] = $row[0];
-				$tbdLine[$j] += $row[1];
-				$tcyLine[$j] = ($row[2]==0) ? null : $tcyLine[$j]+$row[2];
-				$tpyLine[$j] += $row[3];
+					$tbdLine[] += $row[1];
+					$tcyLine[] = ($row[2]==0) ? null : $row[2];
+					$tpyLine[] += $row[3];
+				} else {
+					$tbdLine[$j] += $row[1];
+					$tcyLine[$j] = ($row[2]==0) ? null : $tcyLine[$j]+$row[2];
+					$tpyLine[$j] += $row[3];
+				}
 				$newRow = array();
 				if ($j== floor((sizeof($table)/2))) {
 					//sum for the total table;
@@ -200,7 +208,23 @@ class BudgetSalesReport extends FannieReportPage
 		$chart[] = $tcyLine;
 		$chart[] = $tpyLine;
 		$this->totalsChart = $chart;
-		//echo '<script>console.log("Budget: '.$totalBudget.'This: '.$totalThisYear.'Last: '.$totalLastYear.'");</script>';
+
+		// calculate the basket size values for the chart.
+		$basketLabels = $tLabels;
+		$basketline1 = array();
+		$basketline2 = array();
+		foreach ($tcyLine as $key => $value) {
+			$basket = (!array_key_exists($key, $this->custChart[1]) || $this->custChart[1][$key] ==0) 
+				? null : $value/$this->custChart[1][$key];
+			$histBasket = (!array_key_exists($key, $this->custChart[2]) || $this->custChart[2][$key] ==0) 
+				? null : $value/$this->custChart[2][$key];	
+			$basketline1[] = $basket;
+			$basletline2[] = $histBasket;
+			//echo '<script>console.log("Basket Line: '.$basket.'");</script>';
+		}
+		$this->basketChart = array($basketLabels,$basketline1,$basketline2);
+
+		
 		$totalLastYearDiff = 0;
 		$totalBudgetDiff = 0;
 		if($totalThisYear !=0 && $totalBudget !=0) {
@@ -343,6 +367,106 @@ class BudgetSalesReport extends FannieReportPage
         return $data;
 	}
 
+	function getCustomerCount ($dbc, $store,$d1,$d2, $dlog) {
+		$startDate = DateTime::createFromFormat('Y-m-d' ,$d1);
+		$startDay = $startDate->format('l');
+		$endDate = DateTime::createFromFormat('Y-m-d' ,$d2);
+		$endDay = $endDate->format('l');
+		$interval = $startDate->diff($endDate);
+		$changeS = ($interval->d+1)*4; // go back four intervals, the days are one shorter then we want.
+		$changeE = ($interval->d+1)*3;
+		$startDate->modify("-{$changeS} days");
+		$endDate->modify("+{$changeE} days");
+
+		
+		$startDateHist = DateTime::createFromFormat('Y-m-d' ,$d1);
+		$endDateHist = DateTime::createFromFormat('Y-m-d' ,$d2);
+		$startDateHist->modify('-1 year');
+		$startDateHist->modify("next {$startDay}");
+		$startDateHist->modify("-{$changeS} days");
+		$endDateHist->modify('-1 year');
+		$endDateHist->modify("next {$endDay}");
+		$endDateHist->modify("+{$changeE} days");
+
+		$chartLabels = array();
+		$labelDate = DateTime::createFromFormat('Y-m-d', $startDate->format('Y-m-d'));
+		$labelDate->modify('this Saturday');
+		$changeL = $interval->d+1;
+		for ($i=0; $i < 8; $i++) { 
+			$chartLabels[] = $labelDate->format('m-d');
+			$labelDate->modify("+{$changeL} days");
+		}
+
+		echo '<script>console.log(" Interval:'.$interval->d.'");</script>';
+		
+		$args= array($startDate->format('Ymd'), $endDate->format('Ymd'), $store);
+		$custCountQ = $dbc->prepare("SELECT 
+			count(distinct concat(t.trans_num, t.date_id)) AS customerCount, t.date_id 
+			FROM {$dlog} t 
+			WHERE t.date_id BETWEEN ? AND ? AND t.store_id=? 
+			AND WEEK(t.tdate) != WEEK(NOW())
+			GROUP BY t.date_id");
+		$custCountR = $dbc->execute($custCountQ,$args);
+
+
+		
+		$chartLine1 = array();
+		$chartLine2 = array();
+		$i = 0;
+		$key = -1;
+		$countLine = false;
+		while($row = $dbc->fetchRow($custCountR)) {
+			if($i==0) {
+				$startDateI = DateTime::createFromFormat('Ymd', $row[1]);
+				$countLine = ($startDateI->format('Y-m-d') == $d1) ? true : false ;
+				//$chartLabels[] = $startDateI->format('m-d');
+				$chartLine1[] = $row[0];
+				if($countLine)
+					$this->customerCount += $row[0];
+				$key++;
+			} else {
+				$chartLine1[$key] += $row[0];
+				if($countLine)
+					$this->customerCount += $row[0];
+			} 
+
+			$i = ($i < $interval->d) ? $i+1 : 0 ;
+		}
+		
+		$dlogHist = DTransactionsModel::selectDLog($startDateHist->format('Y-m-d'),$endDateHist->format('Y-m-d'));
+		$args = array($startDateHist->format('Ymd'),$endDateHist->format('Ymd'),$store);
+		$custCtHistQ = $dbc->prepare("SELECT 
+			count(distinct concat(t.trans_num, t.date_id)) AS customerCount, t.date_id 
+			FROM {$dlogHist} t 
+			WHERE t.date_id BETWEEN ? AND ? AND t.store_id=? 
+			AND WEEK(t.tdate) != WEEK(NOW())
+			GROUP BY t.date_id");
+		$custCtHistR = $dbc->execute($custCtHistQ,$args);
+		$key = -1;
+		$i = 0;
+		while($row = $dbc->fetchRow($custCtHistR)) {
+			if($i==0) {
+				$key++;
+				//$startDateI = DateTime::createFromFormat('Ymd', $row[1]);
+				$chartLine2[] = $row[0];
+				//$table[$key][] = $row[0];	
+			} else {
+				$chartLine2[$key] += $row[0];
+				//$table[$key][2] = $table[$key][2] + $row[0];
+			} 
+
+			$i = ($i < $interval->d) ? $i+1 : 0 ;
+		}
+
+		$this->custChart = array($chartLabels,$chartLine1,$chartLine2);
+		
+
+		//echo '<script>console.log(" Table:'.$this->customerCount.'");</script>';
+
+		return true;
+
+	}
+
 	function getFiscalYearBalnce($date,$dbc, $store, $dlog) {
 		$endDate = new DateTime($date->format('Y-m-d'));
 		if($date->format('n') >= 10) {
@@ -391,90 +515,6 @@ class BudgetSalesReport extends FannieReportPage
 		return $yearBalance;
    	}
 
-   	private function getStoreTotals($dbc,$store,$date1,$date2) {
-   		$startThisYear = DateTime::createFromFormat('Y-m-d' ,$date1);
-   		$startThisYear->modify('-4 weeks');
-		$startDay = $startThisYear->format('l');
-		$startLastYear = DateTime::createFromFormat('Y-m-d' ,$date1);
-		$startLastYear->modify('-52 weeks');
-		$startLastYear->modify('next ' . $startDay);
-		$startLastYear->modify('-4 weeks');
-		$endThisYear = DateTime::createFromFormat('Y-m-d' ,$date2);
-		$endThisYear->modify('+4 weeks');
-		$endDay = $endThisYear->format('l');
-		$endLastYear = DateTime::createFromFormat('Y-m-d' ,$date2);
-		$endLastYear->modify('+4 weeks');
-		$endLastYear->modify('-52 weeks');
-		$endLastYear->modify('next ' . $endDay);
-		
-
-		$data = array();
-		$args = array($startThisYear->format('Y-m-d'), $endThisYear->format('Y-m-d'),$store);
-		$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate), SUM(b.budget) 
-			FROM gfm_approach.daily_dept_sales_budget b
-			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
-			JOIN core_op.superDeptNames s on s.superID = m.superDeptNo
-			WHERE b.budgetDate BETWEEN ? AND ? AND m.storeNo = ?
-			GROUP BY WEEK(b.budgetDate)");
-		$budgetR = $dbc->execute($budgetQ, $args);
-		while($row = $dbc->fetchRow($budgetR)) {
-			$record = array();
-			$graphDate = new DateTime();
-			$graphDate->setISODate(date('Y'),$row[0]+1);
-			$graphDate->modify('this Saturday');
-			$record[] = $graphDate->format('m-d');
-			$record[] = $row[1];
-			$data[] = $record;
-		}
-
-		$startThisYear->setTime(00,00,00);
-		$endThisYear->setTime(23,59,58);
-		$args = array($startThisYear->format('Y-m-d H:i:s'), $endThisYear->format('Y-m-d H:i:s'),$store);
-		$salesQ = $dbc->prepare("SELECT WEEK(t.tdate AS DATE), sum(t.total) 
-			FROM core_trans.dlog_90_view t
-			JOIN core_op.superdepts s on t.department = s .dept_ID
-			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
-			AND WEEK(t.tdate) != WEEK(NOW())
-			AND t.trans_type IN ('D', 'I') AND s.superID < 14
-			GROUP BY WEEK(t.tdate AS DATE)");
-		$salesR = $dbc->execute($salesQ, $args);
-
-		$i = 0;
-		while($row = $dbc->fetchRow($salesR)) {
-			$record = array();
-			//$record[] = $row[0];
-			$record[] = (array_key_exists(1, $row)) ? $row[1] : 'wtf' ;
-			if(array_key_exists($i,$data)){$data[$i] = array_merge($data[$i],$record);}
-			$i++;
-		}
-
-		$args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
-		$salesLastQ = $dbc->prepare("SELECT WEEK(s.`date`) ,SUM(s.creditAmt) as deptSales FROM gfm_approach.daily_sales_sage s
-			JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
-			WHERE `date` BETWEEN ? AND ? AND m.storeNo = ?
-			GROUP BY WEEK(s.`date`)");
-		$salesTotalR = $dbc->execute($salesLastQ,$args);
-
-		// add the zeros for the future weeks
-		while ($i < $dbc->numRows($salesTotalR)) {
-				$record = array();
-				$record[] = 0;
-				if(array_key_exists($i,$data)){$data[$i] = array_merge($data[$i],$record);}
-			    $i++;
-		}
-
-		$i = 0;
-		while($row = $dbc->fetchRow($salesTotalR)) {
-			$record = array();
-			//$record[] = $row[0];
-			$record[] = (array_key_exists(1, $row)) ? $row[1] :  0;
-			//$record[] = $row[1];
-			if(array_key_exists($i,$data)){ $data[$i] = array_merge($data[$i],$record); }
-			$i++;
-		}
-
-		return $data;
-   	}
 
 	function calculate_footers($data)
     {
@@ -509,6 +549,10 @@ class BudgetSalesReport extends FannieReportPage
  			$yearBal = '$'.number_format($yearBal,2);
        	 	
        	 	return array('Totals',$thisQty,$budgetQty,$budgetDiff,$lastQty,$lastDiff,$yearBal);
+		} elseif ($this->multi_counter == 1) {
+			$number = str_replace(',', '', ltrim($data[0][1],'$'));
+			$basketSize = '$'.number_format($number/$this->customerCount,2);
+			return array('','Customer Count',$this->customerCount,'' ,'Basket Size', $basketSize, '');
 		}
 
 		return array();
@@ -550,10 +594,13 @@ class BudgetSalesReport extends FannieReportPage
     			var deptCanvases ='.json_encode($this->deptCanvases).';
     			var canvasPos = '.json_encode($this->canvasPos).';
     			var chartTitles = '.json_encode($this->deptNames).';
+    			var custChart = '.json_encode($this->custChart).';
+    			var basketChart = '.json_encode($this->basketChart).';
 			</script>';
 
-            $this->addOnloadCommand('budgetSales.totals('.(count($this->report_headers)-2).');');
-            $this->addOnloadCommand('budgetSales.chartAll('.(count($this->report_headers)-2).')');
+            $this->addOnloadCommand('budgetSales.totals('.(count($this->report_headers)-3).');');
+            $this->addOnloadCommand('budgetSales.chartAll('.(count($this->report_headers)-3).');');
+            $this->addOnloadCommand('budgetSales.chartBaskets();');
         }
 
         return $default;

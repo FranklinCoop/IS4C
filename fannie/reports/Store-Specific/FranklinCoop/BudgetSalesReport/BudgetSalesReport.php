@@ -89,16 +89,16 @@ class BudgetSalesReport extends FannieReportPage
    		$startThisYear->modify('-4 weeks');
 		$startDay = $startThisYear->format('l');
 		$startLastYear = DateTime::createFromFormat('Y-m-d' ,$d1);
-		$startLastYear->modify('-1 year');
-		$startLastYear->modify('next ' . $startDay);
+		$startLastYear->modify('-52 weeks');
+		//$startLastYear->modify('next ' . $startDay);
 		$startLastYear->modify('-4 weeks');
 		$endThisYear = DateTime::createFromFormat('Y-m-d' ,$d2);
 		$endThisYear->modify('+3 weeks');
 		$endDay = $endThisYear->format('l');
 		$endLastYear = DateTime::createFromFormat('Y-m-d' ,$d2);
 		$endLastYear->modify('+3 weeks');
-		$endLastYear->modify('-1 year');
-		$endLastYear->modify('last ' . $endDay);
+		$endLastYear->modify('-52 weeks');
+		//$endLastYear->modify('next ' . $endDay);
 
 		//echo '<script>console.log("Super: '.$superDepts.'");</script>';
 		//echo '<script>console.log(" Start:'.$startLastYear->format('W D : Y-m-d').' - END: '
@@ -381,11 +381,11 @@ class BudgetSalesReport extends FannieReportPage
 		
 		$startDateHist = DateTime::createFromFormat('Y-m-d' ,$d1);
 		$endDateHist = DateTime::createFromFormat('Y-m-d' ,$d2);
-		$startDateHist->modify('-1 year');
-		$startDateHist->modify("next {$startDay}");
+		$startDateHist->modify('-52 weeks');
+		//$startDateHist->modify("next {$startDay}");
 		$startDateHist->modify("-{$changeS} days");
-		$endDateHist->modify('-1 year');
-		$endDateHist->modify("next {$endDay}");
+		$endDateHist->modify('-52 weeks');
+		//$endDateHist->modify("next {$endDay}");
 		$endDateHist->modify("+{$changeE} days");
 
 		$chartLabels = array();

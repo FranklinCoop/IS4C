@@ -103,7 +103,7 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
 
 
 
-            if ($flags['Local']&&$flags['Organic'] || true) {
+            if ($flags['Local']&&$flags['Organic']) {
                 //LOCAL
                 $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-0.5;
                 $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -59.14;

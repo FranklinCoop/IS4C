@@ -38,10 +38,10 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
 
     protected $width = 288;
     protected $height = 216;
-    protected $startX = 18;
+    protected $startX = 12;
     protected $startY = 36;
-    protected $borderLineWidth=11;
-    protected $outerBorderWidth=7;
+    protected $borderLineWidth=12;
+    protected $outerBorderWidth=9;
     protected $innderBorderWidth=3;
     public function drawPDF()
     {
@@ -65,8 +65,8 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
         $sign = 0;
         //fpdf draws the border rect is outside of the width this accounts for the extra size in placemnt.
         //the fallowing two methods account for porder size when seting starting postions.
-        $xOffset = $this->width + $this->borderLineWidth/2 ;
-        $yOffset = $this->height + $this->borderLineWidth/2 ;
+        $xOffset = $this->width + $this->borderLineWidth ;
+        $yOffset = $this->height + $this->borderLineWidth ;
         foreach ($data as $item) {
             if ($count % 6 === 0) {
                 $pdf->AddPage();
@@ -103,17 +103,17 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
 
 
 
-            if ($flags['Local']&&$flags['Organic']) {
+            if ($flags['Local']&&$flags['Organic'] || true) {
                 //LOCAL
-                $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-1;
+                $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-0.5;
                 $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -59.14;
-                $end_x = ($xOffset*$column) + $this->width+1+$this->startX-($this->borderLineWidth/2);
+                $end_x = ($xOffset*$column) + $this->width+1+$this->startX-($this->borderLineWidth/2)-.5;
                 $end_y = ($yOffset*$row) + $this->height+$this->startY-($this->borderLineWidth/2) -20;
                 $eq_x1 = $start_x+200;
                 $eq_y1 = $start_y;
                 $eq_x2 = $end_x;
                 $eq_y2 = $end_y;
-                $w = $this->width-9;
+                $w = $this->width-11;
                 $h = 60.14;
                 $pdf->topCurveRect($start_x,$start_y,$eq_x1,$eq_y1,$eq_x2,$eq_y2,$end_x,$end_y,$w, $h,'FD', null, array(151,174,103));
                 $fontSize = 28;
@@ -130,7 +130,7 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
                 $eq_y1 = $start_y-5;
                 $eq_x2 = $end_x;
                 $eq_y2 = $end_y;
-                $w = $this->width-8;
+                $w = $this->width-11;
                 $h = 31.4;
                 $pdf->topCurveRect($start_x,$start_y,$eq_x1,$eq_y1,$eq_x2,$eq_y2,$end_x,$end_y,$w, $h,'FD', null, array(30, 77, 44));
                 $fontSize = 28;
@@ -140,11 +140,11 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
                 $pdf->CellFit($w-130, $fontSize, 'ORGANIC',0,0,'L');
             } elseif ($flags['Local']) {
                 //LOCAL .43 inch 31pt
-                $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-1;
+                $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-0.5;
                 $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -31.4;
                 $end_x = ($xOffset*$column) + $this->width+$this->startX-($this->borderLineWidth/2);
-                $end_y = ($yOffset*$row) + $this->height+$this->startY-($this->borderLineWidth/2)+1;
-                $pdf->topCurveRect($start_x,$start_y,$start_x+200,$start_y,$end_x,$end_y,$end_x,$end_y,$this->width-8, 32.4,'FD', null, array(151,174,103));
+                $end_y = ($yOffset*$row) + $this->height+$this->startY-($this->borderLineWidth/2);
+                $pdf->topCurveRect($start_x,$start_y,$start_x+200,$start_y,$end_x,$end_y,$end_x,$end_y,$this->width-11, 32.4,'FD', null, array(151,174,103));
                 $fontSize = 28;
                 $pdf->SetTextColor(30, 77, 44);
                 $pdf->SetFont('ModestoOpenInlineFillH', '', $fontSize);
@@ -152,11 +152,11 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
                 $pdf->Cell($this->width-170, $fontSize, 'LOCAL',0,0,'L');
             } elseif ($flags['Organic']) {
                 // ORGANIC
-                $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-1;
+                $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-0.5;
                 $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -32.4;
                 $end_x = ($xOffset*$column) + $this->width+$this->startX-($this->borderLineWidth/2);
                 $end_y = ($yOffset*$row) + $this->height+$this->startY-($this->borderLineWidth/2)+1;
-                $pdf->topCurveRect($start_x,$start_y,$start_x+200,$start_y,$end_x,$end_y,$end_x,$end_y,$this->width-8, 33.4,'FD', null, array(30, 77, 44));
+                $pdf->topCurveRect($start_x,$start_y,$start_x+200,$start_y,$end_x,$end_y,$end_x,$end_y,$this->width-11, 33.4,'FD', null, array(30, 77, 44));
                 $fontSize = 28;
                 $w = $this->width-8;
                 $pdf->SetFont('ModestoOpenInlineFillH', '', $fontSize);
@@ -189,32 +189,50 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
             $pdf->Cell($w, $h, $origin, 0,0, 'R');
 
 
-            //Brand
-            $brand = ($item['brand']=='') ? 'FRESH' : $item['brand'] ;
+            //varity
+            $descParts = explode(', ',$item['description']);
+            $varity = $descParts[1];
+            $description = $descParts[0];
             $x = $this->startX + $xOffset*$column + $this->outerBorderWidth/2;
             $y += $fontSize +10;
             $fontSize = 14;
             $w = $this->width - $this->outerBorderWidth;
             $h = $fontSize;
             $spacing = 5;
-            $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
+            $pdf->SetFont('ModestoIOpenPrimary','',$fontSize);
             $pdf->SetXY($x, $y);            
             
-            $pdf->Cell($w, $h, $brand, 0, 0, 'C');
+            $pdf->Cell($w, $h, $varity, 0, 0, 'C');
             //Description
             $y += $fontSize + 1.5;
-            $fontSize = 22;
+            $fontSize = 26;
             $h = $fontSize;
-            $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
+            $pdf->SetFont('ModestoIOpenPrimary','',$fontSize);
             $pdf->SetXY($x, $y);
-            $lines = $pdf->MultiCellRet($w, $h, $item['description'],0, 'C');
+            $lines = $pdf->MultiCellRet($w, $h, $description,0, 'C');
             $blankSpace = ($lines==1) ? $fontSize : 0;
             // Vendor/Farm
+            $brand = $item['brand'];
+            $x = $this->startX + $xOffset*$column + $this->outerBorderWidth/2;
+            $y += $fontSize +1;
+            $fontSize = 12;
+            $w = $this->width - $this->outerBorderWidth;
+            $h = $fontSize;
+            $spacing = 5;
+            $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
+            $pdf->SetXY($x, $y);
+            $pdf->Cell($w, $h, $brand, 0, 0, 'C');           
 
             //price
-            $price = sprintf('$%.2f', $item['normal_price']);
+            $price ='';
+            //if($item['normal_price'] > 1) {
+                $price = sprintf('$%.2f', $item['normal_price']);
+            //} else  {
+             //   $price = ltrim(sprintf('¢%d', $item['normal_price']*100),'A');
+            //}
+            
             //$x -= 10;
-            $y += $fontSize + 30; //space bewtten top and start of first element.
+            $y += $fontSize + 10; //space bewtten top and start of first element.
             $fontSize = 46;
             $h = $fontSize;
             $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
@@ -236,40 +254,6 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
             $pdf->SetXY($x, $y);
             $pdf->Cell($w, $h, $units, 0, 0, 'C');
 
-
-
-            //desciption
-
-            //$pdf->Cell($textWidth/2, $fontSize, sprintf('REG. $%.2f', $info['normal_price']), 0,0, 'L');
-            //MultiCellRet
-            
-            //$pdf->Ln(1);
-            //brand
-
-
-            //reg price
-
-            //$info = $this->getExtraInfo($item['upc']);
-            //$pdf->SetX(10 + ($this->width*$column));
-            //$pdf->MultiCell($this->width-5, 4, str_replace('<br />', "\n", $info['long_text']), 0, 'L');
-
-            //$pdf->SetX(10 + ($this->width*$column));
-            //$pdf->SetFont($this->font, 'B', $this->MED_FONT);
-            //$pdf->Cell($this->width-5, 9, $item['originName'], 0, 1, 'R');
-/*
-            $pdf->SetFont($this->font, '', $this->MED_FONT);
-            $pdf->SetXY(10 + ($this->width*$column), 5 + ($row*$this->height) + $this->height - 10 - 1);
-            $pdf->Cell($this->width-5, 7, '', 1); // blank box
-            $pdf->SetXY(15 + ($this->width*$column), 5 + ($row*$this->height) + $this->height - 10);
-            $pdf->Cell(20, 5, 'PLU#', 0, 0, 'L');
-            $pdf->SetFont($this->font, 'B', $this->MED_FONT);
-            $pdf->Cell(30, 5, ltrim($item['upc'], '0'), 0, 0, 'L');
-            $pdf->SetFont($this->font, '', $this->MED_FONT);
-            $pdf->Cell(20, 5, sprintf('$%.2f/lb.', $item['normal_price']), 0, 0, 'L');
-            $file = dirname(__FILE__) . '/../../../item/images/nutrition-facts/' . $info['nutritionFacts'];
-            if (file_exists($file) && is_file($file)) {
-                $pdf->Image($file, 10+($this->width*$column), 11.5 + ($row*$this->height) + 52, 88.9);
-            } */
 
             $count++;
             $sign++;

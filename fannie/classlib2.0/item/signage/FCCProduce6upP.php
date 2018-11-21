@@ -292,7 +292,7 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
                 AND f.active=1";
         $args = array($upc);
         if (\FannieConfig::config('STORE_MODE') == 'HQ') {
-            $args[] = \qFannieConfig::config('STORE_ID');
+            $args[] = \FannieConfig::config('STORE_ID');
         }
         $prep = $dbc->prepare($query);
         $res = $dbc->execute($prep,$args);

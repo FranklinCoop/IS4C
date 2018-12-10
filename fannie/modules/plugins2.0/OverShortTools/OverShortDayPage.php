@@ -208,7 +208,7 @@ class OverShortDayPage extends FanniePage
                 $perCashierCountTotal = 0;
                 $perCashierOSTotal = 0;
 
-                $noteR = $dbc->execute($noteP, array($date, $emp_no, $store));
+                $noteR = $dbc->execute($noteP, array($emp_no, $date, $store));
                 $noteW = $dbc->fetchRow($noteR);
                 $note = stripslashes($noteW[0]);
 
@@ -318,7 +318,7 @@ class OverShortDayPage extends FanniePage
             $output .= "<td id=overallCountTotal>$overallCountTotal</td>";
             $output .= "<td id=overallOSTotal>$overallOSTotal</td></tr>";
 
-            $noteR = $dbc->execute($noteP, array(-1, $date));
+            $noteR = $dbc->execute($noteP, array(-1, $date, $store)); //array($emp_no, $date, $store)
             $noteW = $dbc->fetchRow($noteR);
             $note = $noteW[0];
             $output .= "<tr><td>&nbsp;</td><td>Notes</td><td colspan=3</td>";

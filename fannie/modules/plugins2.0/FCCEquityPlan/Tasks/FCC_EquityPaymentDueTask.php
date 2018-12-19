@@ -99,7 +99,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 
 			$blueLine = $row['card_no'].' '.substr($row['FirstName'], 0, 1).'. '.$row['LastName'].' ';
 			$memberLevel = $row['memType'];
-			if ($yearAmt > 0 && $monthAmt>0 && $row['equityPaymentPlanID'] != 2){ 
+			if ($yearAmt > 0 && $monthAmt>0 && ($row['equityPaymentPlanID'] != 2 || $row['equityPaymentPlanID'] != 3){ 
 				if ($memberLevel == 1) { $memberLevel = 0; }
 				$blueLine .= $monthAmt.'/'.$yearAmt.'/'.$remainAmt;
 			} else {

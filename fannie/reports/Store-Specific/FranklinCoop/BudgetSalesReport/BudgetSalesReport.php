@@ -215,12 +215,12 @@ class BudgetSalesReport extends FannieReportPage
 		$basketline2 = array();
 		foreach ($tcyLine as $key => $value) {
 			$basket = (!array_key_exists($key, $this->custChart[1]) || $this->custChart[1][$key] ==0) 
-				? null : $value/$this->custChart[1][$key];
+				? null : number_format(($value/$this->custChart[1][$key]), 2);
 			$histBasket = (!array_key_exists($key, $this->custChart[2]) || $this->custChart[2][$key] ==0) 
-				? null : $value/$this->custChart[2][$key];	
+				? null : number_format(($value/$this->custChart[2][$key]), 2);	
 			$basketline1[] = $basket;
 			$basletline2[] = $histBasket;
-			//echo '<script>console.log("Basket Line: '.$basket.'");</script>';
+			echo '<script>console.log("Basket Line: '.$basket.'");</script>';
 		}
 		$this->basketChart = array($basketLabels,$basketline1,$basketline2);
 
@@ -247,14 +247,16 @@ class BudgetSalesReport extends FannieReportPage
 			FROM gfm_approach.daily_dept_sales_budget b
 			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
 			WHERE b.budgetDate BETWEEN ? AND ?  AND m.storeNo = ?
-			GROUP BY m.superDeptNo,WEEK(b.budgetDate) ORDER BY m.superDeptNo");
+			GROUP BY m.superDeptNo,WEEK(b.budgetDate)
+			ORDER BY m.superDeptNo,MAX(YEAR(b.budgetDate)), WEEK(b.budgetDate)");
         $budgetR = $dbc->execute($budgetQ,$args);
 
         $args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
-        $lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`) ,SUM(s.creditAmt) as deptSales, m.superDeptNo 
+        $lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`) ,SUM(s.creditAmt) as deptSales, m.superDeptNo
         	FROM gfm_approach.daily_sales_sage s
 			JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
-			WHERE `date` BETWEEN ? AND ? AND m.storeNo = ? GROUP BY m.superDeptNo, WEEK(s.`date`) ORDER BY m.superDeptNo');
+			WHERE `date` BETWEEN ? AND ? AND m.storeNo = ? GROUP BY m.superDeptNo, WEEK(s.`date`)
+			ORDER BY m.superDeptNo,MAX(YEAR(s.`date`)), WEEK(s.`date`)');
         $lastYearR = $dbc->execute($lastYearQ,$args);
 
         $args = array($startThisYear->format('Y-m-d').' 00:00:00', $endThisYear->format('Y-m-d').' 23:59:59', $store);
@@ -264,7 +266,7 @@ class BudgetSalesReport extends FannieReportPage
 			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
 			AND t.trans_type IN ('D', 'I') AND s.superID < 14
 			AND WEEK(t.tdate) != WEEK(NOW())
-			GROUP BY s.superID,WEEK(t.tdate) ORDER BY s.superID");
+			GROUP BY s.superID,WEEK(t.tdate) ORDER BY s.superID,MAX(YEAR(t.tdate)), WEEK(t.tdate)");
         $salesR = $dbc->execute($salesQ, $args);
 
         $i=0;
@@ -288,7 +290,8 @@ class BudgetSalesReport extends FannieReportPage
 			$graphDate = new DateTime();
 			$graphDate->setISODate(date('Y'),$budgetW[0]+1);
 			$graphDate->modify('this Saturday');
-			$record[] = $graphDate->format('m-d-y');
+			$record[] = $graphDate->format('m-d');
+			echo '<script>console.log(" Budget Date:'.($budgetW[0]+1).'");</script>';
         	//$record[] = sprintf('%.2f',$budgetW[2]);
         	$record[] = $budgetW[1];//number_format($budgetW[1],2);//sprintf('$%.2f',$budgetW[1]);
         	//$record[] = sprintf('%.2f',$lastYearW[2]);
@@ -415,6 +418,7 @@ class BudgetSalesReport extends FannieReportPage
 		$i = 0;
 		$key = -1;
 		$countLine = false;
+		$count = 0;
 		while($row = $dbc->fetchRow($custCountR)) {
 			if($i==0) {
 				$startDateI = DateTime::createFromFormat('Ymd', $row[1]);
@@ -422,12 +426,12 @@ class BudgetSalesReport extends FannieReportPage
 				//$chartLabels[] = $startDateI->format('m-d');
 				$chartLine1[] = $row[0];
 				if($countLine)
-					$this->customerCount += $row[0];
+					$count += $row[0];
 				$key++;
 			} else {
 				$chartLine1[$key] += $row[0];
 				if($countLine)
-					$this->customerCount += $row[0];
+					$count += $row[0];
 			} 
 
 			$i = ($i < $interval->d) ? $i+1 : 0 ;
@@ -460,8 +464,8 @@ class BudgetSalesReport extends FannieReportPage
 
 		$this->custChart = array($chartLabels,$chartLine1,$chartLine2);
 		
-
-		//echo '<script>console.log(" Table:'.$this->customerCount.'");</script>';
+		$this->customerCount = $count;
+		echo '<script>console.log(" Table:'.$this->customerCount.'");</script>';
 
 		return true;
 

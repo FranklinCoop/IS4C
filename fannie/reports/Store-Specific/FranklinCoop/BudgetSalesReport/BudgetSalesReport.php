@@ -288,7 +288,7 @@ class BudgetSalesReport extends FannieReportPage
 			$graphDate = new DateTime();
 			$graphDate->setISODate(date('Y'),$budgetW[0]+1);
 			$graphDate->modify('this Saturday');
-			$record[] = $graphDate->format('m-d');
+			$record[] = $graphDate->format('m-d-y');
         	//$record[] = sprintf('%.2f',$budgetW[2]);
         	$record[] = $budgetW[1];//number_format($budgetW[1],2);//sprintf('$%.2f',$budgetW[1]);
         	//$record[] = sprintf('%.2f',$lastYearW[2]);
@@ -513,6 +513,41 @@ class BudgetSalesReport extends FannieReportPage
 		}
 
 		return $yearBalance;
+   	}
+
+   	private function calcDates($date1, $date2) {
+   		$startDate = DateTime::createFromFormat('Y-m-d' ,$date1);
+		$startDay = $startDate->format('l');
+		$endDate = DateTime::createFromFormat('Y-m-d' ,$date2);
+		$endDay = $endDate->format('l');
+		
+		if($startDate->format('m')==$endDate->format('m')){
+			
+		}
+
+		$interval = $startDate->diff($endDate);
+		$changeS = ($interval->d+1)*4; // go back four intervals, the days are one shorter then we want.
+		$changeE = ($interval->d+1)*3;
+		$startDate->modify("-{$changeS} days");
+		$endDate->modify("+{$changeE} days");
+
+		
+		$startDateHist = DateTime::createFromFormat('Y-m-d' ,$date1);
+		$endDateHist = DateTime::createFromFormat('Y-m-d' ,$date2);
+		$startDateHist->modify('-52 weeks');
+		//$startDateHist->modify("next {$startDay}");
+		$startDateHist->modify("-{$changeS} days");
+		$endDateHist->modify('-52 weeks');
+		//$endDateHist->modify("next {$endDay}");
+		$endDateHist->modify("+{$changeE} days");
+
+   		return array(
+   			'start' => $startDate,
+   			'end' => $endDate,
+   			'startHist' => $startDateHist,
+   			'endHist' => $endHist,
+   			'interval' => 0
+   		);
    	}
 
 

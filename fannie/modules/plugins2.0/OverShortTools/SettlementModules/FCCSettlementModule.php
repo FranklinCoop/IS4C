@@ -322,7 +322,7 @@ private function genRowData($dbc,$dlog,$args) {
     $row[] = 0;
     $ret[] = $row;
     //Tax Section
-    $rowNames = array('PLUS MEALS TAX Collected','PLUS SALES TAX Collected','TOTAL TAX');
+    $rowNames = array('PLUS SALES TAX Collected','PLUS MEALS TAX Collected','TOTAL TAX');
     $gfmAcctNo = array('(2400G990)','(2450A990)','');
     $mccAcctNo = array('(2400M990)','(2450A990)','');
     $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
@@ -513,7 +513,7 @@ private function getSalesTotals($dbc,$dlog,$args) {
 private function getTaxTotals($dbc,$dlog,$args) {
     $query = $dbc->prepare("SELECT sum(regPrice),description FROM {$dlog} 
                           WHERE upc ='TAXLINEITEM' AND `datetime` BETWEEN ? AND ? AND store_id =? AND trans_status != 'X'
-                          GROUP BY description");
+                          GROUP BY description ORDER BY description");
     $result = $dbc->execute($query,$args);
     $return = array();
     while ($row = $dbc->fetch_row($result)) {

@@ -63,6 +63,7 @@ class MemMailList extends FannieReportPage
              case 'Members':
              default:
                 $ret .= "c.Type='PC'
+                  AND m.street >'' and m.street not in ('*','.') and m.city > '' and m.state >'' and m.zip > ''
                   AND (end_date > ".$dbc->now()." 
                     or end_date = '' 
                     or end_date is null
@@ -93,7 +94,7 @@ class MemMailList extends FannieReportPage
                   order by m.card_no";
                 break;
          }
-
+         
          return $ret;
     }
 

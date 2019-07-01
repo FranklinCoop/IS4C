@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2018 Franklin Community Co-op
+    Copyright 2019 Franklin Community Co-op
 
     This file is part of IT CORE.
 
@@ -19,33 +19,6 @@
     in the file license.txt along with IT CORE; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-
-    				$paid = 175;
-			$now = new DateTime('2020-12-23');
-$now->modify('first day of this month')->setTime(23,59,59);;
-			$remain = 175 - $paid;
-			$startDate = new DateTime('2018-12-15');
-$startDate->modify('first day of this month')->setTime(0,0,0);;
-//$startDate->modify('-1 day');
-			$lastDate = new DateTime('1995-03-01');
-			$interval = $now->diff($startDate);
-			$months = $interval->m;
-			$years = $interval->y;
-			$yearAmt = 0;
-			if ($years >= 6) {$yearAmt = 175 - $paid;}
-			else if ($years == 0) {$yearAmt = 50 - $paid;}
-			else if ($paid < 50+25*$years){$yearAmt = (50+25*$years) -$paid;}
-	
-			$monthAmt = 0;
-			if($years == 0 && $months <5){$monthAmt = 10*($months+1)-$paid;}
-			else if ($yearAmt >0 && $months <5) {$monthAmt = $yearAmt + 5*($months+1) -25;}
-			else {$monthAmt = $yearAmt;}
-
-			select e.card_no, e.payments, e.startdate, c.FirstName, c.LastName, c.discount
-from core_trans.equity_history_sum e 
-left join core_op.CustomerAccounts a on e.card_no = a.CardNo 
-left join core_op.custdata c on e.card_no = c.CardNo
-
 *********************************************************************************/
 
 class FCC_EquityPaymentDueTask extends FannieTask
@@ -56,20 +29,31 @@ class FCC_EquityPaymentDueTask extends FannieTask
 							until any monthly payment is reached. This task calcualtes what a member owes.';
 
 	function run(){
-		$this->calcualtePayments();
+		$this->updateBlueLine();
 	}
 
-	function calcualtePayments() {
+	function updateBlueLine() {
 		global $FANNIE_OP_DB;
 		$TransDB = $this->config->get('TRANS_DB');
 		$OpDB = $FANNIE_OP_DB;
 		$dbc = FannieDB::get($TransDB);
-		$query = "select e.card_no, e.payments,d.start_date, (case when p.nextPaymentDate is null then e.mostRecent else p.nextPaymentDate end) as mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id,p.equityPaymentPlanID, p.nextPaymentAmount
-					from ".$TransDB.".equity_history_sum e
-					left join ".$OpDB.".custdata c on e.card_no=c.CardNo 
-					left join ".$OpDB.".memDates d on e.card_no=d.card_no 
-					left join ".$OpDB.".EquityPaymentPlanAccounts p on e.card_no=p.cardNo 
-					where e.card_no < 8000 AND e.payments < 175";
+		$query = "select e.card_no, e.payments,d.start_date, s.lastPaymentDate as mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id,p.equityPaymentPlanID, p.nextPaymentAmount
+				from {$TransDB}.equity_history_sum e
+				left join {$OpDB}.custdata c on e.card_no=c.CardNo 
+				left join {$OpDB}.memDates d on e.card_no=d.card_no 
+				left join {$OpDB}.EquityPaymentPlanAccounts p on e.card_no=p.cardNo
+                left join (
+                    SELECT a.card_no, a.stockPurchase, MAX(a.tdate)  as lastPaymentDate, b.total
+					FROM {$TransDB}.stockpurchases AS a
+					JOIN (
+						SELECT card_no, stockPurchase, MAX(tdate) as max_tdate, sum(stockPurchase) as total
+						FROM {$TransDB}.stockpurchases
+						GROUP BY card_no
+					) as b
+					WHERE a.card_no = b.card_no
+    				AND a.tdate = b.max_tdate
+    				group by a.card_no) s on c.cardNo = s.card_no
+				where e.card_no between 10 and 8000 AND e.payments < 175";
 		$prep = $dbc->prepare($query);
 		$results = $dbc->execute($prep,array());
 		$blueLines = array();
@@ -83,28 +67,37 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			$months = $interval->m;
 			$days = $interval->d;
 			$blueLine = $row['blueLine'];
+			$newLine = '';
 			$memType = $row['memType'];
 			$paid = $row['payments'];
-			$paymentDue = $row['nextPaymentAmount'];
-			if($days==0 || $paymentDue > 3){
+			$paymentDue = 3*$months;
+			$updateAccount = false;
+			if($months >= 1 && $row['equityPaymentPlanID'] == 1){
 				$remainAmt = 175 - $paid;
-				$blueLine = sprintf("%s %s. %s %d/%d",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName'],$remainAmt,$paymentDue); //$row['card_no'].' '.substr($row['FirstName'], 0, 1).'. '.$row['LastName'].' '.$remainAmt.'/'.$paymentDue;
-				if ($days >= 60 && $memType == 1) {
-					//deactivate member.
-					$memType = 12;
-				} else if ($memType == 12 && $days < 60) {
-					$memType = 1;
-				}
-			} elseif ($paymentDue == 3.00) {
-				$blueLine = sprintf("%s %s. %s",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName']);
+				$newLine = sprintf("%s %s. %s %d/%d",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName'],$remainAmt,$paymentDue); //$row['card_no'].' '.substr($row['FirstName'], 0, 1).'. '.$row['LastName'].' '.$remainAmt.'/'.$paymentDue;
+			} else {
+				$newLine = sprintf("%s %s. %s",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName']);
 			}
-
-			if ($row['nextPaymentAmount'] > 0) {
+			// update account blueline if information has changed.
+			if ($blueLine != $newLine) {
+				$blueLine = $newLine;
+				$updateAccount = true;
+			}
+			// check for member deactivation
+			if ($days >= 60 && $memType == 1) {
+				//deactivate member.
+				$memType = 12;
+			} else if ($memType == 12 && $days < 60) {
+				//ractivate member.
+				$memType = 1;
+			}
+			//$updateAccount = true;
+			if ($updateAccount) {
 				$opDBC = FannieDB::get($OpDB);
 				$updateQ = 'UPDATE '.$OpDB.'.custdata c set blueLine="'.$blueLine.'",memType ='.$memType.' where c.CardNo='.$row['card_no'].' AND c.id='.$row['id'];
 				$updateP = $opDBC->prepare($updateQ);
 				$updateR = $opDBC->execute($updateP,array());
-				echo $this->cronMsg("Blue Line: ".$blueLine.'  '.$paid.' start_date. '.$days);
+				echo $this->cronMsg("Blue Line: ".$blueLine.'  '.$newLine.' start_date. '.$row['mostRecent']);
 			}
 		}
 	}

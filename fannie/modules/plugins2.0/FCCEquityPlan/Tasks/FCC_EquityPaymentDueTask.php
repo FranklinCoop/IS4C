@@ -59,17 +59,17 @@ class FCC_EquityPaymentDueTask extends FannieTask
 		$this->calcualtePayments();
 	}
 
-	function calcualtePayments(){
+	function calcualtePayments() {
 		global $FANNIE_OP_DB;
 		$TransDB = $this->config->get('TRANS_DB');
 		$OpDB = $FANNIE_OP_DB;
 		$dbc = FannieDB::get($TransDB);
-		$query = "select e.card_no, e.payments,e.startdate, e.mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id,p.equityPaymentPlanID
+		$query = "select e.card_no, e.payments,d.start_date, (case when p.nextPaymentDate is null then e.mostRecent else p.nextPaymentDate end) as mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id,p.equityPaymentPlanID, p.nextPaymentAmount
 					from ".$TransDB.".equity_history_sum e
 					left join ".$OpDB.".custdata c on e.card_no=c.CardNo 
 					left join ".$OpDB.".memDates d on e.card_no=d.card_no 
 					left join ".$OpDB.".EquityPaymentPlanAccounts p on e.card_no=p.cardNo 
-					where e.card_no < 8000";
+					where e.card_no < 8000 AND e.payments < 175";
 		$prep = $dbc->prepare($query);
 		$results = $dbc->execute($prep,array());
 		$blueLines = array();
@@ -77,42 +77,36 @@ class FCC_EquityPaymentDueTask extends FannieTask
 		$now = new DateTime();
 		$now->modify('first day of this month')->setTime(23,59,59);
 		while ($row = $dbc->fetch_row($results)) {
-			$paid = $row['payments'];
-			$remainAmt = 175 - $paid;
-			$startDate = new DateTime($row['startdate']);
-			$startDate->modify('first day of this month')->setTime(0,0,0);
-			$interval = $now->diff($startDate);
-
+			$mostRecentDate = new DateTime($row['mostRecent']);
+			$mostRecentDate->modify('first day of this month')->setTime(0,0,0);
+			$interval = $now->diff($mostRecentDate);
 			$months = $interval->m;
-			$years = $interval->y;
-			$yearAmt = 0;
-			// calculate how much is owed for the year
-			if ($years >= 6) {$yearAmt = 175 - $paid;} //full term should be paid off but if not a simple differnce.
-			else if ($years == 0) {$yearAmt = 50 - $paid;} //first year for 50 dollars also a simple diffrence.
-			else if ($paid < 50+25*$years){$yearAmt = (50+25*$years) -$paid;} //this is an if so that it will be zero
-																			  //if the years balance is paid instead of a negative.
-			// calculate how much is owed for the month
-			$monthAmt = 0;
-			if($years == 0 && $months <5){$monthAmt = 10*($months+1)-$paid;}//first year monthly payment
-			else if ($yearAmt >0 && $months <5) {$monthAmt = $yearAmt + 5*($months+1) -25;}//any other year
-			else {$monthAmt = $yearAmt;}//doesn't increment after month 5 so it's the same as for the year.
-
-			$blueLine = $row['card_no'].' '.substr($row['FirstName'], 0, 1).'. '.$row['LastName'].' ';
-			$memberLevel = $row['memType'];
-			if ($yearAmt > 0 && $monthAmt>0 && ($row['equityPaymentPlanID'] != 2 || $row['equityPaymentPlanID'] != 3){ 
-				if ($memberLevel == 1) { $memberLevel = 0; }
-				$blueLine .= $monthAmt.'/'.$yearAmt.'/'.$remainAmt;
-			} else {
-				if ($memberLevel == 0) { $memberLevel = 1; }
+			$days = $interval->d;
+			$blueLine = $row['blueLine'];
+			$memType = $row['memType'];
+			$paid = $row['payments'];
+			$paymentDue = $row['nextPaymentAmount'];
+			if($days==0 || $paymentDue > 3){
+				$remainAmt = 175 - $paid;
+				$blueLine = sprintf("%s %s. %s %d/%d",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName'],$remainAmt,$paymentDue); //$row['card_no'].' '.substr($row['FirstName'], 0, 1).'. '.$row['LastName'].' '.$remainAmt.'/'.$paymentDue;
+				if ($days >= 60 && $memType == 1) {
+					//deactivate member.
+					$memType = 12;
+				} else if ($memType == 12 && $days < 60) {
+					$memType = 1;
+				}
+			} elseif ($paymentDue == 3.00) {
+				$blueLine = sprintf("%s %s. %s",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName']);
 			}
-			if ($blueLine != $row['blueLine']) {
+
+			if ($row['nextPaymentAmount'] > 0) {
 				$opDBC = FannieDB::get($OpDB);
-				$updateQ = 'UPDATE '.$OpDB.'.custdata c set blueLine="'.$blueLine.'",memType ='.$memberLevel.' where c.CardNo='.$row['card_no'].' AND c.id='.$row['id'];
+				$updateQ = 'UPDATE '.$OpDB.'.custdata c set blueLine="'.$blueLine.'",memType ='.$memType.' where c.CardNo='.$row['card_no'].' AND c.id='.$row['id'];
 				$updateP = $opDBC->prepare($updateQ);
 				$updateR = $opDBC->execute($updateP,array());
-				echo $this->cronMsg("Blue Line: ".$blueLine.'  '.$yearAmt.' start_date. '.$startDate->format('Y-m-d'));
+				echo $this->cronMsg("Blue Line: ".$blueLine.'  '.$paid.' start_date. '.$days);
 			}
 		}
-
 	}
+
 }

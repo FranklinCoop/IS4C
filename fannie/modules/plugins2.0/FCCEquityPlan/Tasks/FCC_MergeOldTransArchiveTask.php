@@ -23,7 +23,7 @@
 
 class FCC_MergeOldTransArchiveTask extends FannieTask
 {
-    public $name = 'Transaction Archiving';
+    public $name = 'Merge Old Trans Archive Task';
 
     public $description = 'Archive current transaction data.
     Replaces the old nightly.dtrans.php script.';

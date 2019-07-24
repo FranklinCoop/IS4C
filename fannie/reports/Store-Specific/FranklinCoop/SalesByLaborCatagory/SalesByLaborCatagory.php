@@ -142,9 +142,9 @@ class SalesByLaborCatagory extends FannieReportPage
         }
 
         }
-        $data[] = $report; // deal with the last value.
+        //$data[] = $report; // deal with the last value.
 
-		return $return;
+		return $report;
 	}
 
 

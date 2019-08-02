@@ -798,8 +798,8 @@ class UPC extends Parser
          */
         if ($row["inUse"] == 0) {
             TransRecord::addLogRecord(array(
-                'upc' => $row['upc'],
-                'description' => $row['description'],
+                'upc' => 'NOTINUSE',
+                'description' => $row['upc'],
                 'department' => $row['department'],
                 'charflag' => 'IU',
             ));

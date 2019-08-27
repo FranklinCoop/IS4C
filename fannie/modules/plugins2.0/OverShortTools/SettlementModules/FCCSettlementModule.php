@@ -513,7 +513,7 @@ private function getSalesTotals($dbc,$dlog,$args) {
 private function getTaxTotals($dbc,$dlog,$args) {
     $query = $dbc->prepare("SELECT sum(regPrice),description FROM {$dlog} 
                           WHERE upc ='TAXLINEITEM' AND `datetime` BETWEEN ? AND ? AND store_id =? AND trans_status != 'X'
-                          GROUP BY description ORDER BY description");
+                          GROUP BY RIGHT(description,7) ORDER BY RIGHT(description,7)");
     $result = $dbc->execute($query,$args);
     $return = array();
     while ($row = $dbc->fetch_row($result)) {
@@ -627,6 +627,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
             AND p.xResultCode = 1 and t.trans_status <>'X'");
 
         */
+        $args[] = $args[0];
         $result = $dbc->execute($query,$args);
         $row = $dbc->fetch_row($result);
         
@@ -638,7 +639,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
             WHERE t.trans_type ='T' AND t.trans_subtype IN ('CC','DC','EC','EF','GD')
             AND t.`datetime` BETWEEN ? AND ? AND t.store_id =?
             AND p.`issuer` != '0'                 AND p.httpCode=200
-            AND p.xResultCode = 1 and t.trans_status <>'X'");
+            AND p.xResultCode = 1 and t.trans_status <>'X' AND DATE(p.requestDateTime) = DATE(?)");
 
         $amexR = $dbc->execute($amexQ, $args);
         $amexW = $dbc->fetch_row($amexR);

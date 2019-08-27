@@ -71,6 +71,10 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			$memType = $row['memType'];
 			$paid = $row['payments'];
 			$paymentDue = 3*$months;
+			if (($paid + $paymentDue) >= 175 ) {
+				$paymentDue = 175 - ($paid+$paymentDue);
+			}
+			
 			$updateAccount = false;
 			if($months >= 1 && $row['equityPaymentPlanID'] == 1){
 				$remainAmt = 175 - $paid;

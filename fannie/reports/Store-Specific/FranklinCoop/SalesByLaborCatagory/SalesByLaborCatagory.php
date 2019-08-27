@@ -38,7 +38,7 @@ class SalesByLaborCatagory extends FannieReportPage
     protected $sortable = false;
     protected $no_sort_but_style = true;
     protected $new_tablesorter = true;
-    protected $multi_report_mode = true;
+    protected $multi_report_mode = false;
 
     protected $report_headers = array('Name','Total Sales');
     protected $required_fields = array('date1','date2');

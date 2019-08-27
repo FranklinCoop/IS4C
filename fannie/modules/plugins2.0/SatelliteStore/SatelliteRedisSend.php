@@ -68,17 +68,16 @@ class SatelliteRedisSend extends FannieTask
             $this->unlock();
             return false;
         }
-
-        $local = $this->localDB($remote, $myID, $my_db);
-        if (!$local->isConnected($my_db)) {
-            echo $this->cronMsg("No local connection");
-            echo $this->cronMsg('Task Unlock Enganged');
-
-            $this->unlock();
-            return false;
-        }
-
         try {
+            $local = $this->localDB($remote, $myID, $my_db);
+            if (!$local->isConnected($my_db)) {
+                echo $this->cronMsg("No local connection");
+                echo $this->cronMsg('Task Unlock Enganged');
+
+                $this->unlock();
+                return false;
+            }
+
             $redis = new Predis\Client($redis_host);
 
             $this->sendTable($local, $redis, $myID, 'dtransactions', 'store_row_id');

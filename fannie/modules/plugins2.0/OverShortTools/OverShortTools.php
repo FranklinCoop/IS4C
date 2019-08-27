@@ -62,7 +62,9 @@ class OverShortTools extends \COREPOS\Fannie\API\FanniePlugin {
             'DailyCounts',
             'DailyDeposit',
             'DailyNotes',
-            'OverShortsLog'
+            'OverShortsLog',
+            'DailySettlement',
+            'DailySettlementAccounts'
         );
 
         foreach($tables as $t){

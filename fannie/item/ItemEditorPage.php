@@ -607,8 +607,8 @@ HTML;
         $FANNIE_PRODUCT_MODULES = $this->getConfiguredModules();
         $FANNIE_URL = $this->config->get('URL');
 
-        $upc = FormLib::get_form_value('updateBtn','');
-        if ($upc === '' || !is_numeric($upc)) {
+        $upc = FormLib::get_form_value('upc','');
+        if (($upc === '' && !$isNew) || !is_numeric($upc)) {
             return '<span style="color:red;">Error: bad UPC:</span> '.$upc;
         }
         $upc = BarcodeLib::padUPC($upc);

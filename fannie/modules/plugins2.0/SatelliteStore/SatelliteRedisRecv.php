@@ -62,6 +62,7 @@ class SatelliteRedisRecv extends FannieTask
             $this->getTrans($dbc, $redis, new PaycardTransactionsModel(null));
             $this->getTrans($dbc, $redis, new CapturedSignatureModel(null), array('capturedSignatureID'));
         } catch (Exception $ex) {
+            $this->unlock();
             $this->cronMsg("Exception: ".$ex);
         }
 

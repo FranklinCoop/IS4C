@@ -76,7 +76,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			}
 			
 			$updateAccount = false;
-			if($months >= 1 && $row['equityPaymentPlanID'] == 1){
+			if($months >= 1 && $row['equityPaymentPlanID'] == 1 && $row['payments'] < 175){
 				$remainAmt = 175 - $paid;
 				$newLine = sprintf("%s %s. %s %d/%d",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName'],$remainAmt,$paymentDue); //$row['card_no'].' '.substr($row['FirstName'], 0, 1).'. '.$row['LastName'].' '.$remainAmt.'/'.$paymentDue;
 			} else {

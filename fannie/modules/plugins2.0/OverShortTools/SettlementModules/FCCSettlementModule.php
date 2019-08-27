@@ -627,10 +627,10 @@ private function getTaxTotals($dbc,$dlog,$args) {
             AND p.xResultCode = 1 and t.trans_status <>'X'");
 
         */
-        $args[] = $args[0];
+    
         $result = $dbc->execute($query,$args);
         $row = $dbc->fetch_row($result);
-        
+        $args[] = $args[0];
 
         $amexQ = $dbc->prepare("SELECT 
             sum(case when p.`issuer` = 'AMEX' and trans_subtype='CC' then p.amount else 0 end) as AMEX

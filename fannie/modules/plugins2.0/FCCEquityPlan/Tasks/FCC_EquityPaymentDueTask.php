@@ -72,7 +72,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			$paid = $row['payments'];
 			$paymentDue = 3*$months;
 			if (($paid + $paymentDue) >= 175 ) {
-				$paymentDue = $paymentDue - ($paid+$paymentDue) - 175;
+				$paymentDue = $paymentDue - (($paid+$paymentDue) - 175);
 			}
 			
 			$updateAccount = false;

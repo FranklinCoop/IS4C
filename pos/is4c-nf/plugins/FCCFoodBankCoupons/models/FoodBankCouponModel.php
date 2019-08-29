@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2018 Franklin Community Coop
+    Copyright 2019 Franklin Community Co-op
 
     This file is part of CORE-POS.
 
@@ -56,10 +56,10 @@ Depends on:
 Nothing
 
 Use:
-This table stores a set of members be month
-each number has an old member type at the end
-of each month a cron will reset every memeber
-to the new member type.
+This table stores a map of coupons to upcs to sales plus for a suspended items program
+The upc is the item, the sales plu is applied when a customer wants to buy a coupon for
+the food bank, and the coupons are given out by the food bank and can be redeemed for an
+item from the same category.
         ';
     }
 }

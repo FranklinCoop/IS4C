@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2019 Franklin Community Co-op
+     Copyright 2019 Franklin Community Co-op
 
     This file is part of IT CORE.
 
@@ -21,34 +21,30 @@
 
 *********************************************************************************/
 
-namespace COREPOS\pos\parser\preparse;
+namespace COREPOS\pos\parser\parse;
 use \CoreLocal;
 use COREPOS\pos\lib\DisplayLib;
-use COREPOS\pos\parser\PreParser;
+use COREPOS\pos\parser\Parser;
 
-class ScaleValue extends PreParser 
+class ScaleValueError extends Parser 
 {
-    
-    function check($str){
-        if (strstr($str, "$"))
-            return True;
-        return False;
-    }
-
-    function parse($str)
+    public function check($str)
     {
-        $ret = $str;
-        if (CoreLocal::get("weight") == 0) {
-            return $str;
-        } else {
-            $weight = CoreLocal::get("weight");
-            $ret = str_replace("$", $weight, $str);
-        }
-        return $ret;
+        return (strstr($str, "$"));
     }
 
-    function isLast(){
-        return True;
+    public function parse($str)
+    {
+            $ret = $this->default_json();
+            CoreLocal::set("SNR",CoreLocal::get('strEntered'));
+            $ret['output'] = DisplayLib::boxMsg(
+                _("please put item on scale"),
+                _('Weighed Item'),
+                true,
+                DisplayLib::standardClearButton()
+            );
+
+        return $ret;
     }
 
     function doc(){
@@ -57,10 +53,9 @@ class ScaleValue extends PreParser
                 <th>Input</th><th>Result</th>
             </tr>
             <tr>
-                <td><i>number</i>*<i>item</i></td>
-                <td>Enter <i>item</i> <i>number</i> times
-                (e.g., 2*item to ring up two of the same
-                item)</td>
+                <td>CM<i>text</i></td>
+                <td>Add <i>text</i> to the transaction
+                as a comment line</td>
             </tr>
             </table>";
     }

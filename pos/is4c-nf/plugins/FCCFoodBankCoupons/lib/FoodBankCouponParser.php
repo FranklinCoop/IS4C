@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2007 Whole Foods Co-op
+     Copyright 2019 Franklin Community Co-op
 
     This file is part of IT CORE.
 
@@ -66,9 +66,8 @@ class FoodBankCouponParser extends Parser implements AdminLoginInterface
 
                 $status = $this->checkstatus($transID);
                 $upc = $status['upc'];
-                $row = $this->validationCheck($upc);
-                echo "---let's go".$row['item_upc']."----".$row['sale_plu']."   **nothing else";
-                $ret = $this->buyCoupon($row['item_upc'],$row['sale_plu'], $ret);
+                echo "---let's go: ".$upc."   **nothing else\n";
+                $ret = $this->buyCoupon($upc, $ret);
             }
 
             if (empty($ret['output']) && empty($ret['main_frame'])) {
@@ -85,9 +84,12 @@ class FoodBankCouponParser extends Parser implements AdminLoginInterface
         return $ret;
     }
 
-    private function buyCoupon ($upc, $plu, $json) {
+    private function buyCoupon ($upc, $json) {
         
         try {
+            $row = $this->validationCheck($upc);
+            echo "---let's go".$row['item_upc']."----".$row['sale_plu']."   **nothing else";
+            $plu = $row['sale_plu'];
             $queryCoupon ="SELECT description, department,tax,foodstamp,discount,discount,discounttype
                        FROM products
                        WHERE upc={$plu}";
@@ -117,7 +119,7 @@ class FoodBankCouponParser extends Parser implements AdminLoginInterface
                 'scale' => $item["scale"], 
                 'tax' => $coupon["tax"], 
                 'foodstamp' => $coupon["foodstamp"], 
-                'discount' => $coupon["discount"], 
+                'discount' => $item["discount"], 
                 'memDiscount' => $item["memDiscount"], 
                 'discountable' => $coupon["discount"], 
                 'discounttype' => $coupon["discounttype"], 
@@ -149,7 +151,7 @@ class FoodBankCouponParser extends Parser implements AdminLoginInterface
         $numRows = $dbc->numRows($result);
         if ($numRows == 0 ) {
             throw new Exception(DisplayLib::boxMsg(
-                _("Ineligible item") . $upc,
+                _("Ineligible item: ") . $upc,
                 '',
                 false,
                 DisplayLib::standardClearButton()

@@ -26,7 +26,6 @@ use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DisplayLib;
 use COREPOS\pos\lib\UdpComm;
 use COREPOS\pos\parser\Parser;
-use COREPOS\pos\lib\LaneLogger;
 
 class SigTermCommands extends Parser 
 {
@@ -34,8 +33,6 @@ class SigTermCommands extends Parser
 
     function check($str)
     {
-        $log = new LaneLogger();
-        $log->debug("SigTerm Check: ".$str);
         if ($str == "TERMMANUAL") {
             UdpComm::udpSend("termManual");
             $this->session->set("paycard_keyed", true);

@@ -92,7 +92,7 @@ class SeniorDiscountParser extends Parser
         }
         CoreLocal::set('SeniorDiscountAmt',$discount);
         //update discount.
-        DiscountModule::updateDiscount(new DiscountModule($discount, 'SeniorDiscount',Ture));
+        DiscountModule::updateDiscount(new DiscountModule($discount, 'SeniorDiscount',True));
         //adds record of the action.
         TransRecord::addRecord(array(
             'description' => $description,

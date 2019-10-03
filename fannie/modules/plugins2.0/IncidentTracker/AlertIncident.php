@@ -22,14 +22,112 @@ class AlertIncident extends FannieRESTfulPage
 
     public function preprocess()
     {
-        $this->addRoute('get<new>', 'get<search>');
+        $this->addRoute('get<new>', 'get<search>', 'post<escalate>', 'post<id><field><value>');
         return parent::preprocess();
+    }
+
+    protected function post_id_field_value_handler()
+    {
+        $settings = $this->config->get('PLUGIN_SETTINGS');
+        $this->connection->selectDB($settings['IncidentDB']);
+        $model = new IncidentsModel($this->connection);
+        $model->incidentID($this->id);
+        if (trim($this->value) == '') {
+            echo 'No value!';
+            return false;
+        }
+        switch ($this->field) {
+            case 'personName':
+                $model->personName($this->value);
+                break;
+            case 'personDOB':
+                $stamp = strtotime($this->value);
+                $model->personDOB($stamp ? date('Y-m-d', $stamp) : null);
+                break;
+            case 'employees':
+                $model->employees($this->value);
+                break;
+            case 'caseNumber':
+                $model->caseNumber($this->value);
+                break;
+            case 'trespassStart':
+                $stamp = strtotime($this->value);
+                $model->trespassStart($stamp ? date('Y-m-d', $stamp) : null);
+                break;
+            case 'trespassEnd':
+                $stamp = strtotime($this->value);
+                $model->trespassEnd($stamp ? date('Y-m-d', $stamp) : null);
+                break;
+            case 'police':
+                $model->police($this->value);
+                break;
+            case 'trespass':
+                $model->trespass($this->value);
+                break;
+            default:
+                echo 'Unknown';
+                return false;
+        }
+        $model->save();
+        echo 'OK';
+
+        return false;
+    }
+
+    protected function post_escalate_handler()
+    {
+        $msg = "Alert needing attention\n";
+        $msg .= 'http://key/git/fannie/modules/plugins2.0/IncidentTracker/AlertIncident.php?id=' . $this->escalate . "\n\n";
+
+        try {
+            $row = $this->getIncident($this->escalate);
+        } catch (Exception $ex) {
+            return false; // incident not found; can't escalate
+        }
+        $comments =  $this->getComments($this->escalate);
+        
+        $msg .= "Date {$row['tdate']}\n";
+        $msg .= "Store {$row['storeName']}\n";
+        $msg .= "Type {$row['incidentSubType']}\n";
+        $msg .= "Location {$row['incidentLocation']}\n";
+        $msg .= "Reported by {$row['reportedBy']}\n";
+        $msg .= "Summary: " . $row['details'] . "\n\n";
+        foreach ($comments as $c) {
+            if ($c['comment']) {
+                $msg .= "Additional comment by {$c['userName']}\n";
+                $msg .= $c['tdate'] . "\n";
+                $msg .= $c['comment'] . "\n\n";
+            }
+        }
+
+        $subject = 'Alert Needing Attention';
+        $to = 'andy@wholefoods.coop,sbroome@wholefoods.coop,michael@wholefoods.coop,shannigan@wholefoods.coop';
+
+        $upP = $this->connection->prepare("
+            UPDATE " . FannieDB::fqn('Incidents', 'plugin:IncidentDB') . "
+            SET escalate=1
+            WHERE incidentID=?");
+        $this->connection->execute($upP, array($this->escalate));
+
+        mail($to, $subject, $msg, "From: alerts@wholefoods.coop\r\n");
+
+        return false;
     }
 
     protected function get_search_view()
     {
         $settings = $this->config->get('PLUGIN_SETTINGS');
         $prefix = $settings['IncidentDB'] . $this->connection->sep();
+        $commentP = $this->connection->prepare("
+            SELECT incidentID
+            FROM {$prefix}IncidentComments
+            WHERE comment LIKE ? OR comment LIKE ?");
+        $cArgs = array(
+            '%' . $this->search . '%',
+            '%' . str_replace(' ', '%', trim($this->search)) . '%',
+        );
+        $cIDs = $this->connection->getAllValues($commentP, $cArgs);
+        list($inStr, $args) = $this->connection->safeInClause($cIDs);
         $searchP = $this->connection->prepare("
             SELECT i.*,
                 COALESCE(t.incidentSubType, 'Other') AS incidentSubType,
@@ -41,13 +139,12 @@ class AlertIncident extends FannieRESTfulPage
                 LEFT JOIN {$prefix}IncidentLocations AS l ON i.incidentLocationID=l.incidentLocationID
                 LEFT JOIN Users as u ON i.uid=u.uid
                 LEFT JOIN Stores AS s ON i.storeID=s.storeID
-            WHERE (details LIKE ? OR details LIKE ?)
+            WHERE (i.incidentID IN ({$inStr}) OR details LIKE ? OR details LIKE ? OR personName LIKE ?)
                 AND i.deleted=0
             ORDER BY tdate DESC");
-        $args = array(
-            '%' . $this->search . '%',
-            '%' . str_replace(' ', '%', trim($this->search)) . '%',
-        );
+        $args[] = '%' . $this->search . '%';
+        $args[] = '%' . str_replace(' ', '%', trim($this->search)) . '%';
+        $args[] = '%' . $this->search . '%';
         $searchR = $this->connection->execute($searchP, $args);
 
         $ret = '
@@ -133,8 +230,23 @@ class AlertIncident extends FannieRESTfulPage
         $model->reportedBy(FormLib::get('reported'));
         $model->tdate(date('Y-m-d H:i:s'));
         $model->modified(date('Y-m-d H:i:s'));
+        $model->employees(FormLib::get('staff',''));
+        $model->personName(FormLib::get('name',''));
+        $dob = strtotime(FormLib::get('dob'));
+        if ($dob) {
+            $model->personDOB(date('Y-m-d', $dob));
+        }
         $model->police(FormLib::get('police', 0));
+        $model->caseNumber(FormLib::get('case',''));
         $model->trespass(FormLib::get('trespass', 0));
+        $tStart = strtotime(FormLib::get('tStart'));
+        if ($tStart) {
+            $model->trespassStart(date('Y-m-d', $tStart));
+        }
+        $tEnd = strtotime(FormLib::get('tEnd'));
+        if ($tEnd) {
+            $model->trespassStart(date('Y-m-d', $tEnd));
+        }
         $model->details(FormLib::get('details'));
         $model->uid($uid);
         $model->storeID(FormLib::get('store'));
@@ -160,22 +272,27 @@ class AlertIncident extends FannieRESTfulPage
         $id = $model->save();
 
         $this->connection->selectDB($this->config->get('OP_DB'));
-        $incident = $this->getIncident($id);
-        $prefix = $settings['IncidentDB'] . $this->connection->sep();
-        $res = $this->connection->query("SELECT * FROM {$prefix}IncidentNotifications WHERE incidentTypeID=1");
-        while ($row = $this->connection->fetchRow($res)) {
-            try {
-                switch (strtolower($row['method'])) {
-                    case 'slack':
-                        $slack = new Slack();
-                        $slack->send($incident, $row['address']);
-                        break;
-                    case 'email':
-                        $email = new Email();
-                        $email->send($incident, $row['address']);
-                        break;
-                }
-            } catch (Exception $ex) {}
+        try {
+            $incident = $this->getIncident($id);
+            $prefix = $settings['IncidentDB'] . $this->connection->sep();
+            $res = $this->connection->query("SELECT * FROM {$prefix}IncidentNotifications WHERE incidentTypeID=1");
+            while ($row = $this->connection->fetchRow($res)) {
+                try {
+                    switch (strtolower($row['method'])) {
+                        case 'slack':
+                            $slack = new Slack();
+                            $slack->send($incident, $row['address']);
+                            break;
+                        case 'email':
+                            $email = new Email();
+                            $email->send($incident, $row['address']);
+                            break;
+                    }
+                } catch (Exception $ex) {}
+            }
+        } catch (Exception $ex) {
+            // something went wrong here and the new incident doesn't exist
+            // letting the redirect happen is OK since it'll show an error
         }
 
         return 'AlertIncident.php?id=' . $id;
@@ -191,7 +308,7 @@ class AlertIncident extends FannieRESTfulPage
             FROM {$prefix}IncidentComments AS i
                 LEFT JOIN Users as u ON i.userID=u.uid
             WHERE incidentID=?
-            ORDER BY tdate";
+            ORDER BY tdate DESC";
         $prep = $this->connection->prepare($query);
         $res = $this->connection->execute($prep, array($id));
         $ret = array();
@@ -220,6 +337,9 @@ class AlertIncident extends FannieRESTfulPage
             WHERE i.incidentID=?";
         $prep = $this->connection->prepare($query);
         $row = $this->connection->getRow($prep, array($id));
+        if ($row === false) {
+            throw new Exception('incident not found: ' . $id);
+        }
         $row['reportedBy'] = $row['reportedBy'] == 0 ? 'Staff' : 'Customer';
         $row['police'] = $row['police'] ? 'Yes' : 'No';
         $row['trespass'] = $row['trespass'] ? 'Yes' : 'No';
@@ -227,9 +347,47 @@ class AlertIncident extends FannieRESTfulPage
         return $row;
     }
 
+    private function getPrevNext($modified)
+    {
+        $prevQ = $this->connection->addSelectLimit("
+            SELECT incidentID
+            FROM " . FannieDB::fqn('Incidents', 'plugin:IncidentDB') . "
+            WHERE modified > ?
+            ORDER BY modified", 1); 
+        $prevP = $this->connection->prepare($prevQ);
+        $prev = $this->connection->getValue($prevP, array($modified));
+
+        $nextQ = $this->connection->addSelectLimit("
+            SELECT incidentID
+            FROM " . FannieDB::fqn('Incidents', 'plugin:IncidentDB') . "
+            WHERE modified < ?
+            ORDER BY modified DESC", 1); 
+        $nextP = $this->connection->prepare($nextQ);
+        $next = $this->connection->getValue($nextP, array($modified));
+
+        $next = sprintf('<a href="AlertIncident.php?id=%d" class="btn btn-default" %s>Next</a>',
+            $next, (!$next ? 'disabled' : ''));
+        $prev = sprintf('<a href="AlertIncident.php?id=%d" class="btn btn-default" %s>Prev</a>',
+            $prev, (!$prev ? 'disabled' : ''));
+
+        return array($prev, $next);
+    }
+
+    protected function get_id_handler()
+    {
+        $this->header .= ' #' . $this->id;
+
+        return true;
+    }
+
     protected function get_id_view()
     {
-        $row = $this->getIncident($this->id);
+        try {
+            $row = $this->getIncident($this->id);
+        } catch (Exception $ex) {
+            return '<div class="alert alert-danger">Unknown alert</div>';
+        }
+        list($prev, $next) = $this->getPrevNext($row['modified']);
         $row['details'] = nl2br($row['details']);
         $img1 = $row['image1'] ? "<img style=\"max-width: 95%;\" src=\"image/{$row['image1']}\" />" : '';
         $img2 = $row['image2'] ? "<img style=\"max-width: 95%;\" src=\"image/{$row['image2']}\" />" : '';
@@ -258,10 +416,74 @@ class AlertIncident extends FannieRESTfulPage
 
         $deleteURL = "?_method=delete&id={$this->id}&undo=" . ($row['deleted'] ? '1' : '0');
         $deleteVerb = $row['deleted'] ? 'Undelete' : 'Delete';
+        $escalated = $row['escalate'] ? 'checked' : '';
+        $case = '';
+        if ($row['police'] == 'Yes') {
+            $case = sprintf('<tr><th>Case #</th><td><input type="text" class="form-control input-sm" value="%s" 
+                onchange="saveField(\'caseNumber\', this.value, %d);" /></td></tr>',
+                $row['caseNumber'], $this->id);
+            $row['police'] = '<select onchange="saveReload(\'police\', this.value, ' . $this->id . ');"
+                class="form-control input-sm">
+                    <option value="1" selected>Yes</option>
+                    <option value="0">No</option>
+                </select>';
+        } else {
+            $row['police'] = '<select onchange="saveReload(\'police\', this.value, ' . $this->id . ');"
+                class="form-control input-sm">
+                    <option value="1">Yes</option>
+                    <option value="0" selected>No</option>
+                </select>';
+        }
+        $tpass = '';
+        if ($row['trespass'] == 'Yes') {
+            $tpass = sprintf('<tr><th>Starts</th><td><input type="text" class="form-control input-sm date-field" value="%s" 
+                onchange="saveField(\'trespassStart\', this.value, %d);" /></td></tr>',
+                $row['trespassStart'], $this->id);
+            $tpass .= sprintf('<tr><th>Ends</th><td><input type="text" class="form-control input-sm date-field" value="%s" 
+                onchange="saveField(\'trespassEnd\', this.value, %d);" /></td></tr>',
+                $row['trespassEnd'], $this->id);
+            $row['trespass'] = '<select onchange="saveReload(\'trespass\', this.value, ' . $this->id . ');"
+                class="form-control input-sm">
+                    <option value="1" selected>Yes</option>
+                    <option value="0">No</option>
+                </select>';
+        } else {
+            $row['trespass'] = '<select onchange="saveReload(\'trespass\', this.value, ' . $this->id . ');"
+                class="form-control input-sm">
+                    <option value="1">Yes</option>
+                    <option value="0" selected>No</option>
+                </select>';
+        }
 
         return <<<HTML
+<script type="text/javascript">
+function saveField(field, newVal, commentID) {
+    var dstr = 'id='+commentID;
+    dstr += '&field=' + field;
+    dstr += '&value=' + encodeURIComponent(newVal);
+    $.ajax({
+        url: 'AlertIncident.php',
+        data: dstr,
+        type: 'post'
+    });
+}
+function saveReload(field, newVal, commentID) {
+    var dstr = 'id='+commentID;
+    dstr += '&field=' + field;
+    dstr += '&value=' + encodeURIComponent(newVal);
+    $.ajax({
+        url: 'AlertIncident.php',
+        data: dstr,
+        type: 'post'
+    }).done(function (resp) {
+        location.reload();
+    });
+}
+</script>
 <p>
     <a href="AlertIncident.php" class="btn btn-default">Home</a>
+    {$prev}
+    {$next}
 </p>
 <table class="table table-bordered">
 <tr>
@@ -283,10 +505,28 @@ class AlertIncident extends FannieRESTfulPage
     <th>Entered by</th><td>{$row['userName']}</td>
 </tr>
 <tr>
-    <th>Called police</th><td>{$row['police']}</td>
+    <th>Staff involved</th><td><input type="text" class="form-control input-sm" value="{$row['employees']}" 
+        onchange="saveField('employees', this.value, {$this->id});" /></td>
 </tr>
 <tr>
+    <th>Name</th><td><input type="text" class="form-control input-sm" value="{$row['personName']}" 
+        onchange="saveField('personName', this.value, {$this->id});" /></td>
+</tr>
+<tr>
+    <th>DoB</th><td><input type="text" class="form-control input-sm date-field" value="{$row['personDOB']}" 
+        onchange="saveField('personDOB', this.value, {$this->id});" /></td>
+</tr>
+<tr>
+    <th>Called police</th><td>{$row['police']}</td>
+</tr>
+{$case}
+<tr>
     <th>Requested trespass</th><td>{$row['trespass']}</td>
+</tr>
+{$tpass}
+<tr>
+    <th>Escalate to Store Managers</th>
+    <td><input type="checkbox" onchange="\$.ajax({type:'post',data:'escalate={$this->id}'});" {$escalated} /></td>
 </tr>
 </table>
 <div class="panel panel-default">
@@ -388,14 +628,38 @@ HTML;
         </select>
     </div>
     <div class="form-group">
+        <label>Staff involved</label>
+        <input type="text" class="form-control" name="staff" value="" />
+    </div>
+    <div class="form-group">
+        <label>Name</label>
+        <input type="text" class="form-control" name="name" value="" />
+    </div>
+    <div class="form-group">
+        <label>DoB</label>
+        <input type="text" class="form-control date-field" name="dob" value="" />
+    </div>
+    <div class="form-group">
         <label>Called police
             <input type="checkbox" name="police" value="1" />
         </label>
     </div>
     <div class="form-group">
+        <label>Case #</label>
+        <input type="text" class="form-control" name="case" value="" />
+    </div>
+    <div class="form-group">
         <label>Requested trespass
             <input type="checkbox" name="trespass" value="1" />
         </label>
+    </div>
+    <div class="form-group">
+        <label>Start</label>
+        <input type="text" class="form-control date-field" name="tStart" value="" />
+    </div>
+    <div class="form-group">
+        <label>End</label>
+        <input type="text" class="form-control date-field" name="tEnd" value="" />
     </div>
     <div class="form-group">
         <label>Tales of Truculence and Tomfoolery</label>

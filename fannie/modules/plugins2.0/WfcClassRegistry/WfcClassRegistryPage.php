@@ -25,6 +25,9 @@ include(__DIR__.'/../../../config.php');
 if (!class_exists('FannieAPI')) {
     include_once(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
+if (!class_exists('wfcuRegistryModel')) {
+    include(__DIR__ . '/wfcuRegistryModel.php');
+}
 
 class WfcClassRegistryPage extends FanniePage
 {
@@ -149,7 +152,7 @@ class WfcClassRegistryPage extends FanniePage
         $msg .= "\n";
         $msg .= "$className<br/>";
         $msg .= "\n";
-        $mail->Body = $msg;
+        $mail->Body = strip_tags($msg);
         $ret = $mail->send();
 
         return $ret ? true : false;
@@ -232,7 +235,7 @@ class WfcClassRegistryPage extends FanniePage
             <th style="width: 10px;"></th>
             <th style="width: 200px;">First</th>
             <th style="width: 200px;">Last</th>
-            <th style="width: 100px;">Member #</th>
+            <th style="width: 100px;">Mem #</th>
             <th style="width: 130px;">Phone Number</th>
             <th style="width: 80px;">Amount</th>
             <th>Notes</th>
@@ -255,7 +258,7 @@ class WfcClassRegistryPage extends FanniePage
             <th style="width: 10px;"></th>
             <th style="width: 200px;">First</th>
             <th style="width: 200px;">Last</th>
-            <th style="width: 100px;">Member #</th>
+            <th style="width: 100px;">Mem #</th>
             <th style="width: 130px;">Phone Number</th>
             <th style="width: 80px;">Amount</th>
             <th>Notes</th>
@@ -277,7 +280,7 @@ class WfcClassRegistryPage extends FanniePage
         }
         $ret .= '</tbody></table>';
 
-        $this->add_onload_command('itemEditing(' . $classSize . ');');
+        $this->add_onload_command('itemEditing(' . (isset($classSize) ? $classSize : '') . ');');
         //$this->add_onload_command('withdraw();');
         $this->addScript('../../src/javascript/tablesorter/jquery.tablesorter.js');
         $this->addCssFile('../../src/javascript/tablesorter/themes/blue/style.css');
@@ -289,6 +292,9 @@ class WfcClassRegistryPage extends FanniePage
     public function css_content()
     {
         return '
+            .w-xs {
+                max-width: 60px;
+            }
             table td,th {
                 border-top: none !important;
             }
@@ -342,7 +348,7 @@ class WfcClassRegistryPage extends FanniePage
 
         $ret = '';
         $curPlu = FormLib::get('class_plu');
-        if (is_numeric($curPlu)) {
+        if (is_numeric($curPlu) && isset($classUPC[$curPlu])) {
             $upc = BarcodeLib::padUPC($classUPC[$curPlu]);
             $ret .= '<input type="hidden" id="curUpc" value="'.$upc.'">';
             $ret .= '<input type="hidden" id="notified" value="'.$notified[$curPlu].'">';
@@ -383,7 +389,7 @@ class WfcClassRegistryPage extends FanniePage
             $ret .= 'checked="checked" ';
         }
         $ret .= ' ><i style="padding: 20;"> Don\'t show expired Classes</i> ';
-        if ($soldOut[$curPlu] == 1) {
+        if (isset($soldOut[$curPlu]) && $soldOut[$curPlu] == 1) {
             $ret .= "<span class='soldOut' title='This class has been removed from online sign-up.'>CLASS IS SOLD OUT</span>";
         }
         $ret .= '</div>';
@@ -401,8 +407,8 @@ class WfcClassRegistryPage extends FanniePage
         $ret .= '</div>';
 
         $key = FormLib::get('class_plu');
-        $plu = $classUPC[$key];
-        $this->plu = $classUPC[$key];
+        $plu = isset($classUPC[$key]) ? $classUPC[$key] : '';
+        $this->plu = $plu;
 
         //* Create table if it doesn't exist
         $prep = $dbc->prepare("CREATE TABLE IF NOT EXISTS
@@ -492,8 +498,8 @@ class WfcClassRegistryPage extends FanniePage
 
         if ($key > -1) {
             //* Class Roster
-            $ret .= "<div style='float: left'><h3>" . $className[$key] . "</h3></div>";
-            $ret .= "<h4 align=\"center\">" . $classDate[$key] . "</h4>";
+            $ret .= "<div style='float: left'><h3>" . (isset($className[$key]) ? $className[$key] : '') . "</h3></div>";
+            $ret .= "<h4 align=\"center\">" . (isset($classDate[$key]) ? $classDate[$key] : '') . "</h4>";
             $ret .= "<h5 align='center'><a href='/git/fannie/item/ItemEditorPage.php?searchupc=" . $plu . "' target='_blank'>PLU: " . $plu . "</a></h5>";
             $ret .= "<div id=\"line-div\"></div>";
 
@@ -502,13 +508,15 @@ class WfcClassRegistryPage extends FanniePage
             $items->seatType(1);
 
             $ret .= '<div id="alert-area"></div>
-            <table class="table tablesorter" name="ClassRegistry">';
-            $ret .= '<thead><tr><th>Class Registry  </th></tr>
+            <h4>Class Registry</h4>
+            <table class="table tablesorter" name="ClassRegistry" id="table-roster">';
+            $ret .= '<thead><tr></tr>
                 <tr><th>Seat</th>
+                <th>Mem #</th>
                 <th>First</th>
                 <th>Last</th>
-                <th>Member #</th>
                 <th>Phone Number</th>
+                <th>Email Address</th>
                 <th>Payment Type</th>
                 <th>Notes</th>
                 </thead>';
@@ -523,13 +531,15 @@ class WfcClassRegistryPage extends FanniePage
 
             //* Waiting List Roster
             $ret .= '<div id="alert-area"></div>
-            <table class="table tablesorter">';
-            $ret .= '<thead><tr><th>Waiting List<th>
+            <h4>Waiting List</h4>
+            <table class="table tablesorter" id="table-waiting">';
+            $ret .= '<thead>
                 <tr><th></th>
+                <th>Mem #</th>
                 <th>First</th>
                 <th>Last</th>
-                <th>Member #</th>
                 <th>Phone Number</th>
+                <th>Email Address</th>
                 <th>Payment Type</th>
                 <th>Notes</th></thead>';
             $ret .= '<tbody>';
@@ -544,14 +554,15 @@ class WfcClassRegistryPage extends FanniePage
 
             //* Class Cancellations
             $ret .= '<div id="alert-area"></div>
-            <table class="table tablesorter">';
+            <h4>Cancellations</h4>
+            <table class="table tablesorter" id="table-cancel">';
             $ret .= '<thead><tr>
-                <th>Cancellations</th>
                 <tr><th></th>
+                <th>Mem #</th>
                 <th>First</th>
                 <th>Last</th>
-                <th>Member #</th>
                 <th>Phone Number</th>
+                <th>Email Address</th>
                 <th>Payment Type</th>
                 <th>Refund Type</th>
                 <th>Notes</th></thead>';
@@ -561,7 +572,9 @@ class WfcClassRegistryPage extends FanniePage
             $ret .= '</tbody></table></div>';
         }
 
-        $this->addOnloadCommand('itemEditing(' . $classSize . ');');
+        if (!is_array($classSize)) {
+            $this->addOnloadCommand('itemEditing(' . $classSize . ');');
+        }
         $this->addOnloadCommand('withdraw();');
         $this->addOnloadCommand('checkSoldOut();');
         $this->addScript('../../src/javascript/tablesorter/jquery.tablesorter.js');
@@ -582,7 +595,7 @@ class WfcClassRegistryPage extends FanniePage
         $info->upc(FormLib::get('class_plu'));
         $info->id(FormLib::get('id'));
 
-        $ret .= '<p class="bg-success" align="center"> <b>';
+        $ret = '<p class="bg-success" align="center"> <b>';
 
         foreach ($info->find() as $info) {
             $ret .= $info->first_name() . " ";
@@ -651,6 +664,48 @@ class WfcClassRegistryPage extends FanniePage
 
     public function javascriptContent()
     {
+        return <<<JAVASCRIPT
+$('.cardno').change(function(){
+    var ownerid = $(this).val();
+    var seat = $(this).closest('tr').find('.seat').text();
+    var tableID = $(this).closest('table').attr('id');
+    if (ownerid != 11) {
+        $.ajax ({
+            url: 'registryUpdate.php',
+            type: 'post',
+            data: 'ownerid='+ownerid+'&custdata=1',
+            dataType: 'json',
+            success: function(resp)
+            {
+                var card_no = resp['card_no'];
+                var data = ['first_name','last_name','street','city',
+                    'state','zip','email_1','email_2','phone','address'];
+                $('.seat').each(function(){
+                    var curTable = $(this).closest('table').attr('id');
+                    if ($(this).text() == seat && curTable == tableID) {
+                        var editFirst = $(this).closest('tr').find('input[name="editFirst"]');
+                        var editLast = $(this).closest('tr').find('input[name="editLast"]');
+                        var editPhone = $(this).closest('tr').find('input[name="editPhone"]');
+                        var editEmail = $(this).closest('tr').find('input[name="editEmail"]');
+                        editFirst.val(resp.first_name);
+                        editFirst.trigger('change');
+                        editLast.val(resp.last_name);
+                        editLast.trigger('change');
+                        editPhone.val(resp.phone);
+                        editPhone.trigger('change');
+                        editEmail.val(resp.email_1);
+                        editEmail.trigger('change');
+                    }
+                });
+                $.each(data, function(k,v) {
+                    // var value = resp[v];
+                    // $('#'+v).val(value);
+                });
+            }
+        });
+    }
+});
+JAVASCRIPT;
     }
 
     public function helpContent()
@@ -678,26 +733,30 @@ class WfcClassRegistryPage extends FanniePage
                 <td class="id collapse">%s</td>
                 <td class="seat">%d</td>
                 <td><span class="collapse">%s</span>
-                    <input type="text" class="form-control input-sm editable" id="first_name"  name="editFirst" value="%s" /></td>
+                    <input type="text" class="form-control input-sm w-xs editable cardno" name="editCard_no" value="%s" /></td>
+                <td><span class="collapse">%s</span>
+                    <input type="text" class="form-control input-sm editable first_name" name="editFirst" value="%s" /></td>
                 <td><span class="collapse">%s</span>
                     <input type="text" class="form-control input-sm editable" name="editLast" value="%s" /></td>
                 <td><span class="collapse">%s</span>
-                    <input type="text" class="form-control input-sm editable" name="editCard_no" value="%s" /></td>
-                <td><span class="collapse">%s</span>
                     <input type="text" class="form-control input-sm editable" name="editPhone" value="%s" /></td>
+                <td><span class="collapse">%s</span>
+                    <input type="text" class="form-control input-sm editable" name="editEmail" value="%s" /></td>
                 <td><span class="collapse">%s</span>
                     <select class="form-control input-sm editable" name="editPayment">
                         <option value="student has not paid">*unpaid*</option>',
                 $item->id(),
                 $i,
+                $item->card_no(),
+                $item->card_no(),
                 $item->first_name(),
                 $item->first_name(),
                 $item->last_name(),
                 $item->last_name(),
-                $item->card_no(),
-                $item->card_no(),
                 $item->phone(),
                 $item->phone(),
+                $item->email(),
+                $item->email(),
                 htmlspecialchars($item->payment())
             );
             foreach (array('Cash', 'Card', 'Gift Card', 'Check', 'Other') as $tender) {

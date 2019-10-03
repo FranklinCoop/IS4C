@@ -22,6 +22,7 @@
 
 *********************************************************************************/
 
+use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\FormLib;
 use COREPOS\pos\lib\MiscLib;
 use COREPOS\pos\lib\UdpComm;
@@ -67,11 +68,22 @@ class PaycardEmvPage extends PaycardProcessPage
                 }
             } elseif ( $input != "" && substr($input,-2) != "CL") {
                 // any other input is an alternate amount
-                $this->conf->set("paycard_amount","invalid");
-                if( is_numeric($input)){
+                $cbLimit = $this->conf->get('PaycardsTermCashBackLimit');
+                if (!is_numeric($cbLimit)) {
+                    $cbLimit = 40;
+                }
+                $cval = new CardValidator();
+                if (substr($input, -2) == 'CA' && is_numeric(substr($input, 0, strlen($input)-2)) && $cval->allowCashback($this->conf->get('CacheCardType'))) {
+                    $cashback = substr($input, 0, strlen($input)-2) / 100;
+                    if ($cashback > 0 && $cashback <= $cbLimit) {
+                        $this->conf->set('CacheCardCashBack', $cashback);
+                        $this->conf->set('paycard_amount', $this->conf->get('amtdue') + $cashback);
+                    }
+                } elseif (is_numeric($input)) {
                     $this->conf->set("paycard_amount",$input/100);
-                    if ($this->conf->get('CacheCardCashBack') > 0 && $this->conf->get('CacheCardCashBack') <= 40)
+                    if ($this->conf->get('CacheCardCashBack') > 0 && $this->conf->get('CacheCardCashBack') <= $cbLimit) {
                         $this->conf->set('paycard_amount',($input/100)+$this->conf->get('CacheCardCashBack'));
+                    }
                 }
             }
             // if we're still here, we haven't accepted a valid amount yet; display prompt again
@@ -83,6 +95,14 @@ class PaycardEmvPage extends PaycardProcessPage
                 $log->error('javascript: ' . $err);
             }
             $this->emvResponseHandler($xml);
+            return false;
+        } elseif (FormLib::get('retry')) {
+            $ref = FormLib::get('retry');
+            $dbc = Database::tDataConnect();
+            $prep = $dbc->prepare('SELECT entry FROM MagellanLog WHERE tdate > CURDATE() AND entryKey=?');
+            $entry = $prep->getValue(array($ref));
+            list($headers, $xml) = explode('<?xml', $entry, 2);
+            $this->emvResponseHandler('<?xml' . $xml);
             return false;
         } elseif (FormLib::get('cancel') == 1) {
             UdpComm::udpSend("termReset");
@@ -101,7 +121,8 @@ class PaycardEmvPage extends PaycardProcessPage
         if (!$this->runTransaction) {
             return '';
         }
-        $e2e = new MercuryDC();
+        $e2e = new MercuryDC($this->conf->get('PaycardsDatacapName'));
+        $overrides = $this->conf->get('portOverrides');
         ?>
 <script type="text/javascript">
 function emvSubmit() {
@@ -114,6 +135,8 @@ function emvSubmit() {
     }
     <?php if ($this->conf->Get('training') == 1) { ?>
     emv.setURL('../ajax/AjaxPaycardTest.php');
+    <?php } elseif (isset($overrides['t8999'])) { ?>
+    emv.setURL('http://localhost:<?php echo $overrides['t8999']; ?>');
     <?php } ?>
     emv.submit(xmlData);
     $(document).keyup(checkForCancel);

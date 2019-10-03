@@ -64,15 +64,6 @@ class Paycards extends Plugin {
             'Customer' => 0
             )
         ),
-        'PaycardsCustomerChoice' => array(
-        'label' => 'Mode',
-        'description' => 'Who picks card type?',
-        'default' => 1,
-        'options' => array(
-            'Cashier' => 1,
-            'Customer' => 0
-            )
-        ),
         'PaycardsStateChange' => array(
         'label' => 'Communication',
         'description' => 'Should terminal switch screens 
@@ -106,6 +97,8 @@ messages from POS?',
             'Yes' => 1,
             'No' => 0,
             'Member Only' => 2,
+            'Debit DC' => 3,
+            'Debit + EMV DC' => 4,
             'Prompt Cashier' => 3,
             )
         ),
@@ -149,6 +142,11 @@ messages from POS?',
             'label' => 'LAN Datacap Server',
             'description' => 'Datacap server on the local network (only required for EMV)',
             'default' => '127.0.0.1',
+        ),
+        'PaycardsDatacapName' => array(
+            'label' => 'Datacap Processor Name',
+            'description' => 'Card processor handling Datacap transactions',
+            'default' => 'MercuryE2E',
         ),
         'PaycardsBlockExceptions' => array(
             'label' => 'Blocking Exceptions',
@@ -228,6 +226,20 @@ messages from POS?',
         'MercuryGiftPassword' => array(
             'label' => 'Mercury Gift Password',
             'description' => 'Password for use with Mercury gift card processing',
+            'default' => '',
+        ),
+        'PaycardsTipping' => array(
+            'label' => 'Allow Tipping',
+            'description' => 'Tipping is allowed on chip transactions',
+            'default' => 0,
+            'options' => array(
+                'Yes' => 1,
+                'No' => 0
+                )
+        ),
+        'PaycardsTipDepartment' => array(
+            'label' => 'Tips Department #',
+            'description' => 'Tips are added as an open ring to the specified department',
             'default' => '',
         ),
     );

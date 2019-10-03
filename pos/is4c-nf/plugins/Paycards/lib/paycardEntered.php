@@ -21,10 +21,12 @@
 
 *********************************************************************************/
 
+use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\PrehLib;
 use COREPOS\pos\lib\UdpComm;
 use COREPOS\pos\parser\Parser;
 use COREPOS\pos\plugins\Paycards\card\CardReader;
+use COREPOS\pos\plugins\Paycards\card\CardValidator;
 
 if (!class_exists("PaycardLib")) 
     include_once(realpath(dirname(__FILE__)."/paycardLib.php"));
@@ -33,6 +35,7 @@ class paycardEntered extends Parser
 {
     private $swipetype;
     private $manual = false;
+    private $interceptVoid = false;
 
     public function __construct($session)
     {
@@ -50,6 +53,31 @@ class paycardEntered extends Parser
             return true;
         } elseif (((is_numeric($str) && strlen($str) >= 16) || (is_numeric(substr($str,2)) && strlen($str) >= 18)) && substr($str,0, 3)!='0XA') {
             $this->manual = true;
+            return true;
+        } elseif ($str === 'VD') {
+            return $this->checkVoid();
+        }
+
+        return false;
+    }
+
+    private function checkVoid()
+    {
+        $transID = $this->session->get('currentid');
+        $dbc = Database::tDataConnect();
+        $prep = $dbc->prepare('SELECT charflag, numflag FROM localtemptrans WHERE trans_id=?');
+        $trans = $dbc->getRow($prep, array($transID));
+
+        if ($trans['charflag'] === 'PT') {
+            $this->conf->set('paycard_id', $transID);
+            $ptP = $dbc->prepare('SELECT processor, transID FROM PaycardTransactions WHERE paycardTransactionID=?');
+            $ptW = $dbc->getRow($ptP, array($trans['numflag']));
+
+            $pluginInfo = new Paycards();
+            $url = $pluginInfo->pluginUrl() . '/gui/';
+            $url .= $ptW['processor'] == 'GoEMerchant' ? 'paycardboxMsgAuth.php' : 'PaycardEmvVoid.php';
+            $this->interceptVoid = $url;
+
             return true;
         }
 
@@ -75,6 +103,11 @@ class paycardEntered extends Parser
     function parse($str)
     {
         $ret = array();
+        if ($this->interceptVoid) {
+            $ret['main_frame'] = $this->interceptVoid;
+            return $ret;
+        }
+
         if( substr($str,0,2) == "PV") {
             $ret = $this->paycard_entered(PaycardLib::PAYCARD_MODE_BALANCE, substr($str,2), $this->manual, $this->swipetype);
         } elseif( substr($str,0,2) == "AV") {
@@ -132,7 +165,8 @@ class paycardEntered extends Parser
             } 
             $this->conf->set("paycard_amount",$this->conf->get("fsEligible"));
         }
-        if (($type == 'EBTCASH' || $type == 'DEBIT') && $this->conf->get('CacheCardCashBack') > 0){
+        $cval = new CardValidator();
+        if ($cval->allowCashback($type) && $this->conf->get('CacheCardCashBack') > 0) {
             $this->conf->set('paycard_amount',
                 $this->conf->get('amtdue') + $this->conf->get('CacheCardCashBack'));
         }

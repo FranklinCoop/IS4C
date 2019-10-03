@@ -59,7 +59,7 @@ class AdvancedMemSearch extends FannieRESTfulPage
             $data = $this->$method($data, $this->form);
         }
 
-        if (count($data) > 3000) {
+        if (count($data) > 5000) {
             echo 'Too many results';
             return false;
         }
@@ -91,12 +91,14 @@ class AdvancedMemSearch extends FannieRESTfulPage
             <th>Owner #</th><th>First Name</th><th>Last Name</th><th>Status</th><th>Type</th></thead>
             <tbody>';
         $copyPaste = "";
+        $url = $this->config->get('URL') . $this->config->get('MEMBER_URL', 'mem/MemberEditor.php');
+        $urlParam = $this->config->get('MEMBER_PARAM', 'memNum');
         foreach ($data as $d) {
             $checked = in_array($d['CardNo'], $saved) ? 'checked' : '';
             $ret .= "<tr>
                 <td><input type=\"checkbox\" onchange=\"checkedCount('#selection-counter', '.savedCB');\" 
                     class=\"savedCB\" {$checked} name=\"saved[]\" value=\"{$d['CardNo']}\" /></td>
-                <td><a href=\"MemberEditor.php?memNum={$d['CardNo']}\">{$d['CardNo']}</a></td>
+                <td><a href=\"{$url}?{$urlParam}={$d['CardNo']}\">{$d['CardNo']}</a></td>
                 <td>{$d['FirstName']}</td><td>{$d['LastName']}</td><td>{$d['Type']}</td><td>{$d['memDesc']}</td></tr>";
             $copyPaste .= $d['CardNo'] . "\n";
         }
@@ -446,6 +448,9 @@ class AdvancedMemSearch extends FannieRESTfulPage
     <br /><br />
     <button class="btn btn-default btn-sm" type="button" 
         onclick="sendTo('../reports/from-search/AccountNames/AccountNamesFromSearch.php');">All Names</button>
+    <br /><br />
+    <button class="btn btn-default btn-sm" type="button" 
+        onclick="sendTo('../reports/from-search/CustomerSales/CustomerSalesReport.php');">Sales</button>
 </div>
 </div>
 <p>

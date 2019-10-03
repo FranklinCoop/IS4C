@@ -540,7 +540,8 @@ function duplicateOrder($old_id,$from='CompleteSpecialOrder')
             trans_id
         FROM ' . $TRANS . $from . '
         WHERE order_id=?
-            AND trans_id > 0');
+            AND trans_id > 0
+        ORDER BY trans_id');
     $itemR = $dbc->execute($itemP, array($old_id));
     while ($itemW = $dbc->fetchRow($itemR)) {
         $prod = $dbc->execute($prodP, array($itemW['upc']));
@@ -569,6 +570,12 @@ function duplicateOrder($old_id,$from='CompleteSpecialOrder')
     $st = $statusW['numflag'];
     $timestamp = time();
 
+    $memP = $dbc->prepare("SELECT m.*
+        FROM {$TRANS}{$from} AS o
+            INNER JOIN " . FannieDB::fqn('meminfo', 'op') . " AS m ON o.card_no=m.card_no
+        WHERE o.order_id=?");
+    $mem = $dbc->getRow($memP, array($old_id));
+
     $dbc = FannieDB::get($FANNIE_TRANS_DB);
     // load values from old order
     $soModel = new SpecialOrdersModel($dbc);
@@ -578,6 +585,16 @@ function duplicateOrder($old_id,$from='CompleteSpecialOrder')
     $soModel->specialOrderID($new_id);
     $soModel->statusFlag( ($st == 1) ? 3 : 0 );
     $soModel->subStatus($timestamp);
+    // use latest contact info if available
+    if ($mem && strlen($mem['street']) > 0) {
+        $soModel->street($mem['street']);
+        $soModel->city($mem['city']);
+        $soModel->state($mem['state']);
+        $soModel->zip($mem['zip']);
+        $soModel->phone($mem['phone']);
+        $soModel->altPhone($mem['email_2']);
+        $soModel->email($mem['email_1']);
+    }
     // save with the new ID
     $soModel->save();
     $dbc = FannieDB::get($FANNIE_OP_DB);
@@ -787,11 +804,11 @@ function getCustomerForm($orderID,$memNum="0")
         $statusR = $dbc->execute($statusQ,array($memNum));
         $status_row  = $dbc->fetch_row($statusR);
         if ($status_row['Type'] == 'INACT') {
-            $status_row['status'] = 'Inactive';
+            $status_row['status'] = '<span style="color: #a94442; font-size: 140%; font-weight: bold;">Inactive</span>';
         } elseif ($status_row['Type'] == 'INACT2') {
-            $status_row['status'] = 'Inactive';
+            $status_row['status'] = '<span style="color: #a94442; font-size: 140%; font-weight: bold;">Inactive</span>';
         } elseif ($status_row['Type'] == 'TERM') {
-            $status_row['status'] = 'Terminated';
+            $status_row['status'] = '<span style="color: #a94442; font-size: 140%; font-weight: bold;">Terminated</span>';
         }
     } 
 
@@ -991,6 +1008,14 @@ function getCustomerForm($orderID,$memNum="0")
         $orderModel->state(), $orderID,
         $orderModel->zip(), $orderID
     );
+
+    $noteP = $dbc->prepare('SELECT note FROM ' . FannieDB::fqn('memberNotes', 'op') . ' WHERE cardno=? ORDER BY stamp DESC');
+    $acctNote = $dbc->getValue($noteP, array($memNum));
+    $acctNote = str_replace("\r", "", $acctNote);
+    $acctNote = str_replace('<br /><br />', '<br />', $acctNote);
+    if (trim($acctNote)) {
+        $ret .= '<tr><th>Acct Notes</th><td colspan="8" style="font-size: 85%;">' . $acctNote . '</td></tr>';
+    }
 
     $ret .= '</table>';
 

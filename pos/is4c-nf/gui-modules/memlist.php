@@ -97,7 +97,9 @@ class memlist extends NoInputCorePage
             throw new Exception('page change requested');
         }
         foreach ($chk['results'] as $key=>$val) {
-            $results[$key] = $val;
+            if (!isset($results[$key])) {
+                $results[$key] = $val;
+            }
         }
 
         return $results;
@@ -146,7 +148,7 @@ class memlist extends NoInputCorePage
             if ($memberID == $this->session->get('defaultNonMem')) {
                 $personNum = 1;
             }
-            COREPOS\pos\lib\MemberLib::setMember($memberID, $personNum);
+            $redirect = COREPOS\pos\lib\MemberLib::setMember($memberID, $personNum);
 
             if ($this->session->get('store') == "WEFC_Toronto") {
                 $errorMsg = $this->wefcCardCheck($memberID);
@@ -164,6 +166,8 @@ class memlist extends NoInputCorePage
                 if ($unpaid) {
                     $url = $this->page_url."gui-modules/UnpaidAR.php";
                 }
+            } elseif ($redirect !== true) {
+                $url = $redirect;
             }
             $this->change_page($url);
 

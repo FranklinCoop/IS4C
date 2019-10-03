@@ -28,11 +28,11 @@ if (!class_exists('FannieAPI')) {
 
 class AlbertsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
-    public $title = "Fannie - Alberts Prices";
-    public $header = "Upload Alberts price file";
+    public $title = "Fannie - Alberts Produce Prices";
+    public $header = "Upload Alberts Produce price file";
     public $themed = true;
 
-    public $description = '[Alberts Catalog Import] specialized vendor import tool. Column choices
+    public $description = '[Alberts Produce Catalog Import] specialized vendor import tool. Column choices
     default to Alberts price file layout.';
 
     protected $preview_opts = array(
@@ -63,7 +63,7 @@ class AlbertsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage {
         ),
     );
 
-    protected $skip_first = 26;
+    protected $skip_first = -1;
 
     protected $use_splits = false;
     protected $use_js = false;
@@ -74,7 +74,7 @@ class AlbertsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage {
     protected function getVendorID()
     {
         $idP = $this->connection->prepare("SELECT vendorID FROM vendors WHERE vendorName=? ORDER BY vendorID");
-        $vid = $this->connection->getValue($idP, array('ALBERTS'));
+        $vid = $this->connection->getValue($idP, array('Alberts (Produce)'));
 
         return $vid !== false ? $vid : $this->presetID;
     }
@@ -95,8 +95,17 @@ class AlbertsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage {
         return BarcodeLib::padUPC($upc);
     }
 
-    private function parseSize($str)
+    private function parseSize($str, $scale)
     {
+        if (strstr(strtolower($str), 'bin')) {
+            if (!$scale && preg_match('/(\d+)\s*-(\d+)\s*ct/', strtolower($str), $matches)) {
+                $case = ($matches[1] + $matches[2]) / 2;
+                return array($case, 'ea');
+            } elseif (preg_match('/(\d+)\s*-(\d+)\s*lb/', strtolower($str), $matches)) {
+                $case = ($matches[1] + $matches[2]) / 2;
+                return array($case, 'lb');
+            }
+        }
         if (preg_match('/\d+x\d+/', $str)) {
             list($case, $size) = explode('x', $str, 2);
             return array(trim($case), trim($size));
@@ -133,6 +142,7 @@ class AlbertsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 modified=' . $dbc->now() . '
             WHERE upc=?
                 AND default_vendor_id=?');
+        $scaleP = $dbc->prepare("SELECT scale FROM products WHERE upc=?");
         $itemP = $dbc->prepare("
             INSERT INTO vendorItems (
                 brand, sku, size, upc,
@@ -145,6 +155,8 @@ class AlbertsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage {
             )");
         $delP = $dbc->prepare('DELETE FROM vendorItems WHERE sku=? AND vendorID=?');
         $mapP = $dbc->prepare('UPDATE VendorLikeCodeMap SET sku=? WHERE vendorID=? AND sku=?');
+        $rpP1 = $dbc->prepare('UPDATE RpOrderItems SET vendorSKU=? WHERE vendorID=? AND vendorSKU=?');
+        $rpP2 = $dbc->prepare('UPDATE RpOrderItems SET backupSKU=? WHERE backupID=? AND backupSKU=?');
         $updated_upcs = array();
 
         foreach ($linedata as $data) {
@@ -163,14 +175,18 @@ class AlbertsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 continue;
             }
             $size = trim($data[$indexes['size']]);
-            list($case, $unit) = $this->parseSize($size);
+            $scale = $dbc->getValue($scaleP, array($upc));
+            list($case, $unit) = $this->parseSize($size, $scale);
 
             // need unit cost, not case cost
             $reg_unit = $reg / $case;
 
+            /* parseSize is not completely reliable;
+             * mistakes there blow cost way out of proportion
             $dbc->execute($extraP, array($reg_unit,$upc));
             $dbc->execute($prodP, array($reg_unit,$upc,$VENDOR_ID));
             $updated_upcs[] = $upc;
+             */
 
             $dbc->execute($delP, array($sku, $VENDOR_ID));
             $dbc->execute($itemP, array($sku, $unit, $upc, $case, $reg_unit,
@@ -179,10 +195,15 @@ class AlbertsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $oldSKU = $this->sameItem($VENDOR_ID, $description, $case, $unit);
             if ($oldSKU) {
                 $dbc->execute($mapP, array($sku, $VENDOR_ID, $oldSKU));
+                $dbc->execute($rpP1, array($sku, $VENDOR_ID, $oldSKU));
+                $dbc->execute($rpP2, array($sku, $VENDOR_ID, $oldSKU));
                 $this->remaps .= "$oldSKU => $sku<br />";
             }
         }
         $dbc->commitTransaction();
+
+        $clearP = $dbc->prepare("DELETE FROM vendorItems WHERE vendorID=? AND modified < ?");
+        $dbc->execute($clearP, array($VENDOR_ID, date('Y-m-d')));
 
         $updateModel = new ProdUpdateModel($dbc);
         $updateModel->logManyUpdates($updated_upcs, ProdUpdateModel::UPDATE_EDIT);

@@ -174,7 +174,7 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
                 LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id = v.vendorID
                 LEFT JOIN vendors AS n ON p.default_vendor_id=n.vendorID
                 LEFT JOIN InventoryCache AS i ON p.upc=i.upc AND p.store_id=i.storeID
-                LEFT JOIN InventoryCounts AS c ON p.upc=c.upc AND p.store_id=c.storeID
+                LEFT JOIN InventoryCounts AS c ON p.upc=c.upc AND p.store_id=c.storeID AND c.mostRecent=1
             WHERE p.upc=?';
         $p_def = $dbc->tableDefinition('products');
         if (!isset($p_def['last_sold'])) {
@@ -404,8 +404,15 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
         }
         $ret .= ' <label style="color:darkmagenta;">Modified</label>
                 <span style="color:darkmagenta;">'. $rowItem['modified'] . '</span>';
-        $ret .= ' | <label style="color:darkmagenta;">Last Sold</label>
-                <span style="color:darkmagenta;">'. (empty($rowItem['last_sold']) ? 'n/a' : $rowItem['last_sold']) . '</span>';
+        $ret .= ' | <label style="color:darkmagenta;">Last Sold</label> ';
+        $netStore = COREPOS\Fannie\API\lib\Store::getIdByIp();
+        foreach ($items as $store_id => $item) {
+            $ret .= sprintf('<span style="color:darkmagenta;" class="last-sold %s" id="last-sold%d">%s</span>',
+                ($store_id == $netStore ? '' : 'collapse'),
+                $store_id,
+                (!empty($item['last_sold']) ? $item['last_sold'] : 'n/a')
+            );
+        }
         $ret .= '</div>'; // end panel-heading
 
         $ret .= '<div class="panel-body">';
@@ -420,7 +427,6 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
 
         $nav_tabs = '<ul id="store-tabs" class="nav nav-tabs small" role="tablist">';
         $ret .= '{{nav_tabs}}<div class="tab-content">';
-        $netStore = COREPOS\Fannie\API\lib\Store::getIdByIp();
         foreach ($items as $store_id => $rowItem) {
             $active_tab = false;
             if (FannieConfig::config('STORE_MODE') !== 'HQ' || $netStore == $store_id || ($netStore == false && $store_id == FannieConfig::config('STORE_ID'))) {
@@ -433,14 +439,15 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
             }
             $nav_tabs .= '<li role="presentation" ' . ($active_tab ? 'class="active"' : '') . '>'
                 . '<a href="#' . $tabID . '" aria-controls="' . $tabID . '" '
-                . 'onclick="$(\'.tab-content .chosen-select:visible\').chosen();"'
+                . 'onclick="$(\'.tab-content .chosen-select:visible\').chosen();
+                    $(\'.last-sold\').hide(); $(\'#last-sold' . $store_id . '\').show();"'
                 . 'role="tab" data-toggle="tab">'
                 . $store_description . '</a></li>';
             $ret .= '<div role="tabpanel" class="tab-pane' . ($active_tab ? ' active' : '') . '"
                 id="' . $tabID . '">';
 
             $ret .= '<input type="hidden" class="store-id" name="store_id[]" value="' . $store_id . '" />';
-            $ret .= '<table class="table table-bordered">';
+            $ret .= '<div id="" class=""><table id="productTable" class="table table-bordered">';
 
             $jsVendorID = $rowItem['default_vendor_id'] != 0 ? $rowItem['default_vendor_id'] : 'no-vendor';
             $vFieldsDisabled = $jsVendorID == 'no-vendor' || !$active_tab ? 'disabled' : '';
@@ -453,8 +460,8 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
     <th class="text-right">Description</th>
     <td colspan="5">
         <div class="input-group" style="width:100%;">
-            <input type="text" maxlength="30" class="form-control syncable-input" required
-                name="descript[]" id="descript" value="{$rowItem['description']}"
+            <input type="text" maxlength="30" class="form-control syncable-input descript-input" required
+                name="descript[]" id="descript" value="{$rowItem['description']}" 
                 onkeyup="$(this).next().html(30-(this.value.length));" />
             <span class="input-group-addon">{$limit}</span>
         </div>
@@ -502,7 +509,7 @@ HTML;
                 <tr>
                     <th class="text-right">Brand</th>
                     <td colspan="5">
-                        <input type="text" name="manufacturer[]" 
+                        <input type="text" name="manufacturer[]"
                             class="form-control input-sm brand-field syncable-input"
                             value="' . $rowItem['manufacturer'] . '" />
                     </td>';
@@ -676,6 +683,9 @@ HTML;
                 dept_start:'#department{$store_id}', 
                 callback:function(){
                     \$('#department{$store_id}').trigger('chosen:updated');
+                    if ($('#store-sync').prop('checked') === false) {
+                        return;
+                    }
                     baseItem.chainSubs({$store_id});
                     var opts = $('#department{$store_id}').html();
                     $('.chosen-dept').each(function(i, e) {
@@ -695,7 +705,7 @@ HTML;
             {$deptOpts}
         </select>
         <select name="subdept[]" id="subdept{$store_id}" 
-            class="form-control chosen-select syncable-input">
+            class="form-control chosen-select chosen-subdept syncable-input">
             <option {$subZero} value="0">None</option>
             {$subOpts}
         </select>
@@ -809,8 +819,8 @@ HTML;
                     $store_id
                 );
             }
-            $ret .= $this->getRowMods($upc, $active_tab);
-            $ret .= '</table></div>';
+            $ret .= $this->getRowMods($upc, $active_tab, $store_id);
+            $ret .= '</table></div></div>';
             if (FannieConfig::config('STORE_MODE') != 'HQ') {
                 break;
             }
@@ -846,7 +856,7 @@ HTML;
         return $ret;
     }
 
-    private function getRowMods($upc, $active_tab)
+    private function getRowMods($upc, $active_tab, $store_id)
     {
         $mods = FannieConfig::config('PRODUCT_ROWS');
         asort($mods);
@@ -856,7 +866,7 @@ HTML;
                 include(__DIR__ . '/' . $mod . '.php');
             }
             $obj = new $mod();
-            $ret .= $obj->formRow($upc, $active_tab);
+            $ret .= $obj->formRow($upc, $active_tab, $store_id);
         }
 
         return $ret;
@@ -921,6 +931,7 @@ HTML;
                 $model->scaleprice(0);
                 $model->inUse(1);
                 $model->created(date('Y-m-d H:i:s'));
+                $model->last_sold(null);
             }
 
             $taxes = $this->formNoEx('tax', array());
@@ -1130,7 +1141,15 @@ HTML;
             if ($alias) {
                 return true;
             }
-            if (!empty($sku) && $sku != $upc) {
+            if (count($vitem->find()) > 0 && $sku != '') {
+                $editP = $dbc->prepare('
+                    UPDATE vendorItems
+                    SET sku=?
+                    WHERE upc=?
+                        AND vendorID=? 
+                '); 
+                $editR = $dbc->execute($editP, array($sku, $upc, $vendorID));
+            } elseif (!empty($sku) && $sku != $upc) {
                 /**
                   If a SKU is provided, update any
                   old record that used the UPC as a
@@ -1142,8 +1161,8 @@ HTML;
                     WHERE sku=?
                         AND upc=?
                         AND vendorID=?');
-                $existsR = $dbc->execute($existsP, array($upc, $upc, $vendorID));
-                if ($dbc->numRows($existsR) > 0 && $sku != $upc) {
+                $exists = $dbc->getValue($existsP, array($upc, $upc, $vendorID));
+                if ($exists && $sku != $upc && $sku != $exists) {
                     $fixSkuP = $dbc->prepare('
                         UPDATE vendorItems
                         SET sku=?

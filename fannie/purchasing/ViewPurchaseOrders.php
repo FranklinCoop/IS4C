@@ -233,11 +233,12 @@ class ViewPurchaseOrders extends FannieRESTfulPage
         if (!class_exists($this->sendAs)) {
             return $this->unknownRequestHandler();
         }
+        if (!class_exists('WfcPoExport')) {
+            include('exporters/WfcPoExport.php');
+        }
 
-        ob_start();
-        $exportObj = new $this->sendAs();
-        $exportObj->export_order($this->id);
-        $exported = ob_get_clean();
+        $csvObj = new WfcPoExport();
+        $exported = $csvObj->exportString($this->id);
 
         $html = $this->csvToHtml($exported);
         $nonHtml = str_replace("\r", "", $exported);
@@ -270,7 +271,11 @@ class ViewPurchaseOrders extends FannieRESTfulPage
         $mail->FromName = $this->config->get('PO_EMAIL_NAME');
         $mail->isHTML = true;
         $mail->addAddress($vendor->email());
-        if ($userEmail && filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
+        if ($this->config->get('COOP_ID') == 'WFC_Duluth' && $order->storeID() == 2) {
+            $mail->From = 'dbuyers@wholefoods.coop';
+            $mail->FromName = 'Whole Foods Co-op Denfeld';
+            $mail->addCC('dbuyers@wholefoods.coop');
+        } elseif ($userEmail && filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
             $mail->addCC($userEmail);
             $mail->addReplyTo($userEmail);
             $mail->From = $userEmail;
@@ -283,8 +288,10 @@ class ViewPurchaseOrders extends FannieRESTfulPage
         $mail->AltBody = $mail->Body;
         $mail->Body = '<p>' . $mail->Body . '</p>' . $html;
         $mail->AltBody .= $nonHtml;
+        $exportObj = new $this->sendAs();
+        $attachment = $exportObj->exportString($this->id);
         $mail->addStringAttachment(
-            $exported,
+            $attachment,
             'Order ' . date('Y-m-d') . '.' . $exportObj->extension,
             'base64',
             $exportObj->mime_type
@@ -451,12 +458,14 @@ class ViewPurchaseOrders extends FannieRESTfulPage
         return sprintf('<tr %s><td><a href="ViewPurchaseOrders.php?id=%d">%s <span class="hidden-xs">%s</span></a></td>
                 <td class="hidden-xs">%s</td>
                 <td class="hidden-xs">%s</td>
-                <td>%s</td><td>%d</td><td class="hidden-xs">%.2f</td>
+                <td><a href="VendorPoPage.php?id=%d">%s</a></td>
+                <td>%d</td><td class="hidden-xs">%.2f</td>
                 <td class="hidden-xs">%s</td><td class="hidden-xs">%s</td><td class="hidden-xs">%.2f</td></tr>',
                 ($row['soFlag'] ? 'class="success" title="Contains special order(s)" ' : ''),
                 $row['orderID'],
-                $date, $time, $row['vendorInvoiceID'], $row['storeName'], $row['vendorName'], $row['records'],
-                $row['estimatedCost'],
+                $date, $time, $row['vendorInvoiceID'], $row['storeName'],
+                $row['vendorID'], $row['vendorName'],
+                $row['records'], $row['estimatedCost'],
                 ($placed == 1 ? $row['placedDate'] : '&nbsp;'),
                 (!empty($row['receivedDate']) ? $row['receivedDate'] : '&nbsp;'),
                 (!empty($row['receivedCost']) ? $row['receivedCost'] : 0.00)
@@ -1179,8 +1188,8 @@ HTML;
             <td><input type="text" class="form-control" name="receiveCost" value="%.2f" /></td>
             <td><button type="submit" class="btn btn-default">Add New Item</button><input type="hidden" name="id" value="%d" /></td>
             </tr>',
-            $item['sku'],
-            $item['sku'],
+            isset($item['sku']) ? $item['sku'] : $this->sku,
+            isset($item['sku']) ? $item['sku'] : $this->sku,
             $item['upc'],
             $item['brand'],
             $item['description'],

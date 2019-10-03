@@ -112,7 +112,7 @@ function loadlc(id){
     }).done(function(resp){
         $('.progress').hide();
         $('#rightdiv').html(resp.form);
-        $('.v-chosen').chosen();
+        $('.v-chosen').chosen({search_contains: true});
         $('input.retailCat').autocomplete({source: resp.retail });
         $('input.internalCat').autocomplete({source: resp.internal });
         $('#lcCategories').html(resp.similar);
@@ -167,6 +167,7 @@ function loadlc(id){
             <ul>
                 <li><a href="LikeCodeActivity.php">Likecode Status & Activity</a></li>
                 <li><a href="LikeCodeSKUsPage.php">Likecode Vendor SKUs & Pricing</a></li>
+                <li><a href="cool/CoolImport.php">COOL Imports</a></li>
             </ul>
         </div>
         <div id="rightdiv" class="col-sm-6">
@@ -181,8 +182,8 @@ function loadlc(id){
 
         $this->addScript('../../src/javascript/chosen/chosen.jquery.min.js');
         $this->addCssFile('../../src/javascript/chosen/bootstrap-chosen.css');
-        $this->addOnloadCommand("\$('select.chosen').chosen();");
-        $this->addScript('lcEditor.js');
+        $this->addOnloadCommand("\$('select.chosen').chosen({search_contains: true});");
+        $this->addScript('lcEditor.js?date=20190701');
         if (FormLib::get('start')) {
             $start = (int)FormLib::get('start');
             $this->addOnloadCommand("\$('#lcselect').val({$start});");

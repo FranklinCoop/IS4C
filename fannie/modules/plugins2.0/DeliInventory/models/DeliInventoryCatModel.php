@@ -24,8 +24,8 @@
 /**
   @class DeliInventoryCatModel
 */
-class DeliInventoryCatModel extends BasicModel {
-
+class DeliInventoryCatModel extends BasicModel
+{
     protected $name = "deliInventoryCat";
     protected $preferred_db = 'op';
 
@@ -40,7 +40,14 @@ class DeliInventoryCatModel extends BasicModel {
     'price' => array('type'=>'MONEY'),
     'total' => array('type'=>'MONEY'),
     'size' => array('type'=>'VARCHAR(20)'),
-    'category' => array('type'=>'VARCHAR(50)', 'index'=>True)
+    'category' => array('type'=>'VARCHAR(50)', 'index'=>True),
+    'upc' => array('type'=>'VARCHAR(13)'),
+    'vendorID' => array('type'=>'INT'),
+    'storeID' => array('type'=>'INT'),
+    'categoryID' => array('type'=>'INT'),
+    'seq' => array('type'=>'INT', 'default'=>0),
+    'modified' => array('type'=>'DATETIME'),
+    'attnFlag' => array('type'=>'TINYINT', 'default'=>0),
     );
 }
 

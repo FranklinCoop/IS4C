@@ -133,7 +133,7 @@ class PITermCheck extends FannieRESTfulPage
          * Generate a check
          *****************/
         $pdf = new FPDF('P', 'mm', 'Letter');
-        $pdf->SetMargins($left, $left, $left); // quarter-inch margins
+        $pdf->SetMargins(null, null, null); // quarter-inch margins
         $pdf->SetAutoPageBreak(false);
         $pdf->AddPage();
 
@@ -146,7 +146,7 @@ class PITermCheck extends FannieRESTfulPage
 
         $checkDateP = $dbc->prepare("
             UPDATE " . $checkDB . $dbc->sep() . "GumPayoffs 
-            SET checkIssued=NOW()
+            SET issueDate=NOW(), amount=?
             WHERE checkNumber=?");
 
         $custdata = new CustdataModel($dbc);
@@ -162,7 +162,7 @@ class PITermCheck extends FannieRESTfulPage
         if ($number === false) {
             $number = GumLib::allocateCheck($custdata, false, 'EQ REFUND', 'eqr' . $this->id);
         }
-        $dbc->execute($checkDateP, array($number));
+        $res = $dbc->execute($checkDateP, array($equity, $number));
 
         $pdf->SetXY(0, 0);
         $pdf->Image('../GiveUsMoneyPlugin/img/new_letterhead.png', 10, 10, 35);
@@ -204,16 +204,12 @@ class PITermCheck extends FannieRESTfulPage
         $pdf->Cell($width, $line_height, 'Thank you,', 0, 1);
         $pdf->Ln(2*$line_height);
         $pdf->SetX($left);
-        $pdf->Cell($width, $line_height, 'Amanda Borgren', 0, 1);
-        $pdf->SetX($left);
-        $pdf->Cell($width, $line_height, 'Finance Coordinator', 0, 1);
-        $pdf->SetX($left);
         $pdf->Cell($width, $line_height, 'Finance Department', 0, 1);
         $pdf->Ln(2*$line_height);
         $pdf->SetX($left);
-        $pdf->Cell($width, $line_height, '218.728.0884 | ext. 453', 0, 1);
+        $pdf->Cell($width, $line_height, '218.728.0884', 0, 1);
         $pdf->SetX($left);
-        $pdf->Cell($width, $line_height, 'os@wholefoods.coop', 0, 1);
+        $pdf->Cell($width, $line_height, 'finance@wholefoods.coop', 0, 1);
 
         $check = new GumCheckTemplate($custdata, $meminfo, $equity, 'Equity Refund', $number);
         $check->shiftMICR(true);

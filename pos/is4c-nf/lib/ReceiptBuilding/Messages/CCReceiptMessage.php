@@ -71,7 +71,12 @@ class CCReceiptMessage extends ReceiptMessage {
         $query = "SELECT $trans_type AS tranType,
                     CASE WHEN p.transType = 'Return' THEN -1*p.amount ELSE p.amount END as amount,
                     p.PAN,
-                    CASE WHEN p.manual=1 THEN 'Manual' WHEN p.manual=-1 THEN 'Chip' ELSE 'Swiped' END as entryMethod,
+                    CASE 
+                        WHEN p.manual=1 THEN 'Manual'
+                        WHEN p.manual=-1 THEN 'Chip'
+                        WHEN p.manual=-2 THEN 'NFC'
+                        ELSE 'Swiped'
+                    END as entryMethod,
                     p.issuer,
                     p.xResultMessage,
                     p.xApprovalNumber,
@@ -198,7 +203,7 @@ class CCReceiptMessage extends ReceiptMessage {
                     $col2[] = ReceiptLib::boldFont()."Amount: ".$amt.ReceiptLib::normalFont();
                     $slip .= ReceiptLib::twoColumns($col1,$col2);
                     if (strpos($row['tranType'], ' R.')) {
-                        $slip .= ReceiptLib::boldFont() . 'This is a recurring payment' . ReceiptLib::normalizeFont() . "\n"
+                        $slip .= ReceiptLib::boldFont() . 'This is a recurring payment' . ReceiptLib::normalFont() . "\n"
                             . wordwrap(
                                 sprintf('You will be billed monthly %d additional times for $%.2f. ', $payments_left, $recurring)
                                 . 'The charges on your bank statement will be labeled "recurring". '

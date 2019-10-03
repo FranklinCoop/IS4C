@@ -62,7 +62,7 @@ class PcDailyReport extends FannieReportPage
         $mercuryQ = "
             SELECT cardType,
                 CASE 
-                    WHEN transType='Sale' THEN 'Sales'
+                    WHEN transType IN ('Sale', 'R.Sale') THEN 'Sales'
                     WHEN transType='Return' THEN 'Returns'
                     WHEN transType='VOID' THEN 'Sales'
                     ELSE 'Unknown'
@@ -78,15 +78,15 @@ class PcDailyReport extends FannieReportPage
             FROM PaycardTransactions
             WHERE dateID=?
                 AND httpCode=200
-                AND (xResultMessage LIKE '%approve%' OR xResultMessage LIKE '%PENDING%')
+                AND (xResultMessage LIKE '%approve%' OR xResultMessage LIKE '%PENDING%' OR xResultMessage='AP')
                 AND xResultMessage not like '%declined%'
                 AND empNo <> 9999
                 AND registerNo <> 99
                 AND processor=?";
         if ($store == 1) {
-            $mercuryQ .= ' AND registerNo BETWEEN 1 AND 10 ';
+            $mercuryQ .= ' AND (registerNo BETWEEN 1 AND 10 OR registerNo=31) ';
         } elseif ($store == 2) {
-            $mercuryQ .= ' AND registerNo BETWEEN 11 AND 20 ';
+            $mercuryQ .= ' AND (registerNo BETWEEN 11 AND 20 OR registerNo=32) ';
         }
         $mercuryP = $this->connection->prepare($mercuryQ);
         $mercuryR = $this->connection->execute($mercuryP, array($date_id, $processor));
@@ -105,17 +105,19 @@ class PcDailyReport extends FannieReportPage
                 );
             }
             $transType = $mercuryW['transType'];
-            $proc[$cardType][$transType]['amt'] += $mercuryW['ttl'];
-            $proc[$cardType][$transType]['num'] += $mercuryW['num'];
-            $issuer = $mercuryW['cardIssuer'];
-            if (!isset($proc[$cardType]['Details'][$issuer])) {
-                $proc[$cardType]['Details'][$issuer] = array(
-                    'Sales' => array('amt'=>0.0, 'num'=>0),
-                    'Returns' => array('amt'=>0.0, 'num'=>0),
-                );
+            if (isset($proc[$cardType]) && isset($proc[$cardType][$transType])) {
+                $proc[$cardType][$transType]['amt'] += $mercuryW['ttl'];
+                $proc[$cardType][$transType]['num'] += $mercuryW['num'];
+                $issuer = $mercuryW['cardIssuer'];
+                if (!isset($proc[$cardType]['Details'][$issuer])) {
+                    $proc[$cardType]['Details'][$issuer] = array(
+                        'Sales' => array('amt'=>0.0, 'num'=>0),
+                        'Returns' => array('amt'=>0.0, 'num'=>0),
+                    );
+                }
+                $proc[$cardType]['Details'][$issuer][$transType]['amt'] += $mercuryW['ttl'];
+                $proc[$cardType]['Details'][$issuer][$transType]['num'] += $mercuryW['num'];
             }
-            $proc[$cardType]['Details'][$issuer][$transType]['amt'] += $mercuryW['ttl'];
-            $proc[$cardType]['Details'][$issuer][$transType]['num'] += $mercuryW['num'];
         }
 
         return $proc;
@@ -170,6 +172,9 @@ class PcDailyReport extends FannieReportPage
 
         $proc = $this->getTransactions($date_id, $store, 'MercuryE2E');
         $dataset = $this->procToDataset($dataset, $proc, 'Mercury');
+
+        $proc = $this->getTransactions($date_id, $store, 'RapidConnect');
+        $dataset = $this->procToDataset($dataset, $proc, 'First Data');
 
         $proc = $this->getTransactions($date_id, $store, 'GoEMerchant', true);
         $dataset = $this->procToDataset($dataset, $proc, 'FAPS');

@@ -99,10 +99,70 @@ class StatementsPluginEmail extends FannieRESTfulPage
             $mail->Body = $html;
             $mail->AltBody = $body;
             $mail->addAddress($primary['email']);
-            $mail->addBCC('bcarlson@wholefoods.coop');
+            if ($primary['email'] == 'carmen.lesavage@gmail.com') {
+                $mail->addCC('lesavagefamily@aol.com');
+            }
+            $mail->addBCC('jlepak@wholefoods.coop');
             $mail->addBCC('andy@wholefoods.coop');
+            $mail->addBCC('hheinz@wholefoods.coop');
             $mail->send();
             $this->sent[$name] = $primary['email'];
+        }
+
+        return true;
+    }
+
+    private function checkPickUps($dbc, $ids)
+    {
+        list($inStr, $args) = $dbc->safeInClause($ids);
+        $prep = $dbc->prepare("SELECT email, company
+            FROM CheckPickUps
+            WHERE checkPickUpID IN ({$inStr})");
+        $res = $dbc->execute($prep, $args);
+        while ($row = $dbc->fetchRow($res)) {
+            $mail = new PHPMailer();
+            $mail->isSMTP();
+            $mail->Host = '127.0.0.1';
+            $mail->Port = 25;
+            $mail->SMTPAuth = false;
+            $mail->From = 'finance@wholefoods.coop';
+            $mail->FromName = 'Whole Foods Co-op';
+
+            $today = date('F j, Y');
+            $body = <<<BODY
+Valued Vendor:
+
+Your requested check to pick up is available at the customer service desk at the Hillside location after 5pm today ({$today}). 
+If you have any questions regarding this email or your check, please direct all questions to finance@wholefoods.coop.  Please allow 1 business day for a response. 
+
+Thank you,
+Finance Department
+Whole Foods Co-op
+218 - 728 - 0884 
+finance@wholefoods.coop
+BODY;
+
+            $htmlBody = <<<HTML
+Valued Vendor:<br />
+<br />
+Your requested check to pick up is available at the customer service desk at the Hillside location after 5pm today ({$today}). 
+If you have any questions regarding this email or your check, please direct all questions to finance@wholefoods.coop.  Please allow 1 business day for a response. <br />
+<br />
+Thank you,<br />
+<u>Finance Department</u><br />
+Whole Foods Co-op<br />
+218 - 728 - 0884<br />
+finance@wholefoods.coop<br />
+HTML;
+
+            $mail->isHTML(true);
+            $mail->Subject = 'Check Payment Alert Whole Foods Co-op';
+            $mail->Body = $htmlBody;
+            $mail->AltBody = $body;
+            $mail->addAddress($row['email']);
+            $mail->addBCC('andy@wholefoods.coop');
+            $mail->send();
+            $this->sent[$row['company']] = $row['email'];
         }
 
         return true;
@@ -120,6 +180,9 @@ class StatementsPluginEmail extends FannieRESTfulPage
         }
         if (count($this->id) > 0 && substr($this->id[0], 0, 3) == 'b2b') {
             return $this->b2bHandler($dbc, $this->id);
+        }
+        if (FormLib::get('check-pick-ups')) {
+            return $this->checkPickUps($dbc, $this->id);
         }
         foreach($this->id as $c) {
             $cards .= "?,";
@@ -195,12 +258,15 @@ class StatementsPluginEmail extends FannieRESTfulPage
             SELECT card_no,
                 description,
                 department,
+                quantity,
+                total,
                 trans_num
             FROM ' . $FANNIE_ARCHIVE_DB . $dbc->sep() . 'dlogBig
             WHERE tdate BETWEEN ? AND ?
                 AND trans_num=?
                 AND card_no=?
-                AND trans_type IN (\'I\', \'D\')
+                AND trans_type IN (\'I\', \'D\', \'A\')
+                AND total <> 0
         ';         
         $todayQ = str_replace($FANNIE_ARCHIVE_DB . $dbc->sep() . 'dlogBig', $FANNIE_TRANS_DB . $dbc->sep() . 'dlog', $detailsQ);
         $detailsP = $dbc->prepare($detailsQ);
@@ -233,7 +299,7 @@ class StatementsPluginEmail extends FannieRESTfulPage
                     if (!isset($details[$row['card_no']][$trans_num])) {
                         $details[$row['card_no']][$trans_num] = array();
                     }
-                    $details[$row['card_no']][$trans_num][] = $row['description'];
+                    $details[$row['card_no']][$trans_num][] = sprintf('$%.2f %s', $row['total'], $row['description']);
                 }
             }
             if ($found_charge) {
@@ -345,9 +411,12 @@ class StatementsPluginEmail extends FannieRESTfulPage
 
                 $lineitem = (count($detail)==1) ? $detail[0] : '(multiple items)';
                 foreach ($detail as $line) {
-                    if ($line == 'ARPAYMEN') {
+                    if (substr($line, -8) == 'ARPAYMEN') {
                         $lineitem = 'Payment Received - Thank You';
                     }
+                }
+                if ($lineitem != 'Payment Received - Thank You') {
+                    $lineitem = implode('<br />', $detail);
                 }
 
                 $body .= str_pad($date, 20) . str_pad($trans, 15);
@@ -384,12 +453,12 @@ class StatementsPluginEmail extends FannieRESTfulPage
             $mail->Body = $html;
             $mail->AltBody = $body;
             $mail->addAddress($primary['email']);
-            $mail->addBCC('bcarlson@wholefoods.coop');
+            $mail->addBCC('jlepak@wholefoods.coop');
             $mail->addBCC('andy@wholefoods.coop');
             $mail->send();
             $this->sent[$name] = $primary['email'];
 
-            $docfile = "/var/www/cgi-bin/docfile/docfile/" . $card_no;
+            $docfile = __DIR__ . "/noauto/docfile/" . $card_no;
             if (!file_exists($docfile)) {
                 mkdir($docfile);
             }

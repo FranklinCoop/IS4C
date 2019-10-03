@@ -22,6 +22,7 @@
 *********************************************************************************/
 
 namespace COREPOS\pos\plugins\Paycards\sql;
+use \COREPOS\pos\plugins\Paycards\card\CardValidator;
 use \Exception;
 use \PaycardConf;
 
@@ -58,7 +59,8 @@ class PaycardRequest
     private function initAmounts()
     {
         $amount = $this->conf->get("paycard_amount");
-        if (($this->type == "Debit" || $this->type == "EBTCASH") && $amount > $this->conf->get("amtdue")) {
+        $valid = new CardValidator();
+        if ($valid->allowCashback($this->type) && $amount > $this->conf->get("amtdue")) {
             $cashback = $amount - $this->conf->get("amtdue");
             $amount = $this->conf->get("amtdue");
             return array($amount, $cashback);
@@ -108,6 +110,11 @@ class PaycardRequest
     public function setAmount($amt)
     {
         $this->amount = $amt;
+    }
+
+    public function setCashBack($amt)
+    {
+        $this->cashback = $amt;
     }
 
     public function setCardholder($name)
@@ -182,6 +189,8 @@ class PaycardRequest
         switch (strtoupper($entryMethod)) {
             case 'CHIP':
                 return -1;
+            case 'CONTACTLESS':
+                return -2;
             case 'SWIPED':
                 return 0;
             default:

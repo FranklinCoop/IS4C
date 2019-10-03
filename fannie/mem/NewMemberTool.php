@@ -101,7 +101,7 @@ class NewMemberTool extends FanniePage
         <div class="form-group">
             <label class="col-sm-2">How Many</label>
             <div class="col-sm-4">
-                <input type="number" name="num" value="40" class="form-control" required />
+                <input type="number" name="num" value="80" class="form-control" required />
             </div>
         </div>
         <div class="form-group">
@@ -209,11 +209,12 @@ class NewMemberTool extends FanniePage
         */
 
         /* everything's set but the actual member #s */
-        $numQ = $dbc->prepare("SELECT MAX(CardNo) FROM custdata");
+        $limit = $this->config->get('CARDNO_MAX', 1000000000);
+        $numQ = $dbc->prepare("SELECT MAX(CardNo) FROM custdata WHERE CardNo <= ?");
         if ($FANNIE_SERVER_DBMS == 'MSSQL') {
-            $numQ = $dbc->prepare("SELECT MAX(CAST(CardNo AS int)) FROM custdata");
+            $numQ = $dbc->prepare("SELECT MAX(CAST(CardNo AS int)) FROM custdata WHERE CAST(CardNo AS int) <= ?");
         }
-        $numR = $dbc->execute($numQ);
+        $numR = $dbc->execute($numQ, array($limit));
         $start = 1;
         if ($dbc->num_rows($numR) > 0) {
             $numW = $dbc->fetch_row($numR);

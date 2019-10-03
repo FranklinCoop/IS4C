@@ -25,13 +25,19 @@ namespace COREPOS\Fannie\Plugin\CoopDealsSigns;
 use \FannieDB;
 use \FannieConfig;
 
-class WfcSmartSigns4UpL extends \COREPOS\Fannie\API\item\signage\Signage4UpL 
+class WfcSmartSigns4UpL extends \COREPOS\Fannie\API\item\signage\Giganto4UpP 
 {
     public function drawPDF()
     {
         $pdf = $this->createPDF();
         $dbc = FannieDB::get(FannieConfig::config('OP_DB'));
-        $basicP = $dbc->prepare("SELECT MAX(price_rule_id) FROM products WHERE upc=?");
+        $basicP = $dbc->prepare("SELECT
+            CASE WHEN pr.priceRuleTypeID = 6 THEN 1 ELSE 0 END
+            FROM products AS p
+                LEFT JOIN PriceRules AS pr ON p.price_rule_id=pr.priceRuleID
+            WHERE upc = ?;");
+        $organicLocalP = $dbc->prepare("SELECT 'true' FROM products WHERE numflag & (1<<16) != 0 AND upc = ? AND local > 0");
+        $organicP = $dbc->prepare("SELECT 'true' FROM products WHERE numflag & (1<<16) != 0 AND upc = ?");
 
         $data = $this->loadItems();
         $count = 0;
@@ -72,6 +78,8 @@ class WfcSmartSigns4UpL extends \COREPOS\Fannie\API\item\signage\Signage4UpL
             $pdf = $this->drawItem($pdf, $item, $row, $column);
 
             $item['basic'] = $dbc->getValue($basicP, $item['upc']);
+            $item['organicLocal'] = $dbc->getValue($organicLocalP, $item['upc']);
+            $item['organic'] = $dbc->getValue($organicP, $item['upc']);
 
             $pdf->Image($this->getTopImage($item), ($left-1) + ($width*$column), ($top-19) + ($row*$height), 133);
             $pdf->Image($this->getBottomImage($item), ($left-1)+($width*$column), $top + ($height*$row) + ($height-$top-8), 133);
@@ -91,7 +99,12 @@ class WfcSmartSigns4UpL extends \COREPOS\Fannie\API\item\signage\Signage4UpL
             return __DIR__ . '/noauto/images/chaching_top_12.png';
         } elseif ($item['basic']) {
             return __DIR__ . '/noauto/images/basics_top_12.png';
+        } elseif ($item['organicLocal']) {
+            return __DIR__ . '/noauto/images/local_og_top.png';
+        } elseif ($item['organic']) {
+            return __DIR__ . '/noauto/images/organic_top_12.png';
         }
+
 
         return __DIR__ . '/noauto/images/standard_top_12.png';
     }
@@ -104,7 +117,12 @@ class WfcSmartSigns4UpL extends \COREPOS\Fannie\API\item\signage\Signage4UpL
             return __DIR__ . '/noauto/images/chaching_bottom_12.png';
         } elseif ($item['basic']) {
             return __DIR__ . '/noauto/images/basics_bottom_12.png';
+        } elseif ($item['organicLocal']) {
+            return __DIR__ . '/noauto/images/local_og_bottom.png';
+        } elseif ($item['organic']) {
+            return __DIR__ . '/noauto/images/organic_bottom_12.png';
         }
+
 
         return __DIR__ . '/noauto/images/standard_bottom_12.png';
     }

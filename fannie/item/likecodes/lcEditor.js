@@ -24,6 +24,10 @@ var lcEditor = (function ($) {
         ajax('id='+lc+'&multi=flip');
     };
 
+    mod.toggleCOOL = function(lc) {
+        ajax('id='+lc+'&cool=flip');
+    };
+
     mod.updateVendor = function(lc, vid) {
         ajax('id='+lc+'&vendorID='+vid);
     };
@@ -43,6 +47,14 @@ var lcEditor = (function ($) {
     mod.internalCat = function(lc, cat) {
         ajax('id='+lc+'&icat='+encodeURIComponent(cat));
     };
+
+    mod.origin = function(lc, origin) {
+        ajax('id='+lc+'&origin='+encodeURIComponent(origin));
+    };
+
+    mod.saveSign = function(lc, storeID, sign) {
+        ajax('id='+lc+'&storeID='+storeID+'&sign='+encodeURIComponent(sign));
+    }
 
     return mod;
 

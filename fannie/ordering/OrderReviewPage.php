@@ -20,6 +20,9 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
+
+use COREPOS\Fannie\API\lib\Operators as Op;
+
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
     include(__DIR__ . '/../classlib2.0/FannieAPI.php');
@@ -262,14 +265,15 @@ class OrderReviewPage extends FannieRESTfulPage
         $ret .= '</tr>';
         $ret .= '<tr>';
         $ret .= sprintf('<td colspan="2" align="right">Unit Price: $%.2f</td>',
-            ($row['regPrice']/$row['ItemQtty']/$row['quantity']));
+            Op::div( Op::div($row['regPrice'],$row['ItemQtty']), $row['quantity'] ));
         $ret .= sprintf('<td>From: %s</td>',$row['mixMatch']);
         $ret .= '<td>Discount</td>';
         if ($row['discounttype'] == 1 || $row['discounttype'] == 2) {
             $ret .= '<td id="discPercent'.$row['upc'].'">Sale</td>';
         } else if ($row['regPrice'] != $row['total']) {
             $ret .= sprintf('<td id="discPercent%s">%d%%</td>',$row['upc'],
-                round(100*(($row['regPrice']-$row['total'])/$row['regPrice'])));
+                round(100*Op::div($row['regPrice']-$row['total'], $row['regPrice']))
+            );
         } else {
             $ret .= '<td id="discPercent'.$row['upc'].'">0%</td>';
         }

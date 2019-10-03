@@ -119,17 +119,21 @@ class DepartmentMovementReport extends FannieReportPage
             case 'PLU':
                 $query = "SELECT t.upc,
                       p.brand,
-                      CASE WHEN p.description IS NULL THEN t.description ELSE p.description END as description, 
+                      CASE WHEN t.description IS NULL THEN p.description ELSE t.description END as description, 
                       SUM(CASE WHEN trans_status IN('','0','R') THEN 1 WHEN trans_status='V' THEN -1 ELSE 0 END) as rings,"
                       . DTrans::sumQuantity('t')." as qty,
                       SUM(t.total) AS total,
                       d.dept_no,d.dept_name,s.superID,
-                      v.vendorName AS distributor
+                      v.vendorName AS distributor,
+                      l.likeCode,
+                      l.likeCodeDesc
                       FROM $dlog as t "
                       . DTrans::joinProducts()
                       . DTrans::joinDepartments()
                       . "LEFT JOIN $superTable AS s ON t.department = s.dept_ID
                       LEFT JOIN vendors AS v ON p.default_vendor_id=v.vendorID
+                      LEFT JOIN upcLike AS u ON t.upc=u.upc
+                      LEFT JOIN likeCodes AS l ON u.likeCode=l.likeCode
                       WHERE $filter_condition
                       AND t.trans_type IN ('I', 'D')
                       AND tdate BETWEEN ? AND ?
@@ -137,7 +141,7 @@ class DepartmentMovementReport extends FannieReportPage
                       AND " . DTrans::isStoreID($store, 't') . "
                       GROUP BY t.upc,
                           p.brand,
-                          CASE WHEN p.description IS NULL THEN t.description ELSE p.description END,
+                          CASE WHEN t.description IS NULL THEN p.description ELSE t.description END,
                           CASE WHEN t.trans_status = 'R' THEN 'Refund' ELSE 'Sale' END,
                       d.dept_no,d.dept_name,s.superID,v.vendorName ORDER BY SUM(t.total) DESC";
                 break;
@@ -209,7 +213,9 @@ class DepartmentMovementReport extends FannieReportPage
             // MySQL 5.6 doesn't handle correctly
             return array();
         }
+        $likeCodes = FormLib::get('lc') ? array() : false;
         $ret = array();
+        $dateSum = 0;
         while ($row = $dbc->fetchRow($result)) {
             $record = array();
             if ($groupby == "Date") {
@@ -217,6 +223,42 @@ class DepartmentMovementReport extends FannieReportPage
                 $record[] = date('l', strtotime($record[0]));
                 $record[] = sprintf('%.2f', $row[3]);
                 $record[] = sprintf('%.2f', $row[4]);
+                $record[] = 0; // percent placeholder
+                $dateSum += $row[4];
+            } elseif ($groupby == 'PLU') {
+                if ($likeCodes !== false && $row['likeCode']) {
+                    $lc = $row['likeCode'];
+                    if (isset($likeCodes[$lc])) {
+                        $likeCodes[$lc][3] += $row['rings'];
+                        $likeCodes[$lc][4] += $row['qty'];
+                        $likeCodes[$lc][5] += $row['total'];
+                    } else {
+                        $likeCodes[$lc] = array(
+                            'LC' . $row['likeCode'],
+                            '', // brand
+                            $row['likeCodeDesc'],
+                            $row['rings'],
+                            $row['qty'],
+                            $row['total'],
+                            $row['dept_no'],
+                            $row['dept_name'],
+                            $row['superID'],
+                            $row['distributor'] == null ? '' : $row['distributor'],
+                        );
+                    }
+                    continue;
+                } else {
+                    $record[] = $row['upc'];
+                    $record[] = $row['brand'] ? $row['brand'] : '';
+                    $record[] = $row['description'];
+                    $record[] = sprintf('%.2f', $row['rings']);
+                    $record[] = sprintf('%.2f', $row['qty']);
+                    $record[] = sprintf('%.2f', $row['total']);
+                    $record[] = $row['dept_no'];
+                    $record[] = $row['dept_name'];
+                    $record[] = $row['superID'];
+                    $record[] = $row['distributor'] == null ? '' : $row['distributor'];
+                }
             } else {
                 for($i=0;$i<$dbc->numFields($result);$i++) {
                     if (preg_match('/^\d+\.\d+$/', $row[$i])) {
@@ -226,6 +268,18 @@ class DepartmentMovementReport extends FannieReportPage
                 }
             }
             $ret[] = $record;
+        }
+        $likeCodes = $this->dekey_array($likeCodes);
+        foreach ($likeCodes as $row) {
+            $row[3] = sprintf('%.2f', $row[3]);
+            $row[4] = sprintf('%.2f', $row[4]);
+            $row[5] = sprintf('%.2f', $row[5]);
+            $ret[] = $row;
+        }
+        if ($groupby == 'Date') {
+            for ($i=0; $i<count($ret); $i++) {
+                $ret[$i][4] = sprintf('%.2f', $ret[$i][3] / $dateSum * 100);
+            }
         }
 
         return $ret;
@@ -252,6 +306,11 @@ class DepartmentMovementReport extends FannieReportPage
         switch(count($data[0])) {
             case 10:
                 return $this->upcFooter($data);
+            case 5:
+                $this->nonUpcHeaders();
+                $ret = $this->nonUpcFooter($data);
+                $ret[] = '';
+                return $ret;
             case 4:
                 /**
                   The Department and Weekday datasets are both four
@@ -287,7 +346,7 @@ class DepartmentMovementReport extends FannieReportPage
             $this->sort_column = 0;
             $this->sort_direction = 0;
         } elseif (FormLib::get_form_value('sort')=='Date') {
-            $this->report_headers = array('Date','Day','Qty','$');
+            $this->report_headers = array('Date','Day','Qty','$', '%');
             $this->sort_column = 0;
             $this->sort_direction = 0;
         } else {
@@ -332,12 +391,16 @@ class DepartmentMovementReport extends FannieReportPage
         <div class="form-group">
             <label class="col-sm-4 control-label">Sum movement by?</label>
             <div class="col-sm-8">
-                <select name="sort" class="form-control">
+                <select name="sort" class="form-control"
+                    onchange="if (this.value=='PLU') $('#rollup').show(); else $('#rollup').hide();">
                     <option>PLU</option>
                     <option>Date</option>
                     <option>Department</option>
                 <option>Weekday</option>
                 </select> 
+                <label class="control-label" id="rollup">Rollup Likecodes
+                    <input type=checkbox name=lc id=lc value=1>
+                </label>
             </div>
         </div>
         <div class="form-group">

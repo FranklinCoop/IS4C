@@ -36,14 +36,29 @@ class LikeCodeAjax extends FannieRESTfulPage
             'post<id><strict>',
             'post<id><organic>',
             'post<id><multi>',
+            'post<id><cool>',
             'post<id><vendorID>',
             'post<id><rcat>',
             'post<id><icat>',
+            'post<id><origin>',
             'post<id><storeID><inUse>',
-            'post<id><storeID><internal>'
+            'post<id><storeID><internal>',
+            'post<id><storeID><sign>'
         );
 
         return parent::preprocess();
+    }
+
+    protected function post_id_storeID_sign_handler()
+    {
+        $model = new LikeCodeActiveMapModel($this->connection);
+        $model->likeCode($this->id);
+        $model->storeID($this->storeID);
+        $model->defaultSign($this->sign);
+        $model->save();
+        echo 'Sign: ' . $this->sign;
+
+        return false;
     }
 
     private function getOthersInSort($dbc, $sort, $lc)
@@ -76,6 +91,36 @@ class LikeCodeAjax extends FannieRESTfulPage
         return $ret;
     }
 
+    private function getSignOpts()
+    {
+        $mods = FannieAPI::listModules('\COREPOS\Fannie\API\item\FannieSignage');
+        $enabled = $this->config->get('ENABLED_SIGNAGE');
+        if (count($enabled) > 0) {
+            $mods = array_filter($mods, function ($i) use ($enabled) {
+                return in_array($i, $enabled) || in_array(str_replace('\\', '-', $i), $enabled);
+            });
+        }
+        sort($mods);
+        $tagEnabled = $this->config->get('ENABLED_TAGS');
+        foreach (COREPOS\Fannie\API\item\signage\LegacyWrapper::getLayouts() as $l) {
+            if (in_array($l, $tagEnabled) && count($tagEnabled) > 0) {
+                $mods[] = 'Legacy:' . $l;
+            }
+        }
+        $opts = array('');
+        foreach ($mods as $m) {
+            $name = $m;
+            if (strstr($m, '\\')) {
+                $pts = explode('\\', $m);
+                $name = $pts[count($pts)-1];
+            }
+            if ($name === 'LegacyWrapper') continue;
+            $opts[] = $name;
+        }
+
+        return $opts;
+    }
+
     protected function get_id_handler()
     {
         $dbc = $this->connection;
@@ -95,16 +140,25 @@ class LikeCodeAjax extends FannieRESTfulPage
             WHERE s.hasOwnItems=1
             ORDER BY s.storeID');
         $activeR = $dbc->execute($activeP, array($this->id));
+        $signOpts = $this->getSignOpts();
         $table = '';
         while ($activeW = $dbc->fetchRow($activeR)) {
+            $opts = '';
+            foreach ($signOpts as $o) {
+                $opts .= sprintf('<option %s>%s</option>',
+                    ($o == $activeW['defaultSign'] ? 'selected' : ''), $o);
+            }
             $table .= sprintf('<tr><td>%s</td>
                 <td><input type="checkbox" onchange="lcEditor.toggleUsage(%d,%d);" %s /></td>
                 <td><input type="checkbox" onchange="lcEditor.toggleInternal(%d,%d);" %s /></td>
-                <td>%s</td></tr>',
+                <td>%s</td></tr>
+                <tr><td>&nbsp;</td><td colspan="2">Default Sign</td>
+                <td><select class="form-control input-sm" onchange="lcEditor.saveSign(%d,%d,this.value);">%s</select></td></tr>',
                 $activeW['description'],
                 $this->id, $activeW['sID'], $activeW['inUse'] ? 'checked' : '',
                 $this->id, $activeW['sID'], $activeW['internalUse'] ? 'checked' : '',
-                $activeW['lastSold']
+                $activeW['lastSold'],
+                $this->id, $activeW['sID'], $opts
             );
         }
         if ($table !== '') {
@@ -136,6 +190,8 @@ class LikeCodeAjax extends FannieRESTfulPage
                 <label><input type="checkbox" %s onchange="lcEditor.toggleOrganic(%d);" /> Organic</label>
                 &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
                 <label><input type="checkbox" %s onchange="lcEditor.toggleMulti(%d);" /> Multi-Vendor</label>
+                &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
+                <label><input type="checkbox" %s onchange="lcEditor.toggleCOOL(%d);" /> COOL Signs</label>
                 <p>
                     <label>Preferred Vendor</label>
                     <select onchange="lcEditor.updateVendor(%d, this.value);" class="form-control v-chosen">
@@ -152,6 +208,11 @@ class LikeCodeAjax extends FannieRESTfulPage
                     <input type="text" onchange="lcEditor.internalCat(%d, this.value);" 
                         class="form-control internalCat" value="%s" />
                 </p>
+                <p>
+                    <label>Origin</label>
+                    <input type="text" onchange="lcEditor.origin(%d, this.value);" 
+                        class="form-control origin" value="%s" />
+                </p>
                 %s
                 <p>%s</p>
             </div>
@@ -162,10 +223,13 @@ class LikeCodeAjax extends FannieRESTfulPage
             $likeCode->likeCode(),
             $likeCode->multiVendor() ? 'checked' : '',
             $likeCode->likeCode(),
+            $likeCode->signOrigin() ? 'checked' : '',
+            $likeCode->likeCode(),
             $likeCode->likeCode(),
             $vOpts,
             $likeCode->likeCode(), $likeCode->sortRetail(),
             $likeCode->likeCode(), $likeCode->sortInternal(),
+            $likeCode->likeCode(), $likeCode->origin(),
             $table,
             $ret
         );
@@ -192,6 +256,11 @@ class LikeCodeAjax extends FannieRESTfulPage
     protected function post_id_multi_handler()
     {
         return $this->toggleField($this->id, 'multiVendor');
+    }
+
+    protected function post_id_cool_handler()
+    {
+        return $this->toggleField($this->id, 'signOrigin');
     }
 
     protected function getLcModel($likeCode)
@@ -231,10 +300,36 @@ class LikeCodeAjax extends FannieRESTfulPage
 
         $model->sortRetail($this->rcat);
         $model->save();
+        if ($this->connection->tableExists('RpOrderItems')) {
+            $catP = $this->connection->prepare("SELECT rpOrderCategoryID FROM RpOrderCategories WHERE name=?");
+            $cat = $this->connection->getValue($catP, array($this->rcat));
+            if ($cat) {
+                $upP = $this->connection->prepare("UPDATE RpOrderItems SET categoryID=? WHERE upc=?");
+                $this->connection->execute($upP, array($cat, 'LC' . $this->id));
+            }
+        }
 
         echo 'Done';
         return false;
     }
+
+    protected function post_id_origin_handler()
+    {
+        $model = $this->getLcModel($this->id);
+        if ($model === false) {
+            return false;
+        }
+        $new = strtoupper(trim($this->origin));
+        if ($new != strtoupper($model->origin())) {
+            $model->origin($new);
+            $model->originChanged(date('Y-m-d H:i:s'));
+            $model->save();
+        }
+
+        echo 'Done';
+        return false;
+    }
+
     protected function post_id_icat_handler()
     {
         $model = $this->getLcModel($this->id);

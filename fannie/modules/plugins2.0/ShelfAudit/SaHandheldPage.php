@@ -57,21 +57,24 @@ class SaHandheldPage extends FannieRESTfulPage
         $settings = $this->config->get('PLUGIN_SETTINGS');
         if ($this->id !== '') {
             $dbc = FannieDB::getReadOnly($this->config->get('OP_DB'));
+            $original = $this->id;
             $upc = BarcodeLib::padUPC($this->id);
+            $scalePrice = false;
             if (substr($upc, 0, 3) == '002') {
+                $scalePrice = substr($upc, -4) / 100;
                 $upc = substr($upc, 0, 7) . '000000';
             }
             $ret['upc'] = $upc;     
             $store = FormLib::get('store', 0);
-            $q = 'SELECT p.description,v.brand,s.quantity,v.units FROM
+            $q = 'SELECT p.description,v.brand,s.quantity,v.units,p.normal_price FROM
                 products AS p LEFT JOIN vendorItems AS v ON p.upc=v.upc
                 LEFT JOIN '.$settings['ShelfAuditDB'].$dbc->sep().
                 'sa_inventory AS s ON p.upc=s.upc AND s.clear=0 AND s.storeID=?
                     AND s.section=?
                 WHERE p.upc=? 
                 ORDER BY v.vendorID';
-            $p = $dbc->prepare($q);
-            $r = $dbc->execute($p,array($store, $this->section, $upc));
+            $mainP = $dbc->prepare($q);
+            $r = $dbc->execute($mainP,array($store, $this->section, $upc));
             if ($dbc->numRows($r) == 0 && substr($upc, 0, 5) == '00454') {
                 // look up special order
                 $orderID = (int)substr($upc, 5, 6);
@@ -90,6 +93,9 @@ class SaHandheldPage extends FannieRESTfulPage
                     $p = $dbc->prepare($q2);
                     $r = $dbc->execute($p, $args);
                 }
+            } elseif ($dbc->numRows($r)==0 && strlen(ltrim($upc, '0')) == 6) {
+                $upc = BarcodeLib::padUPC('0' . ltrim($upc, '0'));
+                $r = $dbc->execute($mainP,array($store, $this->section, $upc));
             } elseif ($dbc->numRows($r)==0) {
                 // try again; item on-hand but not in products
                 $q = 'SELECT v.description,v.brand,s.quantity,v.units FROM
@@ -112,6 +118,9 @@ class SaHandheldPage extends FannieRESTfulPage
                 }
                 if (!isset($this->current_item_data['case_sizes'])){
                     $ret['case_sizes'] = array();
+                }
+                if ($scalePrice && $w['normal_price']) {
+                    $ret['case_sizes'][] = sprintf('%.2f', $scalePrice / $w['normal_price']);
                 }
                 if ($w['units'] > 0) {
                     $ret['case_sizes'][] = $w['units'];
@@ -155,7 +164,7 @@ class SaHandheldPage extends FannieRESTfulPage
         $insP = $dbc->prepare('INSERT INTO sa_inventory (datetime,upc,clear,quantity,section,storeID)
                 VALUES ('.$dbc->now().',?,0,?,?,?)');
         $dbc->execute($delP, array($upc, $this->section, $store));
-        if ($qty > 0){
+        if ($qty > 0 || strlen(ltrim($upc, '0')) == 5){
             $dbc->execute($insP, array($upc, $qty, $this->section, $store));
         }
         $ret['qty'] = $qty;
@@ -304,8 +313,8 @@ document.addEventListener("BarcodeScanned", function (ev) {
         $cases = '';
         foreach($data['case_sizes'] as $s){
             if (isset($used[$s])) continue;
-            $cases.= sprintf('<button type="button" tabindex="-1" onclick="handheld.updateQty(%d)" class="btn btn-success btn-lg">+%d</button>
-                <button type="button" tabindex="-1" onclick="handheld.updateQty(%d)" class="btn btn-danger btn-lg">-%d</button>',
+            $cases.= sprintf('<button type="button" tabindex="-1" onclick="handheld.updateQty(%s)" class="btn btn-success btn-lg">+%s</button>
+                <button type="button" tabindex="-1" onclick="handheld.updateQty(%s)" class="btn btn-danger btn-lg">-%s</button>',
                 $s,$s,-1*$s,$s);
         }
         echo <<<HTML

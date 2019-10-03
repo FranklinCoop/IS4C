@@ -50,7 +50,7 @@ class TasksTest extends PHPUnit_Framework_TestCase
           Verify dtransactions was cleared
         */
         $trans_db = FannieDB::get($config->get('TRANS_DB'));
-        $records = $trans_db->query('SELECT * FROM dtransactions');
+        $records = $trans_db->query('SELECT * FROM dtransactions WHERE datetime < \'' . date('Y-m-d 00:00:00') . '\'');
         $data = array();
         while ($row = $trans_db->fetchRow($records)) {
             $data[] = $row;
@@ -456,13 +456,60 @@ class TasksTest extends PHPUnit_Framework_TestCase
 
     public function testOneTime()
     {
-        foreach (array('InitProductCreated', 'InitLastSold', 'InitProductAttributes') as $class) {
+        foreach (array('InitProductCreated', 'InitLastSold', 'InitProductAttributes', 'ConvertArchiveMonthlyToPartitions', 'CustdataToCustomerAccountsTask', 'AddIDsToOldTransactions') as $class) {
+            $task = new $class();
+            $task = $this->initTask($task);
+            //ob_start();
+            $task->run();
+            //ob_end_clean();
+        }
+    }
+
+    public function testOOS()
+    {
+        $task = new OutOfStocksTask();
+        $task = $this->initTask($task);
+        ob_start();
+        $task->run();
+        ob_end_clean();
+    }
+
+    public function testTrackCards()
+    {
+        foreach (array('TrackCardsTask', 'TrackCardsLiveTask') as $class) {
             $task = new $class();
             $task = $this->initTask($task);
             ob_start();
             $task->run();
             ob_end_clean();
         }
+    }
+
+    public function testPCAlert()
+    {
+        $task = new PaycardAlertTask();
+        $task = $this->initTask($task);
+        ob_start();
+        $task->run();
+        ob_end_clean();
+    }
+
+    public function testLift()
+    {
+        $task = new SalesLiftTask();
+        $task = $this->initTask($task);
+        ob_start();
+        $task->run();
+        ob_end_clean();
+    }
+
+    public function testEndSale()
+    {
+        $task = new EndSalesBatchAlertTask();
+        $task = $this->initTask($task);
+        ob_start();
+        $task->run();
+        ob_end_clean();
     }
 }
 

@@ -33,6 +33,7 @@ class ShrinkTool extends FannieRESTfulPage
     public $themed = true;
     public $description = '[Shrink Entry] adds items to shrink counts. Duplicates lane functionality to allow backend entry.';
     public $enable_linea = true;
+    private $quantity = 1;
 
     public function preprocess()
     {
@@ -99,7 +100,26 @@ class ShrinkTool extends FannieRESTfulPage
         $product = new ProductsModel($dbc);
         $product->upc($upc);
         $product->store_id($this->config->get('STORE_ID'));
+        $superP = $dbc->prepare("SELECT superID FROM MasterSuperDepts WHERE dept_ID=?");
         if (!$product->load()) {
+            if (substr($upc, 0, 3) == '002') {
+                $price = substr($upc, -4) / 100;
+                $upc = substr($upc, 0, 8) . '00000';
+                $product->upc($upc);
+                if ($product->load()) {
+                    $this->id = $upc;
+                    $this->description = $product->description();
+                    $this->cost = $product->cost();
+                    $this->price = $product->normal_price();
+                    $this->department = $product->department();
+                    $this->superID = $dbc->getValue($superP, array($this->department));
+                    $this->upc = $upc;
+                    if ($product->scale() && $product->normal_price() > 0 && $price > 0) {
+                        $this->quantity = sprintf('%.2f', $price / $product->normal_price());
+                    }
+                    return true; 
+                }
+            }
             $this->add_onload_command("showBootstrapAlert('#alert-area', 'danger', 'Item not found');\n");
             $this->__route_stem = 'get';
         } else {
@@ -107,10 +127,53 @@ class ShrinkTool extends FannieRESTfulPage
             $this->cost = $product->cost();
             $this->price = $product->normal_price();
             $this->department = $product->department();
+            $this->superID = $dbc->getValue($superP, array($this->department));
             $this->upc = $upc;
         }
 
         return true;
+    }
+
+    private function getLossContribute($dbc)
+    {
+        $deptP = $dbc->prepare("SELECT lossContribute FROM ShrinkDefaults WHERE deptID=?");
+        $dDefault = $dbc->getValue($deptP, array($this->department));
+        if ($dDefault && $dDefault == 'L') {
+            return array('', 'selected', '');
+        } elseif ($dDefault && $dDefault == 'C') {
+            return array('', '', 'selected');
+        } elseif ($dDefault) {
+            return array('selected', '', '');
+        }
+
+        $superP = $dbc->prepare("SELECT lossContribute FROM ShrinkDefaults WHERE superID=?");
+        $sDefault = $dbc->getValue($superP, array($this->superID));
+        if ($sDefault && $sDefault == 'L') {
+            return array('', 'selected', '');
+        } elseif ($sDefault && $sDefault == 'C') {
+            return array('', '', 'selected');
+        } elseif ($sDefault) {
+            return array('selected', '', '');
+        }
+
+        return array('', 'selected', '');
+    }
+
+    private function getDefaultReason($dbc)
+    {
+        $deptP = $dbc->prepare("SELECT shrinkReasonID FROM ShrinkDefaults WHERE deptID=?");
+        $dDefault = $dbc->getValue($deptP, array($this->department));
+        if ($dDefault) {
+            return $dDefault;
+        }
+
+        $superP = $dbc->prepare("SELECT shrinkReasonID FROM ShrinkDefaults WHERE superID=?");
+        $sDefault = $dbc->getValue($superP, array($this->superID));
+        if ($sDefault) {
+            return $sDefault;
+        }
+
+        return 0;
     }
 
     public function get_id_view()
@@ -120,13 +183,37 @@ class ShrinkTool extends FannieRESTfulPage
         $this->add_onload_command("\$('#qty-field').focus();\n");
 
         $reasons = new ShrinkReasonsModel($dbc);
+        $reasons->disabled(0);
+        $default = $this->getDefaultReason($dbc);
         $shrink_opts = '';
         foreach ($reasons->find('description') as $reason) {
-            $shrink_opts .= sprintf('<option value="%d">%s</option>',
+            $shrink_opts .= sprintf('<option %s value="%d">%s</option>',
+                ($default == $reason->shrinkReasonID() ? 'selected' : ''),
                 $reason->shrinkReasonID(), $reason->description());
         }
+        list($choose,$loss,$contrib) = $this->getLossContribute($dbc);
+        $this->addOnloadCommand("\$(document).keyup(keyToType);");
 
         $ret = <<<HTML
+<script type="text/javascript">
+function keyToType(e) {
+    console.log(e.which);
+    if (e.which == 32) {
+        if ($('#select-type').val() == 'Loss') {
+            $('#select-type').val('Contribute');
+        } else {
+            $('#select-type').val('Loss');
+        } 
+    } else if (e.which == 17) {
+        console.log(cur);
+        console.log(next);
+        if (next.length == 0) {
+            next = $('#select-reason option:first');
+        }
+        $('#select-reason').val(next.val());
+    }
+}
+</script>
 <form method="post">
     <div class="form-group">
         <label>UPC</label> {{upc}} {{description}}
@@ -141,22 +228,25 @@ class ShrinkTool extends FannieRESTfulPage
                 <div class="col-sm-9">
                     <div class="input-group">
                         <span class="input-group-addon">$</span>
-                        <input type="text" name="cost" class="form-control" value="{{cost}}" />
+                        <input type="number" name="cost" class="form-control" value="{{cost}}"
+                            min="0" max="9999" step="0.001" />
                     </div> 
                 </div> 
             </div> 
             <div class="row form-group">
                 <label class="col-sm-3 text-right">Quantity</label>
                 <div class="col-sm-9">
-                    <input type="text" name="qty" id="qty-field" class="form-control" required />
+                    <input type="number" name="qty" id="qty-field" class="form-control"
+                        value="{$this->quantity}" min="-9999" max="9999" step="0.01" required />
                 </div>
             </div>
             <div class="row form-group">
                 <label class="col-sm-3 text-right">Type</label>
                 <div class="col-sm-9">
-                    <select name="type" class="form-control">
-                        <option>Loss</option>
-                        <option>Contribute</option>
+                    <select name="type" required id="select-type" class="form-control">
+                        <option value="" {$choose}>Select one...</option>
+                        <option {$loss}>Loss</option>
+                        <option {$contrib}>Contribute</option>
                     </select>
                 </div> 
             </div> 
@@ -167,14 +257,15 @@ class ShrinkTool extends FannieRESTfulPage
                 <div class="col-sm-9">
                     <div class="input-group">
                         <span class="input-group-addon">$</span>
-                        <input type="text" name="price" class="form-control" value="{{price}}" />
+                        <input type="number" name="price" class="form-control" value="{{price}}"
+                            min="0" max="9999" step="0.01" />
                     </div> 
                 </div> 
             </div> 
             <div class="row form-group">
                 <label class="col-sm-3 text-right">Reason</label>
                 <div class="col-sm-9">
-                    <select name="reason" class="form-control">';
+                    <select name="reason" id="select-reason" class="form-control">';
                         {{shrink_opts}}
                     </select>
                 </div>

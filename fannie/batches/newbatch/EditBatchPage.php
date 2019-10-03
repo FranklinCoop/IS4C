@@ -81,10 +81,48 @@ class EditBatchPage extends FannieRESTfulPage
             'post<id><trim>',
             'post<id><storeID>',
             'post<noteID><batchNotes>',
-            'post<partialID>'
+            'post<partialID>',
+            'post<editBatch>',
+            'post<editDate>'
         );
 
         return parent::preprocess();
+    }
+
+    protected function post_editDate_handler()
+    {
+        $id = FormLib::get('id');
+        $start = FormLib::get('startDate');
+        $end = FormLib::get('endDate');
+        $action = FormLib::get('action');
+        $model = new BatchesModel($this->connection);
+        $model->batchID($id);
+        switch ($action) {
+            case 'start':
+                $model->startDate($start);
+                break;
+            case 'end':
+                $model->endDate($end);
+                break;
+        }
+        $model->save();
+        echo 'Saved';
+
+        return false;
+    }
+
+
+    protected function post_editBatch_handler()
+    {
+        $id = FormLib::get('id');
+        $name = FormLib::get('name');
+        $model = new BatchesModel($this->connection);
+        $model->batchID($id);
+        $model->batchName($name);
+        $model->save();
+        echo 'Saved';
+
+        return false;
     }
 
     protected function post_noteID_batchNotes_handler()
@@ -155,6 +193,9 @@ class EditBatchPage extends FannieRESTfulPage
         $batch = new BatchesModel($dbc);
         $batch->batchID($id);
         $batch->load();
+        if ($batch->discountType() <= 0) {
+            return false;
+        }
         $overlapP = $dbc->prepare('
             SELECT b.batchName,
                 b.startDate,
@@ -172,15 +213,20 @@ class EditBatchPage extends FannieRESTfulPage
         $args = array(
             $id,
             $upc,
-            date('Y-m-d', strtotime($batch->startDate())),
-            date('Y-m-d', strtotime($batch->endDate())),
         );
-        $overlapR = $dbc->execute($overlapP, $args);
-        if ($batch->discountType() > 0 && $dbc->numRows($overlapR) > 0) {
-            return $dbc->fetchRow($overlapR);
-        } else {
+        $stamp = strtotime($batch->startDate());
+        if ($stamp === false) {
             return false;
         }
+        $args[] = $stamp ? date('Y-m-d', $stamp) : '1900-01-01';
+        $stamp = strtotime($batch->endDate());
+        $args[] = $stamp ? date('Y-m-d', $stamp) : '1900-01-01';
+        $overlapR = $dbc->execute($overlapP, $args);
+        if ($dbc->numRows($overlapR) > 0) {
+            return $dbc->fetchRow($overlapR);
+        }
+
+        return false;
     }
 
     protected function post_id_addUPC_handler()
@@ -344,6 +390,9 @@ class EditBatchPage extends FannieRESTfulPage
         $selP = $dbc->prepare($selQ);
         $selR = $dbc->execute($selP, $args);
         $upc = "";
+        $insP = $dbc->prepare("INSERT INTO batchBarcodes
+            (upc,description,normal_price,brand,sku,size,units,vendor,batchID)
+            VALUES (?,?,?,?,?,?,?,?,?)");
         $tag_count = 0;
         $source = $this->config->get('TAG_DATA_SOURCE');
         if (empty($source) || !class_exists($source)) {
@@ -776,6 +825,7 @@ class EditBatchPage extends FannieRESTfulPage
             DELETE FROM batchList
             WHERE batchID=?
                 AND upc=?');
+        $dbc->startTransaction();
         $bu = new BatchUpdateModel($dbc);
         while ($w = $dbc->fetchRow($res)) {
             $dbc->execute($delP, array($this->id, $w['upc']));
@@ -784,6 +834,23 @@ class EditBatchPage extends FannieRESTfulPage
             $bu->upc($w['upc']);
             $bu->logUpdate($bu::UPDATE_REMOVED);
         }
+        $dbc->commitTransaction();
+
+        $query = "SELECT upc, salePrice FROM batchList WHERE batchID=? AND upc like 'LC%'";
+        $prep = $dbc->prepare($query);
+        $res = $dbc->execute($prep, array($this->id));
+        $priceP = $dbc->prepare("SELECT MIN(normal_price), MAX(normal_price)
+            FROM upcLike AS u INNER JOIN products AS p ON p.upc=u.upc
+            WHERE u.likeCode=?");
+        $dbc->startTransaction();
+        while ($row = $dbc->fetchRow($res)) {
+            $price = $row['salePrice'];
+            $minMax = $dbc->getRow($priceP, array(substr($row['upc'], 2)));
+            if (abs($price - $minMax[0]) < 0.005 && abs($price - $minMax[1]) < 0.005) {
+                $dbc->execute($delP, array($this->id, $row['upc']));
+            }
+        }
+        $dbc->commitTransaction();
 
         $ret['display'] = $this->showBatchDisplay($this->id);
         echo $this->debugJSON($ret);
@@ -833,7 +900,7 @@ class EditBatchPage extends FannieRESTfulPage
     <span class="add-by-lc-fields collapse">
         <label class="control-label">Like code</label>
         <input type=text id=addItemLC name="addLC" size=4 value=1 class="form-control" disabled />
-        <select id=lcselect onchange="\$('#addItemLC').val(this.value);" class="form-control" disabled>
+        <select id=lcselect onchange="\$('#addItemLC').val(this.value);" class="form-control chosen-select" disabled>
         {$lcOpts}
         </select>
     </span>
@@ -865,6 +932,10 @@ HTML;
         $dbc = $this->connection;
         $uid = getUID($this->current_user);
         $uid = ltrim($uid,'0');
+        $authorized = false;
+        if (FannieAuth::validateUserQuiet('admin')) {
+            $authorized = true;
+        }
 
         $orderby = '';
         switch($order) {
@@ -957,12 +1028,16 @@ HTML;
                 b.quantity,
                 b.pricemethod,
                 p.brand,
-                NULL AS locationName
+                NULL AS locationName,
+                r.maxPrice,
+                r.priceRuleID,
+                r.priceRuleTypeID
             FROM batchList AS b
                 " . DTrans::joinProducts('b') . "
                 LEFT JOIN likeCodes AS l ON b.upc = {$joinColumn}
                 LEFT JOIN batchCutPaste AS c ON b.upc=c.upc AND b.batchID=c.batchID
                 LEFT JOIN FloorSectionsListView as f on b.upc=f.upc and f.storeID=?
+                LEFT JOIN PriceRules AS r ON p.price_rule_id=r.priceRuleID
             WHERE b.batchID = ?
             $orderby";
         $fetchArgs[] = $store_location;
@@ -999,12 +1074,25 @@ HTML;
         $cpCount = $row[0];
         $limited = ($this->limited == 1) ? true : false ;
 
-        $ret = "<span class=\"newBatchBlack\"><b>Batch name</b>: $name</span> | ";
-        $ret .= '<b>Sale Dates</b>: '
+        $this->addOnloadCommand("$('.be-editable-date').datepicker();");
+        //$this->addOnloadCommand("$('#batchName').removeAttribute('tabIndex');");
+
+        $ret = "<span class=\"newBatchBlack\"><b>Batch name</b>: <input type=\"text\" class=\"be-editable form-control wide\"
+            value=\"$name\" name=\"batchName\" id=\"batchName\" onchange=\"batchEdit.renameBatch('$name'); return false;\" /></span> | ";
+
+        $startYMD = date('Y-m-d', strtotime($model->startDate()));
+        $endYMD = date('Y-m-d', strtotime($model->endDate()));
+        $ret .= "<input type=\"hidden\" id=\"batchStartDate\" value=\"$startYMD\"/>";
+        $ret .= "<input type=\"hidden\" id=\"batchEndDate\" value=\"$endYMD\"/>";
+        $ret .= '<b>Sale Dates</b>: <input type="text" class="be-editable be-editable-date form-control"
+            onchange="batchEdit.editBatchDate(\''.$startYMD.'\', \'start\'); return false;"
+            name="startDate" id="startDate" value="'
             . date('Y-m-d', strtotime($model->startDate()))
-            . ' - '
+            . '"/> - <input type="text" class="be-editable be-editable-date form-control"
+            onchange="batchEdit.editBatchDate(\''.$endYMD.'\', \'end\'); return false;"
+            name="startDate" id="endDate" value="'
             . date('Y-m-d', strtotime($model->endDate()))
-            . ' | ' . '<a href="batchReport.php?batchID=' . $id . '">Report</a><br />';
+            . '"/> | ' . '<a href="batchReport.php?batchID=' . $id . '">Report</a><br />';
         if ($this->config->get('STORE_MODE') === 'HQ') {
             $stores = new StoresModel($dbc);
             $stores->hasOwnItems(1);
@@ -1049,6 +1137,8 @@ HTML;
         if ($cpCount > 0) {
             $ret .= "<a href=\"EditBatchPage.php?id=$id&paste=1\">Paste Items ($cpCount)</a> | ";
         }
+
+        if ($dtype == 0 || (time() >= $start && time() <= $end)) {
         if (($dtype == 0 || (time() >= $start && time() <= $end)) && !$limited) {
             $ret .= "<a href=\"\" class=\"{$noprices}\" onclick=\"batchEdit.forceNow($id); return false;\">Force batch</a> | ";
         }
@@ -1069,6 +1159,10 @@ HTML;
         }
         $ret .= " | <a data-toggle='modal' data-target='#myModal'>Batch History</a>";
         $ret .= '</span>';
+        if ($authorized === true && $type == 4) {
+            $ret .= " | <a href='' onclick='batchEdit.logBatch($id); return false;'>
+                <span class='btn-info'>Admin</span>: Stage Price Change</a>";
+        }
 
         /**
           Insert extra fields to manage partial day batch
@@ -1134,6 +1228,9 @@ HTML;
 
         $colors = array('#ffffff','#ffffcc');
         $cur = 0;
+        $upcFields = '';
+        $upcs = '';
+        $allLCs = true;
         while ($fetchW = $dbc->fetchRow($fetchR)) {
             $cur = ($cur + 1) % 2;
             $ret .= "<tr>";
@@ -1144,8 +1241,11 @@ HTML;
                 $ret .= " <a href=\"\" onclick=\"\$('.lc-item-{$likecode}').toggle(); return false;\">[+]</a>";
                 $ret .= "</td>";
             } else {
+                $allLCs = false;
+                $upcFields .= sprintf('<input type="hidden" name="u[]" value="%s" />', $fetchW['upc']);
+                $upcs .= $fetchW['upc'] . "\n";
                 $conflict = '';
-                if ($dtype != 0) {
+                if ($dtype > 0) {
                     $overlapR = $dbc->execute($overlapP, array_merge(array($fetchW['upc'], $id), $overlap_args));
                     if ($overlapR && $dbc->numRows($overlapR)) {
                         $overlap = $dbc->fetchRow($overlapR);
@@ -1157,15 +1257,24 @@ HTML;
                                                 $overlap['batchName']);
                     }
                 }
+                if ($fetchW['priceRuleID'] != NULL && $fetchW['maxPrice'] > 0) {
+                    $mp = $fetchW['maxPrice'];
+                    $sp = $fetchW['salePrice'];
+                    if ($sp < $mp && $fetchW['priceRuleTypeID'] == 10) {
+                        $conflict .= '<a href="#" class="btn btn-warning btn-xs"
+                            title="Sale price falls below MAP restriction. Minimum Price: $'.$mp.'">
+                            <span class="glyphicon glyphicon-exclamation-sign"></span></span>';
+                    }
+                }
                 $ret .= "<td bgcolor=$colors[$cur]><a href=\"{$FANNIE_URL}item/ItemEditorPage.php?searchupc={$fetchW['upc']}\"
                     target=\"_new{$fetchW['upc']}\">{$fetchW['upc']}</a>{$conflict}</td>";
             }
             $ret .= "<td bgcolor=$colors[$cur]>{$fetchW['brand']}</td>";
             $ret .= "<td bgcolor=$colors[$cur]>{$fetchW['description']}</td>";
-            $ret .= "<td bgcolor=$colors[$cur]>{$fetchW['normal_price']}</td>";
+            $ret .= "<td bgcolor=$colors[$cur] class=\"price\">{$fetchW['normal_price']}</td>";
             $qtystr = ($fetchW['pricemethod']>0 && is_numeric($fetchW['quantity']) && $fetchW['quantity'] > 0) ? $fetchW['quantity'] . " for " : "";
             $qty = is_numeric($fetchW['quantity']) && $fetchW['quantity'] > 0 ? $fetchW['quantity'] : 1;
-            $ret .= "<td bgcolor=$colors[$cur] class=\"{$noprices}\">";
+            $ret .= "<td bgcolor=$colors[$cur] class=\"{$noprices} saleprice\">";
             $ret .= '<span id="editable-text-' . $fetchW['upc'] . '">';
             $ret .= '<span class="editable-' . $fetchW['upc'] . ($qty == 1 ? ' collapse ' : '') . '"'
                     . ' id="item-qty-' . $fetchW['upc'] . '" data-name="qty">'
@@ -1228,7 +1337,18 @@ HTML;
         if ($dbc->numRows($fetchR) > 0) {
             $ret .= '<p>
                 <a href="BatchImportExportPage.php?id=' . $id . '">Export as JSON</a>
+                | <a href="" onclick="$(\'#previousPromos\').submit(); return false;">Previous Promos</a>
+                | <a href="" onclick="$(\'#searchForm\').submit(); return false;">Search These</a>
+                <form method="post" id="previousPromos" action="../../reports/from-search/PreviousPromos/PreviousPromosReport.php">
+                ' . $upcFields . '</form>
+                <form method="post" id="searchForm" action="../../item/AdvancedItemSearch.php">
+                <input type="hidden" name="extern" value="1" />
+                <input type="hidden" name="upcs" value="' . $upcs . '" />
                 </p>';
+        }
+
+        if ($allLCs && $model->discountType() == 0) {
+            $ret = str_replace('SignFromSearch.php?batch', 'LikeCodeBatchSigns.php?id', $ret);
         }
 
         return $ret;
@@ -1276,7 +1396,7 @@ HTML;
         return $ret;
     }
 
-    private function pairedTableBody($dbc, $result)
+    private function pairedTableBody($dbc, $result, $down=true)
     {
         $colors = array('#ffffff','#ffffcc');
         $cur = 0;
@@ -1295,10 +1415,12 @@ HTML;
                 $ret .= "<td bgcolor=$colors[$cur]><a href={$FANNIE_URL}item/ItemEditorPage.php?searchupc=$fetchW[0] target=_new$fetchW[0]>$fetchW[0]</a></td>";
             }
             $ret .= "<td bgcolor=$colors[$cur]>$fetchW[1]</td>";
+            $showDown = $down ? '' : 'collapse';
+            $showUp = $down ? 'collapse' : '';
             $ret .= "<td bgcolor=$colors[$cur]>
-                <a href=\"\" class=\"down-arrow\" onclick=\"batchEdit.swapQualifierToDiscount(this, '$fetchW[0]'); return false;\">
+                <a href=\"\" class=\"down-arrow {$showDown}\" onclick=\"batchEdit.swapQualifierToDiscount(this, '$fetchW[0]'); return false;\">
                     <img src=\"{$FANNIE_URL}src/img/buttons/arrow_down.gif\" alt=\"Make Discount Item\" /></a>
-                <a href=\"\" class=\"up-arrow collapse\" onclick=\"batchEdit.swapDiscountToQualifier(this, '$fetchW[0]'); return false;\">
+                <a href=\"\" class=\"up-arrow {$showUp}\" onclick=\"batchEdit.swapDiscountToQualifier(this, '$fetchW[0]'); return false;\">
                     <img src=\"{$FANNIE_URL}src/img/buttons/arrow_up.gif\" alt=\"Make Qualifying Item\" />
                     </a>
                 </td>";
@@ -1324,7 +1446,8 @@ HTML;
 
         $ret = "";
         $ret .= sprintf('<input type="hidden" id="currentBatchID" value="%d" />',$id);
-        $ret .= "<b>Batch name</b>: $name<br />";
+        $ret .= "<b>Batch name</b>: <input type=\"text\" class=\"editable\" value=\"$name\"
+            name=\"batchName\" /><br />";
         $ret .= "<a href=\"BatchListPage.php\">Back to batch list</a> | ";
         $ret .= "<a href=\"\" onclick=\"batchEdit.forceNow($id); return false;\">Force batch</a>";
         $ret .= " | No limit";
@@ -1408,7 +1531,7 @@ HTML;
 
         $ret .= '<table class="table" id="discount-table">';
         $ret .= '<tr><th colspan="4">Discount Item(s)</th></tr>';
-        $ret .= $this->pairedTableBody($dbc, $fetchR);
+        $ret .= $this->pairedTableBody($dbc, $fetchR, false);
         $ret .= "</table>";
 
         return $ret;
@@ -1471,10 +1594,32 @@ HTML;
 
     public function get_id_view()
     {
-        $this->addScript('edit.js?20160105');
+        $this->addScript($this->config->get('URL') . 'src/javascript/chosen/chosen.jquery.min.js');
+        $this->addCssFile($this->config->get('URL') . 'src/javascript/chosen/bootstrap-chosen.css');
+        $this->addScript('edit.js?20180523');
         $this->addCssFile('index.css');
         $this->addOnloadCommand('$(\'#addItemUPC\').focus()');
         $this->addOnloadCommand("enableLinea('#addItemUPC');\n");
+        $cmd = <<<JAVASCRIPT
+function resizeInput()
+{
+    $('.be-editable').each(function(){
+        var elm = $(this);
+        var newWidth = (parseInt(elm.val().length, 10) + 1) * 10;
+        newWidth = newWidth.toString() + "px";
+        elm.css('width', newWidth);
+    });
+    $('.be-editable').on('keyup', function(){
+        var elm = $(this);
+        var newWidth = (parseInt(elm.val().length, 10) + 1) * 10;
+        newWidth = newWidth.toString() + "px";
+        elm.css('width', newWidth);
+    });
+
+}
+resizeInput();
+JAVASCRIPT;
+        $this->addOnloadCommand($cmd);
 
         $url = $this->config->get('URL');
         $sort = FormLib::get('sort', 'natural');

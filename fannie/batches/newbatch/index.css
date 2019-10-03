@@ -36,3 +36,9 @@ img {
 #batchesTable tbody tr:nth-child(odd) {
     background-color: #ffffcc;
 }
+.be-editable {
+    display: inline-block;
+}
+.be-editable-date {
+    width: 100px;
+}

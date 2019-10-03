@@ -89,7 +89,7 @@ class CpwPriceTask extends FannieTask
         $filename = $this->download($url);
 
         $dbc = FannieDB::get($this->config->get('OP_DB'));
-        $idP = $dbc->prepare('SELECT vendorID FROM vendors WHERE vendorName=\'CPW\'');
+        $idP = $dbc->prepare('SELECT vendorID FROM vendors WHERE vendorName=\'CPW (Produce)\'');
         $vendorID = $dbc->getValue($idP);
 
         $resetP = $dbc->prepare('UPDATE vendorItems SET vendorDept=0 WHERE vendorID=? AND (vendorDept < 5 OR vendorDept=999999)');
@@ -126,8 +126,8 @@ class CpwPriceTask extends FannieTask
             $item = $this->priceItem($item, $data);
 
             $dept = trim($data[16]);
-            if ($dept < 5) {
-                $dept = 999999;
+            if ($dept != 2 && $dept != 3 && $dept != 4) {
+                continue;
             }
             $brand = trim($data[1]);
             if (!empty(trim($data[2]))) {
@@ -154,6 +154,8 @@ class CpwPriceTask extends FannieTask
             }
         }
         $dbc->commitTransaction();
+        $clearP = $dbc->prepare('DELETE FROM vendorItems WHERE vendorID=? AND modified < ?');
+        $dbc->execute($clearP, array($vendorID, date('Y-m-d')));
         fclose($file);
 
         if ($mode && count($upcs)) {

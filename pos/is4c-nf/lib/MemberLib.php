@@ -92,6 +92,7 @@ class MemberLib
                 self::setMember($row["CardNo"], $row["personNum"]);
                 $ret['redraw_footer'] = true;
                 $ret['output'] = DisplayLib::lastpage();
+                $ret['scale'] = ''; // redraw sidebar
 
                 if ($memberNumber != \CoreLocal::get('defaultNonMem')) {
                     $ret['udpmsg'] = 'goodBeep';
@@ -380,8 +381,10 @@ class MemberLib
           on member_subtotal setting.
         */
         if (\CoreLocal::get('member_subtotal') !== 0 && \CoreLocal::get('member_subtotal') !== '0') {
-            PrehLib::ttl();
+            return PrehLib::ttl();
         } 
+
+        return true;
     }
 
     /**

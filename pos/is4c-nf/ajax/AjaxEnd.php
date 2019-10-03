@@ -30,6 +30,7 @@ use COREPOS\pos\lib\AjaxCallback;
 use COREPOS\pos\lib\CoreState;
 use COREPOS\pos\lib\ReceiptLib;
 use COREPOS\pos\lib\UdpComm;
+use COREPOS\pos\lib\DriverWrappers\ScaleDriverWrapper;
 
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
@@ -67,9 +68,14 @@ class AjaxEnd extends AjaxCallback
 
         if ($transFinished) {
             UdpComm::udpSend("termReset");
+            $sdObj = ScaleDriverWrapper::factory($this->session->get('scaleDriver'));
+            if (is_object($sdObj)) {
+                $sdObj->readReset();
+            }
             $this->session->set('ccTermState','swipe');
             $this->uploadAndReset();
             $this->session->set("End",0);
+            Database::flushJobs();
         }
 
         // close session so if printer hangs

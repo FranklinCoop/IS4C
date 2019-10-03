@@ -404,6 +404,9 @@ class SQLManager
     */
     public function query($query_text,$which_connection='',$params=false)
     {
+        if (php_sapi_name() != 'cli' && memory_get_usage() > 67108864) {
+            $this->logger("High memory on query: " . print_r($query_text, true));
+        }
         $con = $this->getNamedConnection($which_connection);
 
         $result = (!is_object($con)) ? false : $con->Execute($query_text,$params);
@@ -1726,8 +1729,8 @@ class SQLManager
     */  
     public function logger($str)
     {
-        if (is_object($this->QUERY_LOG) && method_exists($this->QUERY_LOG, 'debug')) {
-            $this->QUERY_LOG->debug($str);
+        if (is_object($this->QUERY_LOG) && method_exists($this->QUERY_LOG, 'warning')) {
+            $this->QUERY_LOG->warning($str);
 
             return true;
         }
@@ -1858,6 +1861,7 @@ class SQLManager
         'pdo_mysql' => 'COREPOS\common\sql\MysqlAdapter',
         'pdo'       => 'COREPOS\common\sql\MysqlAdapter',
         'mssql'     => 'COREPOS\common\sql\MssqlAdapter',
+        'mssqlnative' => 'COREPOS\common\sql\MssqlAdapter',
         'pgsql'     => 'COREPOS\common\sql\PgsqlAdapter',
         'postgres9' => 'COREPOS\common\sql\PgsqlAdapter',
         'pdo_pgsql'     => 'COREPOS\common\sql\PgsqlAdapter',
@@ -1872,6 +1876,7 @@ class SQLManager
         if (isset($this->adapter_map[$type])) {
             $class = $this->adapter_map[$type];
             $this->adapters[$type] = new $class();
+            return $this->adapters[$type];
         }
 
         return $this->getAdapter('mysqli');

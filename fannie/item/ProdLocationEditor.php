@@ -30,6 +30,7 @@ class ProdLocationEditor extends FannieRESTfulPage
 {
     protected $header = 'Product Location Update';
     protected $title = 'Product Location Update';
+    protected $sortable = true;
 
     public $description = '[Product Location Update] find and update products missing
         floor section locations.';
@@ -61,13 +62,13 @@ class ProdLocationEditor extends FannieRESTfulPage
         $newLocation = FormLib::get('newLocation');
 
         $args = array($upc, $newLocation);
-        $prep = $dbc->prepare('
-            INSERT INTO FloorSectionProductMap (upc, floorSectionID)
-                values (?, ?)
-        ');
-        $dbc->execute($prep, $args);
-        if (mysql_errno() > 0) {
-            echo mysql_errno() . ": " . mysql_error(). "<br>";
+        $chkP = $dbc->prepare("SELECT 1 FROM FloorSectionProductMap WHERE upc=? AND floorSectionID=?");
+        if (!$dbc->getValue($chkP, $args)) {
+            $prep = $dbc->prepare('
+                INSERT INTO FloorSectionProductMap (upc, floorSectionID)
+                    values (?, ?)
+            ');
+            $dbc->execute($prep, $args);
         }
 
         $ret = '';
@@ -80,7 +81,7 @@ class ProdLocationEditor extends FannieRESTfulPage
         $ret .= '<a class="btn btn-default" href="ProdLocationEditor.php?searchupc=Update+Locations+by+UPC">Back</a>&nbsp;&nbsp;';
         $ret .= '<a class="btn btn-default" href="ProdLocationEditor.php">Home</a><br><br>';
         if (FormLib::get('batchCheck', false)) {
-            $ret .= '<br><a class="btn btn-default" href="../../../scancoord/ScannieV2/content/Scanning/BatchCheck/SCS.php?upc='.$upc.'">
+            $ret .= '<br><a class="btn btn-default" href="../../../scancoord/ScannieV2/content/Scanning/BatchCheck/SCS.php">
                 Back to Batch Check</a><br><br>';
         } else {
             $ret .= '<br><a class="btn btn-default" href="ProdLocationEditor.php">Back</a><br><br>';
@@ -110,16 +111,24 @@ class ProdLocationEditor extends FannieRESTfulPage
             $newSection[] = FormLib::get($curName);
         }
         foreach ($secID as $mapID => $sectionID) {
-            $args = array($sectionID, $upc, $mapID);
-            $prep = $dbc->prepare('
-                UPDATE FloorSectionProductMap
-                SET floorSectionID = ?
-                WHERE upc = ?
-                    AND floorSectionProductMapID = ?;
-            ');
-            $dbc->execute($prep, $args);
-            if (mysql_errno() > 0) {
-                echo mysql_errno() . ": " . mysql_error(). "<br>";
+            if ($sectionID != 999) {
+                $args = array($sectionID, $upc, $mapID);
+                $prep = $dbc->prepare('
+                    UPDATE FloorSectionProductMap
+                    SET floorSectionID = ?
+                    WHERE upc = ?
+                        AND floorSectionProductMapID = ?;
+                ');
+                $dbc->execute($prep, $args);
+            } else {
+                $args = array($upc, $mapID);
+                $prep = $dbc->prepare('
+                    DELETE FROM FloorSectionProductMap
+                    WHERE upc = ?
+                        AND floorSectionProductMapID = ?;
+                ');
+                $dbc->execute($prep, $args);
+
             }
         }
 
@@ -132,7 +141,7 @@ class ProdLocationEditor extends FannieRESTfulPage
         }
         $ret .= '<a class="btn btn-default" href="ProdLocationEditor.php?searchupc=Update+Locations+by+UPC">Back</a>&nbsp;&nbsp;';
         if (FormLib::get('batchCheck', false)) {
-            $ret .= '<br><a class="btn btn-default" href="../../../scancoord/ScannieV2/content/Scanning/BatchCheck/SCS.php?upc='.$upc.'">
+            $ret .= '<br><a class="btn btn-default" href="../../../scancoord/ScannieV2/content/Scanning/BatchCheck/SCS.php">
                 Back to Batch Check</a><br><br>';
         } else {
             $ret .= '<br><a class="btn btn-default" href="ProdLocationEditor.php">Back</a><br><br>';
@@ -161,18 +170,17 @@ class ProdLocationEditor extends FannieRESTfulPage
             if ($section > 0) $item[$upc] = $section;
         }
 
+        $chkP = $dbc->prepare("SELECT 1 FROM FloorSectionProductMap WHERE upc=? AND floorSectionID=?");
         $prep = $dbc->prepare('
             INSERT INTO FloorSectionProductMap (upc, floorSectionID) values (?, ?);
         ');
         foreach ($item as $upc => $section) {
             $args = array($upc, $section );
-            $dbc->execute($prep, $args);
+            if (!$dbc->getValue($chkP, $args)) {
+                $dbc->execute($prep, $args);
+            }
         }
-        if (mysql_errno() > 0) {
-            echo mysql_errno() . ": " . mysql_error(). "<br>";
-        } else {
-            $ret .= '<div class="alert alert-success">Update Successful</div>';
-        }
+        $ret .= '<div class="alert alert-success">Update Successful</div>';
 
         $cache = new FloorSectionsListTableModel($dbc);
         $cache->refresh();
@@ -213,16 +221,15 @@ class ProdLocationEditor extends FannieRESTfulPage
             $dbc->execute($prepZ,$args);
 
             $args = array($upc,$section);
-            $prep = $dbc->prepare('
-                INSERT INTO FloorSectionProductMap (upc, floorSectionID) values (?, ?);
-            ');
-            $dbc->execute($prep, $args);
+            $chkP = $dbc->prepare("SELECT 1 FROM FloorSectionProductMap WHERE upc=? AND floorSectionID=?");
+            if (!$dbc->getValue($chkP, $args)) {
+                $prep = $dbc->prepare('
+                    INSERT INTO FloorSectionProductMap (upc, floorSectionID) values (?, ?);
+                ');
+                $dbc->execute($prep, $args);
+            }
         }
-        if (mysql_errno() > 0) {
-            echo mysql_errno() . ": " . mysql_error(). "<br>";
-        } else {
-            $ret .= '<div class="alert alert-success">Update Successful</div>';
-        }
+        $ret .= '<div class="alert alert-success">Update Successful</div>';
 
         $ret .= '<br><br><a class="btn btn-default" href="javascript:history.back()">Back</a><br><br>';
         $ret .= '<a class="btn btn-default" href="ProdLocationEditor.php">Return</a><br><br>';
@@ -245,7 +252,6 @@ class ProdLocationEditor extends FannieRESTfulPage
     {
         global $FANNIE_OP_DB;
         $dbc = FannieDB::get($FANNIE_OP_DB);
-        $store_location = COREPOS\Fannie\API\lib\Store::getIdByIp();
 
         $start = FormLib::get('start');
         $end = FormLib::get('end');
@@ -268,20 +274,13 @@ class ProdLocationEditor extends FannieRESTfulPage
                     p.brand,
                     d.dept_name
                 from products as p
-                    left join FloorSectionProductMap as pp on pp.upc=p.upc
                     left join batchList as bl on bl.upc=p.upc
                     left join batches as b on b.batchID=bl.batchID
                     left join productUser as pu on pu.upc=p.upc
                     left join departments as d on d.dept_no=p.department
                 where ' . $where . '
                     and p.store_id= ?
-                    and (pp.floorSectionID is NULL OR pp.floorSectionID=0)
-                    AND department NOT BETWEEN 508 AND 998
-                    AND department NOT BETWEEN 250 AND 259
-                    AND department NOT BETWEEN 225 AND 234
-                    AND department NOT BETWEEN 61 AND 78
-                    AND department != 46
-                    AND department != 150
+                    AND department < 700
                     AND department != 208
                     AND department != 235
                     AND department != 240
@@ -290,22 +289,27 @@ class ProdLocationEditor extends FannieRESTfulPage
             ');
             $result = $dbc->execute($query, $args);
             $item = array();
-            while($row = $dbc->fetch_row($result)) {
+            $fsChk = $dbc->prepare('SELECT m.floorSectionID
+                FROM FloorSectionProductMap AS m
+                    INNER JOIN FloorSections AS f ON m.floorSectionID=f.floorSectionID
+                WHERE m.upc=?
+                    AND f.storeID=?
+                ORDER BY m.floorSectionID DESC');
+            while($row = $dbc->fetchRow($result)) {
+                $curFS = $dbc->getValue($fsChk, array($row['upc'], $store_id));
+                if ($curFS) continue;
                 $item[$row['upc']]['upc'] = $row['upc'];
                 $item[$row['upc']]['dept'] = $row['department'];
                 $item[$row['upc']]['desc'] = $row['pdesc'];
                 $item[$row['upc']]['brand'] = $row['brand'];
                 $item[$row['upc']]['dept_name'] = $row['dept_name'];
             }
-            if (mysql_errno() > 0) {
-                echo mysql_errno() . ": " . mysql_error(). "<br>";
-            }
 
             foreach ($item as $upc => $row) {
                 $item[$upc]['sugDept'] = $this->getLocation($item[$upc]['dept'],$dbc);
             }
 
-            $args = array($store_location);
+            $args = array($store_id);
             $query = $dbc->prepare('SELECT
                     floorSectionID,
                     name
@@ -316,9 +320,6 @@ class ProdLocationEditor extends FannieRESTfulPage
             $floor_section = array();
             while($row = $dbc->fetch_row($result)) {
                 $floor_section[$row['floorSectionID']] = $row['name'];
-            }
-            if (mysql_errno() > 0) {
-                echo mysql_errno() . ": " . mysql_error(). "<br>";
             }
 
             $ret = "";
@@ -362,8 +363,15 @@ class ProdLocationEditor extends FannieRESTfulPage
             }
 
         $ret .= '<tr><td><input type="submit" class="btn btn-default" value="Update Locations"></td>
-            <td><a class="btn btn-default" href="ProdLocationEditor.php">Back</a><br><br></td></table>
+            <td><br><br></td></table>
             </form>';
+
+        if (FormLib::get('batchCheck', false)) {
+            $ret .= '<br><a class="btn btn-default" href="../../../scancoord/ScannieV2/content/Scanning/BatchCheck/SCS.php">
+                Back to Batch Check</a><br><br>';
+        } else {
+            $ret .= '<br><a class="btn btn-default" href="ProdLocationEditor.php">Back</a><br><br>';
+        }
 
 
         return $ret;
@@ -436,8 +444,7 @@ class ProdLocationEditor extends FannieRESTfulPage
             p.department,
             pu.description as pudesc,
             p.brand,
-            d.dept_name,
-            fslv.sections
+            d.dept_name
             from products as p
                 left join productUser as pu on pu.upc=p.upc
                 left join departments as d on d.dept_no=p.department
@@ -460,7 +467,7 @@ class ProdLocationEditor extends FannieRESTfulPage
                 $item[$row['upc']]['desc'] = $row['pdesc'];
                 $item[$row['upc']]['brand'] = $row['brand'];
                 $item[$row['upc']]['dept_name'] = $row['dept_name'];
-                $item[$row['upc']]['curSections'] = $row['sections'];
+                $item[$row['upc']]['curSections'] = isset($row['sections']) ? $row['sections'] : '';
             }
             if ($dbc->error()) {
                 echo '<div class="alert alert-danger">' . $dbc->error() . '</div>';
@@ -488,7 +495,7 @@ class ProdLocationEditor extends FannieRESTfulPage
         }
 
 
-        $ret .= '<table class="table">
+        $ret .= '<table class="table mySortableTable tablesorter tablesorter-bootstrap">
             <thead>
                 <th>UPC</th>
                 <th>Brand</th>
@@ -541,7 +548,7 @@ class ProdLocationEditor extends FannieRESTfulPage
         $ret .= '<tr><td><input type="submit" class="btn btn-default" value="Update Locations"></td>
             <td><a class="btn btn-default" href="ProdLocationEditor.php">Back</a><br><br></td></table>
             </form>';
-
+        $this->addOnloadCommand("$('.mySortableTable').tablesorter();");
 
         return $ret;
 
@@ -549,6 +556,7 @@ class ProdLocationEditor extends FannieRESTfulPage
 
     function get_batch_view()
     {
+        $stores = FormLib::storePicker('store_id', false);
         $ret = '
             <form method="get"class="form-inline">
 
@@ -560,8 +568,10 @@ class ProdLocationEditor extends FannieRESTfulPage
                 <span class="input-group-addon">to Batch#</span>
                 <input type="text" class="form-control inline" name="end" required><br>
             </div><br><br>
-
-                <input type="hidden" name="store_id" value="1" required>
+            <div class="input-group" style="width:200px;">
+                <span class="input-group-addon">Store</span>
+                ' . $stores['html'] . '
+            </div><br /><br />
 
                 <input type="submit" class="btn btn-default" value="Find item locations">
 
@@ -595,16 +605,13 @@ class ProdLocationEditor extends FannieRESTfulPage
             while($row = $dbc->fetch_row($result)) {
                 $floor_section[$row['floorSectionID']] = $row['name'];
             }
-            if (mysql_errno() > 0) {
-                echo mysql_errno() . ": " . mysql_error(). "<br>";
-            }
             $floor_section['none'] = 'none';
 
         $ret = '';
         $ret .= '<div class=""><div class="row"><div class="col-md-5">';
         $ret .= '
 
-            <form method="get">
+            <form method="get" class="form-inline">
                 <input type="hidden" name="store_id" class="form-control">
                 <br><br>
                 <div class="input-group">
@@ -612,11 +619,11 @@ class ProdLocationEditor extends FannieRESTfulPage
                     <input type="text" class="form-control" id="upc" name="upc" value="'.$upc.'" autofocus required>
                     <input type="hidden" name="batchCheck" value="'.$batchCheck.'">
                 </div>
-                    <input type="hidden" class="btn btn-default" name="searchupc" value="Update Locations by UPC">
-                    <div class="spacer"></div>
                     <button type="submit" class="btn btn-default" value="Go" style="width: 50">
                         <span class="glyphicon glyphicon-chevron-right"></span>
                     </button>
+                    <input type="hidden" class="btn btn-default" name="searchupc" value="Update Locations by UPC">
+                    <div class="spacer"></div>
             </form><br>
         ';
 
@@ -652,6 +659,8 @@ class ProdLocationEditor extends FannieRESTfulPage
                 $brand = $model->brand();
                 $description = $model->description();
                 $sugLocation = $this->getLocation($model->department(),$dbc);
+                $department = $model->department();
+                $dept_name = '';
             } else {
                 while ($row = $dbc->fetch_row($result)) {
                     $floorID = $row['floorSectionID'];
@@ -703,24 +712,25 @@ class ProdLocationEditor extends FannieRESTfulPage
                 foreach ($curLocation as $value) {
                     $count++;
                     $name = 'section' . $primaryKey[$count-1];
-                    //$name = 'mapid' . $primaryKey;
                     $oldName = 'mapID' . ($primaryKey[$count-1]);
                     $ret .= '<input type="hidden" name="' . $oldName . '" value="' . $value . '">';
                     $ret .= '
                         <div class="input-group">
                             <span class="input-group-addon">Loc#' . $count . '</span>
                             <select name="' . $name . '" class="form-control">';
+                        $i=0;
                         foreach ($floor_section as $fs_key => $fs_value) {
-
                             //echo $fs_key . ' :: ' . $fs_value . '<br>'; --keys and values are correct.
-
+                            $ret .= ($i==0) ? '<option value="999">Remove this location</option>' : "";
+                            $i++;
                             $ret .= '<option value="' . $fs_key . '" name="' . $fs_key . '"';
                             if ($value == $fs_key) {
                                 $ret .= ' selected';
                             }
                             $ret .= '>' . $fs_value . '</option>';
                         }
-                        $ret .= '</select></div><br>';
+                        $ret .= '</select></div>
+                            <br>';
 
                         if ($count == 0) $ret .= '<span class="alert-warning">There is currently no location set for this product.</span>';
 
@@ -736,7 +746,7 @@ class ProdLocationEditor extends FannieRESTfulPage
 
         $ret .= '</div></div></div>'; //<column B><row><container>
         if (FormLib::get('batchCheck', false)) {
-            $ret .= '<br><a class="btn btn-default" href="../../../scancoord/ScannieV2/content/Scanning/BatchCheck/SCS.php?upc='.$upc.'">
+            $ret .= '<br><a class="btn btn-default" href="../../../Scannie/content/Scanning/BatchCheck/SCS.php">
                 Back to Batch Check</a><br><br>';
         } else {
             $ret .= '<br><a class="btn btn-default" href="ProdLocationEditor.php">Back</a><br><br>';

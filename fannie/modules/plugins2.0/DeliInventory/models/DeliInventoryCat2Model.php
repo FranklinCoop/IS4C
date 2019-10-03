@@ -40,7 +40,11 @@ class DeliInventoryCat2Model extends BasicModel {
     'price' => array('type'=>'MONEY'),
     'total' => array('type'=>'MONEY'),
     'size' => array('type'=>'VARCHAR(20)'),
-    'category' => array('type'=>'VARCHAR(50)', 'index'=>True)
+    'category' => array('type'=>'VARCHAR(50)', 'index'=>True),
+    'upc' => array('type'=>'VARCHAR(13)'),
+    'vendorID' => array('type'=>'INT'),
+    'storeID' => array('type'=>'INT'),
+    'categoryID' => array('type'=>'INT'),
     );
 }
 

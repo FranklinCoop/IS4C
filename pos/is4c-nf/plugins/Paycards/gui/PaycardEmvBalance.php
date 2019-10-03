@@ -42,10 +42,10 @@ class PaycardEmvBalance extends PaycardProcessPage
                 $this->conf->reset();
                 $this->change_page($this->page_url."gui-modules/pos2.php");
                 return false;
-            } elseif ($input == "" || $input == 'MANUAL') {
+            } elseif ($input == "" || $input == 'MANUAL' || $input === 'M') {
                 $this->action = "onsubmit=\"return false;\"";    
                 $this->addOnloadCommand("emvSubmit();");
-                if ($input == 'MANUAL') {
+                if ($input == 'MANUAL' || $input == 'M') {
                     $this->prompt = true;
                 }
                 $this->runTransaction = true;
@@ -65,7 +65,7 @@ class PaycardEmvBalance extends PaycardProcessPage
         if (!$this->runTransaction) {
             return '';
         }
-        $e2e = new MercuryDC();
+        $e2e = new MercuryDC($this->conf->get('PaycardsDatacapName'));
         ?>
 <script type="text/javascript" src="../js/emv.js?date=20180308"></script>
 <script type="text/javascript">
@@ -77,6 +77,9 @@ function emvSubmit() {
         location = '<?php echo MiscLib::baseURL(); ?>gui-modules/boxMsg2.php';
         return false;
     }
+    <?php if ($this->conf->Get('training') == 1) { ?>
+    emv.setURL('../ajax/AjaxPaycardTest.php');
+    <?php } ?>
     emv.submit(xmlData);
 }
 </script>

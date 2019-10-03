@@ -22,6 +22,7 @@
 *********************************************************************************/
 
 namespace COREPOS\pos\plugins\Paycards\sql;
+use COREPOS\pos\lib\Database;
 use \Exception;
 
 class PaycardVoidRequest extends PaycardRequest
@@ -38,24 +39,25 @@ class PaycardVoidRequest extends PaycardRequest
         /**
           populate a void record in PaycardTransactions
         */
-        $initQ = "INSERT INTO PaycardTransactions (
+        $orig = $this->findOriginal();
+        $initQ = $this->dbTrans->prepare("INSERT INTO PaycardTransactions (
                     dateID, empNo, registerNo, transNo, transID,
                     previousPaycardTransactionID, processor, refNum,
                     live, cardType, transType, amount, PAN, issuer,
                     name, manual, requestDateTime)
-                  SELECT dateID, empNo, registerNo, transNo, transID,
-                    paycardTransactionID, processor, refNum,
-                    live, cardType, 'VOID', amount, PAN, issuer,
-                    name, manual, " . $this->dbTrans->now() . "
-                  FROM PaycardTransactions
-                  WHERE
-                    dateID=" . $this->today . "
-                    AND empNo=" . $this->cashierNo . "
-                    AND registerNo=" . $this->original[1] . "
-                    AND transNo=" . $this->original[2] . "
-                    AND transID=" . $this->transID;
-        $initR = $this->dbTrans->query($initQ);
+                VALUES (?, ?, ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?)");
+        $args = array(
+            $orig['dateID'], $orig['empNo'], $orig['registerNo'], $orig['transNo'], $orig['transID'],
+            $orig['previousPaycardTransactionID'], $orig['processor'], $orig['refNum'],
+            $orig['live'], $orig['cardType'], 'VOID', $orig['amount'], $orig['PAN'], $orig['issuer'],
+            $orig['name'], $orig['manual'], $orig['requestDateTime']);
+        $initR = $this->dbTrans->execute($initQ, $args);
         if ($initR === false) {
+            $log = new \COREPOS\pos\lib\LaneLogger();
+            $log->debug("SQL error: " . $this->dbTrans->error());
             throw new Exception('Error saving void request in PaycardTransactions');
         }
         $this->last_paycard_transaction_id = $this->dbTrans->insertID();
@@ -71,7 +73,12 @@ class PaycardVoidRequest extends PaycardRequest
                     xAcquirerRef AS acqRefData,
                     xApprovalNumber,
                     transType AS mode,
-                    cardType
+                    manual,
+                    cardType,
+                    dateID, empNo, registerNo, transNo, transID,
+                    previousPaycardTransactionID, processor,
+                    live, amount, PAN, issuer,
+                    name, requestDateTime
                 FROM PaycardTransactions
                 WHERE dateID=' . $this->today . '
                     AND empNo=' . $this->cashierNo . '
@@ -80,10 +87,31 @@ class PaycardVoidRequest extends PaycardRequest
                     AND transID=' . $this->transID;
         $res = $this->dbTrans->query($sql);
         if ($res === false || $this->dbTrans->numRows($res) != 1) {
-            throw new Exception('Could not locate original transaction');
+            $server = Database::mDataConnect();
+            $res2 = $server->query($sql);
+            $log = new \COREPOS\pos\lib\LaneLogger();
+            //$log->debug($sql);
+            if ($res2 === false || $server->numRows($res2) != 1) {
+                throw new Exception('Could not locate original transaction');
+            }
+            return $server->fetchRow($res2);
         }
 
         return $this->dbTrans->fetchRow($res);
+    }
+
+    /**
+      On an unsuccessful void attempt zero out the transID field
+
+      Normally the PaycardTransactions record for the original transaction and the
+      reversal have the same transID. This prevents "re-voiding" a transaction (the
+      processor should, too, but better safe than sorry). If the void attempt fails
+      zeroing this record out allows for another attempt
+    */
+    public function dropTransID()
+    {
+        $prep = $this->dbTrans->prepare('UPDATE PaycardTransactions SET transID=0 WHERE paycardTransactionID=?');
+        $this->dbTrans->execute($prep, array($this->last_paycard_transaction_id));
     }
 }
 

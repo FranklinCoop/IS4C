@@ -224,7 +224,7 @@ class B2BInvoicePage extends FannieRESTfulPage
     </tr>
     <tr>
         <th>Web ID</th>
-        <td colspan="2">{$invoice->uuid}</td>
+        <td colspan="2"><a href="https://store.wholefoods.coop/invoice/{$invoice->uuid}">{$invoice->uuid}</a></td>
     </tr>
 </table>
 <hr />
@@ -259,6 +259,8 @@ HTML;
     protected function get_view()
     {
         $this->addOnloadCommand("\$('#inv-num').focus();");
+        $this->addScript('../../../item/autocomplete.js');
+        $this->addOnloadCommand("bindAutoComplete('#memSearch', '../../../ws/', 'mlastnamen');");
         return <<<HTML
 <form method="get" action="B2BInvoicePage.php">
     <div class="form-group">
@@ -273,7 +275,7 @@ HTML;
 <form method="get" action="B2BInvoicePage.php">
     <div class="form-group">
         <label>Customer #</label>
-        <input type="text" class="form-control" name="id" required />
+        <input type="text" class="form-control" name="id" id="memSearch" required />
         <input type="hidden" name="_method" value="put" />
     </div>
     <div class="form-group">

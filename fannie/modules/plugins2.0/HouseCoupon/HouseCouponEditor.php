@@ -113,7 +113,7 @@ class HouseCouponEditor extends FanniePage
                 $hci->upc($upc);
                 $hci->save();
             }
-            $this->connection->finishTransaction();
+            $this->connection->commitTransaction();
             header('Location: ' . filter_input(INPUT_SERVER, 'PHP_SELF') . '?edit_id=' . $hci->coupID());
             return false;
         } elseif (FormLib::get_form_value('edit_id','') !== '') {
@@ -234,9 +234,9 @@ class HouseCouponEditor extends FanniePage
         $this->addOnloadCommand('$(\'.fancybox-btn\').fancybox();');
         $ret .= '</p>';
         $ret .= '</form>';
-        $ret .= '<table class="table">';
-        $ret .= '<tr><th>ID</th><th>Name</th><th>Value</th>';
-        $ret .= '<th>Begins</th><th>Expires</th></tr>';
+        $ret .= '<table class="table tablesorter">';
+        $ret .= '<thead><tr><th>ID</th><th>Name</th><th>Value</th>';
+        $ret .= '<th>Begins</th><th>Expires</th><th>&nbsp;</th></tr></thead><tbody>';
         $model = new HouseCouponsModel($dbc);
         foreach($model->find('coupID', true) as $obj) {
             if (strstr($obj->startDate(), ' ')) {
@@ -252,11 +252,15 @@ class HouseCouponEditor extends FanniePage
                 date('Y-m-d', strtotime($obj->endDate())),
             );
             /**
-              If coupon period is more than 45 days, use the current month
-              as a reporting period
+              If coupon period is more than 365 days, use a narrower
+              90 day reporting period
             */
-            if (strtotime($report_dates[1]) - strtotime($report_dates[0]) > (86400 * 45)) {
-                $report_dates = array(date('Y-m-01'), date('Y-m-t'));
+            if (strtotime($report_dates[1]) - strtotime($report_dates[0]) > (86400 * 365)) {
+                $ts = strtotime($obj->startDate());
+                $report_dates = array(
+                    date('Y-m-d', $ts),
+                    date('Y-m-t', mktime(0, 0, 0, date('n',$ts), date('j',$ts)+90, date('Y',$ts))),
+                );
             }
             $ret .= sprintf('<tr><td>#%d <a href="HouseCouponEditor.php?edit_id=%d">Edit</a></td>
                     <td>%s</td><td>%.2f%s</td><td>%s</td><td>%s</td>
@@ -290,7 +294,10 @@ class HouseCouponEditor extends FanniePage
                     (\COREPOS\Fannie\API\FanniePlugin::isEnabled('CoreWarehouse') ? '' : 'collapse')
                 );
         }
-        $ret .= '</table>';
+        $ret .= '</tbody></table>';
+        
+        $this->addScript($FANNIE_URL . 'src/javascript/tablesorter/jquery.tablesorter.js');
+        $this->addOnloadCommand("\$('.tablesorter').tablesorter();");
         
         $dbc->close();
 
@@ -334,6 +341,17 @@ class HouseCouponEditor extends FanniePage
         $ret = '<form class="form-horizontal" action="HouseCouponEditor.php" method="post">';
         $ret .= '<input type="hidden" name="cid" value="'.$cid.'" />';
 
+        $memOpts = array(
+            0 => 'No',
+            1 => 'Yes',
+            2 => 'Plus',
+        );
+        $optStr = '';
+        foreach ($memOpts as $val => $label) {
+            $optStr .= sprintf('<option %s value="%d">%s</option>',
+                $mem == $val ? 'selected' : '', $val, $label);
+        }
+
         $ret .= sprintf('
             <div class="row">
                 <div class="col-sm-1 text-right">Coupon ID#</div>
@@ -362,9 +380,10 @@ class HouseCouponEditor extends FanniePage
                 </div>
             </div>
             <div class="row">
-                <label class="col-sm-2">Member Only
-                <input type=checkbox name=memberonly id=memberonly value="1" %s />
-                </label>
+                <label class="col-sm-1">Member Only</label>
+                <div class="col-sm-1">
+                    <select class="form-control input-sm" name="memberonly" id="memberonly">%s</select>
+                </div>
                 <label class="col-sm-2">Auto-apply
                 <input type=checkbox name=autoapply id=autoapply value="1" %s />
                 </label>
@@ -378,7 +397,7 @@ class HouseCouponEditor extends FanniePage
             $description,
             $limit,
             $starts, $expires,
-            ($mem==1?'checked':''),
+            $optStr,
             ($auto==1?'checked':'') 
         );
         foreach($depts as $k=>$v){
@@ -423,6 +442,7 @@ class HouseCouponEditor extends FanniePage
         $dts = array('Q'=>'Quantity Discount',
             'QD' => 'Quantity Discount (Department)',
             'P'=>'Set Price Discount',
+            'P+'=>'Set Price (mixed price items)',
             'FI'=>'Scaling Discount (Item)',
             'FD'=>'Scaling Discount (Department)',
             'MD'=>'Capped Discount (Department)',
@@ -432,6 +452,8 @@ class HouseCouponEditor extends FanniePage
             'PS'=>'Per-Set Discount',
             'BG'=>'BOGO (Buy one get one)',
             'BQ'=>'BOGO (Qty limited)',
+            'BH'=>'BOHO (Buy one get one 1/2 off)',
+            'BM'=>'BOHO (Buy one get one 1/2 off, mixed items)',
             '%'=>'Percent Discount (End of transaction)',
             '%B' => 'Percent Discount (Coupon discount OR member discount)',
             '%I'=>'Percent Discount (Specific Items)',

@@ -135,6 +135,12 @@ static public function systemInit()
     CoreLocal::set('perfLog', array());
 
     /**
+     * @var portOverrides
+     * Track port re-negotiation
+     */
+    CoreLocal::set('portOverrides', array());
+
+    /**
       Load lane and store numbers from LaneMap array
       if present
     */
@@ -389,6 +395,14 @@ static public function transReset()
     */
     CoreLocal::set("lastWeight",0.00);
 
+    /**
+     * @var lotterySpin
+     * Set to a random value between 0 and 1 once per transaction
+     * Doing one "spin" per transaction allow for UI cues about
+     * the result before the end of the transaction
+     */
+    CoreLocal::set('lotterySpin', false);
+
     if (!is_array(CoreLocal::get('PluginList'))) {
         CoreLocal::set('PluginList', array());
     }
@@ -431,7 +445,8 @@ static public function printReset()
       signature slips cannot be suppressed
       and will always print.
     */
-    CoreLocal::set("receiptToggle",1);
+    $default = CoreLocal::get('receiptToggleDefault') !== '' ? CoreLocal::get('receiptToggleDefault') : 1;
+    CoreLocal::set("receiptToggle", $default);
 
     /**
       @var autoReprint

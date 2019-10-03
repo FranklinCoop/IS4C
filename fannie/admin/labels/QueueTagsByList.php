@@ -69,6 +69,7 @@ class QueueTagsByList extends FannieRESTfulPage
             $tag = new ShelftagsModel($dbc);
             $tag->upc($upc);
             $tag->id($tagID);
+            $this->session->LastTagQueue = $tagID;
             $tag->description($info['description']);
             $tag->brand($info['brand']);
             $tag->normal_price($info['normal_price']);
@@ -84,10 +85,12 @@ class QueueTagsByList extends FannieRESTfulPage
                 $aDanger.= "{$upc}<br/>";    
             }
         }
+        $success = '';
         if ($aSuccess) {
             $success = "<div class='alert alert-success'>
                 Successfully Queued UPCs<br/>{$aSuccess}</div>";
         }
+        $danger = '';
         if ($aDanger) {
             $danger = "<div class='alert alert-danger'>
                 UPCs that did not save to queue{$aDanger}</div>";
@@ -107,7 +110,11 @@ HTML;
 
         $queues = new ShelfTagQueuesModel($dbc); 
         $queues->load();
-        $options = $queues->toOptions();
+        $master = false;
+        if (isset($this->session->LastTagQueue) && is_numeric($this->session->LastTagQueue)) {
+            $master = $this->session->LastTagQueue;
+        }
+        $options = $queues->toOptions($master);
         
         return <<<HTML
 <p><button class="glyphicon glyphicon-chevron-left btn btn-default" id="back"></button></p>

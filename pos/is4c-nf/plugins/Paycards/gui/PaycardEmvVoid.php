@@ -33,9 +33,8 @@ class PaycardEmvVoid extends PaycardProcessPage
     private $id = false;
     private $runTransaction = false;
 
-    function preprocess()
+    private function findTransaction()
     {
-        $this->hide_input(true);
         $dbc = Database::tDataConnect();
         $query = '
             SELECT MAX(paycardTransactionID) 
@@ -47,9 +46,41 @@ class PaycardEmvVoid extends PaycardProcessPage
             $this->id = $row[0];
         }
         if (!$this->id) {
-            $this->conf->set('boxMsg', 'Cannot locate transaction to void');
+            $dbc = Database::mDataConnect();
+            $query = '
+                SELECT MAX(paycardTransactionID) 
+                FROM PaycardTransactions
+                WHERE transID=' . ((int)$this->conf->get('paycard_id'))
+                    . " AND dateID=" . date('Ymd')
+                    . " AND registerNo=" . ((int)$this->conf->get('laneno'));
+            $res = $dbc->query($query);
+            if ($res && $dbc->numRows($res)) {
+                $row = $dbc->fetchRow($res);
+                $this->id = $row[0];
+                $query = $dbc->prepare('
+                    SELECT amount
+                    FROM PaycardTransactions
+                    WHERE transID=' . ((int)$this->conf->get('paycard_id'))
+                        . " AND dateID=" . date('Ymd')
+                        . " AND registerNo=" . ((int)$this->conf->get('laneno'))
+                        . " AND paycardTransactionID=" . $this->id);
+                $this->conf->set('paycard_amount', $dbc->getValue($query));
+            }
+        }
+    }
+
+    function preprocess()
+    {
+        $this->hide_input(true);
+        $this->findTransaction();
+        if (!$this->id) {
+            $this->conf->set('boxMsg', 'Cannot locate transaction to void' . $this->conf->get('paycard_id'));
             $this->change_page(MiscLib::baseURL() . 'gui-modules/boxMsg2.php');
             return false;
+        } elseif ($this->conf->get('paycard_amount') == 0) {
+            $dbc = Database::tDataConnect();
+            $prep = $dbc->prepare('SELECT amount FROM PaycardTransactions WHERE paycardTransactionID=?');
+            $this->conf->set('paycard_amount', $dbc->getValue($prep, array($this->id)));
         }
         $this->conf->set('paycard_mode', PaycardLib::PAYCARD_MODE_VOID);
 
@@ -83,9 +114,9 @@ class PaycardEmvVoid extends PaycardProcessPage
         if (!$this->runTransaction) {
             return '';
         }
-        $e2e = new MercuryDC();
+        $e2e = new MercuryDC($this->conf->get('PaycardsDatacapName'));
         ?>
-<script type="text/javascript" src="../js/emv.js?date=20180308"></script>
+<script type="text/javascript" src="../js/emv.js?date=20180502"></script>
 <script type="text/javascript">
 function emvSubmit()
 {

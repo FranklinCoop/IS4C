@@ -484,7 +484,7 @@ class FannieReportPage extends FanniePage
         return $data;
     }
 
-    private function getCacheKey()
+    protected function getCacheKey()
     {
         $reflector = new ReflectionClass($this);
         $qstr = filter_input(INPUT_SERVER, 'QUERY_STRING');
@@ -844,7 +844,7 @@ class FannieReportPage extends FanniePage
                     $this->addScript($url . 'src/javascript/tablesorter-2.22.1/js/jquery.tablesorter.js');
                     $this->addScript($url . 'src/javascript/tablesorter-2.22.1/js/jquery.tablesorter.widgets.js');
                 }
-                $this->addScript($url . 'src/javascript/jquery.floatThead.min.js');
+                $this->addScript($url . 'src/javascript/jquery.floatThead.min.js?date=20181121');
                 $sort = sprintf('[[%d,%d]]',$this->sort_column,$this->sort_direction);
                 if ($this->sortable) {
                     if (!$this->new_tablesorter) {
@@ -960,6 +960,9 @@ class FannieReportPage extends FanniePage
     public function dekey_array($arr)
     {
         $ret = array();
+        if (!is_array($arr)) {
+            return $ret;
+        }
         foreach($arr as $outer_key => $row) {
             $record = array();
             foreach($row as $key => $val) {

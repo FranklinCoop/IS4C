@@ -16,8 +16,13 @@ class ScanTransferPage extends FannieRESTfulPage
     public function preprocess()
     {
         if (php_sapi_name() !== 'cli') {
-            @session_start();
-            if (!isset($this->session->items)) {
+            if (session_status() == PHP_SESSION_NONE) {
+                session_start();
+                if (!isset($this->session->items)) {
+                    $this->session->items = array();
+                }
+            }
+            if (!is_array($this->session->items)) {
                 $this->session->items = array();
             }
         }
@@ -76,6 +81,9 @@ class ScanTransferPage extends FannieRESTfulPage
                 $item->unitCost($data['cost']);  
                 $item->salesCode($data['codeTo']);
                 $item->caseSize(1);
+                $item->receivedDate(date('Y-m-d H:i:s'));
+                $item->receivedQty($data['qty']);
+                $item->receivedTotalCost($data['qty'] * $data['cost']);
                 
                 $item->quantity($data['qty']);
                 $item->orderID($inID);
@@ -83,6 +91,8 @@ class ScanTransferPage extends FannieRESTfulPage
 
                 $item->salesCode($data['codeFrom']);
                 $item->quantity(-1*$data['qty']);
+                $item->receivedQty(-1*$data['qty']);
+                $item->receivedTotalCost(-1 * $data['qty'] * $data['cost']);
                 $item->orderID($outID);
                 $item->save();
             }
@@ -139,6 +149,18 @@ HTML;
                 AND store_id=1');
         $upc = BarcodeLib::padUPC($this->id);
         $info = $this->connection->getRow($infoP, array($upc));
+        if ($info == false && substr($upc, 0, 3) == '002') {
+            $upc = substr($upc, 0, 7) . '000000';
+            $info = $this->connection->getRow($infoP, array($upc));
+        }
+        $info['cost'] = sprintf('%.2f', $info['cost']);
+        $accounting = $this->config->get('ACCOUNTING_MODULE');
+        if (!class_exists($accounting)) {
+            $accounting = '\COREPOS\Fannie\API\item\Accounting';
+        }
+        $info['salesCode'] = isset($info['salesCode']) ? $accounting::toPurchaseCode($info['salesCode']) : '';
+        $info['brand'] = isset($info['brand']) ? $info['brand'] : '';
+        $info['description'] = isset($info['description']) ? $info['description'] : '';
         
         $ret = <<<HTML
 <form method="post">

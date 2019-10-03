@@ -63,7 +63,7 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
         $dbc = FannieDB::get($FANNIE_OP_DB);
         $ret = array(); 
         $orderID = FormLib::get('orderID');
-
+        
         // search by vendor SKU
         $skuQ = 'SELECT v.brand, v.description, v.size, v.units, v.cost, v.sku
                  FROM vendorItems AS v
@@ -108,6 +108,7 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
             $this->mergeSearchResult($ret, $orderID, $dbc);
             return False;
         }
+
 
         echo '[]';
         return False;

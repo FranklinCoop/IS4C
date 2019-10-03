@@ -80,6 +80,8 @@ class CoopDealsReviewPage extends FanniePage
         list($upcIn, $args) = $dbc->safeInClause($upcs);
         $args[] = $set;
 
+        $cdDef = $dbc->tableDefinition('CoopDealsItems');
+
         $saleItemsP = $dbc->prepare("
             SELECT t.upc,
                 t.price,
@@ -90,13 +92,14 @@ class CoopDealsReviewPage extends FanniePage
                     "'Co-op Deals '",
                     "t.abtpr",
                     ''
-                ) . " AS batch
+                ) . " AS batch,
+                " . (isset($cdDef['cost']) ? 't.cost' : '0') . " AS cost
             FROM CoopDealsItems as t
                 " . DTrans::joinProducts('t', 'p', 'INNER') . "
                 LEFT JOIN MasterSuperDepts AS s ON p.department=s.dept_ID
             WHERE t.upc IN ({$upcIn})
                 AND t.dealSet=?
-            ORDER BY s.super_name, t.upc
+            ORDER BY batch, t.upc
         ");
         $saleItemsR = $dbc->execute($saleItemsP, $args);
 
@@ -117,8 +120,14 @@ class CoopDealsReviewPage extends FanniePage
         if (isset($blDef['signMultiplier'])) {
             $insQ .= ", signMultiplier";
         }
+        if (isset($blDef['cost'])) {
+            $insQ .= ", cost";
+        }
         $insQ .= ") VALUES (?, ?, ?, 0";
         if (isset($blDef['signMultiplier'])) {
+            $insQ .= ", ?";
+        }
+        if (isset($blDef['cost'])) {
             $insQ .= ", ?";
         }
         $insQ .= ")";
@@ -156,6 +165,9 @@ class CoopDealsReviewPage extends FanniePage
             $args = array($row['upc'], $id, sprintf('%.2f', $row['price']));
             if (isset($blDef['signMultiplier'])) {
                 $args[] = $row['multiplier'];
+            }
+            if (isset($blDef['cost'])) {
+                $args[] = $row['cost'];
             }
             $dbc->execute($insP, $args);
             //$bu->reset();
@@ -211,7 +223,7 @@ class CoopDealsReviewPage extends FanniePage
                 p.description,
                 t.price,
                 t.abtpr
-            ORDER BY s.super_name,t.upc
+            ORDER BY batch,t.upc
         ");
         $result = $dbc->execute($query, array($set));
 

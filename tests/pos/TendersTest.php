@@ -70,6 +70,7 @@ class TendersTest extends PHPUnit_Framework_TestCase
 
     function testTenderDbRecords()
     {
+        COREPOS\pos\lib\CoreState::memberReset();
         lttLib::clear();
         $t = new TenderModule('CA', 1.00);
         $t->add();

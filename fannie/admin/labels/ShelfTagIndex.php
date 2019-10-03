@@ -20,7 +20,6 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
-
 require(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
     include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
@@ -30,14 +29,27 @@ class ShelfTagIndex extends FanniePage {
 
     protected $title = 'Fannie - Shelf Tags';
     protected $header = 'Shelf Tags';
-    protected $must_authenticate = True;
-    protected $auth_classes = array('barcodes');
     public $description = '[Shelf Tag Menu] lists shelf tag related pages.';
     public $themed = true;
 
     private $layouts = array();
 
     function preprocess(){
+        if (php_sapi_name() !== 'cli') {
+            /* this page requires a session to pass some extra
+               state information through multiple requests */
+            if (session_id() == '') {
+                session_start();
+            }
+        }
+
+        $sel = FormLib::get('layout');
+        $queue = FormLib::get('queue');
+        if (is_numeric($queue)) {
+            $obj = new COREPOS\Fannie\API\item\signage\MovementTags(array(), 'shelftags', $queue);
+            $obj->drawPDF();
+        }
+
         if (!function_exists('scan_layouts')) {
             require('scan_layouts.php');
         }
@@ -48,8 +60,25 @@ class ShelfTagIndex extends FanniePage {
     function javascript_content(){
         ob_start();
         ?>
+$(function(){
+    $('#layoutselector').on('change', function(){
+        var layout = $('#layoutselector option:selected').text();
+        window.location.href = "ShelfTagIndex.php?layout=" + layout;
+    });
+});
+function getMovement(queue){
+    var layout = $('#layoutselector option:selected').text();
+    window.location.href = 'ShelfTagIndex.php?queue='+queue;
+}
+
+
 function goToPage(the_id){
-    var offset = document.getElementById('offset').value;
+    var offsetCheckbox = $('#offset');
+    if (offsetCheckbox.prop('checked')) {
+        var offset = document.getElementById('offset').value;
+    } else {
+        var offset = 0;
+    }
     var str = "0";
     if (!isNaN(parseInt(offset)))
         str = parseInt(offset);
@@ -84,6 +113,10 @@ function printMany(){
     function body_content()
     {
         global $FANNIE_OP_DB;
+        $dbc = FannieDB::getReadOnly($FANNIE_OP_DB);
+
+        $sel = FormLib::get('layout', $this->config->get('DEFAULT_PDF'));
+
         ob_start();
         ?>
         <div class="col-sm-8">
@@ -95,18 +128,19 @@ function printMany(){
         <p>
         <div class="form-group form-inline">
             <label>Offset</label>: 
-            <input type="number" class="price-field form-control" id=offset value=0 />
+            <input type="checkbox" class="price-field form-control" id=offset name="offset" value=1 />
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
             <label>Layout</label>: 
         <select id=layoutselector class="form-control">
         <?php
+        $tagEnabled = $this->config->get('ENABLED_SIGNAGE');
+
         $tagEnabled = $this->config->get('ENABLED_TAGS');
-        foreach($this->layouts as $l){
+        sort($this->layouts);
+        $this->layouts = array_reverse($this->layouts);
+        foreach($this->layouts as $k => $l){
             if (!in_array($l, $tagEnabled) && count($tagEnabled) > 0) continue;
-            if ($l == $this->config->get('DEFAULT_PDF'))
-                echo "<option selected>".$l."</option>";
-            else
-                echo "<option>".$l."</option>";
+            echo ($l == $sel) ? "<option selected>".$l."</option>" : "<option>".$l."</option>";
         }
         ?>
         </select>
@@ -122,7 +156,6 @@ function printMany(){
         <table class="table table-striped">
         <?php
 
-        $dbc = FannieDB::getReadOnly($FANNIE_OP_DB);
         $query = $dbc->prepare("
             SELECT s.shelfTagQueueID, 
                 s.description, 
@@ -155,29 +188,78 @@ function printMany(){
         </div>
 
         <div class="col-sm-3">
-        <a href="CreateTagsByDept.php">Create Tags By Department</a>
-        <br />
-        <a href="CreateTagsByManu.php">Create Tags By Brand</a>
-        <br />
-        <a href="QueueTagsByList.php">Queue Tags by A List</a>
+            <div><a href="CreateTagsByDept.php">Create Tags By Department</a></div>
+            <div><a href="CreateTagsByManu.php">Create Tags By Brand</a></div>
+            <div><a href="QueueTagsByList.php">Queue Tags by A List</a></div>
+            <div><a href="QueueTagsByLC.php">Queue Tags by Like Code</a></div>
+            <div><a href="MovementTagTracker.php">Movement Tag Tracker</a>
+                | <a href="MovementTagTracker.php?id=config">Settings</a></div>
+            <div><a href="../../item/handheld/ItemStatusPage.php">Scan a Single Item</a></div>
         </div>
         <?php
         
         return ob_get_clean();
     }
 
+
+    private function drawPdf()
+    {
+        if (FormLib::get('pdf') == 'Print') {
+            foreach (FormLib::get('exclude', array()) as $e) {
+                $this->signage_obj->addExclude($e);
+            }
+            $this->signage_obj->setInUseFilter(FormLib::get('store', 0));
+            $this->signage_obj->drawPDF();
+            return false;
+        } else {
+            return true;
+        }
+    }
+
     private function printRow($row)
     {
-        printf("<tr>
-        <td>%s barcodes/shelftags</td>
-        <td style='text-align:right;'>%d</td>
-        <td><a href=\"\" onclick=\"goToPage('%d');return false;\">Print</a></td>
-        <td><a href=\"DeleteShelfTags.php?id=%d\">Clear</a></td>
-        <td><a href=\"EditShelfTags.php?id=%d\">" . \COREPOS\Fannie\API\lib\FannieUI::editIcon() . "</td>
-        <td><a href=\"SignFromSearch.php?queueID=%d\">Signs</a></td>
-        <td><input type=\"checkbox\" name=\"id[]\" value=\"%d\" class=\"print-many\" /></td> 
-        </tr>",
-        $row[1],$row[2],$row[0],$row[0],$row[0],$row[0], $row[0]);
+        $layoutselected = FormLib::get('layout');
+        $lastTagQueue = false;
+        if (isset($this->session->LastTagQueue) && is_numeric($this->session->LastTagQueue)) {
+            $lastTagQueue = $this->session->LastTagQueue;
+        }
+        $trc = ($lastTagQueue == $row[0]) ? "alert-warning" : "";
+        if ($layoutselected == "MovementTags") {
+            /* 
+                what needs to happen
+                . include SignFromSearch.php
+                . instantiate an object of SignFromSearch()
+                . set $this->u with upc(s) in "Print"-ed queue.
+                . call $obj->post_u_hander();
+                . that's it???
+            */
+            if (!class_exists("SignFromSearch")) {
+                require("SignFromSearch.php");
+            }
+            $sfs = new SignFromSearch();
+
+            printf("<tr class=\"%s\">
+            <td>%s barcodes/shelftags</td>
+            <td style='text-align:right;'>%d</td>
+            <td><a href=\"\" onclick=\"getMovement('%d'); return false;\">Print</a></td>
+            <td><a href=\"DeleteShelfTags.php?id=%d\">Clear</a></td>
+            <td><a href=\"EditShelfTags.php?id=%d\">" . \COREPOS\Fannie\API\lib\FannieUI::editIcon() . "</td>
+            <td><a href=\"SignFromSearch.php?queueID=%d\">Signs</a></td>
+            <td><input type=\"checkbox\" name=\"id[]\" value=\"%d\" class=\"print-many\" /></td> 
+            </tr>",
+            $trc,$row[1],$row[2],$row[0],$row[0],$row[0],$row[0], $row[0]);
+        } else {
+            printf("<tr class=\"%s\">
+            <td>%s barcodes/shelftags</td>
+            <td style='text-align:right;'>%d</td>
+            <td><a href=\"\" onclick=\"goToPage('%d');return false;\">Print</a></td>
+            <td><a href=\"DeleteShelfTags.php?id=%d\">Clear</a></td>
+            <td><a href=\"EditShelfTags.php?id=%d\">" . \COREPOS\Fannie\API\lib\FannieUI::editIcon() . "</td>
+            <td><a href=\"SignFromSearch.php?queueID=%d\">Signs</a></td>
+            <td><input type=\"checkbox\" name=\"id[]\" value=\"%d\" class=\"print-many\" /></td> 
+            </tr>",
+            $trc, $row[1],$row[2],$row[0],$row[0],$row[0],$row[0], $row[0]);
+        }
     }
 
     public function helpContent()

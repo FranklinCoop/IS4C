@@ -51,6 +51,7 @@ Replaces nightly.lanesync.php and/or lanesync.api.php';
         'houseCouponItems',
         'houseVirtualCoupons',
         'custPreferences',
+        'taxrates',
     );
 
     public function run()
@@ -66,12 +67,16 @@ Replaces nightly.lanesync.php and/or lanesync.api.php';
         if ($this->test_mode) {
             $this->regularPushTables = array('houseCoupons');
         }
+        $dbc = FannieDB::get($this->config->get('OP_DB'));
+        if ($dbc->tableExists('EWicItems')) {
+            $this->regularPushTables[] = 'EWicItems';
+        }
         foreach ($this->regularPushTables as $table) {
             $result = SyncLanes::pushTable("$table", 'op', SyncLanes::TRUNCATE_DESTINATION);
             /**
             @severity: error message may indicate lane down or connectivity problem
             */
-            $severity = strstr($result['messages'], 'Error:') ? FannieTask::TASK_LARGE_ERROR : FannieTask::TASK_NO_ERROR;
+            $severity = strstr($result['messages'], 'Error:') ? FannieLogger::CRITICAL : FannieLogger::INFO;
             $this->cronMsg($result['messages'], $severity);
         }
     }

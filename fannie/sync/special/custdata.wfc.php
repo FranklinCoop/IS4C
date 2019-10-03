@@ -22,7 +22,7 @@
 *********************************************************************************/
 
 include(dirname(__FILE__).'/../../config.php');
-require_once(__DIR__ . '/generic.mysql.php');
+require(__DIR__ . '/generic.mysql.php');
 
 // on each MySQL lane, load the CSV file
 foreach($FANNIE_LANES as $lane) {
@@ -31,6 +31,7 @@ foreach($FANNIE_LANES as $lane) {
     if ($dbc->connections[$lane['op']] !== false) {
 
         $dbc->query("DELETE FROM custdata WHERE type IN ('TERM','INACT2')", $lane['op']);
+        $dbc->query("DELETE FROM custdata WHERE memType IN (7)", $lane['op']);
     }
 }
 

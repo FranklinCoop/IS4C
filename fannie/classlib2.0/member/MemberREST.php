@@ -579,6 +579,9 @@ class MemberREST
                 foreach ($columns as $col_name => $info) {
                     if ($col_name == 'cardNo') continue;
                     if ($col_name == 'modified') continue;
+                    if ($col_name == 'lastName' || $col_name == 'firstName') {
+                        $c_json[$col_name] = trim($c_json[$col_name]);
+                    }
 
                     if (isset($c_json[$col_name])) {
                         $customers->$col_name($c_json[$col_name]);
@@ -718,11 +721,11 @@ class MemberREST
                     $personNum++;
                 }
                 if (isset($c_json['firstName'])) {
-                    $loopCD->FirstName($c_json['firstName']);
+                    $loopCD->FirstName(trim($c_json['firstName']));
                     $loopCD_changed = true;
                 }
                 if (isset($c_json['lastName'])) {
-                    $loopCD->LastName($c_json['lastName']);
+                    $loopCD->LastName(trim($c_json['lastName']));
                     $loopCD_changed = true;
                 }
                 if (isset($c_json['chargeAllowed'])) {
@@ -793,8 +796,12 @@ class MemberREST
     {
         if (isset($json['startDate']) || isset($json['endDate'])) {
             $dates = self::getModel($dbc, 'MemDatesModel');
-            $dates->start_date($json['startDate']); 
-            $dates->end_date($json['endDate']); 
+            if (isset($json['startDate'])) {
+                $dates->start_date($json['startDate']); 
+            }
+            if (isset($json['endDate'])) {
+                $dates->end_date($json['endDate']); 
+            }
             $dates->card_no($id);
             if (!$dates->save()) {
                 $ret['errors']++;
@@ -1018,6 +1025,9 @@ class MemberREST
                 LEFT JOIN memberCards AS u ON c.CardNo=u.card_no
                 LEFT JOIN memContact AS t ON c.CardNo=t.card_no
             WHERE 1=1 ';
+        if (FannieConfig::config('COOP_ID') == 'WFC_Duluth') {
+            $query .= ' AND c.memType <> 7 ';
+        }
         $params = array();
         if (!isset($json['customers']) || !is_array($json['customers'])) {
             $json['customers'] = array();
@@ -1203,15 +1213,17 @@ class MemberREST
       Provide lookups for the autocomplete service
       @param $field [string] field name being autocompleted
       @param $val [string] partial field 
+      @param $convertToID [boolean] give autocomplete results as ID instead
+        of the matching string
     */
-    public static function autoComplete($field, $val)
+    public static function autoComplete($field, $val, $convertToID=false)
     {
         $config = FannieConfig::factory();
         $dbc = FannieDB::getReadOnly($config->get('OP_DB'));
         if (strtolower($field) == 'mfirstname') {
             list($query, $args) = self::autoCompleteFirstName($val);
         } elseif (strtolower($field) == 'mlastname') {
-            list($query, $args) = self::autoCompleteLastName($val);
+            list($query, $args) = self::autoCompleteLastName($val, $convertToID);
         } elseif (strtolower($field) == 'maddress') {
             list($query, $args) = self::autoCompleteAddress($val);
         } elseif (strtolower($field) == 'mcity') {
@@ -1227,7 +1239,14 @@ class MemberREST
         $prep = $dbc->prepare($query);
         $res = $dbc->execute($prep, $args);
         while ($row = $dbc->fetch_row($res)) {
-            $ret[] = $row[0];
+            if ($convertToID) {
+                $ret[] = array(
+                    'label' => $row[0],
+                    'value' => $row[1],
+                );
+            } else {
+                $ret[] = $row[0];
+            }
             if (count($ret) > 50) {
                 break;
             }
@@ -1239,36 +1258,43 @@ class MemberREST
     private static function autoCompleteFirstName($val)
     {
         if (FannieConfig::config('CUST_SCHEMA') == 1) {
-            $query = 'SELECT firstName
+            $query = 'SELECT firstName, customerID
             FROM Customers
             WHERE firstName LIKE ?
-            GROUP BY firstName
+            GROUP BY firstName, customerID
             ORDER BY firstName';
         } else {
-            $query = 'SELECT FirstName
+            $query = 'SELECT FirstName, CardNo
             FROM custdata
             WHERE FirstName LIKE ?
-            GROUP BY FirstName
+                ' . (FannieConfig::config('COOP_ID') == 'WFC_Duluth' ? ' AND memType <> 7 ' : '') . '
+            GROUP BY FirstName, CardNo
             ORDER BY FirstName';
         }
 
         return array($query, array('%' . $val . '%'));
     }
 
-    private static function autoCompleteLastName($val)
+    private static function autoCompleteLastName($val, $convertToID=false)
     {
         if (FannieConfig::config('CUST_SCHEMA') == 1) {
-            $query = 'SELECT lastName
+            $query = 'SELECT lastName, customerID
             FROM Customers
             WHERE lastName LIKE ?
-            GROUP BY lastName
+            GROUP BY lastName, customerID
             ORDER BY lastName';
         } else {
-            $query = 'SELECT LastName
-            FROM custdata
+            $ln = 'LastName';
+            if ($convertToID) {
+                $ln = "CONCAT(LastName, ' (', memDesc, ')')";
+            }
+            $query = 'SELECT ' . $ln . ' AS ln, CardNo
+            FROM custdata AS c
+                LEFT JOIN memtype AS m ON c.memType=m.memtype
             WHERE LastName LIKE ?
-            GROUP BY LastName
-            ORDER BY LastName';
+                ' . (FannieConfig::config('COOP_ID') == 'WFC_Duluth' ? ' AND c.memType <> 7 ' : '') . '
+            GROUP BY ' . $ln . ', CardNo
+            ORDER BY ' . $ln;
         }
 
         return array($query, array('%' . $val . '%'));
@@ -1277,16 +1303,16 @@ class MemberREST
     private static function autoCompleteAddress($val)
     {
         if (FannieConfig::config('CUST_SCHEMA') == 1) {
-            $query = 'SELECT addressLineOne
+            $query = 'SELECT addressLineOne, cardNo
                        FROM CustomerAccounts
                        WHERE addressLineOne LIKE ?
-                       GROUP BY addressLineOne
+                       GROUP BY addressLineOne, cardNo
                        ORDER BY addressLineOne';
         } else {
-            $query = 'SELECT street
+            $query = 'SELECT street, card_no
                        FROM meminfo
                        WHERE street LIKE ?
-                       GROUP BY street
+                       GROUP BY street, card_no
                        ORDER BY street';
         }
 
@@ -1297,15 +1323,15 @@ class MemberREST
     {
         if (FannieConfig::config('CUST_SCHEMA') == 1) {
             $query = 'SELECT city
-                       FROM CustomerAccounts
+                       FROM CustomerAccounts, cardNo
                        WHERE city LIKE ?
-                       GROUP BY city
+                       GROUP BY city, cardNo
                        ORDER BY city';
         } else {
-            $query = 'SELECT city
+            $query = 'SELECT city, card_no
                        FROM meminfo
                        WHERE city LIKE ?
-                       GROUP BY city
+                       GROUP BY city, card_no
                        ORDER BY city';
         }
 
@@ -1316,15 +1342,15 @@ class MemberREST
     {
         if (FannieConfig::config('CUST_SCHEMA') == 1) {
             $query = 'SELECT email
-                       FROM Customers
+                       FROM Customers, customerID
                        WHERE email LIKE ?
-                       GROUP BY email
+                       GROUP BY email, customerID
                        ORDER BY email';
         } else {
-            $query = 'SELECT email_1
+            $query = 'SELECT email_1, card_no
                        FROM meminfo
                        WHERE email_1 LIKE ?
-                       GROUP BY email_1
+                       GROUP BY email_1, card_no
                        ORDER BY email_1';
         }
 

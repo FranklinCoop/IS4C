@@ -184,6 +184,52 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
         } catch (Exception) { }
     }
 
+    public string getEmailSync()
+    {
+        string ret = "";
+        try {
+            initPort();
+            sp.Open();
+            WriteMessageToDevice(GetEmailAddress());
+            ArrayList bytes = new ArrayList();
+            while (true) {
+                try {
+                    int b = sp.ReadByte();
+                    if (bytes.Count == 0 && b == 0x06) {
+                        // ACK
+                    } else if (bytes.Count == 0 && b == 0x15) {
+                        // NAK
+                        break;
+                    } else {
+                        bytes.Add(b & 0xff); 
+                    }
+                } catch (TimeoutException) {
+                    // expected; not an issue
+                } catch (Exception ex) {
+                    break;
+                }
+                if (bytes.Count > 2 && (int)bytes[bytes.Count-2] == 0x3) {
+                    // end of message, send ACK
+                    ByteWrite(new byte[1]{0x6}); 
+                    byte[] buffer = new byte[bytes.Count];
+                    for (int i=0; i<bytes.Count; i++) {
+                        buffer[i] = (byte)((int)bytes[i] & 0xff);
+                    }
+                    System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
+                    string response = enc.GetString(buffer);
+                    int end = response.IndexOf((char)3);
+                    ret = response.Substring(5, end - 5);
+                    break;
+                }
+            }
+            sp.Close();
+        } catch (Exception ex) {
+            Console.WriteLine(ex);
+        }
+
+        return ret;
+    }
+
     /**
       Simple wrapper to write an array of bytes
     */
@@ -263,10 +309,10 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
             char fs = (char)0x1c;
 
             // standard credit/debit/ebt/gift
-            string buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,S"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S"+fs+"Bbtne,S";
+            string buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,S"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S";
             if (this.emv_buttons == RbaButtons.EMV) {
                 // CHIP+PIN button in place of credit & debit
-                buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,S"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S"+fs+"Bbtne,GIFT"+fs+"Bbtne,S";
+                buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,S"+fs+"Bbtnb,CHIP+PIN"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S";
             } else if (this.emv_buttons == RbaButtons.Cashback) {
                 buttons = "TPROMPT6,"+defaultMsg+fs+"Bbtna,CASHBACK"+fs+"Bbtna,S"+fs+"Bbtnb,CREDIT"+fs+"Bbtnb,S"+fs+"Bbtnc,S"+fs+"Bbtnd,S";
             } else if (this.emv_buttons == RbaButtons.None) {
@@ -286,7 +332,7 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
         System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
 
         ArrayList bytes = new ArrayList();
-        while (SPH_Running) {
+        while (true && this.emv_buttons != RbaButtons.None) {
             try {
                 int b = sp.ReadByte();
                 if (bytes.Count == 0 && b == 0x06) {
@@ -319,14 +365,12 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
                         System.Console.Write(buffer[i] + " ");
                     }
                     if (Choice(enc.GetString(buffer))) {
-                        WriteMessageToDevice(GetCardType());
-                        WriteMessageToDevice(UpdateScreenMessage("TPROMPT6,Please Wait For Cashier"));
-                        //WriteMessageToDevice(SimpleMessageScreen("Please Wait for Cashier"));
+                        WriteMessageToDevice(SimpleMessageScreen("Please Wait"));
                         this.ReadAndAck();
                         // input is done; no need to keep the read thread alive
                         // and rely on cross-thread signaling to end it later
-                        //SPH_Running = false;
-                        //break;
+                        SPH_Running = false;
+                        break;
                     }
                     bytes.Clear();
                 }
@@ -360,7 +404,6 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
     private bool Choice(string str)
     {
         bool ret = false;
-        System.Console.WriteLine("\nString: "+str+"\n");
         if (str.Substring(1,4) == "24.0") {
             switch (str.Substring(5,1)) {
                 case "A":
@@ -395,11 +438,6 @@ public class RBA_Stub : SPH_IngenicoRBA_Common
                 case "D":
                     // ebt food
                     parent.MsgSend("TERM:DCEF");
-                    ret = true;
-                    this.sendBufferedCardType();
-                    break;
-                case "E":
-                    parent.MsgSend("TERM:DCGD");
                     ret = true;
                     this.sendBufferedCardType();
                     break;

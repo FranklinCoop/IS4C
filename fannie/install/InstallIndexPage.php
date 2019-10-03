@@ -38,7 +38,7 @@ if (!class_exists('FannieAPI')) {
 if (!function_exists('confset')) {
     include(dirname(__FILE__).'/util.php');
 }
-if (!function_exists('create_if_neeed')) {
+if (!function_exists('duplicate_structure')) {
     include(dirname(__FILE__).'/db.php');
 }
 
@@ -506,7 +506,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
 
         echo '<div class="row form-group">
                 <label class="control-label col-sm-2">Task Error Severity resulting in emails</label>
-                <div class="col-sm-3">' . installSelectField('FANNIE_TASK_THRESHOLD', $FANNIE_TASK_THRESHOLD, $taskOpts, 99, false)
+                <div class="col-sm-3">' . installSelectField('FANNIE_TASK_THRESHOLD', $FANNIE_TASK_THRESHOLD, $taskOpts, 0, false)
             . '</div></div>';
 
         echo '<p>
@@ -633,6 +633,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'BatchListModel',
         'BatchCutPasteModel',
         'BatchBarcodesModel',
+        'BatchReviewLogModel',
         'BatchTypeModel',
         'BatchUpdateModel',
         'BrandsModel',
@@ -678,6 +679,8 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'MemContactModel',
         'MemContactPrefsModel',
         'MetaProductRulesModel',
+        'MovementTagsModel',
+        'MovementTrackerParamsModel',
         'NarrowTagsModel',
         'OriginsModel',
         'OriginCountryModel',
@@ -696,15 +699,19 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'ProdExtraModel',
         'ProdFlagsModel',
         'ProductAttributesModel',
+        'ProductCostChangesModel',
         'ProdPhysicalLocationModel',
+        'ProdReviewModel',
         'ProdUpdateModel',
         'ProdDepartmentHistoryModel',
         'ProdCostHistoryModel',
         'ProdPriceHistoryModel',
+        'OrderGuidesModel',
         'PurchaseOrderModel',
         'PurchaseOrderItemsModel',
         'PurchaseOrderNotesModel',
         'ReasoncodesModel',
+        'SalesLiftsModel',
         'ScaleItemsModel',
         'ScaleLabelsModel',
         'ServiceScalesModel',
@@ -725,6 +732,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'TableSyncRulesModel',
         'TaxRatesModel',
         'TaxRateComponentsModel',
+        'TrackedCardsModel',
         'TendersModel',
         'VendorsModel',
         'VendorContactModel',
@@ -811,6 +819,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'PaycardTransactionsModel',
         'SpecialOrdersModel',
         'SpecialOrderDeptMapModel',
+        'SpecialOrderEditsModel',
         'SpecialOrderHistoryModel',
         'SpecialOrderMemDiscountsModel',
         'PendingSpecialOrderModel',

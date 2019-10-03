@@ -24,7 +24,6 @@
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\PrehLib;
 use COREPOS\pos\parser\Parser;
-use COREPOS\pos\lib\LaneLogger;
 
 /**
   Using Datacap ActiveX requires the cashier
@@ -44,15 +43,18 @@ class PaycardDatacapParser extends Parser
     private $valid = array(
         'DATACAP',
         'DATACAPEMV',
+        'DATACAPEMVTIP',
         'DATACAPCC',
         'DATACAPCCAUTO',
         'DATACAPDC',
         'DATACAPEF',
         'DATACAPEC',
+        'DATACAPWI',
         'DATACAPGD',
         'PVDATACAPGD',
         'PVDATACAPEF',
         'PVDATACAPEC',
+        'PVDATACAPWI',
         'ACDATACAPGD',
         'AVDATACAPGD',
         'DATACAPRECUR',
@@ -76,8 +78,6 @@ class PaycardDatacapParser extends Parser
 
     public function parse($str)
     {
-        $log = new LaneLogger();
-        $log->debug("PayCardDC Parser: ".$str);
         $ret = $this->default_json();
         if ($this->conf->get("ttlflag") != 1 && $str !== 'DATACAP' && substr($str, 0, 9) !== 'PVDATACAP'
             && substr($str, 0, 11) !=='ACDATACAPGD' && substr($str, 0, 11) !=='AVDATACAPGD') { // must subtotal before running card
@@ -93,14 +93,10 @@ class PaycardDatacapParser extends Parser
         $this->conf->set('paycard_type', PaycardLib::PAYCARD_TYPE_CREDIT);
         $str = $this->remap($str);
         switch ($str) {
-            case 'DATACAP':    
-                if ($this->conf->get("PaycardsCustomerChoice") == 0) {
-                    $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvCustomerAction.php';
-                } else {
-                    $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvMenu.php';
-                    if ($this->conf->get('ttlflag') != 1) {
-                        $ret['main_frame'] .= '?selectlist=PV';
-                        }
+            case 'DATACAP':
+                $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvMenu.php';
+                if (abs($this->conf->get('amtdue')) < 0.005) {
+                    $ret['main_frame'] .= '?selectlist=PV';
                 }
                 break; 
             case 'PVDATACAP':
@@ -108,6 +104,10 @@ class PaycardDatacapParser extends Parser
                 break; 
             case 'DATACAPEMV': 
                 $this->conf->set('CacheCardType', 'EMV');
+                $this->conf->set('CacheCardCashBack', 0);
+                break;
+            case 'DATACAPEMVTIP': 
+                $this->conf->set('CacheCardType', 'EMVTIP');
                 $this->conf->set('CacheCardCashBack', 0);
                 break;
             case 'DATACAPCC':
@@ -150,6 +150,10 @@ class PaycardDatacapParser extends Parser
                 }
                 $this->conf->set('CacheCardType', 'EBTCASH');
                 break;
+            case 'DATACAPWI':
+                $this->conf->set('CacheCardType', 'EWIC');
+                $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvWic.php';
+                break;
             case 'DATACAPGD':
                 $this->conf->set('CacheCardType', 'GIFT');
                 $this->conf->set('paycard_type', PaycardLib::PAYCARD_TYPE_GIFT);
@@ -168,6 +172,11 @@ class PaycardDatacapParser extends Parser
                 break;
             case 'PVDATACAPEC':
                 $this->conf->set('CacheCardType', 'EBTCASH');
+                $this->conf->set('paycard_mode', PaycardLib::PAYCARD_MODE_BALANCE);
+                $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvBalance.php';
+                break;
+            case 'PVDATACAPWI':
+                $this->conf->set('CacheCardType', 'EWIC');
                 $this->conf->set('paycard_mode', PaycardLib::PAYCARD_MODE_BALANCE);
                 $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvBalance.php';
                 break;

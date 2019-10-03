@@ -313,6 +313,9 @@ class FannieAPI
             case 'COREPOS\Fannie\API\item\TagDataSource':
                 $directories[] = dirname(__FILE__) . '/item/tagdatasource/';
                 break;
+            case 'COREPOS\Fannie\API\item\PriceRounder':
+                $directories[] = dirname(__FILE__) . '/item/';
+                break;
             case 'COREPOS\Fannie\API\monitor\Monitor':
                 $directories[] = dirname(__FILE__) . '/monitor/';
                 break;
@@ -348,6 +351,10 @@ class FannieAPI
     */
     static public function listModules($base_class, $include_base=false, $debug=false)
     {
+        // leading backslash is ignored
+        if ($base_class[0] == '\\') {
+            $base_class = substr($base_class, 1);
+        }
         $directories = self::searchDirectories($base_class);
 
         // recursive search
@@ -395,10 +402,11 @@ class FannieAPI
                 continue;
             }
 
+
             // if the file is part of a plugin, make sure
             // the plugin is enabled. The exception is when requesting
             // a list of plugin classes
-            if (strstr($file, 'plugins2.0') && $base_class != 'FanniePlugin' && $base_class != '\COREPOS\Fannie\API\FanniePlugin') {
+            if (strstr($file, 'plugins2.0') && $base_class != 'FanniePlugin' && $base_class != 'COREPOS\Fannie\API\FanniePlugin') {
                 $parent = \COREPOS\Fannie\API\FanniePlugin::memberOf($file);
                 if ($parent === false || !\COREPOS\Fannie\API\FanniePlugin::isEnabled($parent)) {
                     continue;

@@ -21,6 +21,8 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\FanniePlugin;
+
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
     include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
@@ -49,6 +51,7 @@ class CashierPerformanceReport extends FannieReportPage
         $date1 = $this->form->date1;
         $date2 = $this->form->date2;
         $emp_no = FormLib::get('emp_no', false);
+        $store = FormLib::get('store');
 
         $dtrans = DTransactionsModel::selectDTrans($date1,$date2);
 
@@ -59,6 +62,24 @@ class CashierPerformanceReport extends FannieReportPage
             WHERE proc_date BETWEEN ? AND ?
                 AND emp_no = ?
         ');
+        $dt1 = $date1;
+        $dt2 = $date2 . ' 23:59:59';
+
+        $chkQ = $dbc->addSelectLimit("SELECT transInterval FROM " . FannieDB::fqn('CashPerformDay', 'trans') .
+                    " WHERE proc_date BETWEEN ? AND ?", 1);
+        $chkP = $dbc->prepare($chkQ);
+        $chk = $dbc->getValue($chkP, array($date1, $date1 . ' 23:59:59'));
+        if ($chk === false && in_array('CoreWarehouse', FanniePlugin::getPluginList())) {
+            $detailP = $dbc->prepare('
+                SELECT SUM(CASE WHEN transInterval > 600 THEN 600 ELSE transInterval END) AS seconds,
+                    COUNT(*) AS numTrans
+                FROM ' . FannieDB::fqn('CashierByDay', 'plugin:WarehouseDatabase') . '
+                WHERE date_id BETWEEN ? AND ?
+                    AND emp_no = ?
+            ');
+            $dt1 = date('Ymd', strtotime($date1));
+            $dt2 = date('Ymd', strtotime($date2));
+        }
 
         $basicQ = '
             SELECT d.emp_no,
@@ -81,7 +102,7 @@ class CashierPerformanceReport extends FannieReportPage
                 AND register_no <> 99
                 AND d.emp_no <> 9999
                 AND (s.hasOwnItems=1 OR s.hasOwnItems IS NULL)
-        ';
+                AND ' . DTrans::isStoreID($store, 'd');
         if ($emp_no) {
             $basicQ .= ' AND d.emp_no = ? ';
         }
@@ -89,7 +110,7 @@ class CashierPerformanceReport extends FannieReportPage
             GROUP BY d.emp_no, e.FirstName
             ORDER BY e.FirstName';
         $basicP = $dbc->prepare($basicQ);
-        $args = array($date1 . ' 00:00:00', $date2 . ' 23:59:59');
+        $args = array($date1 . ' 00:00:00', $date2 . ' 23:59:59', $store);
         if ($emp_no) {
             $args[] = $emp_no;
         }
@@ -113,8 +134,7 @@ class CashierPerformanceReport extends FannieReportPage
                 sprintf('%.2f%%', $this->safeDivide($row['cancelRings'], $row['rings']) * 100.00),
                 sprintf('$%.2f', $this->safeDivide($row['cancelTotal'], $row['cancelRings'])),
             );
-            $args[2] = $row['emp_no'];
-            $detailR = $dbc->execute($detailP, $args);
+            $detailR = $dbc->execute($detailP, array($dt1, $dt2, $row['emp_no']));
             $detailW = $dbc->fetch_row($detailR);
             $time = $detailW['seconds'];
             $trans = $detailW['numTrans'];
@@ -166,6 +186,7 @@ class CashierPerformanceReport extends FannieReportPage
     function form_content()
     {
         global $FANNIE_URL;
+        $stores = FormLib::storePicker();
         ob_start();
 ?>
 <form method = "get" action="<?php echo $_SERVER['PHP_SELF']; ?>">
@@ -182,6 +203,10 @@ class CashierPerformanceReport extends FannieReportPage
     <div class="form-group">
         <label>End Start</label>
         <input type=text id=date2 name=date2 class="form-control date-field" required />
+    </div>
+    <div class="form-group">
+        <label>Store</label>
+        <?php echo $stores['html']; ?>
     </div>
     <div class="form-group">
         <input type="checkbox" name="excel" id="excel" value="xls" />

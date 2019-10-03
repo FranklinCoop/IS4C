@@ -44,7 +44,7 @@ class CustomerPurchasesReport extends FannieReportPage
         $date1 = $this->form->date1;
         $date2 = $this->form->date2;
         $card_no = FormLib::get_form_value('card_no','0');
-        $store = FormLib::get('store', 0);
+        $store = FormLib::get('store');
 
         $dlog = DTransactionsModel::selectDlog($date1,$date2);
         try {
@@ -53,15 +53,14 @@ class CustomerPurchasesReport extends FannieReportPage
                   t.department,d.dept_name,m.super_name,
                   sum(t.quantity) as qty,
                   sum(t.total) as ttl from
-                  $dlog as t "
-                      . DTrans::joinProducts()
-                      . DTrans::joinDepartments()
-                      . "
+                  $dlog as t
+                  " . DTrans::joinProducts() . "
+                  left join {$FANNIE_OP_DB}.departments AS d ON t.department=d.dept_no
                   left join {$FANNIE_OP_DB}.MasterSuperDepts AS m ON t.department=m.dept_ID
                   where t.card_no = ? AND
                   trans_type IN ('I','D') AND
                   tdate BETWEEN ? AND ?
-                  and ". DTrans::isStoreID($store, 't') ."
+                    AND " . DTrans::isStoreID($store, 't') . "
                   group by year(t.tdate),month(t.tdate),day(t.tdate),
                   t.upc,p.description,
                   t.department,d.dept_name,m.super_name
@@ -123,6 +122,7 @@ class CustomerPurchasesReport extends FannieReportPage
 
     function form_content()
     {
+        $stores = FormLib::storePicker();
         ob_start();
 ?>
 <form method = "get"> 
@@ -139,10 +139,10 @@ class CustomerPurchasesReport extends FannieReportPage
         <label>End Start</label>
         <input type=text id=date2 name=date2 class="form-control date-field" required />
     </div>
-    <label class="col-sm-4 control-label">Store</label>
-            <div class="col-sm-4">
-                <?php $ret=FormLib::storePicker();echo $ret['html']; ?>
-            </div>
+    <div class="form-group">
+        <label>Store</label>
+        <?php echo $stores['html']; ?>
+    </div>
     <div class="form-group">
         <input type="checkbox" name="excel" id="excel" value="xls" />
         <label for="excel">Excel</label>

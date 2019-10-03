@@ -3,7 +3,7 @@ language: php
 # keep verisions minimal to limit total
 # builds on free service. politeness.
 php:
-    - "5.5"
+    - "5.6"
 
 services:
     - mysql
@@ -30,12 +30,12 @@ install:
     - rm composer.json
     - rm composer.lock
     - composer init -n
-    - composer require codeclimate/php-test-reporter johnkary/phpunit-speedtrap twig/twig twig/extensions
+    - composer require codeclimate/php-test-reporter johnkary/phpunit-speedtrap twig/twig twig/extensions predis/predis
     - mkdir -p build/logs
     - npm install acorn
 
 script:
-    - phpunit -d max_execution_time=0 -c phpunit.xml
+    - phpunit -v --debug -d max_execution_time=0 -c phpunit.xml
     - sh tests/acorn.sh
 
 after_script:

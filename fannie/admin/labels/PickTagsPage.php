@@ -27,6 +27,9 @@ class PickTagsPage extends FannieRESTfulPage
         for ($i=0; $i<count($this->id); $i++) {
             $map[$this->id[$i]] = $this->form->qty[$i];
         }
+        $priced = FormLib::get('priced', false);
+        $lifeP = $this->connection->prepare("SELECT shelflife FROM scaleItems WHERE plu=?");
+        $dDate = FormLib::get('dDate', false);
 
         $itemP = $this->connection->prepare("
             SELECT p.upc,
@@ -35,7 +38,8 @@ class PickTagsPage extends FannieRESTfulPage
                 p.size,
                 v.units,
                 n.vendorName,
-                v.sku
+                v.sku,
+                p.normal_price
             FROM products AS p
                 LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
                 LEFT JOIN vendors AS n ON p.default_vendor_id=n.vendorID
@@ -62,8 +66,28 @@ class PickTagsPage extends FannieRESTfulPage
                 'numflag' => 0,
                 'pricePerUnit' => '',
             );
+            if ($item['sku'] == $item['upc']) {
+                $item['sku'] = '';
+            }
+            $countColumn = 'normal_price';
+            if ($priced) {
+                $item['normal_price'] = $itemW['normal_price'];
+                $countColumn = 'pricePerUnit';
+                if (substr($item['upc'], 0, 3) == '002') {
+                    $right = sprintf('%.2f', $itemW['normal_price']);
+                    $right = str_replace('.', '', $right);
+                    $right = str_pad($right, 4, '0', STR_PAD_LEFT);
+                    $item['upc'] = substr($item['upc'], 0, 9) . $right;
+                }
+                $life = $this->connection->getValue($lifeP, array($upc));
+                if ($life && $dDate) {
+                    $today = new DateTime($dDate);
+                    $today->add(new DateInterval('P' . $life . 'D'));
+                    $item['vendor'] = 'Sell by ' . $today->format('m/d/y');
+                }
+            }
             for ($i=0; $i<$map[$upc]; $i++) {
-                $item['normal_price'] = ($i+1) . '/' . $map[$upc];
+                $item[$countColumn] = ($i+1) . '/' . $map[$upc];
                 $items[] = $item;
             }
             unset($map[$upc]);
@@ -75,6 +99,9 @@ class PickTagsPage extends FannieRESTfulPage
         }
 
         $pdf = new Tags4x8P($items, 'provided');
+        if ($priced) {
+            $pdf->noDates(true);
+        }
         $pdf->drawPDF();
 
         return false;
@@ -93,13 +120,15 @@ class PickTagsPage extends FannieRESTfulPage
     private function ordersToItems()
     {
         $orders = FormLib::get('oid', array());
+        $priced = FormLib::get('priced', false);
         list($inStr, $args) = $this->connection->safeInClause($orders);
         $items = array();
         $itemP = $this->connection->prepare("
-            SELECT *
+            SELECT i.*, p.*, n.*, z.normal_price
             FROM PurchaseOrderItems AS i
                 INNER JOIN PurchaseOrder AS p ON i.orderID=p.orderID
                 LEFT JOIN vendors AS n ON p.vendorID=n.vendorID
+                LEFT JOIN products AS z ON i.internalUPC=z.upc AND p.storeID=z.store_id
             WHERE i.orderID IN ({$inStr})
             ORDER BY i.orderID, i.salesCode, i.brand, i.description");
         $res = $this->connection->execute($itemP, $args);
@@ -118,10 +147,24 @@ class PickTagsPage extends FannieRESTfulPage
                 'numflag' => 0,
                 'pricePerUnit' => '',
             );
+            if ($item['sku'] == $item['upc']) {
+                $item['sku'] = '';
+            }
+            $countColumn = 'normal_price';
+            if ($priced) {
+                $item['normal_price'] = $row['normal_price'];
+                $countColumn = 'pricePerUnit';
+                if (substr($item['upc'], 0, 3) == '002') {
+                    $right = sprintf('%.2f', $row['normal_price']);
+                    $right = str_replace('.', '', $right);
+                    $right = str_pad($right, 4, '0', STR_PAD_LEFT);
+                    $item['upc'] = substr($item['upc'], 0, 9) . $right;
+                }
+            }
             for ($i=0; $i<$row['quantity']; $i++) {
-                $item['normal_price'] = ($i+1) . '/' . $row['quantity'];
+                $item[$countColumn] = ($i+1) . '/' . $row['quantity'];
                 if ($row['isSpecialOrder']) {
-                    $item['normal_price'] = 'SO';
+                    $item[$countColumn] = 'SO';
                 }
                 $items[] = $item;
             }
@@ -151,10 +194,18 @@ class PickTagsPage extends FannieRESTfulPage
 
         $poList = $this->purchaseOrderList();
         $noPOs = $poList == '' ? 'collapse' : '';
+        $today = date('Y-m-d');
 
         return <<<HTML
 <form method="post">
-    <p><button type="submit" class="btn btn-default">Get Tags</button></p>
+    <p class="form-inline">
+        <button type="submit" class="btn btn-default">Get Tags</button>
+        <label><input type="checkbox" name="priced" value="1" /> Include prices</label>
+        <div class="input-group">
+            <span class="input-group-addon">Delivery Date</span>
+            <input type="text" class="form-control date-field" name="dDate" value="{$today}" />
+        </div> 
+    </p>
     <table class="table table-bordered table-striped">
         <tr><th>Qty</th><th>UPC</th><th>Brand</th><th>Description</th></tr>
         {$tableBody}

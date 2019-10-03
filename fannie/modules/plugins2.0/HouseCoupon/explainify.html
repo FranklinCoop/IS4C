@@ -39,7 +39,8 @@ in mind.
     <li><b>Expires</b> is when the coupon runs through, inclusive.
     E.g., if the expiration date is January 31, 2010, the coupon will ring as "expired" starting February 1, 2010
     <li><b>Limit</b> is the number of times the coupon can be used <i>per transaction</i>
-    <li><b>Member-only</b> coupons can only be used by members
+    <li><b>Member-only</b> coupons can only be used by members. The <i>Plus</i> setting includes
+            visiting members from other co-ops
     <li><b>Department</b> dicates how the discount gets coded by the POS. This is strictly
     an accounting setting to control whose sales/budget the coupon value is deducted from.
     It does not influence what item(s) the coupon applies to.</li>
@@ -106,6 +107,15 @@ department(s) instead of a specific UPC
         <li><b>BOGO (Qty Limited)</b> Using Quantity (at least): minimum value should always equal 2. Discount
             value equals the maximum number of items given for free; per pair of items sold, one product is given 
             free (of lesser value). </li>
+    </ul>
+</li>
+<li><b>BOHO</b> Gives a certain number of items half-off.
+    <ul>
+        <li><b>BOHO (Buy one get one 1/2 off)</b> buy one get one half off per pairs sold.
+            The <i>Discount Value</i> entered should be the max value given for the coupon 
+            (e.g. BOHO on an item with a normal price of $3 with a limit of 5 free would get a discount
+            value of 7.50)</li>
+        <li><b>BOHO ( ~Mixed items)</b> get one DISCOUNT, BOTH item half off per QUALIFIERs purchased.</li>
     </ul>
 </li>
 <li><b>Percent Discounts</b> provide a percentage off all discountable items (e.g., member 

@@ -113,10 +113,11 @@ class TrendsReport extends FannieReportPage
             $select_cols = '
                 u.likeCode AS prodID,
                 \'\' AS brand,
-                u.likeCodeDesc AS description';
+                l.likeCodeDesc AS description';
             $group_cols = '
                 u.likeCode,
-                u.likeCodeDesc';
+                l.likeCodeDesc';
+            $from_where['query'] = str_replace('=u.upc', '=u.upc LEFT JOIN likeCodes AS l ON u.likeCode=l.likeCode ', $from_where['query']);
         }
 
         $query = "
@@ -125,7 +126,7 @@ class TrendsReport extends FannieReportPage
                 MONTH(t.tdate) AS month,
                 DAY(t.tdate) AS day,
                 $select_cols, "
-                . DTrans::sumQuantity('t') . " AS total
+                . DTrans::sumQuantity('t', true) . " AS total
             " . $from_where['query'] . "
                 AND trans_status <> 'M'
                 AND trans_type = 'I'

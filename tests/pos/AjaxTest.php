@@ -139,7 +139,7 @@ class AjaxTest extends PHPUnit_Framework_TestCase
     public function testScale()
     {
         $ajax = new COREPOS\pos\ajax\AjaxScale(new WrappedStorage(), new ValueContainer());
-        $this->assertEquals(' lb', $ajax->ajax());
+        $this->assertEquals('0.00 lb', $ajax->ajax());
         $ajax = new COREPOS\pos\ajax\AjaxScale(new WrappedStorage(), new ValueContainer());
         $this->assertInternalType('string', $ajax->ajax());
     }
@@ -168,6 +168,12 @@ class AjaxTest extends PHPUnit_Framework_TestCase
         $form->data = 'log this error';
         $ajax = new COREPOS\pos\ajax\AjaxJsError(new WrappedStorage(), $form);
         $this->assertEquals('Done', $ajax->ajax());
+    }
+
+    public function testNotifiers()
+    {
+        $ajax = new COREPOS\pos\ajax\AjaxNotifiers(new WrappedStorage(), new ValueContainer());
+        $this->assertEquals('', $ajax->ajax());
     }
 }
 

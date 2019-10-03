@@ -31,6 +31,13 @@ class WfcPoExport extends DefaultCsvPoExport
     public $extension = 'csv';
     public $mime_type = 'text/csv';
 
+    public function exportString($id)
+    {
+        ob_start();
+        $this->export_order($id);
+        return ob_get_clean();
+    }
+
     public function export_order($id)
     {
         $dbc = FannieDB::get(FannieConfig::config('OP_DB'));
@@ -62,7 +69,7 @@ class WfcPoExport extends DefaultCsvPoExport
             echo "Whole Foods Co-op\r\n";
             echo "4426 Grand Ave\r\n";
             echo "\"Duluth, MN 55807\"\r\n";
-            echo "(218) 728-0884\r\n";
+            echo "(218) 336-0279\r\n";
         }
 
         if ($noteContent != '') {

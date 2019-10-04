@@ -94,9 +94,13 @@ class PaycardDatacapParser extends Parser
         $str = $this->remap($str);
         switch ($str) {
             case 'DATACAP':
-                $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvMenu.php';
-                if (abs($this->conf->get('amtdue')) < 0.005) {
-                    $ret['main_frame'] .= '?selectlist=PV';
+                if ($this->conf->get("PaycardsCustomerChoice") == 0) {
+                    $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvCustomerAction.php';
+                } else {
+                    $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardEmvMenu.php';
+                    if ($this->conf->get('ttlflag') != 1) {
+                        $ret['main_frame'] .= '?selectlist=PV';
+                        }
                 }
                 break; 
             case 'PVDATACAP':
@@ -121,7 +125,7 @@ class PaycardDatacapParser extends Parser
                 $ret['main_frame'] .= '?reginput=';
                 break;
             case 'DATACAPDC':
-                if ($this->conf->get('PaycardsOfferCashBack') == 3 && !$this->conf->get('CardCashBackChecked')) {
+                if ($this->conf->get('PaycardsOfferCashBack') == 5 && !$this->conf->get('CardCashBackChecked')) {
                     $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardCashBackPrompt.php';
                     return $ret;
                 } else if ($this->conf->get('CacheCardCashBack')) {

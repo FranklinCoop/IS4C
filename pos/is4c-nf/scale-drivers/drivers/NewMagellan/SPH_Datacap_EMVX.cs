@@ -52,7 +52,7 @@ public class SPH_Datacap_EMVX : SerialPortHandler
     protected string sequence_no = null;
     private RBA_Stub rba = null;
     private string xml_log = null;
-    private bool enable_xml_log = false;
+    private bool enable_xml_log = true;
     private bool pdc_active;
     private Object pdcLock = new Object();
     private bool emv_reset;

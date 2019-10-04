@@ -133,6 +133,11 @@ class UPC extends Parser
         if ($this->source !== false) {
             $this->status = $this->getStatus($this->source);
         }
+        if ($this->source !== false) {
+            //strip the prefix from the upc here so that parsing continues
+            $str = substr($str,strlen($this->source));
+            $this->status = $this->getStatus($this->source);
+        }
 
         /**
           Do not apply scanned items if

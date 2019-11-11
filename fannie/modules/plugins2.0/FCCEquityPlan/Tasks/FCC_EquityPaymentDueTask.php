@@ -37,7 +37,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 		$TransDB = $this->config->get('TRANS_DB');
 		$OpDB = $FANNIE_OP_DB;
 		$dbc = FannieDB::get($TransDB);
-		$query = "select e.card_no, e.payments,d.start_date, s.lastPaymentDate as mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id,p.equityPaymentPlanID, p.nextPaymentAmount
+		$query = "select e.card_no, e.payments,d.start_date, (case when s.lastPaymentDate is null then d.start_date else s.lastPaymentDate end) as mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id,p.equityPaymentPlanID, p.nextPaymentAmount
 				from {$TransDB}.equity_history_sum e
 				left join {$OpDB}.custdata c on e.card_no=c.CardNo 
 				left join {$OpDB}.memDates d on e.card_no=d.card_no 

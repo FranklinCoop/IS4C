@@ -37,22 +37,22 @@ class FCC_EquityPaymentDueTask extends FannieTask
 		$TransDB = $this->config->get('TRANS_DB');
 		$OpDB = $FANNIE_OP_DB;
 		$dbc = FannieDB::get($TransDB);
-		$query = "select e.card_no, e.payments,d.start_date, (case when s.lastPaymentDate is null then d.start_date else s.lastPaymentDate end) as mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id,p.equityPaymentPlanID, p.nextPaymentAmount
+		$query = "SELECT e.card_no, e.payments,d.start_date, (case when s.lastPaymentDate is null then d.start_date else s.lastPaymentDate end) as mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id,p.equityPaymentPlanID, p.nextPaymentAmount
 				from {$TransDB}.equity_history_sum e
 				left join {$OpDB}.custdata c on e.card_no=c.CardNo 
 				left join {$OpDB}.memDates d on e.card_no=d.card_no 
 				left join {$OpDB}.EquityPaymentPlanAccounts p on e.card_no=p.cardNo
                 left join (
-                    SELECT a.card_no, a.stockPurchase, MAX(a.tdate)  as lastPaymentDate, b.total
+                    SELECT a.card_no, SUM(a.stockPurchase) as total, MAX(a.tdate)  as lastPaymentDate
 					FROM {$TransDB}.stockpurchases AS a
 					JOIN (
-						SELECT card_no, stockPurchase, MAX(tdate) as max_tdate, sum(stockPurchase) as total
+						SELECT card_no, SUM(stockPurchase), MAX(tdate) as max_tdate, sum(stockPurchase) as total
 						FROM {$TransDB}.stockpurchases
 						GROUP BY card_no
 					) as b
 					WHERE a.card_no = b.card_no
     				AND a.tdate = b.max_tdate
-    				group by a.card_no) s on c.cardNo = s.card_no
+    				GROUP BY a.card_no) s on c.cardNo = s.card_no
 				where e.card_no between 10 and 8000 AND (e.payments < 175 OR c.blueLine LIKE '%/%')";
 		$prep = $dbc->prepare($query);
 		$results = $dbc->execute($prep,array());
@@ -69,6 +69,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			$blueLine = $row['blueLine'];
 			$newLine = '';
 			$memType = $row['memType'];
+			$type = 'PC';
 			$paid = $row['payments'];
 			$paymentDue = 3*$months;
 			if (($paid + $paymentDue) >= 175 ) {
@@ -88,19 +89,28 @@ class FCC_EquityPaymentDueTask extends FannieTask
 				$updateAccount = true;
 			}
 			// check for member deactivation
-			if ($days >= 60 && $memType == 1) {
+			if ($months > 2 && $memType == 1) {
 				//deactivate member.
+				echo $this->cronMsg("Blue Line: ".$blueLine.'  mostRecent:'.$row['mostRecent']. "   Now:".$now->format('Y-m-d')."  Months/Days:".$months.'/'.$days);
 				$memType = 12;
-			} else if ($memType == 12 && $days < 60) {
+				$type = 'REG';
+				$updateAccount = true;
+			} else if ($memType == 12 && $months <= 2) {
 				//ractivate member.
+				echo $this->cronMsg("Blue Line: ".$blueLine.'  mostRecent:'.$row['mostRecent']. "   Now:".$now->format('Y-m-d')."  Months/Days:".$months.'/'.$days);
 				$memType = 1;
+				$type = 'PC';
+				$updateAccount = true;
 			}
 			//$updateAccount = true;
 			if ($updateAccount) {
 				$opDBC = FannieDB::get($OpDB);
-				$updateQ = 'UPDATE '.$OpDB.'.custdata c set blueLine="'.$blueLine.'",memType ='.$memType.' where c.CardNo='.$row['card_no'].' AND c.id='.$row['id'];
+				$args = array($blueLine,$memType,$type,$row['card_no']);
+				$updateQ = "UPDATE {$OpDB}.custdata c 
+							SET blueLine=? ,memType = ?, `type` = ?
+							WHERE c.CardNo=?";
 				$updateP = $opDBC->prepare($updateQ);
-				$updateR = $opDBC->execute($updateP,array());
+				$updateR = $opDBC->execute($updateP,$args);
 				echo $this->cronMsg("Blue Line: ".$blueLine.'  '.$newLine.' start_date. '.$row['mostRecent']);
 			}
 		}

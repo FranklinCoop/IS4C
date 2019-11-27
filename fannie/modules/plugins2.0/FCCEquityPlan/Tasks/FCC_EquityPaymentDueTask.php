@@ -72,6 +72,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			$type = 'PC';
 			$paid = $row['payments'];
 			$paymentDue = 3*$months;
+			//this will make the payment due correct nomater what had been paid before, also sets it to zero if 175 is reached.
 			if (($paid + $paymentDue) >= 175 ) {
 				$paymentDue = $paymentDue - (($paid+$paymentDue) - 175);
 			}
@@ -89,7 +90,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 				$updateAccount = true;
 			}
 			// check for member deactivation
-			if ($months > 2 && $paymentDue > 6) {
+			if ($memType == 1 $months > 2 && $paymentDue > 6) {
 				//deactivate member.
 				echo $this->cronMsg("Blue Line: ".$blueLine.'  mostRecent:'.$row['mostRecent']. "   Now:".$now->format('Y-m-d')."  Months/Days:".$months.'/'.$days);
 				$memType = 12;

@@ -131,7 +131,7 @@ class BudgetSalesReport extends FannieReportPage
 			$lastYearSales = $department[2][$d1];
 			$budget = $department[3][$d1];
 			$budgetPercent = number_format(100*($thisYearSales/$budget),2).'%';
-			$yearChange = number_format(100*($lastYearSales/$thisYearSales),2).'%';
+			$yearChange = number_format(100*($thisYearSales/$lastYearSales),2).'%';
 			$yearBudget = '$'.number_format($yearTotals[$deptKey],2);
 			$thisYearSales = '$'.number_format($thisYearSales,2);
 			$lastYearSales = '$'.number_format($lastYearSales,2);

@@ -32,7 +32,7 @@ class BudgetSalesReport extends FannieReportPage
     public $report_set = 'Sales Reports';
 
     protected $title = "Fannie : Budget Sales Report";
-    protected $header = "Buget Sales Report Report";
+    protected $header = "Budget Sales Report Report (Wait it takes about a minute to load)";
     protected $report_cache = 'none';
     
     protected $sortable = false;
@@ -43,8 +43,11 @@ class BudgetSalesReport extends FannieReportPage
     protected $report_headers = array('Dept Name','Sales','Budget','% Budget', 'Last Year Sales', '% Change', 'Year Balance');
     protected $required_fields = array('date1','date2');
   	
-    protected $deptNames = array(0 => 'Store Totals', 1 => 'Bakery', 2=> 'PFD', 3=>'Grocery', 4=>'Bulk', 5=>'Cheese', 6=>'Dairy', 7=>'Frozen',
+  	protected $chartTitles = array(0 => 'Store Totals', 1 => 'Bakery', 2=> 'PFD', 3=>'Grocery', 4=>'Bulk', 5=>'Cheese', 6=>'Dairy', 7=>'Frozen',
     	8=>'Meat',9=>'Produce', 10=>'Body Care', 11 =>'Genral Merch', 12=>'Supplements');
+    protected $deptNames = array(0 => 'Store Totals', 1 => 'Bakery', 2=> 'PFD', 3=>'Grocery', 4=>'Bulk', 5=>'Beer', 6=>'Cheese', 7=>'Dairy', 8=>'Frozen',
+    	9=>'Meat',10=>'Produce', 11=>'Body Care', 12 =>'Genral Merch', 13=>'Supplements');
+    protected $deptToSuper = array(0=>0, 1=>1, 2=>2,3=>3, 4=>4, 5=>4, 6=>5, 7=>5,8=>5, 9=>5, 10=>6, 11=>7, 12=>7,13=>7);
     protected $tableNames = array(0=>'Totals', 1=> '', 2=>'',3=>'',4=>'',5=>'',6=>'Perishable',7=>'',8=>'Wellness');
     protected $deptCanvases = array('Bakery','PFD', 'Grocery', 'Bulk', 'Perishable', 'Perishable', 'Perishable', 'Perishable','Produce', 'Wellness','Wellness','Wellness');
     protected $canvasPos = array(2,3, 4, 5, 6, 6, 6,
@@ -78,419 +81,445 @@ class BudgetSalesReport extends FannieReportPage
     {
 		global $FANNIE_OP_DB, $FANNIE_ARCHIVE_DB, $FANNIE_EQUITY_DEPARTMENTS,
 			$FANNIE_COOP_ID;
+        // grab input
         $dbc = FannieDB::get($FANNIE_OP_DB);
 		$d1 = FormLib::get_form_value('date1',date('Y-m-d'));
 		$d2 = FormLib::get_form_value('date2',date('Y-m-d'));
 		$superDepts = FormLib::get_form_value('buyer','');
-		$store = FormLib::get('store', 0);
+		$store = FormLib::get('store');
 		$superDepts = (!$superDepts) ? 'All' : $superDepts;
 
-		$startThisYear = DateTime::createFromFormat('Y-m-d' ,$d1);
-   		$startThisYear->modify('-4 weeks');
-		$startDay = $startThisYear->format('l');
-		$startLastYear = DateTime::createFromFormat('Y-m-d' ,$d1);
-		$startLastYear->modify('-52 weeks');
-		//$startLastYear->modify('next ' . $startDay);
-		$startLastYear->modify('-4 weeks');
-		$endThisYear = DateTime::createFromFormat('Y-m-d' ,$d2);
-		$endThisYear->modify('+3 weeks');
-		$endDay = $endThisYear->format('l');
-		$endLastYear = DateTime::createFromFormat('Y-m-d' ,$d2);
-		$endLastYear->modify('+3 weeks');
-		$endLastYear->modify('-52 weeks');
-		//$endLastYear->modify('next ' . $endDay);
-
-		//echo '<script>console.log("Super: '.$superDepts.'");</script>';
-		//echo '<script>console.log(" Start:'.$startLastYear->format('W D : Y-m-d').' - END: '
-		//		.$endLastYear->format('W D : Y-m-d').'");</script>';
-
-		$dlog = DTransactionsModel::selectDLog($startThisYear->format('Y-m-d'),$endThisYear->format('Y-m-d'));
-		$report = array();
 		
-		//$report[] = $this->getStoreTotals($dbc,$store,$d1,$d2);
+		$report = array();
 
-		//$this->totalsChart = $this->getStoreTotals($dbc,$store,$d1,$d2);
-		$report = $this->getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear, $dlog);
-		$yearTotals = $this->getFiscalYearBalnce(DateTime::createFromFormat('Y-m-d' ,$d2),$dbc,$store, $dlog);
-		$this->getCustomerCount($dbc,$store,$d1,$d2, $dlog);
+		// get dates
+		$dates = $this->calcDates($d1, $d2);
+		// select dlog
+		$dlog = DTransactionsModel::selectDLog($dates['start']->format('Y-m-d'),$dates['end']->format('Y-m-d'));
+		$dlogHist = DTransactionsModel::selectDLog($dates['historyStart']->format('Y-m-d'),$dates['historyEnd']->format('Y-m-d'));
 
-		//$report = array_merge($report, $this->departmentTotals($dbc,$store,$d1,$d2, $superDepts));
-		//$report = array_merge($report, $this->getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear));
+		//$yearTotals = $this->getFiscalYearBalnce($dates['end'],$dbc, $store, $dlog);
+		$departmentTotals = $this->getDeptTotalsNew($dbc, $dlog, $dlogHist,$store,$dates);
+		$storeTotals = $this->getStoreTotals($dbc, $dlog, $dlogHist,$store,$dates);
+		$yearTotals = $this->getFiscalYearBalnce($d1,$d2,$dbc, $store, $dlog);
+		$this->getCustomerCount($dbc, $dlog, $dlogHist,$store,$dates,$storeTotals['thisYear'],$storeTotals['lastYear']);
 
 		$return = array();
-		$tableNo = 0;
-		$totalBudget = 0;
-		$totalThisYear = 0;
-		$totalLastYear = 0;
-		$tpyLine = array();
-		$tcyLine = array();
-		$tbdLine = array();
-		$tLabels = array();
-		for ($i=0; $i < count($report); $i++) { 
-			$table = $report[$i];
-			$chart = array();
-			$charts = array();
-			$labels = array();
-			$data = array();
-			$salesBudget = array();
-			$cySales = array();
-			$pySales = array();
-			for ($j=0; $j < count($table); $j++) { 
-				// format for the chart here because the javascript seems slow.
-				$row = $table[$j];
-				$labels[] = $row[0];
-				$salesBudget[] = $row[1];
-				$cySales[] = ($row[2]==0) ? null : $row[2];
-				$pySales[] = $row[3];
-				if($i==0) {
-					$tLabels[] = $row[0];
-					$tbdLine[] += $row[1];
-					$tcyLine[] = ($row[2]==0) ? null : $row[2];
-					$tpyLine[] += $row[3];
-				} else {
-					$tbdLine[$j] += $row[1];
-					$tcyLine[$j] = ($row[2]==0) ? null : $tcyLine[$j]+$row[2];
-					$tpyLine[$j] += $row[3];
-				}
-				$newRow = array();
-				if ($j== floor((sizeof($table)/2))) {
-					//sum for the total table;
-					$totalBudget += $row[1];
-					$totalThisYear += $row[2];
-					$totalLastYear += $row[3];
+		$table = array();
+		$thisTotal = $storeTotals['thisYear'][$d1];
+		$lastTotal = $storeTotals['lastYear'][$d1];
+		$budgetTotal = $storeTotals['budget'][$d1];
+		$budgetPercent = number_format(($thisTotal/$budgetTotal)*100,2).'%';
+		$changeOverLast = number_format(($thisTotal/$lastTotal)*100,2).'%';
+		$thisTotal = '$'.number_format($thisTotal,2);
+		$lastTotal = '$'.number_format($lastTotal,2);
+		$budgetTotal ='$'.number_format($budgetTotal,2);
+		$yearBudget = '$'.number_format($yearTotals[0],2);
 
-					//$newRow = array();
-					//$row[0] = $this->deptNames[$i+1];
-					$row[] = (!array_key_exists(1, $row) || $row[1] ==0) ? 0 : sprintf('%.2f%%',($row[2]/$row[1])*100) ;
-				    $row[] = (!array_key_exists(2, $row) || $row[2] ==0) ? 0 : sprintf('%.2f%%',(1 - $row[3]/$row[2])*100) ;
-				    $newRow[] = $this->deptNames[$i+1];
-				    $newRow[] = '$'.number_format($row[2],2);
-				    $newRow[] = '$'.number_format($row[1],2);
-				    $newRow[] = $row[4];
-				    $newRow[] = '$'.number_format($row[3],2);
-				    $newRow[] = $row[5];
-				    $newRow[] = '$'.number_format($yearTotals[$i+1],2);
-				    $data[] = $newRow;
-
-				}
-
-				//$row[] = sprintf('%.2f',(1 - $row[3]/$row[2])*100).'%';
-				//$row[] = sprintf('%.2f',(1 - $row[1]/$row[2])*100).'%';
-				//$table[$j] = $row;
+		$row = array($this->deptNames[0], $thisTotal,$budgetTotal,$budgetPercent,$lastTotal,$changeOverLast,$yearBudget);
+		$table[] = $row;
+		$return[0] = $table;
 
 
-			}
-			$chart[] = $labels;
-			$chart[] = $salesBudget;
-			$chart[] = $cySales;
-			$chart[] = $pySales;
+		$table = array();
 
-			//$this->deptCharts[] = $chart;
-			//if($i==0){
-			//	$this->totalsChart = $chart;
-			//} else {
-				$this->deptCharts[] = $chart;
-			//}
-			//combine the preishable and wellness sub departments
-			if(in_array($i, array(5,6,7))){
-				$return[$tableNo-1] = array_merge($return[$tableNo-1], $data);
-			} elseif (in_array($i, array(10,11))) {
-				$return[$tableNo-1] = array_merge($return[$tableNo-1], $data);
-			} else {
-				$return[$tableNo] = $data;
-				$tableNo++;
+
+		//$return = array('',$storeTotals[0][1],$storeTotals[1][1], $storeTotals[2][1]);
+		$row = array();
+		foreach ($departmentTotals as $deptKey => $department) {
+			$thisYearSales = $department[1][$d1];
+			$lastYearSales = $department[2][$d1];
+			$budget = $department[3][$d1];
+			$budgetPercent = number_format(100*($thisYearSales/$budget),2).'%';
+			$yearChange = number_format(100*($lastYearSales/$thisYearSales),2).'%';
+			$yearBudget = '$'.number_format($yearTotals[$deptKey],2);
+			$thisYearSales = '$'.number_format($thisYearSales,2);
+			$lastYearSales = '$'.number_format($lastYearSales,2);
+			$budget ='$'.number_format($budget,2);
+
+			$row = array($this->deptNames[$deptKey], $thisYearSales,$budget,$budgetPercent,$lastYearSales,$yearChange,$yearBudget);
+			switch ($deptKey) {
+				case '6':
+				case '7':
+				case '8':
+					$table[] = $row;
+					break;
+				case '11':
+				case '12':
+					$table[] = $row;
+					break;
+				default:
+					$table[] = $row;
+					$tableKey = $this->deptToSuper[$deptKey];
+					$return[$tableKey] = $table;
+					$table = array();
+					$row = array();
+					break;
 			}
 
+			$this->deptCharts[] = array(array_values($department[0]), array_values($department[3]),array_values($department[1]),array_values($department[2]));			
 		}
-		$chart = array();
-		$chart[] = $tLabels;
-		$chart[] = $tbdLine;
-		$chart[] = $tcyLine;
-		$chart[] = $tpyLine;
-		$this->totalsChart = $chart;
 
-		// calculate the basket size values for the chart.
-		$basketLabels = $tLabels;
-		$basketline1 = array();
-		$basketline2 = array();
-		foreach ($tcyLine as $key => $value) {
-			$basket = (!array_key_exists($key, $this->custChart[1]) || $this->custChart[1][$key] ==0) 
-				? null : number_format(($value/$this->custChart[1][$key]), 2);
-			$histBasket = (!array_key_exists($key, $this->custChart[2]) || $this->custChart[2][$key] ==0) 
-				? null : number_format(($value/$this->custChart[2][$key]), 2);	
-			$basketline1[] = $basket;
-			$basletline2[] = $histBasket;
-			echo '<script>console.log("Basket Line: '.$basket.'");</script>';
-		}
-		$this->basketChart = array($basketLabels,$basketline1,$basketline2);
-
-		
-		$totalLastYearDiff = 0;
-		$totalBudgetDiff = 0;
-		if($totalThisYear !=0 && $totalBudget !=0) {
-			$totalBudgetDiff = sprintf('%.2f%%',($totalThisYear/$totalBudget)*100);
-			$totalLastYearDiff = sprintf('%.2f%%',(1-$totalLastYear/$totalThisYear)*100);
-		}
-		
-		$totals = array('Store Totals','$'.number_format($totalThisYear,2),'$'.number_format($totalBudget,2),$totalBudgetDiff, '$'.number_format($totalLastYear,2),$totalLastYearDiff, '$'.number_format($yearTotals[0],2));
-		$return = array_merge(array(array($totals)),$return);
+		$this->totalsChart = array(array_values($storeTotals['weekDateStarts']), array_values($storeTotals['budget']),array_values($storeTotals['thisYear']),array_values($storeTotals['lastYear']));
 
 		return $return;
 	}
 
+	private function getStoreTotals($dbc, $dlog, $dlogHist, $store, $dates) {
+		//prepare and exicute all the SQL so we can sort it in our loops.
+		$start = $dates['start'];
+		$end = $dates['end'];
 
-	private function getDepartmentTotals($dbc, $store, $startThisYear, $endThisYear,$startLastYear,$endLastYear, $dlog) {
-		$report = array();
-		$data = array();
-		$args = array($startThisYear->format('Y-m-d'), $endThisYear->format('Y-m-d'),$store);
-		$budgetQ = $dbc->prepare("SELECT WEEK(b.budgetDate), SUM(b.budget),m.superDeptNo
+		$args = array($start->format('Y-m-d Y-m-d H:i:s'),$end->format('Y-m-d H:i:s'), $store);
+		$thisYearQ = $dbc->prepare("SELECT DATE(t.tdate), sum(t.total)
+			FROM core_trans.dlog_90_view t
+			JOIN core_op.superdepts s on t.department = s.dept_ID
+			WHERE t.`tdate` BETWEEN ? AND ?  AND t.store_id = ?
+			AND t.trans_type IN ('D', 'I') AND s.superID < 14
+			AND WEEK(t.tdate) != WEEK(NOW())
+			GROUP BY DATE(t.tdate)
+            ORDER BY DATE(t.tdate)");
+		$thisYearR  = $dbc->execute($thisYearQ,$args);
+		
+        //$end->modify('-1 day');
+		$args = array($start->format('Y-m-d'),$end->format('Y-m-d'), $store);
+		$budgetQ = $dbc->prepare("SELECT b.budgetDate, SUM(b.budget)
 			FROM gfm_approach.daily_dept_sales_budget b
 			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
 			WHERE b.budgetDate BETWEEN ? AND ?  AND m.storeNo = ?
-			GROUP BY m.superDeptNo,WEEK(b.budgetDate)
-			ORDER BY m.superDeptNo,MAX(YEAR(b.budgetDate)), WEEK(b.budgetDate)");
-        $budgetR = $dbc->execute($budgetQ,$args);
+			GROUP BY b.budgetDate
+			ORDER BY b.budgetDate");
+		$budgetR = $dbc->execute($budgetQ, $args);
 
-        $args = array($startLastYear->format('Y-m-d'), $endLastYear->format('Y-m-d'),$store);
-        $lastYearQ = $dbc->prepare('SELECT WEEK(s.`date`) ,SUM(s.creditAmt) as deptSales, m.superDeptNo
-        	FROM gfm_approach.daily_sales_sage s
-			JOIN gfm_approach.sage_to_core_acct_maps m on s.accountID = m.sageAcctNo
-			WHERE `date` BETWEEN ? AND ? AND m.storeNo = ? GROUP BY m.superDeptNo, WEEK(s.`date`)
-			ORDER BY m.superDeptNo,MAX(YEAR(s.`date`)), WEEK(s.`date`)');
-        $lastYearR = $dbc->execute($lastYearQ,$args);
+		$startHist = $dates['historyStart'];
+		$endDateHist = $dates['historyEnd'];
 
-        $args = array($startThisYear->format('Y-m-d').' 00:00:00', $endThisYear->format('Y-m-d').' 23:59:59', $store);
-        $salesQ = $dbc->prepare("SELECT WEEK(t.tdate), sum(t.total), s.superID
-			FROM {$dlog} t
+		$args = array($startHist->format('Y-m-d H:i:s'),$endDateHist->format('Y-m-d H:i:s'),$store);
+		$lastYearQ = $dbc->prepare("SELECT DATE(t.tdate), sum(t.total)
+			FROM trans_archive.dlogbig t
 			JOIN core_op.superdepts s on t.department = s.dept_ID
-			WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id = ?
+			WHERE t.`tdate` BETWEEN ? AND ?  AND t.store_id = ?
 			AND t.trans_type IN ('D', 'I') AND s.superID < 14
-			AND WEEK(t.tdate) != WEEK(NOW())
-			GROUP BY s.superID,WEEK(t.tdate) ORDER BY s.superID,MAX(YEAR(t.tdate)), WEEK(t.tdate)");
-        $salesR = $dbc->execute($salesQ, $args);
+			GROUP BY DATE(t.tdate)
+            ORDER BY DATE(t.tdate)");
+		$lastYearR = $dbc->execute($lastYearQ,$args);
 
-        $i=0;
-        $nextDept = 2; // starts at 2 assuming the first dept is 1
-        //$report = array();
-        while($budgetW = $dbc->fetchRow($budgetR)){
-        	//echo '<script>console.log("'.$nextDept.' : '.$budgetW[2].'");</script>';
-        	//Checking what department we are in by dept_no
-        	if($budgetW[2] == $nextDept){	
-        		$data[] = $report;
-        		$report = array();
-        		$nextDept = $budgetW[2] + 1;
-        		if($store == 1 && $nextDept == 5) {$nextDept = 6;};
-        		//$data[] = $report;
-        		//$report = $data[$nextDept];
-        		//$report = array();
-        	}
-        	$record = array();
-       
-        	// calculate the date start from the numaric date
-			$graphDate = new DateTime();
-			$graphDate->setISODate(date('Y'),$budgetW[0]+1);
-			$graphDate->modify('this Saturday');
-			$record[] = $graphDate->format('m-d');
-			echo '<script>console.log(" Budget Date:'.($budgetW[0]+1).'");</script>';
-        	//$record[] = sprintf('%.2f',$budgetW[2]);
-        	$record[] = $budgetW[1];//number_format($budgetW[1],2);//sprintf('$%.2f',$budgetW[1]);
-        	//$record[] = sprintf('%.2f',$lastYearW[2]);
-        	$report[] = $record;
-
-        }
-        $data[] = $report; // deal with the last value.
-
-
-
-        $nextDept = 2;
-        $currentDept = 1;
-        $report = $data[0]; // start with the dept 1 report.
-        $i=0;
-        while($salesW = $dbc->fetchRow($salesR)){
-        	//echo '<script>console.log(" SALES:'.$nextDept.' : '.$salesW[2].'");</script>';
-        	if($salesW[2] == $nextDept){	
-        		if ($i < sizeof($report)) {
-        			while ($i < sizeof($report)){
-        				$report[$i] = array_merge($report[$i],array(0)); ;
-        				$i++;
-        			}	
-        		}
-        		$data[$currentDept - 1] = $report;
-        		$report = $data[$currentDept];
-        		//$report = $data[$nextDept - 1];
-        		$nextDept = $salesW[2] + 1;
-        		if($store == 1 && $nextDept == 5) {$nextDept = 6;}; // this is a cludge to take out beer for greenfield.
-        		$currentDept = ($store == 1 && $nextDept > 4) ? $nextDept - 2 : $nextDept -1;
-        		$i = 0;
-        	}
-        	$record = array();
-        	$record[] = $salesW[1];//sprintf('%.2f',$salesW[1]);
-        	if(array_key_exists($i,$report)){ $report[$i] = array_merge($report[$i],$record); }
-        	$i++;
-        }
-        if ($i < sizeof($report)) {
-      		while ($i < sizeof($report)){
-      			$report[$i] = array_merge($report[$i],array(0)); ;
-       			$i++;
-       		}	
-       	}
-        $data[$currentDept-1] = $report; // loop doesn't assign the last set.
-        
-        $nextDept = 2;
-        $currentDept = 1;
-        $report = $data[0]; // start with the dept 1 report.
-        $i=0;
-        while($lastYearW = $dbc->fetchRow($lastYearR)){
-        	if($lastYearW[2] == $nextDept){	
-        		$data[$currentDept - 1] = $report;
-        		$report = $data[$currentDept];
-        		//$report = $data[$nextDept - 1];
-        		$nextDept = $lastYearW[2] + 1;
-        		if($store == 1 && $nextDept == 5) {$nextDept = 6;}; // this is a cludge to take out beer for greenfield.
-        		$currentDept = ($store == 1 && $nextDept > 4) ? $nextDept - 2 : $nextDept -1;
-        		$i = 0;
-        	}
-        	$record = array();
-        	$record[] = $lastYearW[1];//sprintf('%.2f',$lastYearW[1]);
-        	if(array_key_exists($i,$report)){ $report[$i] = array_merge($report[$i],$record); }
-        	$i++;
-        }
-        $data[$currentDept-1] = $report; // loop doesn't assign the last set.
-
-        /*
-        
-			$record = array();
-			//$record[] = $row[0];
-			$record[] = (array_key_exists(1, $row)) ? $row[1] :  0;
-			//$record[] = $row[1];
-			if(array_key_exists($i,$data)){ $data[$i] = array_merge($data[$i],$record); }
+		$intervals = $dates['intervals'];
+		$historicals =$dates['historicals'];
 		
-        */
+		
+		//inerval counters for while loop
+		$intervalKey = 1;
+		$intervalDate = $intervals[0];
+		$writeInterval = false;
 
-        return $data;
+
+		$data = array(); // 'Dept' => array(thisData,$lastData, $budgetData)
+		//arrays for saving intervals once the sum is complate.
+		$thisData = array();
+		$lastData = array();
+		$budgetData = array();
+		$dateLables = array();
+		//variables for summing one interval.
+		$thisTotal=0;
+		$lastTotal=0;
+		$budgetTotal=0;
+		//format the results into our intervals.
+		while($budgetRow = $dbc->fetchRow($budgetR)) {
+			$lastRow = $dbc->fetchRow($lastYearR);
+			$thisRow = $dbc->fetchRow($thisYearR);
+			$currentDate = $budgetRow[0];
+			$writeInterval = false;
+			//if the current date is less then the start of the next interval then
+			//we are still inside the current interval with the exception of when we swich departments.
+			if($currentDate < $intervals[$intervalKey]) {
+
+				$thisTotal += $thisRow[1];
+				$lastTotal += $lastRow[1];
+				$budgetTotal += $budgetRow[1];
+
+			} else { // we are in a new interval need to write out the last, reset coutners, and start a new sum
+				$writeInterval = true;
+			}
+
+			//write out the interval, happens two places in the last if so I put it here for bervity.
+			if($writeInterval) {
+				$writeInterval = false;
+				//write out the old interval into the new array.
+				$thisData[$intervalDate] = $thisTotal;
+				$lastData[$intervalDate] =  $lastTotal;
+				$budgetData[$intervalDate] = $budgetTotal;
+				$dateLables[] = $intervalDate;
+				//reset our interval counters
+				$intervalDate = $intervals[$intervalKey];
+				$intervalKey++;
+				//start a new sum for the new interval.
+				$thisTotal = $thisRow[1];
+				$lastTotal = $lastRow[1];
+				$budgetTotal = $budgetRow[1];
+				
+			}
+		}
+
+						$thisData[$intervalDate] = $thisTotal;
+				$lastData[$intervalDate] =  $lastTotal;
+				$budgetData[$intervalDate] = $budgetTotal;
+		//the last interval doesn't catch so we need to write out the last one outside the loop
+		//$thisData[$intervalDate] = $thisTotal;
+		//$lastData[$historicals[$intervalKey+1]] =  $lastTotal;
+		//$budgetData[$intervalDate] = $budgetTotal;
+		$return = array('weekDateStarts'=> $dateLables,
+						'thisYear' => $thisData, 
+						'lastYear' => $lastData, 
+						'budget' => $budgetData);
+
+		return $return;
 	}
 
-	function getCustomerCount ($dbc, $store,$d1,$d2, $dlog) {
-		$startDate = DateTime::createFromFormat('Y-m-d' ,$d1);
-		$startDay = $startDate->format('l');
-		$endDate = DateTime::createFromFormat('Y-m-d' ,$d2);
-		$endDay = $endDate->format('l');
-		$interval = $startDate->diff($endDate);
-		$changeS = ($interval->d+1)*4; // go back four intervals, the days are one shorter then we want.
-		$changeE = ($interval->d+1)*3;
-		$startDate->modify("-{$changeS} days");
-		$endDate->modify("+{$changeE} days");
+	private function getDeptTotalsNew($dbc, $dlog, $dlogHist, $store, $dates) {
+		$return = array();
+		//prepare and exicute all the SQL so we can sort it in our loops.
+		$start = $dates['start'];
+		$end = $dates['end'];
 
+		$args = array($start->format('Y-m-d H:i:s'),$end->format('Y-m-d H:i:s'), $store);
+		$thisYearQ = $dbc->prepare("SELECT DATE(t.tdate), sum(t.total), s.superID
+			FROM core_trans.dlog_90_view t
+			JOIN core_op.superdepts s on t.department = s.dept_ID
+			WHERE t.`tdate` BETWEEN ? AND ?  AND t.store_id = ?
+			AND t.trans_type IN ('D', 'I') AND s.superID < 14
+			AND WEEK(t.tdate) != WEEK(NOW())
+			GROUP BY s.superID,DATE(t.tdate)
+            ORDER BY s.superID,DATE(t.tdate)");
+		$thisYearR  = $dbc->execute($thisYearQ,$args);
 		
-		$startDateHist = DateTime::createFromFormat('Y-m-d' ,$d1);
-		$endDateHist = DateTime::createFromFormat('Y-m-d' ,$d2);
-		$startDateHist->modify('-52 weeks');
-		//$startDateHist->modify("next {$startDay}");
-		$startDateHist->modify("-{$changeS} days");
-		$endDateHist->modify('-52 weeks');
-		//$endDateHist->modify("next {$endDay}");
-		$endDateHist->modify("+{$changeE} days");
+		$end->modify('-1 day');
+		$args = array($start->format('Y-m-d'),$end->format('Y-m-d'), $store);
+		$budgetQ = $dbc->prepare("SELECT b.budgetDate, SUM(b.budget),m.superDeptNo
+			FROM gfm_approach.daily_dept_sales_budget b
+			JOIN gfm_approach.sage_to_core_acct_maps m on b.sageAcctNo = m.sageAcctNo
+			WHERE b.budgetDate BETWEEN ? AND ?  AND m.storeNo = ?
+			GROUP BY m.superDeptNo, b.budgetDate
+			ORDER BY m.superDeptNo,b.budgetDate");
+		$budgetR = $dbc->execute($budgetQ, $args);
+
+		$end->modify('+1 day');
+		$startHist = $dates['historyStart'];
+		$endDateHist = $dates['historyEnd'];
+
+		$args = array($startHist->format('Y-m-d H:i:s'),$endDateHist->format('Y-m-d H:i:s'),$store);
+		$lastYearQ = $dbc->prepare("SELECT DATE(t.tdate), sum(t.total), s.superID
+			FROM trans_archive.dlogbig t
+			JOIN core_op.superdepts s on t.department = s.dept_ID
+			WHERE t.`tdate` BETWEEN ? AND ?  AND t.store_id = ?
+			AND t.trans_type IN ('D', 'I') AND s.superID < 14
+			AND WEEK(t.tdate) != WEEK(NOW())
+			GROUP BY s.superID,DATE(t.tdate)
+            ORDER BY s.superID,DATE(t.tdate)");
+		$lastYearR = $dbc->execute($lastYearQ,$args);
+
+		$intervals = $dates['intervals'];
+		$historicals =$dates['historicals'];
+		
+		//department counters for while loop
+		$currentDept = 1;
+		//$lastDept = 0; //we need to track this because we only know to write the last line when we see the new dept on the next.
+		$nextDept = 2;
+		$writeDept = false;
+		
+		//inerval counters for while loop
+		$intervalKey = 1;
+		$intervalDate = $intervals[0];
+		$writeInterval = false;
+
+
+		$data = array(); // 'Dept' => array(thisData,$lastData, $budgetData)
+		//arrays for saving intervals once the sum is complate.
+		$thisData = array();
+		$lastData = array();
+		$budgetData = array();
+		$theseDates = array();
+		//variables for summing one interval.
+		$thisTotal=0;
+		$lastTotal=0;
+		$budgetTotal=0;
+		//format the results into our intervals.
+		while($budgetRow = $dbc->fetchRow($budgetR)) {
+			$lastRow = $dbc->fetchRow($lastYearR);
+			$thisRow = $dbc->fetchRow($thisYearR);
+			$lastDept = $currentDept; //this will give us the proper department when we write the last line.
+			$currentDept = $budgetRow[2];
+			$currentDate = $budgetRow[0];
+			$writeInterval = false;
+			$writeDept = false;
+			//if the current date is less then the start of the next interval then
+			//we are still inside the current interval with the exception of when we swich departments.
+			if($currentDate < $intervals[$intervalKey]) {
+				if($currentDept == $nextDept) {
+					//increment our department counter.
+					$nextDept++;
+					if($store == 1 && $nextDept == 5) {$nextDept = 6;};
+					//write the interval.
+					$intervalKey = 0;
+					$writeInterval = true;
+					$writeDept = true;
+				} else { // if the date and the dept are both good we can just keep summing here.
+					$thisTotal += $thisRow[1];
+					$lastTotal += $lastRow[1];
+					$budgetTotal += $budgetRow[1];
+				}
+			} else { // we are in a new interval need to write out the last, reset coutners, and start a new sum
+				$writeInterval = true;
+			}
+
+			//write out the interval, happens two places in the last if so I put it here for bervity.
+			if($writeInterval) {
+				$writeInterval = false;
+				//write out the old interval into the new array.
+				$theseDates[] = $intervalDate;
+				$thisData[$intervalDate] = $thisTotal;
+				$lastData[$intervalDate] = $lastTotal;
+				$budgetData[$intervalDate] = $budgetTotal;
+				
+				if ($writeDept) {
+					$data[$lastDept] = array($theseDates,$thisData,$lastData,$budgetData);
+					//zero out the department daata for the new department.
+					$thisData = array();
+					$lastData = array();
+					$budgetData = array();
+					$theseDates = array();
+				}
+
+				//reset our interval counters
+				$intervalDate = $intervals[$intervalKey];
+				$intervalKey++;
+				//start a new sum for the new interval.
+				$thisTotal = $thisRow[1];
+				$lastTotal = $lastRow[1];
+				$budgetTotal = $budgetRow[1];
+			}
+		}
+		
+		$theseDates[] = $intervalDate;
+		$thisData[$intervalDate] = $thisTotal;
+		$lastData[$intervalDate] = $lastTotal;
+		$budgetData[$intervalDate] = $budgetTotal;
+		$data[$lastDept] = array($theseDates,$thisData,$lastData,$budgetData);
+		//$return = array($thisData, $lastData, $budgetData);
+
+
+		return $data;
+	}
+
+	function getCustomerCount ($dbc,$dlog,$dlogHist, $store, $dates,$totals,$histTotals) {
+
+		$start = $dates['start'];
+		$end = $dates['end'];
+
+		$args= array($start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'), $store);
+		$countQ = $dbc->prepare("SELECT DATE(tdate), SUM(DISTINCT(trans_num))
+            FROM trans_archive.dlogbig as t
+            WHERE 
+            t.tdate BETWEEN ? and ?
+            and t.trans_type = 'T'
+            AND t.upc <> 'RRR'
+            AND t.store_id = ?
+            group by DATE(t.tdate)
+            order by Date(t.tdate)");
+		$countR = $dbc->execute($countQ,$args);
+
+
+		$startHist = $dates['historyStart'];
+		$endDateHist = $dates['historyEnd'];
+
+		$args = array($startHist->format('Y-m-d H:i:s'),$endDateHist->format('Y-m-d H:i:s'), $store);
+		$historyQ = $dbc->prepare("SELECT DATE(tdate), SUM(DISTINCT(trans_num))
+            FROM trans_archive.dlogbig as t
+            WHERE 
+            t.tdate BETWEEN ? and ?
+            and t.trans_type = 'T'
+            AND t.upc <> 'RRR'
+            AND t.store_id = ?
+            group by DATE(t.tdate)
+            order by Date(t.tdate)");
+		$historyR = $dbc->execute($historyQ,$args);
+		
+		$basketData = array();
+		$basketHistory = array();
+		$countData = array();
+		$countTotal = 0;
+		$historyData = array();
+		$historyTotal = 0;
+		$count = 0;
 
 		$chartLabels = array();
-		$labelDate = DateTime::createFromFormat('Y-m-d', $startDate->format('Y-m-d'));
-		$labelDate->modify('this Saturday');
-		$changeL = $interval->d+1;
-		for ($i=0; $i < 8; $i++) { 
-			$chartLabels[] = $labelDate->format('m-d');
-			$labelDate->modify("+{$changeL} days");
+
+		//inerval counters for while loop
+		$intervals = $dates['intervals'];
+		$historicals = $dates['historicals'];
+		$intervalKey = 1;
+		$intervalDate = $intervals[0];
+		//$historicalDate = $historicals[0];
+		
+		while($historyRow = $dbc->fetchRow($historyR)) {
+			$countRow = $dbc->fetchRow($countR);
+			$currentDate = $historyRow[0];
+			if($currentDate < $historicals[$intervalKey]) {
+				$countTotal += $countRow[1];
+				$historyTotal += $historyRow[1];
+				if($intervalKey == 3) {
+					$count += $countRow[1];
+				}
+			} else { // we are in a new interval need to write out the last, reset coutners, and start a new sum
+				$countData[] = $countTotal;
+				$historyData[] = $historyTotal;
+				$chartLabels[] = $intervalDate;
+				$basketData[] = $totals[$intervalDate]/$countTotal;
+				$basketHistory[] = $histTotals[$intervalDate]/$historyTotal;
+				//reset our interval counters
+				$intervalDate = $intervals[$intervalKey];
+				$intervalKey++;
+				// start new sums
+				$countTotal = $countRow[1];
+				$historyTotal = $historyRow[1];
+			}
 		}
 
-		echo '<script>console.log(" Interval:'.$interval->d.'");</script>';
-		
-		$args= array($startDate->format('Ymd'), $endDate->format('Ymd'), $store);
-		$custCountQ = $dbc->prepare("SELECT 
-			count(distinct concat(t.trans_num, t.date_id)) AS customerCount, t.date_id 
-			FROM {$dlog} t 
-			WHERE t.date_id BETWEEN ? AND ? AND t.store_id=? 
-			AND WEEK(t.tdate) != WEEK(NOW())
-			GROUP BY t.date_id");
-		$custCountR = $dbc->execute($custCountQ,$args);
+		$countData[] = $countTotal;
+		$historyData[] = $historyTotal;
+		$chartLabels[] = $intervalDate;
 
-
-		
-		$chartLine1 = array();
-		$chartLine2 = array();
-		$i = 0;
-		$key = -1;
-		$countLine = false;
-		$count = 0;
-		while($row = $dbc->fetchRow($custCountR)) {
-			if($i==0) {
-				$startDateI = DateTime::createFromFormat('Ymd', $row[1]);
-				$countLine = ($startDateI->format('Y-m-d') == $d1) ? true : false ;
-				//$chartLabels[] = $startDateI->format('m-d');
-				$chartLine1[] = $row[0];
-				if($countLine)
-					$count += $row[0];
-				$key++;
-			} else {
-				$chartLine1[$key] += $row[0];
-				if($countLine)
-					$count += $row[0];
-			} 
-
-			$i = ($i < $interval->d) ? $i+1 : 0 ;
-		}
-		
-		$dlogHist = DTransactionsModel::selectDLog($startDateHist->format('Y-m-d'),$endDateHist->format('Y-m-d'));
-		$args = array($startDateHist->format('Ymd'),$endDateHist->format('Ymd'),$store);
-		$custCtHistQ = $dbc->prepare("SELECT 
-			count(distinct concat(t.trans_num, t.date_id)) AS customerCount, t.date_id 
-			FROM {$dlogHist} t 
-			WHERE t.date_id BETWEEN ? AND ? AND t.store_id=? 
-			AND WEEK(t.tdate) != WEEK(NOW())
-			GROUP BY t.date_id");
-		$custCtHistR = $dbc->execute($custCtHistQ,$args);
-		$key = -1;
-		$i = 0;
-		while($row = $dbc->fetchRow($custCtHistR)) {
-			if($i==0) {
-				$key++;
-				//$startDateI = DateTime::createFromFormat('Ymd', $row[1]);
-				$chartLine2[] = $row[0];
-				//$table[$key][] = $row[0];	
-			} else {
-				$chartLine2[$key] += $row[0];
-				//$table[$key][2] = $table[$key][2] + $row[0];
-			} 
-
-			$i = ($i < $interval->d) ? $i+1 : 0 ;
-		}
-
-		$this->custChart = array($chartLabels,$chartLine1,$chartLine2);
+		$this->custChart = array($chartLabels,$countData,$historyData);
+		$this->basketChart = array($chartLabels,$basketData, $basketHistory);
 		
 		$this->customerCount = $count;
-		echo '<script>console.log(" Table:'.$this->customerCount.'");</script>';
 
 		return true;
 
 	}
 
-	function getFiscalYearBalnce($date,$dbc, $store, $dlog) {
-		$endDate = new DateTime($date->format('Y-m-d'));
-		if($date->format('n') >= 10) {
-       		$date->modify('first day of october');
+	function getFiscalYearBalnce($d1, $d2,$dbc, $store, $dlog) {
+		$endDate = DateTime::createFromFormat('Y-m-d',$d2);
+		$intervalDate = DateTime::createFromFormat('Y-m-d', $d1);
+		// our fiscal year starts on october 1st so we need to back out to the correct one.
+		if($intervalDate->format('n') >= 10) {
+       		$intervalDate->modify('first day of october');
    		} else {
-       		$date->modify('first day of october last year');
+       		$intervalDate->modify('first day of october last year');
    		}
-   		$date->setTime(00,00,00);
+   		$intervalDate->setTime(00,00,00);
 		$endDate->setTime(23,59,58);
-   		$args = array($date->format('Y-m-d H:i:s'), $endDate->format('Y-m-d H:i:s'),$store);
-   		$salesTotalQ = $dbc->prepare("");
+   		$args = array($intervalDate->format('Y-m-d H:i:s'), $endDate->format('Y-m-d H:i:s'),$store);
 
-   		$salesTotalQ = $dbc->prepare("SELECT SUM(t.total), s.superID FROM {$dlog} t
+
+   		$salesTotalQ = $dbc->prepare("SELECT SUM(t.total), s.superID FROM trans_archive.dlogbig t
 			JOIN core_op.superdepts s on t.department=s.dept_ID
 			WHERE  t.tdate BETWEEN ? AND ? AND t.store_id = ?
-			AND t.trans_type IN ('D', 'I') AND s.superID<15
+			AND t.trans_type IN ('D', 'I') AND s.superID between 1 and 13 and s.superID !=5
 			GROUP BY s.superID ORDER BY s.superID");
    		$salesTotalR = $dbc->execute($salesTotalQ,$args);
 
-   		$args = array($date->format('Y-m-d'), $endDate->format('Y-m-d'),$store);
+   		$args = array($intervalDate->format('Y-m-d'), $endDate->format('Y-m-d'),$store);
 		$budgetTotalQ = $dbc->prepare("SELECT SUM(b.budget) , m.superDeptNo
 			FROM gfm_approach.daily_dept_sales_budget b
 			JOIN gfm_approach.sage_to_core_acct_maps m ON b.sageAcctNo = m.sageAcctNo
@@ -500,57 +529,97 @@ class BudgetSalesReport extends FannieReportPage
 
 		$yearBalance = array();
 		$yearBalance[] = 0;
-		while($row = $dbc->fetchRow($salesTotalR)) {
-			$yearBalance[0] += $row[0];
-			$yearBalance[] = $row[0];
-		}
-		//$return = array();
+		
 		$budget = array();
 		$budget[] = 0;
 		$key = 0;
-		while ($row = $dbc->fetchRow($budgetTotalR)) {
+		while($budgetRow = $dbc->fetchRow($budgetTotalR)) {
+			$salesRow = $dbc->fetchRow($salesTotalR);
+			$deptKey = $budgetRow[1];
 			$key++;
-			$yearBalance[0] -= $row[0];
-			if ($key < 13)
-				$yearBalance[$key] = $yearBalance[$key] - $row[0];
-			//$key++;
+			$yearBalance[0] += $salesRow[0] - $budgetRow[0];
+			if($key < 13)
+				$yearBalance[$deptKey] = $salesRow[0] - $budgetRow[0]; 
 		}
 
 		return $yearBalance;
    	}
 
-   	private function calcDates($date1, $date2) {
-   		$startDate = DateTime::createFromFormat('Y-m-d' ,$date1);
-		$startDay = $startDate->format('l');
-		$endDate = DateTime::createFromFormat('Y-m-d' ,$date2);
-		$endDay = $endDate->format('l');
-		
-		if($startDate->format('m')==$endDate->format('m')){
-			
+   	private function calcDates($d1, $d2) {
+   		// we always have 8 intervals start dates, table inserval the user selected and three before
+		// and three after for display on the graph the extra is that start of the next interval to
+		// use as an end date in searches and for less then comparisons.
+		$intervals = array(); //interval start dates for current year and budget
+		$historicals = array(); //interval start dates for last year.
+		$tableIntervalDate = DateTime::createFromFormat('Y-m-d', $d1); //interval start to display on the table.
+
+		$startDate = DateTime::createFromFormat('Y-m-d', $d1);
+		$startDateLastYear = DateTime::createFromFormat('Y-m-d', $d1);
+		$startDateLastYear->modify('-52 weeks');
+		$endDate = DateTime::createFromFormat('Y-m-d', $d2);
+		$interval = $startDate->diff($endDate);
+
+		$delta = '';
+		$startDelta = '';
+		//are we in a month?
+		if($startDate->format('Y-m-d') == $startDate->format('Y-10-01') 
+   			&& $endDate->format('Y-m-d') == $endDate->format('Y-09-t')){
+			// iinterval is a year.
+			$startDelta = "-4 years";
+			$delta = "+1 year";
+		} else if($startDate->format('Y-m-d') == $startDate->format('Y-m-01') 
+		 			 && $endDate->format('Y-m-d') == $startDate->format('Y-m-t')) {
+			//inserval is a single month 
+			$startDelta = "-4 months";
+			$delta = "+1 month";
+	
+		} else if($startDate->format('Y-m-d') == $startDate->format('Y-m-01') 
+				  && $endDate->format('Y-m-d') == $endDate->format('Y-m-t')) {
+			//inserval is a number of months.
+			$startDelta = "-".(4*($interval->m+1))." months";
+			$delta = "+".($interval->m+1)." months";
+	
+		} else if(($interval->d +1)%7 == 0) {
+			// the interval is some number of weeks
+			$delta = "+".(($interval->d+1)/7)."weeks"; //how many weeks is the interval
+			$startDelta = "-".(4*(($interval->d+1)/7))." weeks"; //how far back to start
+	
+		} else {
+			//interval is in days;
+			$delta = "+".($interval->d+1)." days"; //how may days is the interval
+			$startDelta = "-".(4*$delta)." days"; //how far back to start
+	
 		}
 
-		$interval = $startDate->diff($endDate);
-		$changeS = ($interval->d+1)*4; // go back four intervals, the days are one shorter then we want.
-		$changeE = ($interval->d+1)*3;
-		$startDate->modify("-{$changeS} days");
-		$endDate->modify("+{$changeE} days");
+		$startDate->modify($startDelta);
+		$startDateLastYear->modify($startDelta);
 
-		
-		$startDateHist = DateTime::createFromFormat('Y-m-d' ,$date1);
-		$endDateHist = DateTime::createFromFormat('Y-m-d' ,$date2);
-		$startDateHist->modify('-52 weeks');
-		//$startDateHist->modify("next {$startDay}");
-		$startDateHist->modify("-{$changeS} days");
-		$endDateHist->modify('-52 weeks');
-		//$endDateHist->modify("next {$endDay}");
-		$endDateHist->modify("+{$changeE} days");
+		for($i =0;$i<8;$i++) {
+			$startDate->modify($delta);
+			$startDateLastYear->modify($delta);
+			$intervals[] = $startDate->format('Y-m-d');
+			$historicals[] = $startDateLastYear->format('Y-m-d');
+		}
+
+		$start = DateTime::createFromFormat('Y-m-d',$intervals[0]);
+		$start->setTime(00,00,00);
+		$end = DateTime::createFromFormat('Y-m-d',$intervals[7]);
+		$end->setTime(00,00,00);
+		$historyStart = DateTime::createFromFormat('Y-m-d',$historicals[0]);
+		$historyStart->setTime(00,00,00);
+		$historyEnd = DateTime::createFromFormat('Y-m-d',$historicals[7]);
+		$historyEnd->setTime(00,00,00);
+
+		$endDate->setTime(23,59,58);
 
    		return array(
-   			'start' => $startDate,
-   			'end' => $endDate,
-   			'startHist' => $startDateHist,
-   			'endHist' => $endHist,
-   			'interval' => 0
+   			"intervals" => $intervals,
+   			"historicals" => $historicals,
+   			"tableIntervalDate" => $tableIntervalDate,
+   			"start" => $start,
+   			"end" => $end,
+   			"historyStart" => $historyStart,
+   			"historyEnd" => $historyEnd
    		);
    	}
 
@@ -593,7 +662,7 @@ class BudgetSalesReport extends FannieReportPage
 			$basketSize = '$'.number_format($number/$this->customerCount,2);
 			return array('','Customer Count',$this->customerCount,'' ,'Basket Size', $basketSize, '');
 		}
-
+		
 		return array();
 	}
 
@@ -632,7 +701,7 @@ class BudgetSalesReport extends FannieReportPage
     			var deptCharts = '.json_encode($this->deptCharts) .';
     			var deptCanvases ='.json_encode($this->deptCanvases).';
     			var canvasPos = '.json_encode($this->canvasPos).';
-    			var chartTitles = '.json_encode($this->deptNames).';
+    			var chartTitles = '.json_encode($this->chartTitles).';
     			var custChart = '.json_encode($this->custChart).';
     			var basketChart = '.json_encode($this->basketChart).';
 			</script>';

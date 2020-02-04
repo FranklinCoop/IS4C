@@ -46,6 +46,8 @@ class PayPalTender extends TenderModule
             );
         }
 
+        $parentCheck = TenderModule::errorCheck();
+
         return true;
     }
     

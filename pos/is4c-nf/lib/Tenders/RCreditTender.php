@@ -46,6 +46,8 @@ class RCreditTender extends TenderModule
             );
         }
 
+        $parentCheck = TenderModule::errorCheck();
+
         return true;
     }
     

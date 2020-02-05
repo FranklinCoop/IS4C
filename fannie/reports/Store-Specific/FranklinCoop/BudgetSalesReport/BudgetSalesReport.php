@@ -196,7 +196,7 @@ class BudgetSalesReport extends FannieReportPage
 
 		$args = array($startHist->format('Y-m-d H:i:s'),$endDateHist->format('Y-m-d H:i:s'),$store);
 		$lastYearQ = $dbc->prepare("SELECT DATE(t.tdate), sum(t.total)
-			FROM {$dlog} t
+			FROM {$dlogHist} t
 			JOIN core_op.superdepts s on t.department = s.dept_ID
 			WHERE t.`tdate` BETWEEN ? AND ?  AND t.store_id = ?
 			AND t.trans_type IN ('D', 'I') AND s.superID < 14
@@ -307,7 +307,7 @@ class BudgetSalesReport extends FannieReportPage
 
 		$args = array($startHist->format('Y-m-d H:i:s'),$endDateHist->format('Y-m-d H:i:s'),$store);
 		$lastYearQ = $dbc->prepare("SELECT DATE(t.tdate), sum(t.total), s.superID
-			FROM {dlog} t
+			FROM {dlogHist} t
 			JOIN core_op.superdepts s on t.department = s.dept_ID
 			WHERE t.`tdate` BETWEEN ? AND ?  AND t.store_id = ?
 			AND t.trans_type IN ('D', 'I') AND s.superID < 14
@@ -431,7 +431,7 @@ class BudgetSalesReport extends FannieReportPage
 
 		$args = array($startHist->format('Y-m-d H:i:s'),$endDateHist->format('Y-m-d H:i:s'), $store);
 		$historyQ = $dbc->prepare("SELECT DATE(tdate), SUM(DISTINCT(trans_num))
-            FROM {$dlog} as t
+            FROM {$dlogHist} as t
             WHERE 
             t.tdate BETWEEN ? and ?
             and t.trans_type = 'T'

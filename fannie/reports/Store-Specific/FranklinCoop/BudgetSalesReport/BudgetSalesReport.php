@@ -415,7 +415,7 @@ class BudgetSalesReport extends FannieReportPage
 
 		$args= array($start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'), $store);
 		$countQ = $dbc->prepare("SELECT DATE(tdate), SUM(DISTINCT(trans_num))
-            FROM {dlog} t
+            FROM {$dlog} t
             WHERE 
             t.tdate BETWEEN ? and ?
             and t.trans_type = 'T'

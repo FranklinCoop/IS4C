@@ -98,9 +98,6 @@ class BudgetSalesReport extends FannieReportPage
 		$dlog = DTransactionsModel::selectDLog($dates['start']->format('Y-m-d'),$dates['end']->format('Y-m-d'));
 		$dlogHist = DTransactionsModel::selectDLog($dates['historyStart']->format('Y-m-d'),$dates['historyEnd']->format('Y-m-d'));
 
-
-		echo 'StartDate: '.$dates['start']->format('Y-m-d').' EndDate: '.$dates['end']->format('Y-m-d').'</br>';
-		echo 'dlog: '.$dlog.' dlogHist: '.$dlogHist.'/br';
 		//$yearTotals = $this->getFiscalYearBalnce($dates['end'],$dbc, $store, $dlog);
 		$departmentTotals = $this->getDeptTotalsNew($dbc, $dlog, $dlogHist,$store,$dates);
 		$storeTotals = $this->getStoreTotals($dbc, $dlog, $dlogHist,$store,$dates);

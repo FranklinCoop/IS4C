@@ -101,7 +101,7 @@ class BudgetSalesReport extends FannieReportPage
 		//$yearTotals = $this->getFiscalYearBalnce($dates['end'],$dbc, $store, $dlog);
 		$departmentTotals = $this->getDeptTotalsNew($dbc, $dlog, $dlogHist,$store,$dates);
 		$storeTotals = $this->getStoreTotals($dbc, $dlog, $dlogHist,$store,$dates);
-		$yearTotals = $this->getFiscalYearBalnce($d1,$d2,$dbc, $store, $dlog);
+		$yearTotals = $this->getFiscalYearBalnce($d1,$d2,$dbc, $store);
 		$this->getCustomerCount($dbc, $dlog, $dlogHist,$store,$dates,$storeTotals['thisYear'],$storeTotals['lastYear']);
 
 		$return = array();
@@ -307,7 +307,7 @@ class BudgetSalesReport extends FannieReportPage
 
 		$args = array($startHist->format('Y-m-d H:i:s'),$endDateHist->format('Y-m-d H:i:s'),$store);
 		$lastYearQ = $dbc->prepare("SELECT DATE(t.tdate), sum(t.total), s.superID
-			FROM {dlogHist} t
+			FROM {$dlogHist} t
 			JOIN core_op.superdepts s on t.department = s.dept_ID
 			WHERE t.`tdate` BETWEEN ? AND ?  AND t.store_id = ?
 			AND t.trans_type IN ('D', 'I') AND s.superID < 14
@@ -415,7 +415,7 @@ class BudgetSalesReport extends FannieReportPage
 
 		$args= array($start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'), $store);
 		$countQ = $dbc->prepare("SELECT DATE(tdate), SUM(DISTINCT(trans_num))
-            FROM {dlog} as t
+            FROM {dlog} t
             WHERE 
             t.tdate BETWEEN ? and ?
             and t.trans_type = 'T'
@@ -431,7 +431,7 @@ class BudgetSalesReport extends FannieReportPage
 
 		$args = array($startHist->format('Y-m-d H:i:s'),$endDateHist->format('Y-m-d H:i:s'), $store);
 		$historyQ = $dbc->prepare("SELECT DATE(tdate), SUM(DISTINCT(trans_num))
-            FROM {$dlogHist} as t
+            FROM {$dlogHist} t
             WHERE 
             t.tdate BETWEEN ? and ?
             and t.trans_type = 'T'
@@ -495,7 +495,7 @@ class BudgetSalesReport extends FannieReportPage
 
 	}
 
-	function getFiscalYearBalnce($d1, $d2,$dbc, $store, $dlog) {
+	function getFiscalYearBalnce($d1, $d2,$dbc, $store) {
 		$endDate = DateTime::createFromFormat('Y-m-d',$d2);
 		$intervalDate = DateTime::createFromFormat('Y-m-d', $d1);
 		// our fiscal year starts on october 1st so we need to back out to the correct one.
@@ -509,6 +509,7 @@ class BudgetSalesReport extends FannieReportPage
    		$args = array($intervalDate->format('Y-m-d H:i:s'), $endDate->format('Y-m-d H:i:s'),$store);
 
 
+   		$dlog = DTransactionsModel::selectDLog($intervalDate->format('Y-m-d'),$endDate->format('Y-m-d'));
    		$salesTotalQ = $dbc->prepare("SELECT SUM(t.total), s.superID FROM {$dlog} t
 			JOIN core_op.superdepts s on t.department=s.dept_ID
 			WHERE  t.tdate BETWEEN ? AND ? AND t.store_id = ?

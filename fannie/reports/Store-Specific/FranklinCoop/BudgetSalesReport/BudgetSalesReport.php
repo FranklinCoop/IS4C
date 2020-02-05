@@ -47,7 +47,7 @@ class BudgetSalesReport extends FannieReportPage
     	8=>'Meat',9=>'Produce', 10=>'Body Care', 11 =>'Genral Merch', 12=>'Supplements');
     protected $deptNames = array(0 => 'Store Totals', 1 => 'Bakery', 2=> 'PFD', 3=>'Grocery', 4=>'Bulk', 5=>'Beer', 6=>'Cheese', 7=>'Dairy', 8=>'Frozen',
     	9=>'Meat',10=>'Produce', 11=>'Body Care', 12 =>'Genral Merch', 13=>'Supplements');
-    protected $deptToSuper = array(0=>0, 1=>1, 2=>2,3=>3, 4=>4, 5=>5, 6=>6, 7=>6,8=>6, 9=>6, 10=>7, 11=>8, 12=>8,13=>8);
+    protected $deptToSuper = array(0=>0, 1=>1, 2=>2,3=>3, 4=>4, 5=>4, 6=>5, 7=>5,8=>5, 9=>6, 10=>7, 11=>7, 12=>7);
     protected $tableNames = array(0=>'Totals', 1=> '', 2=>'',3=>'',4=>'',5=>'',6=>'Perishable',7=>'',8=>'Wellness');
     protected $deptCanvases = array('Bakery','PFD', 'Grocery', 'Bulk', 'Perishable', 'Perishable', 'Perishable', 'Perishable','Produce', 'Wellness','Wellness','Wellness');
     protected $canvasPos = array(2,3, 4, 5, 6, 6, 6,

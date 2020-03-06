@@ -451,7 +451,7 @@ class HouseCoupon extends SpecialUPC
                     FROM {$mAlt}dlog_90_view
                     WHERE trans_type='T'
                         AND trans_subtype='IC'
-                            AND upc='$upc'
+                            AND upc='{$upc}'
                             AND card_no=" . ((int)$this->session->get('memberID')) . "
                             AND tdate BETWEEN '{$infoW['startDate']}' AND '{$infoW['endDate']}'
                      GROUP BY upc, card_no";
@@ -460,7 +460,7 @@ class HouseCoupon extends SpecialUPC
                     FROM {$mAlt}dlog
                     WHERE trans_type='T'
                         AND trans_subtype='IC'
-                            AND upc='$upc'
+                            AND upc='{$upc}'
                             AND card_no=" . ((int)$this->session->get('memberID')) . "
                      GROUP BY upc, card_no";
             $lim1Qt = "SELECT SUM(quantity) AS quantity 

@@ -98,9 +98,13 @@ class BudgetSalesReport extends FannieReportPage
 		$dlog = DTransactionsModel::selectDLog($dates['start']->format('Y-m-d'),$dates['end']->format('Y-m-d'));
 		$dlogHist = DTransactionsModel::selectDLog($dates['historyStart']->format('Y-m-d'),$dates['historyEnd']->format('Y-m-d'));
 
+
+		echo 'StartDate: '.$dates['start']->format('Y-m-d').' EndDate: '.$dates['end']->format('Y-m-d').'</br>';
+		echo 'dlog: '.$dlog.' dlogHist: '.$dlogHist.'/br';
 		//$yearTotals = $this->getFiscalYearBalnce($dates['end'],$dbc, $store, $dlog);
-		$departmentTotals = $this->getDeptTotalsNew($dbc, $dlog, $dlogHist,$store,$dates);
+		$departmentTotals = $this->getDeptTotalsNew($dbc, $dlog, $dlogHist,$store,$dates, $dates['cutOffDate']);
 		$storeTotals = $this->getStoreTotals($dbc, $dlog, $dlogHist,$store,$dates);
+		//$this->calculateStoreTotals($departmentTotals,$dates['cutOffDate']);
 		$yearTotals = $this->getFiscalYearBalnce($d1,$d2,$dbc, $store);
 		$this->getCustomerCount($dbc, $dlog, $dlogHist,$store,$dates,$storeTotals['thisYear'],$storeTotals['lastYear']);
 
@@ -165,11 +169,47 @@ class BudgetSalesReport extends FannieReportPage
 		return $return;
 	}
 
+	private function calculateStoreTotals($deptData, $cutOffDate) {
+		// not complate, something I was trying to try and improve preformance by not having
+		// to double queiers.
+		$dateLables = $deptData[1][0];
+		$thisData = array();
+		$lastData = array();
+		$budgetData = array();
+		foreach ($deptData as $deptKey => $dept) {
+			foreach ($dateLables as $dateKey => $intervalDate) {
+				if (!(array_key_exists($intervalDate, $budgetData))) {
+					if ($intervalDate <= $cutOffDate)
+						$thisData[] = array($intervalDate => 0);
+					else
+						$thisData[] = array($intervalDate => Null);
+					$lastData[] = array($intervalDate =>0);
+					$budgetData[] = array($intervalDate =>0);
+				}
+				if ($intervalDate <= $cutOffDate)
+					$thisData[$intervalDate] += $dept[1][$intervalDate];
+				$lastData[$intervalDate] += $dept[2][$intervalDate];
+				$budgetData[$intervalDate] += $dept[3][$intervalDate];
+			}
+		}
+
+
+		// creates a return array.
+		$return = array('weekDateStarts'=> $dateLables,
+						'thisYear' => $thisData, 
+						'lastYear' => $lastData, 
+						'budget' => $budgetData);
+
+		return $return;
+	}
+
 	private function getStoreTotals($dbc, $dlog, $dlogHist, $store, $dates) {
 		//prepare and exicute all the SQL so we can sort it in our loops.
 		$start = $dates['start'];
 		$end = $dates['end'];
+		$cutOffDate = $dates['cutOffDate'];
 
+		// query this years sales data.
 		$args = array($start->format('Y-m-d H:i:s'),$end->format('Y-m-d H:i:s'), $store);
 		$thisYearQ = $dbc->prepare("SELECT DATE(t.tdate), sum(t.total)
 			FROM {$dlog} t
@@ -180,7 +220,8 @@ class BudgetSalesReport extends FannieReportPage
             ORDER BY DATE(t.tdate)");
 		$thisYearR  = $dbc->execute($thisYearQ,$args);
 		
-        $end->modify('-1 day');
+		// query last years sales data
+        $end->modify('-1 day'); //We get the wrong set if we don't do this, has to do with DATE vs DATETIME
 		$args = array($start->format('Y-m-d'),$end->format('Y-m-d'), $store);
 		$budgetQ = $dbc->prepare("SELECT b.budgetDate, SUM(b.budget)
 			FROM gfm_approach.daily_dept_sales_budget b
@@ -189,11 +230,11 @@ class BudgetSalesReport extends FannieReportPage
 			GROUP BY b.budgetDate
 			ORDER BY b.budgetDate");
 		$budgetR = $dbc->execute($budgetQ, $args);
-		$end->modify('+1 day');
+		$end->modify('+1 day'); //fix what we did on line 188ish
 
 		$startHist = $dates['historyStart'];
 		$endDateHist = $dates['historyEnd'];
-
+		// Query historical data.
 		$args = array($startHist->format('Y-m-d H:i:s'),$endDateHist->format('Y-m-d H:i:s'),$store);
 		$lastYearQ = $dbc->prepare("SELECT DATE(t.tdate), sum(t.total)
 			FROM {$dlogHist} t
@@ -229,45 +270,36 @@ class BudgetSalesReport extends FannieReportPage
 		//format the results into our intervals.
 		while($budgetRow = $dbc->fetchRow($budgetR)) {
 			$lastRow = $dbc->fetchRow($lastYearR);
+			$thisRow = $dbc->fetchRow($thisYearR);
 			$currentDate = $budgetRow[0];
-			//$writeInterval = false;
 			//if the current date is less then the start of the next interval then
-			//we are still inside the current interval with the exception of when we swich departments.
+			//we are still inside the current interval.
 			if($currentDate == $nextInterval) {
-				$dateLables[] = $intervalDate;
 				//reset our interval counters
 				$intervalDate = $intervals[$intervalKey];
 				$intervalKey++;
 				$nextInterval = $intervals[$intervalKey];
 			} 
 
+			// add the interval.
 			if (!(array_key_exists($intervalDate, $lastData))){
+				$dateLables[] = $intervalDate;
 				$lastData = array_merge($lastData, array($intervalDate => 0));
 				$budgetData = array_merge($budgetData, array($intervalDate => 0));
-				$thisData = array_merge($thisData, array($intervalDate =>0 ));
+				if($intervalDate <= $cutOffDate) // stop grahing data if the interval is incomplate.
+					$thisData = array_merge($thisData, array($intervalDate =>0 ));
+				else
+					$thisData = array_merge($thisData, array($intervalDate => Null));
 			}
-
-			//$thisTotal += $thisRow[1];
+			
+			//sum the interval.
+			if($intervalDate <= $cutOffDate) // stop grahing data if the interval is incomplate.
+				$thisData[$intervalDate] += $thisRow[1];
 			$lastData[$intervalDate] += $lastRow[1];
 			$budgetData[$intervalDate] += $budgetRow[1];
 		}
 
-		//inerval counters for while loop
-		$intervalKey = 1;
-		$intervalDate = $intervals[0];
-		$nextInterval = $intervals[$intervalKey];
-		while($thisRow = $dbc->fetchRow($thisYearR)) {
-			$currentDate = $thisRow[0];
-
-			if($currentDate == $nextInterval) {
-				$intervalDate = $intervals[$intervalKey];
-				$intervalKey++;
-				$nextInterval = $intervals[$intervalKey];
-
-			} 
-			$thisData[$intervalDate] += $thisRow[1];
-		}
-
+		// creates a return array.
 		$return = array('weekDateStarts'=> $dateLables,
 						'thisYear' => $thisData, 
 						'lastYear' => $lastData, 
@@ -276,7 +308,7 @@ class BudgetSalesReport extends FannieReportPage
 		return $return;
 	}
 
-	private function getDeptTotalsNew($dbc, $dlog, $dlogHist, $store, $dates) {
+	private function getDeptTotalsNew($dbc, $dlog, $dlogHist, $store, $dates, $cutOffDate) {
 		$return = array();
 		//prepare and exicute all the SQL so we can sort it in our loops.
 		$start = $dates['start'];
@@ -337,7 +369,7 @@ class BudgetSalesReport extends FannieReportPage
 		//format the results into our intervals.
 		while($budgetRow = $dbc->fetchRow($budgetR)) {
 			$lastRow = $dbc->fetchRow($lastYearR);
-			//$thisRow = $dbc->fetchRow($thisYearR);
+			$thisRow = $dbc->fetchRow($thisYearR);
 			$currentDate = $budgetRow[0];
 			
 			//echo '</br> Budget Date: '.$budgetRow[0].' LastDate: '.$lastRow[0].' This Date: '.$thisRow[0].'</br>';
@@ -351,7 +383,10 @@ class BudgetSalesReport extends FannieReportPage
 				//echo '***Department**** '.$department.'</br>';
 				$data[$department] = array();
 				$data[$department][] = array($intervalDate);
-				$data[$department][] = array($intervalDate => 0);
+				if ($intervalDate <= $cutOffDate)
+					$data[$department][] = array($intervalDate => 0);
+				else
+					$data[$department][] = array($intervalDate => Null);
 				$data[$department][] = array($intervalDate => 0);
 				$data[$department][] = array($intervalDate => 0);
 			}
@@ -376,12 +411,19 @@ class BudgetSalesReport extends FannieReportPage
 			}
 			if(!(array_key_exists($intervalDate, $data[$department][1]))) {
 				$data[$department][0][] = $intervalDate;
-				$data[$department][1] =  array_merge($data[$department][1] ,array($intervalDate => 0));
+				if ($intervalDate <= $cutOffDate) //cuts the current sales off at the end date.
+					$data[$department][1] =  array_merge($data[$department][1] ,array($intervalDate => 0));
+				else
+					$data[$department][1] =  array_merge($data[$department][1] ,array($intervalDate => Null));
 				$data[$department][2] =  array_merge($data[$department][2] ,array($intervalDate => 0));
 				$data[$department][3] =  array_merge($data[$department][3] ,array($intervalDate => 0));
 			}
 
-			//$data[$department][1][$intervalDate] += $thisRow[1];//  = array(array(),array(), array());
+			if($intervalDate <= $cutOffDate) {
+				$data[$department][1][$intervalDate] += $thisRow[1];//  = array(array(),array(), array()); dept(dates, this, last)
+			} 
+			
+			
 			$data[$department][2][$intervalDate] += $lastRow[1];
 			$data[$department][3][$intervalDate] += $budgetRow[1];
 
@@ -445,55 +487,68 @@ class BudgetSalesReport extends FannieReportPage
             order by Date(t.tdate)");
 		$historyR = $dbc->execute($historyQ,$args);
 		
-		$basketData = array();
-		$basketHistory = array();
-		$countData = array();
-		$countTotal = 0;
-		$historyData = array();
-		$historyTotal = 0;
-		$count = 0;
 
-		$chartLabels = array();
+		
 
 		//inerval counters for while loop
 		$intervals = $dates['intervals'];
 		$historicals = $dates['historicals'];
 		$intervalKey = 1;
 		$intervalDate = $intervals[0];
+		$nextDate = $historicals[$intervalKey];
+		$cutOffDate = $dates['cutOffDate'];
 		//$historicalDate = $historicals[0];
+		$basketData = array($intervalDate => 0);
+		$basketHistory = array($intervalDate =>0);
+		$countData = array($intervalDate => 0);
+		$historyData = array($intervalDate => 0);
+		$count = 0;
+		$chartLabels = array($intervalDate);
+
 		
 		while($historyRow = $dbc->fetchRow($historyR)) {
 			$countRow = $dbc->fetchRow($countR);
 			$currentDate = $historyRow[0];
-			
-
-			if($currentDate < $historicals[$intervalKey]) {
-				$countTotal += $countRow[1];
-				$historyTotal += $historyRow[1];
-				if($intervalKey == 3) {
-					$count += $countRow[1];
-				}
-			} else { // we are in a new interval need to write out the last, reset coutners, and start a new sum
-				$countData[] = $countTotal;
-				$historyData[] = $historyTotal;
-				$chartLabels[] = $intervalDate;
-				$basketData[] = ($countTotal == 0) ? 0 : $totals[$intervalDate]/$countTotal;
-				$basketHistory[] = ($historyTotal == 0 ) ? 0 : $histTotals[$intervalDate]/$historyTotal;
-				//reset our interval counters
+			if ($currentDate == $nextDate) {
+				if ($intervalKey == 3)
+					$count = $countData[$intervalDate];
 				$intervalDate = $intervals[$intervalKey];
 				$intervalKey++;
-				// start new sums
-				$countTotal = $countRow[1];
-				$historyTotal = $historyRow[1];
+				$nextDate = $historicals[$intervalKey];
 			}
+
+			if (!(array_key_exists($intervalDate, $historyData))) {
+				$chartLabels[] = $intervalDate;
+				$historyData = array_merge($historyData, array($intervalDate =>0));
+				if ($intervalDate <= $cutOffDate) {
+					$countData = array_merge($countData, array($intervalDate =>0));
+					$basketData = array_merge($historyData, array($intervalDate =>0));
+				} else {
+					$countData = array_merge($countData, array($intervalDate => Null));
+					$basketData = array_merge($basketData, array($intervalDate => Null));
+				}
+				$basketHistory = array_merge($basketHistory, array($intervalDate =>0));
+			}
+
+			if ($intervalDate <= $cutOffDate) {
+				$countData[$intervalDate] += $countRow[1];
+				//$basketData[$intervalDate] += $totals[$intervalDate]/$countRow[1];
+			}
+			$historyData[$intervalDate] += $historyRow[1];
+			//$basketHistory[$intervalDate] += $histTotals[$intervalDate]/$historyRow[1];
+
+
 		}
 
-		$countData[] = $countTotal;
-		$historyData[] = $historyTotal;
-		$chartLabels[] = $intervalDate;
-
-		$this->custChart = array($chartLabels,$countData,$historyData);
-		$this->basketChart = array($chartLabels,$basketData, $basketHistory);
+		foreach ($chartLabels as $key => $intervalDate) {
+			$basketHistory[$intervalDate] = $histTotals[$intervalDate]/$historyData[$intervalDate];
+			if($countData[$intervalDate] != Null) {
+				$basketData[$intervalDate] = $totals[$intervalDate]/$countData[$intervalDate];
+			}
+		}
+		
+		$this->custChart = array(array_values($chartLabels),array_values($countData),array_values($historyData));
+		$this->basketChart = array(array_values($chartLabels),array_values($basketData), array_values($basketHistory));
 		
 		$this->customerCount = $count;
 
@@ -598,13 +653,21 @@ class BudgetSalesReport extends FannieReportPage
 		$startDate->modify($startDelta);
 		$startDateLastYear->modify($startDelta);
 
+		$today = date('Y-m-d');
+
 		for($i =0;$i<8;$i++) {
 			$startDate->modify($delta);
 			$startDateLastYear->modify($delta);
 			$intervals[] = $startDate->format('Y-m-d');
 			$historicals[] = $startDateLastYear->format('Y-m-d');
+			if ($today > $startDate->format('Y-m-d')) {
+				$startDate->modify('-1 day');
+				$cutOffDate = $startDate->format('Y-m-d');
+				$startDate->modify('+1 day');
+			}
 		}
 
+		// asign array values
 		$start = DateTime::createFromFormat('Y-m-d',$intervals[0]);
 		$start->setTime(00,00,00);
 		$end = DateTime::createFromFormat('Y-m-d',$intervals[7]);
@@ -623,7 +686,8 @@ class BudgetSalesReport extends FannieReportPage
    			"start" => $start,
    			"end" => $end,
    			"historyStart" => $historyStart,
-   			"historyEnd" => $historyEnd
+   			"historyEnd" => $historyEnd,
+   			"cutOffDate" => $cutOffDate
    		);
    	}
 

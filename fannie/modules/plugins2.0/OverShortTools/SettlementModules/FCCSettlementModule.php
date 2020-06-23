@@ -500,7 +500,7 @@ private function getSalesTotals($dbc,$dlog,$args) {
                 sum(t.total) as dept_sales_total
                 FROM {$dlog} t JOIN core_op.superdepts s on t.department = s.dept_ID
                 WHERE t.`datetime` BETWEEN ? AND ? AND t.store_id=?
-                AND t.trans_type IN ('I','D') and s.superID < 15 and trans_status !='X';");
+                AND t.trans_type IN ('I','D') and s.superID < 15 and trans_status !='X'  AND emp_no != 9999");
     $result = $dbc->execute($query,$args);
     $return = 'ERR';
     $row = $dbc->fetch_row($result);
@@ -513,12 +513,20 @@ private function getSalesTotals($dbc,$dlog,$args) {
 private function getTaxTotals($dbc,$dlog,$args) {
     $query = $dbc->prepare("SELECT sum(regPrice),description FROM {$dlog} 
                           WHERE upc ='TAXLINEITEM' AND `datetime` BETWEEN ? AND ? AND store_id =? AND trans_status != 'X'
-                          GROUP BY RIGHT(description,7) ORDER BY RIGHT(description,7)");
+                          GROUP BY RIGHT(description,7) ORDER BY RIGHT(description,7)  AND emp_no != 9999");
     $result = $dbc->execute($query,$args);
     $return = array();
+    $description;
     while ($row = $dbc->fetch_row($result)) {
         $return[] = $row[0];
+        $description = $row[1];
     }
+    if (sizeof($return) < 2 && $description = '6.25000% SalesTax') {
+        $return[] = 0;
+    } else {
+        array_unshift($return, 0);
+    }
+
     $return[] = array_sum($return);
 
     return $return;
@@ -534,13 +542,15 @@ private function getTaxTotals($dbc,$dlog,$args) {
             SUM(CASE WHEN t.department NOT IN (902,992,990,994) AND t.upc NOT IN (6900,6901) THEN t.total ELSE 0 END) AS paid_in_total
             FROM {$dlog} t JOIN core_op.superdepts s ON t.department = s.dept_ID
             WHERE t.`datetime` BETWEEN ? AND ? AND t.store_id =? AND trans_status != 'X'
-            AND t.trans_type IN ('D','I') AND s.superID = 15");
+            AND t.trans_type IN ('D','I') AND s.superID = 15  AND emp_no != 9999");
         $result = $dbc->execute($query,$args);
         $row = $dbc->fetch_row($result);
         $return = array();
         for ($key=0;$key<$dbc->numFields($result);$key++) {
             $return[] = $row[$key];
+            $retVal = (!is_null($row[$key])) ? $row[$key] : 0 ;
         }
+        
         $return[] = array_sum($return);
         return $return;
     }
@@ -570,7 +580,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
                 else 0 end) as seinorDisc,
             sum(case when upc='DISCOUNT' then -unitPrice else 0 end) as total_disc
             FROM {$dlog}
-            WHERE `datetime` BETWEEN ? AND ? AND store_id=? AND trans_status != 'X'");
+            WHERE `datetime` BETWEEN ? AND ? AND store_id=? AND trans_status != 'X'  AND emp_no != 9999");
         $discR = $dbc->execute($discQ, $args);
         
         $return = array();
@@ -608,7 +618,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
             sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
             sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
             sum(case when trans_subtype='GD' AND trans_type ='T' then -total else 0 end) as gift_card_total
-            FROM {$dlog} WHERE `datetime` BETWEEN ? AND ? AND store_id=? AND trans_status != 'X'");
+            FROM {$dlog} WHERE `datetime` BETWEEN ? AND ? AND store_id=? AND trans_status != 'X' AND emp_no != 9999");
         
         
         /*
@@ -670,7 +680,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
             sum(case when t.trans_subtype = 'MI' then -total else 0 end) as StoreCharge,
             sum(case when t.department = 994 then -total else 0 end) as PaidOut
             FROM {$dlog} t
-            WHERE t.`datetime` BETWEEN ? AND ? AND t.store_id =? AND trans_status != 'X'");
+            WHERE t.`datetime` BETWEEN ? AND ? AND t.store_id =? AND trans_status != 'X'  AND emp_no != 9999");
         $result = $dbc->execute($query,$args);
         $row = $dbc->fetch_row($result);
         $return = array();
@@ -687,7 +697,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
             0 as CoopDealCoupons,
             -sum(case when t.trans_subtype IN ('MC','CP') then total else 0 end) as OtherCoupons
             FROM {$dlog} t
-            WHERE t.`datetime` between ? and ? and t.store_id =? AND trans_status != 'X'");
+            WHERE t.`datetime` between ? and ? and t.store_id =? AND trans_status != 'X'  AND emp_no != 9999");
         $result = $dbc->execute($query,$args);
         $row = $dbc->fetch_row($result);
         $return = array();
@@ -702,7 +712,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
         $return = array();
         $posQ = $dbc->prepare("SELECT -sum(case when t.trans_subtype IN ('CA','CK') then t.total else 0 end) as depositTotal
             FROM {$dlog} t
-            WHERE t.`datetime` between ? and ? and t.store_id =? AND trans_status != 'X'");
+            WHERE t.`datetime` between ? and ? and t.store_id =? AND trans_status != 'X'  AND emp_no != 9999");
         $posR = $dbc->execute($posQ,$args);
         $posW = $dbc->fetch_row($posR);
         $return[] = $posW[0];
@@ -711,7 +721,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
         $countQ = $dbc->prepare("SELECT SUM(case when tender_type='CA' then amt - 250.00
                                             when tender_type='CK' then amt else 0 end)
                                 FROM dailyCounts 
-                                WHERE `date` = ? AND storeID = ? AND tender_type in ('CA','CK')");
+                                WHERE `date` = ? AND storeID = ? AND tender_type in ('CA','CK')  AND emp_no != 9999");
         $countR = $dbc->execute($countQ,array($qDate->format('Y-m-d'), $args[2]));
         $countW = $dbc->fetch_row($countR);
         $return[] = $countW[0];

@@ -185,7 +185,7 @@ class MarginMovementReport extends FannieReportPage
             $sum_cost += $row[5];
             $sum_ttl += $row[6];
         }
-        $sum_margin = (($sum_ttl-$sum_cost)/$sum_cost)*100;
+        $sum_margin = (1-($sum_cost/$sum_ttl))*100;
 
         return array('Totals', null, null, null, null, sprintf('%.2f',$sum_cost), sprintf('%.2f',$sum_ttl), sprintf("%.2f%%", $sum_margin), null, null);
     }

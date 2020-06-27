@@ -377,7 +377,7 @@ class BudgetSalesReport extends FannieReportPage
 			//echo '</br> Budget Dept: '.$budgetRow[2].' Last Dept: '.$lastRow[2].' This Dept: '.$thisRow[2].'</br>';
 			//echo '</br></br> Next Row</br>';
 
-			$department = $lastRow[2];
+			$department = $budgetRow[2];
 			//create the department and the first interval for all if it doesn't exisit
 			if(!(array_key_exists($department, $data))) {
 				//echo '***Department**** '.$department.'</br>';

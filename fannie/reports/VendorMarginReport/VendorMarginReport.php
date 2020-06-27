@@ -28,7 +28,7 @@ if (!class_exists('FannieAPI')) {
 
 class VendorMarginReport extends FannieReportPage 
 {
-    public $description = '[Vendor Margin Report] Item margins by vendor and department.'; 
+    public $description = '[Vendor Margin Report] Show Target Margin by vendor and department.'; 
     public $report_set = 'Vendors';
     protected $title = "Fannie : Vendor Margin Report";
     protected $header = "Vendor Margin Report";

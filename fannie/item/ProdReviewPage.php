@@ -474,7 +474,7 @@ HTML;
             if ($row['forced'] == '0000-00-00 00:00:00') {
                 $bids .= ",".$curBid;
                 $tableA .= "<tr>";
-                $tableA .= "<td><input type='checkbox' id='check$curBid'></td>";
+                $tableA .= "<td><input type='checkbox' id='check$curBid' class='upcCheckBox'></td>";
                 $tableA .= "<td class='biduf'><a href=\"{$curBidLn}\" target=\"_blank\">{$curBid}</a></td>";
                 $batchName = $row['batchName'];
                 $tableA .= "<td>{$batchName}</td>";
@@ -490,8 +490,9 @@ HTML;
                 $tableA .= "<td><textarea name='comments' class='batchLogInput editable'
                     '/>{$row['comments']}</textarea></td>";
                 $action = '';
+                $noPunctBatchName = str_replace("'", "", $batchName);
                 $action = "<td class='btn btn-default btn-wide' style='border: 1px solid tomato;'
-                    onClick='forceBatch($curBid, \"$batchName\"); return false;' id='force$curBid'>Force</td>";
+                    onClick='forceBatch($curBid, \"$noPunctBatchName\"); return false;' id='force$curBid'>Force</td>";
                 $tableA .= "<td><span class='glyphicon glyphicon-trash' onClick='deleteRow($curBid)'></span></td>";
                 $tableA .= $action;
                 $tableA .= "</tr>";
@@ -651,7 +652,7 @@ HTML;
         $table = '<table class="table table-condensed small tablesorter tablesorter-bootstrap" id="reviewtable">';
         $table .= '<thead><th>UPC</th><th>Brand</th><th>Description</th>
             <th>Reviewed On</th></thead><tbody><td></td><td></td><td></td><td></td><td>
-            <input type="checkbox" id="checkAll" style="border: 1px solid red;"></td>';
+            <input type="checkbox" id="checkAll" class="upcCheckBox" style="border: 1px solid red;"></td>';
 
         $pr = new ProdReviewModel($dbc);
         $in = array();
@@ -668,7 +669,7 @@ HTML;
                 } else {
                     $table .= '<td><i class="text-danger">no review date</i></td>';
                 }
-                $table .= '<td><input type="checkbox"class="chk" name="checked[]" value="'.$obj->upc().'"></td>';
+                $table .= '<td><input type="checkbox"class="chk upcCheckBox" name="checked[]" value="'.$obj->upc().'"></td>';
                 $table .= '</tr>';
             }
             $in[] = $obj->upc();
@@ -696,6 +697,18 @@ HTML;
             });
         ");
 
+        $vendor = new VendorsModel($dbc);
+        $vendor->vendorID($curVendor);
+        $vendor->load();
+        $shipping = $vendor->shippingMarkup();
+        if ($shipping > 0) {
+            $shipping = $vendor->shippingMarkup() * 100;
+            $shipping = "<label>Shipping Markup</label> $shipping%";
+        } else {
+            $shipping = '';
+        }
+       
+
         return <<<HTML
 {$this->backBtn()}
 <form class="form" method="get" name="vform">
@@ -709,6 +722,7 @@ HTML;
         </select>
     </div>
 </form>
+<div>$shipping</div>
 $vdepts
 <form class="form-inline" method="get">
     {$table}
@@ -720,7 +734,7 @@ HTML;
 
     public function draw_table($data,$dbc)
     {
-        $table = '<table class="table table-condensed small">';
+        $table = '<table class="table table-condensed table-striped small">';
         $table .= '<thead><th>UPC</th><th>Brand</th><th>Description</th>
             <th>Last Reviewed</th></thead><tbody>';
         $pr = new ProdReviewModel($dbc);
@@ -928,10 +942,10 @@ HTML;
                     <div class="divider"></div>
                     <label>Other Pages</label>
                     <ul>
-                        <li><a href="ProdLocationEditor.php">Product Location Editor</a></li>
-                        <li><a href="ProdReviewPage.php?batchLog=1">Review Batch Log</a></li>
-                        <li><a href="ProdReviewPage.php?schedule=1">Vendor Review Schedule</a></li>
-                        <li><a href="ProdReviewPage.php?schedule=1&setup=1">Vendor Schedule Setup</a></li>
+                        <li><a href="ProdLocationEditor.php">Product <strong>Location</strong> Editor</a></li>
+                        <li><a href="ProdReviewPage.php?batchLog=1">Review <strong>Batch Log</strong></a></li>
+                        <li><a href="ProdReviewPage.php?schedule=1">Vendor <strong>Review Schedule</strong></a></li>
+                        <li><a href="ProdReviewPage.php?schedule=1&setup=1">Vendor Schedule <strong>Setup</strong></a></li>
                     </ul>
                 </form>
                 <div class="divider hidden-md hidden-lg"></div>
@@ -960,29 +974,46 @@ HTML;
    {
        ob_start();
        ?>
+var lastChecked = null;
+var i = 0;
+var indexCheckboxes = function(){
+    $('.upcCheckBox').each(function(){
+        $(this).attr('data-index', i);
+        i++;
+    });
+};
+indexCheckboxes();
+$('table').click(function(){
+    indexCheckboxes();
+});
+$('.upcCheckBox').on("click", function(e){
+    if(lastChecked && e.shiftKey) {
+        var i = parseInt(lastChecked.attr('data-index'));
+        var j = parseInt($(this).attr('data-index'));
+        var checked = $(this).is(":checked");
+
+        var low = i;
+        var high = j;
+        if (i>j){
+            var low = j;
+            var high = i;
+        }
+
+        for(var c = low; c < high; c++) {
+            if (c != low && c!= high) {
+                var check = checked ? true : false;
+                $('input[data-index="'+c+'"').prop("checked", check);
+            }
+        }
+    }
+    lastChecked = $(this);
+});
+
 $(document).ready( function() {
     $('#checkAll').click( function () {
        checkAll();
     });
     editable();
-});
-
-var pigeonholes = {};
-var colors = ['white','orange','tomato','purple','cyan','lightblue','yellowgreen'];
-var x = 0;
-$('td.reviewed').each(function(){
-    var date = $(this).text();
-    if (date in pigeonholes) {
-    } else {
-        pigeonholes[date] = colors[x]; 
-        x++;
-    }
-});
-$('td.reviewed').each(function(){
-    var date = $(this).text();
-    if (date in pigeonholes) {
-        $(this).css('background','linear-gradient(to right, white, 80%, '+pigeonholes[date]+')');
-    }
 });
 
 function deleteRow(id)

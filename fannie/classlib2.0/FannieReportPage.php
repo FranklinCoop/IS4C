@@ -689,9 +689,11 @@ class FannieReportPage extends FanniePage
                         foreach ($_POST as $key => $val) {
                             if (is_array($val)) {
                                 foreach ($val as $v) {
+                                    $v = str_replace('"', '', $v);
                                     $ret .= "<input type=\"hidden\" name=\"{$key}[]\" value=\"{$v}\" />";
                                 }
                             } else {
+                                $val = str_replace('"', '', $val);
                                 $ret .= "<input type=\"hidden\" name=\"{$key}\" value=\"{$val}\" />";
                             }
                         }
@@ -847,7 +849,7 @@ class FannieReportPage extends FanniePage
                 $this->addScript($url . 'src/javascript/jquery.floatThead.min.js?date=20181121');
                 $sort = sprintf('[[%d,%d]]',$this->sort_column,$this->sort_direction);
                 if ($this->sortable) {
-                    if (!$this->new_tablesorter) {
+                    if (!$this->new_tablesorter && count($data) > 0) {
                         $this->addOnloadCommand("\$('.mySortableTable').tablesorter({sortList: $sort, widgets: ['zebra']});");
                     } else {
                         $this->addOnloadCommand("\$.tablesorter.themes.bootstrap['active'] = 'info';");

@@ -5,13 +5,13 @@ if (!class_exists('FannieAPI')) {
     include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 if (!class_exists('RpFixedMapsModel')) {
-    include(__DIR__ . '/RpFixedMapsModel.php');
+    include(__DIR__ . '/models/RpFixedMapsModel.php');
 }
 
 class RpFixedMaps extends FannieRESTfulPage
 {
-    protected $header = 'RP Fixed Mappings';
-    protected $title = 'RP Fixed Mappings';
+    protected $header = 'Fixed Mappings';
+    protected $title = 'Fixed Mappings';
 
     protected function get_id_handler()
     {

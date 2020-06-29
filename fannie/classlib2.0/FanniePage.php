@@ -48,6 +48,14 @@ class FanniePage extends \COREPOS\common\ui\CorePage
     protected $session;
 
     /**
+     * Validated means the request includes a random token matching the session token
+     * Auto validation means the individual page does not want to manage
+     * token checks manually.
+     */
+    protected $validated = false;
+    protected $autoValidate = false;
+
+    /**
       Include javascript necessary to integrate linea
       scanner device
     */
@@ -133,7 +141,7 @@ class FanniePage extends \COREPOS\common\ui\CorePage
                 $this->addScript($url . 'src/javascript/jquery-ui.js');
             }
             $this->addScript($url . 'src/javascript/calculator.js');
-            $this->addScript($url . 'src/javascript/core.js?date=20171213');
+            $this->addScript($url . 'src/javascript/core.js?date=20200312');
             if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
                 // windows has trouble with symlinks
                 $this->addCssFile($url . 'src/javascript/jquery-ui-1.10.4/css/smoothness/jquery-ui.min.css?id=20140625');
@@ -144,6 +152,7 @@ class FanniePage extends \COREPOS\common\ui\CorePage
             $this->addCssFile($url . 'src/css/core.css');
             $this->addCssFile($url . 'src/css/print.css');
             $this->add_onload_command('standardFieldMarkup();');
+            $this->addOnloadCommand("logJsErrors('{$url}');");
         } else {
             include(dirname(__FILE__) . '/../src/header.html');
         }
@@ -154,7 +163,7 @@ class FanniePage extends \COREPOS\common\ui\CorePage
             if (strpos(filter_input(INPUT_SERVER, 'HTTP_USER_AGENT'), 'iPod touch')) {
                 $this->addScript($url . 'src/javascript/linea/WebHub.js');
             }
-            $this->addScript($url . 'src/javascript/linea/core.js?date=20190214');
+            $this->addScript($url . 'src/javascript/linea/core.js?date=20200311');
         }
 
         echo $this->getMessages();
@@ -460,6 +469,58 @@ function enableLinea(selector, callback)
         if (!$this->checkAuth() && $this->must_authenticate) {
             $this->loginRedirect();
             exit;
+        }
+
+        if (!isset($_COOKIE['__perma'])) {
+            $perma = uniqid('', true);
+            setcookie('__perma', $perma, time()+60*60*24*999,'/');
+        } elseif (isset($_COOKIE['__perma']) && !isset($this->session->__perma)) {
+            $redis = $this->getRedis();
+            if ($redis) {
+                $vals = $redis->get($_COOKIE['__perma']);
+                if ($vals) {
+                    $vals = unserialize($vals);
+                    foreach ($vals as $k => $v) {
+                        $this->session->{$k} = $v;
+                    }
+                    $this->session->__perma = true;
+                }
+            }
+        }
+
+        if (FormLib::get('_token_') && isset($this->session->csrfToken)) {
+            $this->validated = FormLib::get('_token_') === $this->session->csrfToken;
+            if (!$this->validated && $this->autoValidate) {
+                echo 'HTTP 400';
+                exit;
+            }
+        } elseif (!isset($this->session->csrfToken)) {
+            $this->session->csrfToken = COREPOS\common\FormLib::generateToken();
+        }
+        $this->addOnloadCommand("if (typeof appendTokens == 'function') { appendTokens('{$this->session->csrfToken}'); }");
+    }
+
+    protected function postFlight()
+    {
+        if ($this->session->changed() && isset($_COOKIE['__perma'])) {
+            $redis = $this->getRedis();
+            if ($redis) {
+                $data = $this->session->getPerma();
+                $data = serialize($data);
+                $res = $redis->setEx($_COOKIE['__perma'], 60*60*24*30, $data);
+            }
+        }
+    }
+
+    protected function getRedis()
+    {
+        $conf = $this->config->get('PLUGIN_SETTINGS');
+        $redis_host = isset($conf['SatelliteRedis']) ? $conf['SatelliteRedis'] : '127.0.0.1';
+        try {
+            $redis = new \Predis\Client($redis_host);
+            return $redis;
+        } catch (Exception $ex) {
+            return false;
         }
     }
 

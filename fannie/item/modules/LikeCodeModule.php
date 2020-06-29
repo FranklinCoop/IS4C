@@ -153,7 +153,7 @@ class LikeCodeModule extends \COREPOS\Fannie\API\item\ItemModule
 
         /* get values for current item */
         $valuesP = $dbc->prepare('SELECT normal_price,pricemethod,groupprice,quantity,
-            department,scale,tax,foodstamp,discount,qttyEnforced,local,wicable
+            department,scale,tax,foodstamp,discount,qttyEnforced,local,wicable,numflag
             FROM products WHERE upc=?');
         $values = $dbc->getRow($valuesP,array($upc));  
         if ($values === false) {
@@ -171,6 +171,14 @@ class LikeCodeModule extends \COREPOS\Fannie\API\item\ItemModule
         }
         if (count($upcs) <= 10) {
             COREPOS\Fannie\API\data\ItemSync::sync($upcs);
+        } else {
+            $queue = new COREPOS\Fannie\API\jobs\QueueManager();
+            $queue->add(array(
+                'class' => 'COREPOS\\Fannie\\API\\jobs\\SyncItem',
+                'data' => array(
+                    'upc' => $upcs,
+                ),
+            ));
         }
 
         return true;
@@ -194,6 +202,7 @@ class LikeCodeModule extends \COREPOS\Fannie\API\item\ItemModule
                     qttyEnforced=?,
                     local=?,
                     wicable=?,
+                    numflag=?,
                     mixmatchcode=?
                 WHERE upc=?');
         }
@@ -216,6 +225,7 @@ class LikeCodeModule extends \COREPOS\Fannie\API\item\ItemModule
             $values['qttyEnforced'],
             $values['local'],
             $values['wicable'],
+            $values['numflag'],
             $likecode+500,
             $upc
         );

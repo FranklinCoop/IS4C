@@ -22,6 +22,7 @@
 *********************************************************************************/
 
 use COREPOS\Fannie\API\lib\Store;
+use COREPOS\Fannie\API\data\pipes\OutgoingEmail;
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
@@ -261,7 +262,7 @@ class ViewPurchaseOrders extends FannieRESTfulPage
         $userEmail = $userInfo['email'];
         $userRealName = $userInfo['real_name'];
 
-        $mail = new PHPMailer();
+        $mail = OutgoingEmail::get();
         $mail->isSMTP();
         $mail->Host = '127.0.0.1';
         $mail->Port = 25;
@@ -479,17 +480,30 @@ class ViewPurchaseOrders extends FannieRESTfulPage
 
         $order = new PurchaseOrderModel($dbc);
         $order->orderID($this->id);
-        $order->delete();
-
-        $items = new PurchaseOrderItemsModel($dbc);
-        $items->orderID($this->id);
-        foreach ($items->find() as $item) {
-            $item->delete();
+        $order->load();
+        $ids = array($this->id);
+        if ($order->transferID()) {
+            $ids[] = abs($order->transferID());
         }
+        $this->deleteOrders($dbc, $ids);
 
         echo 'deleted';
 
         return false;
+    }
+
+    private function deleteOrders($dbc, $ids)
+    {
+        foreach ($ids as $id) {
+            $order = new PurchaseOrderModel($dbc);
+            $order->orderID($id);
+            $order->delete();
+            $items = new PurchaseOrderItemsModel($dbc);
+            $items->orderID($id);
+            foreach ($items->find() as $item) {
+                $item->delete();
+            }
+        }
     }
 
     /**
@@ -647,6 +661,35 @@ class ViewPurchaseOrders extends FannieRESTfulPage
         'notes'=>'',
     );
 
+    private function transferHeader($order, $store, $vendor)
+    {
+        if (!$order->transferID()) {
+            return '';
+        }
+
+        $first = 'Receiving';
+        $second = 'Sending';
+        $otherID = $order->transferID();
+        $link = 'Credit';
+        $self = 'Invoice';
+        if ($order->transferID() < 0) {
+            $first = 'Sending';
+            $second = 'Receiving';
+            $otherID = -1 * $order->transferID();
+            $link = 'Invoice';
+            $self = 'Credit';
+        }
+
+        return <<<HTML
+<div class="alert alert-info">
+Transfer {$self} |
+{$first}: {$store} |
+{$second}: {$vendor} |
+<a href="ViewPurchaseOrders.php?id={$otherID}">Matching {$link}</a>
+</div>
+HTML;
+    }
+
     protected function get_id_view()
     {
         $dbc = $this->connection;
@@ -680,6 +723,7 @@ class ViewPurchaseOrders extends FannieRESTfulPage
         }
         $sname = $dbc->prepare('SELECT description FROM Stores WHERE storeID=?');
         $sname = $dbc->getValue($sname, array($orderObj->storeID));
+        $xferHeader = $this->transferHeader($order, $sname, $vendor['vendorName']);
 
         $batchStart = date('Y-m-d', strtotime('+30 days'));
         $batchP = $dbc->prepare("
@@ -693,6 +737,8 @@ class ViewPurchaseOrders extends FannieRESTfulPage
                 AND b.endDate >= " . $dbc->curdate() . "
                 AND b.discounttype > 0
         ");
+
+        $invP = $dbc->prepare("SELECT onHand FROM InventoryCache WHERE upc=? AND storeID=?");
 
         $exportOpts = '';
         foreach (COREPOS\Fannie\API\item\InventoryLib::orderExporters() as $class => $name) {
@@ -739,6 +785,7 @@ class ViewPurchaseOrders extends FannieRESTfulPage
             href="ViewPurchaseOrders.php?{$init}">All Orders</a>
     </div>
 </p>
+{$xferHeader}
 <div class="row">
     <div class="col-sm-6">
         <table class="table table-bordered small">
@@ -814,6 +861,7 @@ HTML;
             <th class="thead">Units/Case</th>
             <th class="thead">Cases</th>
             <th class="thead hidden-xs">Est. Cost</th>
+            ' . (!$order->placed() ? '<th class="thead hidden-xs">On Hand</th>' : '') . '
             <th class="thead hidden-xs">Received</th>
             <th class="thead">Rec. Qty</th>
             <th class="thead hidden-xs">Rec. Cost</th>
@@ -821,6 +869,7 @@ HTML;
         $count = 0;
         foreach ($model->find() as $obj) {
             $css = $this->qtyToCss($order->placed(), $obj->quantity(),$obj->receivedQty());
+            $onHand = '';
             if (!$order->placed()) {
                 $batchR = $dbc->execute($batchP, array($obj->internalUPC(), $orderObj->storeID, $batchStart));
                 $title = '';
@@ -832,6 +881,7 @@ HTML;
                 if ($title) {
                     $css = 'class="info" title="' . $title . '"';
                 }
+                $onHand = '<td class="hidden-xs">' . $dbc->getValue($invP, array($obj->internalUPC(), $order->storeID())) . '</td>';
             }
             $link = '../item/ItemEditorPage.php?searchupc=' . $obj->internalUPC();
             if ($obj->isSpecialOrder()) {
@@ -859,6 +909,7 @@ HTML;
                         </span>
                     </td>
                     <td class="hidden-xs">%.2f</td>
+                    %s
                     <td class="hidden-xs">%s</td><td>%s</td><td class="hidden-xs">%.2f</td>
                     <td class="hidden-xs">
                         <select class="form-control input-sm" onchange="isSO(%d, \'%s\', this.value);">
@@ -874,6 +925,7 @@ HTML;
                     $obj->unitSize(), $obj->caseSize(),
                     $count, $obj->quantity(), $pendingOnlyClass, $this->id, $obj->sku(), $count, $this->id, $obj->sku(), $count,
                     ($obj->quantity() * $obj->caseSize() * $obj->unitCost()),
+                    $onHand,
                     strtotime($obj->receivedDate()) ? date('Y-m-d', strtotime($obj->receivedDate())) : 'n/a',
                     $obj->receivedQty(),
                     $obj->receivedTotalCost(),
@@ -889,6 +941,12 @@ HTML;
                 $coding, $ttl);
         }
         $ret = str_replace('{{CODING}}', $coding_rows, $ret);
+
+        if (file_exists(__DIR__ . '/noauto/invoices/' . $this->id . '.csv')) {
+            $ret .= '<p><a href="noauto/invoices/' . $this->id . '.csv">Download Original</a></p>';
+        } elseif (file_exists(__DIR__ . '/noauto/invoices/' . $this->id . '.xls')) {
+            $ret .= '<p><a href="noauto/invoices/' . $this->id . '.xls">Download Original</a></p>';
+        }
 
         $this->addScript('js/view.js?date=20180220');
         $this->addScript('../src/javascript/tablesorter/jquery.tablesorter.min.js');
@@ -1182,9 +1240,9 @@ HTML;
             <td><input type="text" class="form-control" name="upc" value="%s" /></td>
             <td><input type="text" class="form-control" name="brand" value="%s" /></td>
             <td><input type="text" class="form-control" name="description" value="%s" /></td>
-            <td><input type="text" class="form-control" name="orderQty" value="%s" /></td>
+            <td><input type="hidden" class="form-control" name="orderQty" value="%s" />0</td>
             <td><input type="text" class="form-control" name="orderCost" value="%.2f" /></td>
-            <td><input type="text" class="form-control" name="receiveQty" value="%s" /></td>
+            <td><input type="text" class="form-control receiveQty" name="receiveQty" value="%s" /></td>
             <td><input type="text" class="form-control" name="receiveCost" value="%.2f" /></td>
             <td><button type="submit" class="btn btn-default">Add New Item</button><input type="hidden" name="id" value="%d" /></td>
             </tr>',
@@ -1248,7 +1306,7 @@ HTML;
                 <th>Qty Received</th></tr>
                 <tr><td>%s (%sx%s)</td>
                 <td class="hidden-xs">%.2f</td>
-                <td><input type="text" pattern="\\d*" class="form-control" name="qty[]" value="%s" /></td>
+                <td><input type="text" pattern="\\d*" class="form-control receiveQty" name="qty[]" value="%s" /></td>
                 </tr><tr><th>Cost Received</th></tr>
                 <td><input type="number" min="-999" max="999" step="0.01" pattern="\\d+(\\.\\d*)?" class="form-control" name="cost[]" value="%.2f" /></td>
                 <td><button type="submit" class="btn btn-default">Save</button><input type="hidden" name="id[]" value="%d" /></td>
@@ -1294,7 +1352,7 @@ HTML;
 
         $this->addScript('../src/javascript/tablesorter/jquery.tablesorter.min.js');
         $this->addScript($this->config->get('URL') . 'src/javascript/jquery.floatThead.min.js');
-        $this->addScript('js/view.js');
+        $this->addScript('js/view.js?date=20191121');
         $this->addOnloadCommand("\$('.tablesorter').tablesorter();\n");
         $this->addOnloadCommand("\$('.table-float').floatThead();\n");
 

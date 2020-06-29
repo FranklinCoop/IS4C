@@ -31,6 +31,7 @@ if (!class_exists('FannieAPI')) {
 class MailChimpTask extends FannieTask
 {
     private $requiredMergeFields = array();
+    private $ownerField = 'OWNER NUMBER';
 
     protected function getSettings()
     {
@@ -39,6 +40,9 @@ class MailChimpTask extends FannieTask
         $LISTID='54100d18af';
         $APIKEY = $FANNIE_PLUGIN_SETTINGS['MailChimpApiKey'];
         $LISTID = $FANNIE_PLUGIN_SETTINGS['MailChimpListID'];
+        if ($FANNIE_PLUGIN_SETTINGS['MailChimpMergeVarName']) {
+            $this->ownerField =$FANNIE_PLUGIN_SETTINGS['MailChimpMergeVarName'];
+        }
 
         return array($APIKEY, $LISTID);
     }
@@ -58,6 +62,7 @@ class MailChimpTask extends FannieTask
 
         if ($field_id === false) {
             echo 'Adding member# field' . "\n";
+            /** doesn't worK?
             $new = $chimp->post("lists/{$LISTID}/merge_fields", array(
                 'tag' => 'CARDNO',
                 'name' => 'Owner Number',
@@ -66,6 +71,7 @@ class MailChimpTask extends FannieTask
                 'public' => false,
             ));
             $field_id = $new['merge_id'];
+             */
         }
 
         if ($field_id === false) {
@@ -131,7 +137,7 @@ class MailChimpTask extends FannieTask
                 list($card_no, $email, $fname, $lname, $changed) = $this->unpackRecord($record, $columns);
 
                 /** MailChimp has a POS member number tag **/
-                if (!empty($card_no)) {
+                if ($card_no !== false && !empty($card_no)) {
                     switch ($status) {
                         /**
                           If subscribed list member has been tagged with a POS member number, compare
@@ -274,7 +280,7 @@ class MailChimpTask extends FannieTask
 
     protected function unpackRecord($record, $columns)
     {
-        $card_no = $record[$columns['OWNER NUMBER']];
+        $card_no = isset($columns[$this->ownerField]) ? $record[$columns[$this->ownerField]] : false;
         $email = $record[$columns['EMAIL ADDRESS']];
         $fname = $record[$columns['FIRST NAME']];
         $lname = $record[$columns['LAST NAME']];
@@ -386,6 +392,9 @@ class MailChimpTask extends FannieTask
     protected function unknownSubscribed($record, $columns, $chimp, $LISTID, $memlist)
     {
         list($card_no, $email, $fname, $lname, $changed) = $this->unpackRecord($record, $columns);
+        if ($card_no === false) {
+            return $memlist;
+        }
         $update = array();
         $this->meminfo->reset();
         $this->meminfo->email_1($email);
@@ -424,6 +433,9 @@ class MailChimpTask extends FannieTask
     protected function unknownUnsubscribed($record, $columns, $memlist)
     {
         list($card_no, $email, $fname, $lname, $changed) = $this->unpackRecord($record, $columns);
+        if ($memlist === false) {
+            return $memlist;
+        }
         $this->meminfo->reset();
         $this->cronMsg('Checking unsubscribed ' . $email, FannieLogger::INFO);
         $this->meminfo->email_1($email);

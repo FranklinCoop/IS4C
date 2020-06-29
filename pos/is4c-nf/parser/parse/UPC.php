@@ -371,6 +371,15 @@ class UPC extends Parser
         $row['foodstamp'] = $foodstamp;
         $row['discount'] = $discountable;
 
+        if ($row['special_limit'] && $row['discounttype'] == 0 && $this->hardLimit($dbc, $row, $quantity)) {
+            $ret['output'] = DisplayLib::boxMsg(
+                _("Already purchase maximum amount"),
+                _('Quantity Limited Item'),
+                false,
+                DisplayLib::standardClearButton()
+            );
+            return $ret;
+        }
         $row = $this->enforceSaleLimit($dbc, $row, $quantity);
 
         /*
@@ -807,25 +816,46 @@ class UPC extends Parser
          *   and allowing the sale to be confirmed or canceled
          */
         if ($row["inUse"] == 0) {
+            TransRecord::addLogRecord(array(
+                'upc' => $row['upc'],
+                'description' => $row['description'],
+                'department' => $row['department'],
+                'charflag' => 'IU',
+            ));
             if (substr($row['upc'], 0, 6) == '000000' && $this->session->get('msgrepeat') == 0) {
                 $this->session->set("strEntered",$row["upc"]);
-                $this->session->set("boxMsg", _("Not an active item: ") . $row['description']);
+                $this->session->set("boxMsg", _("Inactive PLU. Is this the correct item: ") . $row['description']);
                 $this->session->set('boxMsgButtons', array(
                     _('Confirm Sale [enter]') => '$(\'#reginput\').val(\'\');submitWrapper();',
                     _('Cancel [clear]') => '$(\'#reginput\').val(\'CL\');submitWrapper();',
                 ));
                 $ret['main_frame'] = MiscLib::baseURL() . "gui-modules/boxMsg2.php?quiet=1";
-            } else {
-                TransRecord::addLogRecord(array(
-                    'upc' => $row['upc'],
-                    'description' => $row['description'],
-                    'department' => $row['department'],
-                    'charflag' => 'IU',
-                ));
             }
         }
 
         return $ret;
+    }
+
+    private function hardLimit($dbc, $row, $quantity)
+    {
+            $appliedQ = "
+                SELECT SUM(quantity) AS saleQty
+                FROM " . $this->session->get('tDatabase') . $dbc->sep() . "localtemptrans
+                WHERE discounttype = 0
+                    AND (
+                        upc='{$row['upc']}'
+                        OR (mixMatch='{$row['mixmatchcode']}' AND mixMatch<>''
+                            AND mixMatch<>'0' AND mixMatch IS NOT NULL)
+                    )";
+            $appliedR = $dbc->query($appliedQ);
+            if ($appliedR && $dbc->num_rows($appliedR)) {
+                $appliedW = $dbc->fetch_row($appliedR);
+                if (($appliedW['saleQty']+$quantity) > $row['special_limit']) {
+                    return true;
+                }
+            }
+
+            return false;
     }
 
     private function enforceSaleLimit($dbc, $row, $quantity)

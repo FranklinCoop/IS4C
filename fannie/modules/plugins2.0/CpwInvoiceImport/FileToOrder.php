@@ -71,14 +71,43 @@ class FileToOrder
 
     private function normalizeItemLine($item)
     {
+        list($case, $unit) = $this->parseSize($item[2]);
         return array(
             'description' => $item[2],
             'orderedQty' => $item[0] === null ? 0 : $item[0],
             'shippedQty' => $item[1] === null ? 0 : $item[1],
             'sku' => $item[5] === null ? $item[2] : $item[5],
-            'casePrice' => $item[6] === null ? $item[7] : $item[6],
+            'casePrice' => $item[7] / $case,
             'total' => $item[7],
+            'caseSize' => $case,
+            'unitSize' => $unit,
         );
+    }
+
+    private function parseSize($item)
+    {
+        $item = strtoupper($item);
+        if (preg_match('/([0-9\.]+)\s*-\s*([0-9\.]+)\s*LB/', $item, $matches)) {
+            $avg = ($matches[1] + $matches[2]) / 2;
+            return array($avg, 'LB');
+        } elseif (preg_match('/([0-9]+)\/([0-9\.]+)\s*LB/', $item, $matches)) {
+            return array($matches[1] * $matches[2], 'LB');
+        } elseif (preg_match('/([0-9\.]+)\s*LB/', $item, $matches)) {
+            return array($matches[1], 'LB');
+        } elseif (preg_match('/([0-9\.]+)\s*-\s*([0-9\.]+)\s*CT/', $item, $matches)) {
+            $avg = ($matches[1] + $matches[2]) / 2;
+            return array($avg, 'CT');
+        } elseif (preg_match('/([0-9]+)\s*CT/', $item, $matches)) {
+            return array($matches[1], 'CT');
+        } elseif (preg_match('/([0-9]+)\s*DOZ/', $item, $matches)) {
+            return array($matches[1], 'DOZ');
+        } elseif (preg_match('/\s([0-9\.]+)\s*GAL/', $item, $matches)) {
+            return array($matches[1], 'GAL');
+        } elseif (preg_match('/([0-9]+)\/([0-9\.]+)\s*OZ/', $item, $matches)) {
+            return array($matches[1] * $matches[2], 'OZ');
+        }
+
+        return array(1, 'CASE');
     }
 
 }

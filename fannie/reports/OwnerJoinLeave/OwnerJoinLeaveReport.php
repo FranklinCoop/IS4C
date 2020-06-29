@@ -43,7 +43,7 @@ class OwnerJoinLeaveReport extends FannieReportPage
         array('Total Equity', null, null, null, null, null),
         array('Period', null, 'Number of Owners', '', null, null),
         array('New Owners', null, null, null, null, null),
-        array('Number', 'Date', 'Name', 'Stock', 'Payment Plan', null),
+        array('Number', 'Date', 'Name', 'Stock', 'Payment Plan', 'Store'),
     );
 
     public function fetch_report_data()
@@ -89,6 +89,19 @@ class OwnerJoinLeaveReport extends FannieReportPage
             WHERE card_no=?
                 AND tdate <= ?');
 
+        $initialP = $dbc->prepare('SELECT trans_num
+            FROM ' . $FANNIE_TRANS_DB. $dbc->sep() . 'stockpurchases
+            WHERE card_no=?
+                AND tdate <= ?
+            ORDER BY tdate');
+
+
+        $franReqP = false;
+        if ($this->config->COOP_ID == 'WFC_Duluth') {
+            $franReqP = $dbc->prepare("SELECT note FROM memberNotes
+                WHERE note LIKE '%FUNDS REQ%' AND cardno=?");
+        }
+
         $data = array();
         $totals = array();
         $data[] = array('meta'=>FannieReportPage::META_REPEAT_HEADERS | FannieReportPage::META_COLOR, 
@@ -107,13 +120,26 @@ class OwnerJoinLeaveReport extends FannieReportPage
         $newCount = 0;
         while ($row = $dbc->fetch_row($joinR)) {
             $actual = $dbc->getValue($stockP, array($row['card_no'], $this->form->date2 . ' 23:59:59'));
+            $initial = $dbc->getValue($initialP, array($row['card_no'], $this->form->date2 . ' 23:59:59'));
+            list($emp, $reg, $trans) = explode('-', $initial);
+            $store = '?';
+            if ($reg > 0 && $reg < 10) {
+                $store = 'Hillside';
+            } elseif ($reg > 10 && $reg < 20) {
+                $store = 'Denfeld';
+            } elseif ($reg == 50) {
+                $store = 'Website';
+            }
+            if ($franReqP && !$row['name']) {
+                $row['name'] = $dbc->getValue($franReqP, array($row['card_no']));
+            }
             $data[] = array(
                 $row['card_no'],
                 date('Y-m-d', strtotime($row['start_date'])),    
                 $row['FirstName'] . ' ' . $row['LastName'],
                 sprintf('$%.2f', $actual),
                 ($row['name'] ? $row['name'] : ''),
-                null,
+                $store,
             );
             $totals['new']++;
             $totals['newStock'] += $actual;
@@ -155,7 +181,7 @@ class OwnerJoinLeaveReport extends FannieReportPage
             FROM memDates AS m
                 INNER JOIN custdata AS c ON m.card_no=c.CardNo AND c.personNum=1
             WHERE m.start_date <= ?
-                AND c.Type=\'PC\'
+               AND c.Type=\'PC\'
         ');
         $activeR = $dbc->execute($activeP, array($args[1]));
         $totals['active'] = '?';
@@ -235,29 +261,35 @@ class OwnerJoinLeaveReport extends FannieReportPage
                 WHERE cardno=?
                 ORDER BY stamp DESC
             ');
+            $pendingCount = 0;
             while ($row = $dbc->fetchRow($termR)) {
                 $note = $dbc->getValue($noteP, array($row['card_no']));
                 if (strstr(strtoupper($note), 'TRANSFER')) {
                     continue;
                 }
                 $fran = $this->franAmount($dbc, $row['card_no']);
+                $actual = $dbc->getValue($stockP, array($row['card_no'], $this->form->date2 . ' 23:59:59'));
                 $record = array(
                     $row['card_no'],
                     date('Y-m-d', strtotime($row['suspDate'])),    
                     $row['FirstName'] . ' ' . $row['LastName'],
-                    sprintf('%.2f', $row['payments'] - $fran),
+                    sprintf('%.2f', $actual - $fran),
                     sprintf('%.2f', $fran),
                 );
                 if ($note !== false) {
+                    /*
                     if (strstr($note, '<br />')) {
                         list($note,) = explode('<br />', $note, 2);
                     }
+*/
                     $record[] = $note;
                 } else {
                     $record[] = '?';
                 }
                 $data[] = $record;
+                $pendingCount++;
             }
+            $this->report_headers[5][0] .= ' (' . $pendingCount . ')';
 
             $this->report_headers[] = array('Fran Allocations', null, null, null, null, null);
             $this->report_headers[] = array('Number', 'Date', 'Name', 'Stock', null, 'Allocation');
@@ -267,16 +299,19 @@ class OwnerJoinLeaveReport extends FannieReportPage
                 'meta_background'=>'#ccc','meta_foreground'=>'#000');
 
             $franP = $dbc->prepare('
-                SELECT cardno
+                SELECT n.cardno
                 FROM memberNotes AS n
                     LEFT JOIN ' . $FANNIE_TRANS_DB . $dbc->sep() . 'equity_live_balance AS e ON n.cardno=e.memnum
                     LEFT JOIN memDates AS d ON n.cardno=d.card_no
+                    LEFT JOIN custdata AS c ON n.cardno=c.CardNo AND c.personNum=1
                 WHERE note LIKE \'%FUNDS REQ%\'
                     AND n.stamp >= ?
                     AND d.start_date < ?
                     AND e.payments <= 100
-                GROUP BY cardno
-                ORDER BY cardno');
+                    AND c.Type <> \'TERM\'
+                    AND c.Type <> \'INACT2\'
+                GROUP BY n.cardno
+                ORDER BY n.cardno');
             $detailP = $dbc->prepare('
                 SELECT c.CardNo,
                     c.FirstName,
@@ -295,17 +330,18 @@ class OwnerJoinLeaveReport extends FannieReportPage
             while ($w = $dbc->fetchRow($franR)) {
                 $detailR = $dbc->execute($detailP, array($w['cardno']));
                 $detailW = $dbc->fetchRow($detailR);
+                $actual = $dbc->getValue($stockP, array($w['cardno'], $this->form->date2 . ' 23:59:59'));
                 $data[] = array(
                     $detailW['CardNo'],
                     date('Y-m-d', strtotime($detailW['stamp'])),
                     $detailW['FirstName'] . ' ' . $detailW['LastName'],
-                    $detailW['payments'],
+                    $actual,
                     null,
                     $detailW['note'],
                 );
                 $franCount++;
             }
-            $this->report_headers[5][0] .= ' (' . $franCount . ')';
+            $this->report_headers[7][0] .= ' (' . $franCount . ')';
 
             $this->report_headers[] = array('Transfer Requests', null, null, null, null, null);
             $this->report_headers[] = array('Owner #', 'Date', 'Name', 'Equity', null, 'Request');
@@ -337,11 +373,12 @@ class OwnerJoinLeaveReport extends FannieReportPage
             while ($termW = $dbc->fetchRow($termR)) {
                 $note = $dbc->getValue($noteP, array($termW['card_no']));
                 if (strstr(strtoupper($note), 'TRANSFER')) {
+                    $actual = $dbc->getValue($stockP, array($termW['card_no'], $this->form->date2 . ' 23:59:59'));
                     $data[] = array(
                         $termW['card_no'],
                         date('Y-m-d', strtotime($termW['suspDate'])),
                         $termW['LastName'] . ', ' . $termW['FirstName'],
-                        sprintf('%.2f', $termW['payments']),
+                        sprintf('%.2f', $actual),
                         null,
                         $note,
                     );

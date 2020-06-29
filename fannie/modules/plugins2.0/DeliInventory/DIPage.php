@@ -429,6 +429,19 @@ HTML;
             $ret .= sprintf('<tr><td>%s</td><td>%s</td></tr>', $code, number_format($ttl));
         }
         $ret .= '</table>';
+        $ret .= '<hr />
+            <p>
+                <a href="DIPage.php?clear=1" class="btn btn-danger" onclick="return confirm(\'Clear totals?\');">Clear</a>
+                &nbsp;&nbsp;&nbsp;|
+                &nbsp;&nbsp;&nbsp;
+                <a href="../ShelfAudit/SaAdjustmentsPage.php">Transfer to Adjustments</a>
+            </p>';
+        $ret .= '<p>
+            <a href="DIExport.php" class="btn btn-default">Export Data</a>
+                &nbsp;&nbsp;&nbsp;|
+                &nbsp;&nbsp;&nbsp;
+            <a href="DICostUpdatePage.php" class="btn btn-default">Update Costs from Invoices</a>
+            </p>';
 
         $vendR = $this->connection->query("SELECT vendorID, vendorName FROM vendors WHERE inactive=0 ORDER BY vendorName");
         $vendors = array();

@@ -138,6 +138,7 @@ class AdvancedItemSearch extends FannieRESTfulPage
                     return substr($ret, 0, strlen($ret)-1);
                 } else {
                     $i = str_replace('-', '', $i);
+                    $i = str_replace("'", '', $i);
                 }
                 return $i;
             }, $upcs);
@@ -919,6 +920,7 @@ class AdvancedItemSearch extends FannieRESTfulPage
         echo '&nbsp;&nbsp;&nbsp;&nbsp;';
         echo '<a href="AdvancedItemSearch.php?init=' . base64_encode($dataStr) . '">Permalink for this Search</a>';
         echo $this->streamOutput($items);
+        echo $this->javascript_chkbox();
 
         return false;
     }
@@ -1090,6 +1092,48 @@ class AdvancedItemSearch extends FannieRESTfulPage
         $this->addOnloadCommand("\$('#resultArea').html(\$('#externResults').html());\n");
 
         return $body;
+    }
+
+    public function javascript_chkbox()
+    {
+        return <<<JAVASCRIPT
+<script type="text/javascript">
+var lastChecked = null;
+var i = 0;
+var indexCheckboxes = function(){
+    $('.upcCheckBox').each(function(){
+        $(this).attr('data-index', i);
+        i++;
+    });
+};
+indexCheckboxes();
+$('table').click(function(){
+    indexCheckboxes();
+});
+$('.upcCheckBox').on("click", function(e){
+    if(lastChecked && e.shiftKey) {
+        var i = parseInt(lastChecked.attr('data-index'));
+        var j = parseInt($(this).attr('data-index'));
+        var checked = $(this).is(":checked");
+
+        var low = i;
+        var high = j;
+        if (i>j){
+            var low = j;
+            var high = i;
+        }
+
+        for(var c = low; c < high; c++) {
+            if (c != low && c!= high) {
+                var check = checked ? true : false;
+                $('input[data-index="'+c+'"').prop("checked", check);
+            }
+        }
+    }
+    lastChecked = $(this);
+});
+</script>
+JAVASCRIPT;
     }
 
     public function helpContent()

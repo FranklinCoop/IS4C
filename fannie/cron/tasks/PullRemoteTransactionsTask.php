@@ -56,6 +56,8 @@ class PullRemoteTransactionsTask extends FannieTask
                     WHERE store_id=?
                 ');
 
+        $verifyP = $dbc->prepare("SELECT COUNT(*) FROM {$local_dtrans} WHERE store_id=?");
+
         $stores = new StoresModel($dbc);
         foreach($stores->find() as $store) {
             if ($store->dbHost() == $this->config->get('SERVER')) {
@@ -70,12 +72,12 @@ class PullRemoteTransactionsTask extends FannieTask
 
             $lowerBound = $dbc->getValue($max1, array($remoteID));
             if ($lowerBound === false) {
-                $this->cronMsg('Polling problem: cannot lookup info in dtransactions', FannieLogger::WARNING);
+                $this->cronMsg('Polling problem: cannot lookup info in dtransactions (#' . $remoteID . ')', FannieLogger::WARNING);
                 continue;
             } elseif ($lowerBound == 0) {
                 $lowerBound = $dbc->getValue($max2, array($remoteID));
                 if ($lowerBound === false) {
-                    $this->cronMsg('Polling problem: cannot lookup info in transarchive', FannieLogger::WARNING);
+                    $this->cronMsg('Polling problem: cannot lookup info in dtransactions (#' . $remoteID . ')', FannieLogger::WARNING);
                     continue;
                 }
             }
@@ -98,6 +100,11 @@ class PullRemoteTransactionsTask extends FannieTask
             // reduces chances of a name collision
             $dbc->transfer($store->transDB(), $selectQ,
                            $FANNIE_OP_DB, $insertQ);
+
+            $records = $dbc->getValue($verifyP, array($remoteID));
+            if ($records == 0) {
+                $this->cronMsg('No records imported for store #' . $remoteID, FannieLogger::ALERT);
+            }
         }
     }
 }

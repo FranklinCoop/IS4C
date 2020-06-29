@@ -37,7 +37,24 @@ class NewClassPage extends FannieRESTfulPage
     function preprocess()
     {
         $this->__routes[] = 'get<create>';
+        $this->__routes[] = 'post<exists>';
         return parent::preprocess();
+    }
+
+    protected function post_exists_handler()
+    {
+        global $FANNIE_OP_DB;
+        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $upc = FormLib::get('upc');
+        $upc = BarcodeLib::padUPC($upc);
+        $args = array($upc);
+        $prep = $dbc->prepare('SELECT upc FROM products WHERE upc = ?');
+        $res = $dbc->execute($prep, $args);
+        $row = $dbc->fetchRow($res);
+        echo $exists = $row['upc'];
+
+        return false;
+
     }
     
     protected function get_create_handler()
@@ -57,7 +74,7 @@ class NewClassPage extends FannieRESTfulPage
         $likeCode = FormLib::get('likeCode');
         $pDept = FormLib::get('pDept');
         $size = FormLib::get('size');
-        $sellonline = FormLib::get('sellonline');
+        $sellonline = 0;
         $expires = FormLib::get('expires') . ' 00:00:00';
         $wBrand = FormLib::get('wBrand');
         $wDesc = FormLib::get('wDesc');
@@ -121,6 +138,7 @@ class NewClassPage extends FannieRESTfulPage
     {
         $alert = '';
         $upc = FormLib::get('upc');
+        $upc = BarcodeLib::padUPC($upc);
         $ln = '<a href="../ItemEditorPage.php?searchupc='.$upc.
                 '&ntype=UPC&searchBtn=">'.$upc.'</a>';
         if (FormLib::get('created') == 'success') {
@@ -132,6 +150,14 @@ class NewClassPage extends FannieRESTfulPage
             $alert = '<div class="alert alert-danger">Something went wrong. Error-code: 
                 '.$error.'<br/>View: '.$ln.'</div>';
         }
+
+        global $FANNIE_OP_DB;
+        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $prep = $dbc->prepare("SELECT upc FROM products WHERE upc LIKE '0000099%'
+            ORDER BY upc DESC LIMIT 1;");
+        $res = $dbc->execute($prep);
+        $row = $dbc->fetchRow($res);
+        $newClassUpc = $row['upc'] + 1;
         
         return <<<HTML
         <div align="center">
@@ -139,40 +165,39 @@ class NewClassPage extends FannieRESTfulPage
         <div class="panel panel-default" style="max-width: 900px;">
         <div class="panel-heading" id="heading"><strong>Create a new WFC-U Class</strong></div>
         <div class="panel-body" style="text-align: left;">
-            {$this->form_content()}
+            {$this->form_content($newClassUpc)}
         </div></div></div>
 HTML;
     }
     
-    public function form_content()
+    public function form_content($newClassUpc)
     {
+        $this->addOnloadCommand("$('#date').datepicker({dateFormat: 'mm-dd-yy'});");
+
         return <<<HTML
 <div>
     <form class="" method="get"> 
         <div class="col-md-3">
             <div class="form-group">
-                <label for="upc">UPC</label>
-                <input type="text" class="form-control len-md" name="upc" id="upc" autofocus value="99" required/>
+                <label for="upc">UPC</label><span id="upc-warning"></span>
+                <input type="text" class="form-control len-md" name="upc" id="upc" autofocus value="00000$newClassUpc" required/>
+            </div>
+            <div class="form-group">
+                <label for="date">Date</label>
+                <input type="text" class="form-control len-md" name="date" id="date" required/>
             </div>
             <div class="form-group">
                 <label for="pDesc">POS Description</label>
                 <input type="text" class="form-control len-lg" name="pDesc" id="pDesc" value="CLASS - "
-                    maxlength="30" required/>
+                    maxlength="30"  onkeyup="this.value = this.value.toUpperCase();" required/>
             </div>
             <div class="form-group">
                 <label for="pBrand">POS Brand</label>
                 <input type="text" class="form-control len-md" name="pBrand" value="WFC-U" readonly="readonly" required/>
             </div>
             <div class="form-group">
-                <label for="pPrice">Price</label><br/>
-                <input type="radio" name="price" value="0.00" selected/> <i>Free</i> <span style="color: grey">| </span>
-                <input type="radio" name="price" value="12.00"/> $12 <span style="color: grey">| </span>
-                <input type="radio" name="price" value="15.00"/> $15 <br/>
-                <input type="radio" name="price" value="20.00"/> $20 <span style="color: grey">| </span>
-                <input type="radio" name="price" value="25.00"/> $25 <span style="color: grey">| </span>
-                <input type="radio" name="price" value="30.00"/> $30 <span style="color: grey">| </span>
-                <input type="radio" name="price" value="40.00"/> $40 <br/>
-                <input type="radio" name="price" value="60.00"/> $60 
+                <label for="Price">Price</label><br/>
+                <input type="number" class="form-control len-lg" name="price" min="0" />
             </div>
             <!--
             <div class="form-group">
@@ -242,7 +267,7 @@ START - END LOCATION
 rows="20"></textarea>
             </div>
             <div class="form-group">
-                <button type="submit" class="btn btn-default" name="create" value="1">Create WFC-U Class</button>
+                <button type="submit" class="btn btn-default" name="create" value="1" id="submit-btn">Create WFC-U Class</button>
             </div>
         </div>
     </form>
@@ -275,7 +300,40 @@ HTML;
     
     public function javascriptContent()
     {
-        return <<<HTML
+        return <<<JAVASCRIPT
+$('#upc').keyup(function(e){
+    var upc = $(this).val();
+    var length = upc.length;
+    if (length == 8) {
+        $.ajax({
+            type: 'post',
+            data: 'upc='+upc+'&exists=1',
+            success: function(response)
+            {
+                if (response != '') {
+                    $('#upc-warning').html("<div class='alert alert-danger'>Product Already Exists</div>");
+                    $('#submit-btn').attr('disabled', true);
+                } else {
+                    $('#upc-warning').html("");
+                    $('#submit-btn').attr('disabled', false);
+                }
+            }
+        });
+    }
+});
+$('#date').change(function(){
+    var dateVal = $(this).val();
+
+    var wDesc = $('#wDesc').val();  
+    wDesc = wDesc.replace('MM-DD-YYYY', dateVal);
+    $('#wDesc').val(wDesc);
+
+    //var month = dateObj.getMonth();
+    //var day = dateObj.getDate();
+    //var year = dateObj.getFullYear();
+    //var expireDate = year+'-'+month+'-'+day;
+    //$('#expires').val(expireDate);
+});
 $(document).ready(function() {
     var input = $("#upc");
     var len = input.val().length;
@@ -338,7 +396,7 @@ function autofill() {
         temp = temp.toUpperCase();
         $('#pDesc').val(temp);
     });
-HTML;
+JAVASCRIPT;
     }
 
     public function helpContent()

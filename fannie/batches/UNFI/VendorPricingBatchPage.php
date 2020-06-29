@@ -52,6 +52,9 @@ class VendorPricingBatchPage extends FannieRESTfulPage
         tr.green td.sub {
             background:#ccffcc;
         }
+        tr.greenb td.sub {
+            background:#ddffcc;
+        }
         tr.red td.sub {
             background:#F7BABA;
         }
@@ -154,12 +157,15 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             <input type=hidden id=queueID value=%d />
             <input type=hidden id=superID value=%d />",
             $vendorID,$batchID,$queueID,$superID);
-        $ret .= '<br/><b>Show only</b>: <button class="btn btn-danger btn-xs" 
-            onClick="showOnlyClass(\'red\'); return false;"> Red </button> | 
-            <button class="btn btn-warning btn-xs" onClick="showOnlyClass(\'yellow\'); return false;">
-            Yellow</button> | <button class="btn btn-success btn-xs" onClick="showOnlyClass(\'green\');
-            return false;">Green</button> | <button class="btn btn-default btn-xs" onClick="showAll(); 
-            return false;"> <b>All</b> </button><br/><br/>';
+        $ret .= '<br/><b>View: </b>: 
+            <button class="btn btn-danger btn-xs btn-filter active" data-filter-type="red">Red</button> 
+            | <button class="btn btn-warning btn-xs btn-filter active" data-filter-type="yellow">Yellow</button> 
+            | <button class="btn btn-success btn-xs btn-filter active" data-filter-type="green">Green</button> 
+            | <button class="btn btn-default btn-xs btn-filter active" data-filter-type="white">White</button> 
+            | <button class="btn btn-default btn-xs multi-filter active" data-filter-type="multiple">
+                <span class="glyphicon glyphicon-exclamation-sign" title="View only rows containing multiple SKUs"> </span>
+            </button> 
+            <br/><br/>';
 
         $batchUPCs = array();
         $batchList = new BatchListModel($dbc);
@@ -277,6 +283,7 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             <th class=\"thead\">Var</th>
             <th class=\"thead\">Batch</th>
             <th class=\"thead\">Ignore</th></tr></thead><tbody>";
+        $rounder = new PriceRounder();
         while ($row = $dbc->fetch_row($result)) {
             $vendorModel->reset();
             $vendorModel->upc($row['upc']);
@@ -293,6 +300,7 @@ class VendorPricingBatchPage extends FannieRESTfulPage
                 $alias = $dbc->getRow($aliasP, array($row['upc']));
                 $row['vendorDept'] = $alias['vendorDept'];
                 $row['srp'] = $alias['srp'] * $alias['multiplier'];
+                $row['srp'] = $rounder->round($row['srp']);
             }
             if ($row['difference']) {
             }
@@ -336,7 +344,7 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             $brand = rtrim(substr($row['brand'], 0, 15));
             $symb = ($row['difference'] > 0) ? "+" : "";
             $row['date'] = ($row['date']) ? "<span class='grey'> <i>on</i> </span> ".$row['date'] : "";
-            $ret .= sprintf("<tr id=row%s class=%s>
+            $ret .= sprintf("<tr id=row%s class='%s %s'>
                 <td class=\"sub\"><a href=\"%sitem/ItemEditorPage.php?searchupc=%s\">%s</a></td>
                 <td class=\"sub sku\">%s</td>
                 <td class=\"sub\"><strong>%s</strong> %s</td>
@@ -364,7 +372,7 @@ class VendorPricingBatchPage extends FannieRESTfulPage
                 <td class=\"clickIgnore\"><input type=\"checkbox\"/></td>
                 </tr>",
                 $row['upc'],
-                $background,
+                $background, $mtp = ($multipleVendors == '') ? '' : 'multiple',
                 $this->config->URL, $row['upc'], $row['upc'],
                 $row['sku'],
                 $temp = (strlen($brand) == 10) ? "$brand~" : $brand,
@@ -453,6 +461,18 @@ class VendorPricingBatchPage extends FannieRESTfulPage
     {
         ob_start();
         ?>
+        $('.green').each(function(){
+            var price = $(this).find('td:eq(4)').text();
+            price = parseFloat(price);
+            var srp = $(this).find('td:eq(9)').text();
+            srp = parseFloat(srp);
+            if (price < srp) {
+                var text = $(this).find('td:eq(10)').text();
+                $(this).find('td:eq(10)').css('background', 'pink');
+            } else {
+                var text = $(this).find('td:eq(10)').text();
+            }
+        });
         var $table = $('#mytable');
         $table.floatThead();
         function showOnlyClass(classname) {
@@ -470,6 +490,56 @@ class VendorPricingBatchPage extends FannieRESTfulPage
         }
        $('.clickIgnore').on('click', function(){
            $(this).closest('tr').hide();
+       });
+       $('.btn-filter').click(function() {
+           var active = $(this).hasClass('active') ? true : false;
+           if (active === true) {
+                $(this).removeClass('active');
+           } else {
+                $(this).addClass('active');
+           }
+           $('.btn-filter').each(function(){
+               var type = $(this).attr('data-filter-type');
+               var curActive = $(this).hasClass('active') ? true : false;
+               if (curActive === true) {
+                   $('tr').each(function(){
+                       if ($(this).hasClass(type)) {
+                            $(this).show();
+                       }
+                   });
+               } else {
+                   $('tr').each(function(){
+                       if ($(this).hasClass(type)) {
+                            $(this).hide();
+                       }
+                   });
+
+               }
+           });
+       });
+       $('.multi-filter').click(function(){
+           var active = $(this).hasClass('active') ? true : false;
+           if (active === true) {
+                $('.btn-filter').each(function(){
+                    $(this).removeClass('active');
+                });
+                $('tr').each(function(){
+                    if (!$(this).hasClass('multiple')) {
+                        if ($(this).is('.red, .white, .yellow, .blue, .green')) {
+                            $(this).hide();
+                        }
+                    }
+                });
+                $(this).removeClass('active');
+           } else {
+                $(this).addClass('active');
+                $('tr').each(function(){
+                    $(this).show();
+                });
+                $('.btn-filter').each(function(){
+                    $(this).addClass('active');
+                });
+           }
        });
         <?php
         return ob_get_clean();

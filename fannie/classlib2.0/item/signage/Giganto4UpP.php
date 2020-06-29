@@ -71,7 +71,7 @@ class Giganto4UpP extends \COREPOS\Fannie\API\item\FannieSignage
         $item['size'] = $this->formatSize($item['size'], $item);
         $pdf->Cell($effective_width, 6, $item['size'], 0, 1, 'C');
 
-        if (isset($item['signMultiplier']) && $item['signMultiplier'] != -3) {
+        if (!isset($item['signMultiplier']) || $item['signMultiplier'] != -3) {
             $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($row*$this->height) + 35);
             $pdf->SetFont($this->font, '', $this->BIG_FONT);
             if (strstr($price, 'lb')) {
@@ -112,7 +112,7 @@ class Giganto4UpP extends \COREPOS\Fannie\API\item\FannieSignage
 
         if ($item['originShortName'] != '') {
             $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 20));
-            $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
+            $pdf->SetFont($this->alt_font, '', $this->MED_FONT);
             $lower = trim(strtolower($item['originShortName']));
             if (substr($lower, 0, 10) !== 'product of') {
                 $item['originShortName'] = 'Product of ' . trim($item['originShortName']);

@@ -110,9 +110,10 @@ class CoopDealsReviewPage extends FanniePage
                 discountType,
                 priority,
                 startDate,
-                endDate
+                endDate,
+                owner
             )
-            VALUES (?, ?, ?, 0, ?, ?)
+            VALUES (?, ?, ?, 0, ?, ?, ?)
         ');
 
         $blDef = $dbc->tableDefinition('batchList');
@@ -148,6 +149,8 @@ class CoopDealsReviewPage extends FanniePage
                     $args[] = $start;
                     $args[] = $b_end;
                 }
+                list($firstWord) = explode(' ', $args[0]);
+                $args[] = $firstWord;
     
                 $dbc->execute($batchP,$args);
                 $bID = $dbc->insertID();
@@ -214,10 +217,9 @@ class CoopDealsReviewPage extends FanniePage
                 MAX(CASE WHEN s.super_name IS NULL THEN 'sale' ELSE s.super_name END) as batch,
                 t.abtpr as subbatch
             FROM CoopDealsItems as t
-                LEFT JOIN products AS p ON t.upc=p.upc
+                " . DTrans::joinProducts('t', 'p', 'INNER') . "
                 LEFT JOIN MasterSuperDepts AS s ON p.department=s.dept_ID
             WHERE t.dealSet=?
-                AND p.inUse=1
             GROUP BY t.upc,
                 p.brand,
                 p.description,

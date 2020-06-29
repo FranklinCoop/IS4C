@@ -67,12 +67,12 @@ class AjaxEnd extends AjaxCallback
         }
 
         if ($transFinished) {
-            UdpComm::udpSend("termReset");
             $sdObj = ScaleDriverWrapper::factory($this->session->get('scaleDriver'));
             if (is_object($sdObj)) {
                 $sdObj->readReset();
             }
             $this->session->set('ccTermState','swipe');
+            $this->session->set('lotterySpin',false);
             $this->uploadAndReset();
             $this->session->set("End",0);
             Database::flushJobs();
@@ -90,6 +90,10 @@ class AjaxEnd extends AjaxCallback
         }
 
         $this->outputReceipt($receiptContent, $customerEmail);
+
+        if ($transFinished) {
+            UdpComm::udpSend("termReset");
+        }
 
         return array();
     }

@@ -22,6 +22,9 @@
   triggered, if present, or the closest form is submitted
 */
 function lineaBarcode(upc, selector, callback) {
+    if (typeof upc === 'undefined') {
+        return;
+    }
     upc = upc.substring(0,upc.length-1);
     if ($(selector).length > 0){
         $(selector).val(upc);
@@ -86,6 +89,11 @@ function enableLinea(selector, callback) {
             lineaBarcode(data, selector, callback);
         });
     }
+
+    document.addEventListener("BarcodeScanned", function (ev) {
+        var data = ev.value;
+        lineaBarcode(data, selector, callback);
+    }, false);
 
     // for webhub
     IPC_PARAMS.selector = selector;

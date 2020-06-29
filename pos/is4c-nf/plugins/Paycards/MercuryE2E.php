@@ -24,6 +24,7 @@
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DisplayLib;
 use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\PrehLib;
 use COREPOS\pos\lib\TransRecord;
 use COREPOS\pos\lib\UdpComm;
 use COREPOS\pos\plugins\Paycards\sql\PaycardRequest;
@@ -375,6 +376,9 @@ class MercuryE2E extends BasicCCModule
                 $charflag = ($recordID != 0) ? 'PT' : '';
                 $this->conf->set('refund', 0); // refund flag should not invert tender amount
                 TransRecord::addFlaggedTender($tenderDescription, $tenderCode, $amt, $recordID, $charflag);
+                if ($tenderCode == 'EF' || $tenderCode == 'EC') {
+                    PrehLib::ttl();
+                }
 
                 $apprType = 'Approved';
                 if ($this->conf->get('paycard_partial')){
@@ -384,6 +388,11 @@ class MercuryE2E extends BasicCCModule
                     $json['receipt'] = 'ccDecline';
                 }
                 $this->conf->set('paycard_partial', false);
+
+                $cbMsg = '';
+                if ($this->conf->get('LastEmvCashBack')) {
+                    $cbMsg = sprintf('<p><b>Cashback: %.2f</b></p>', $this->conf->get('LastEmvCashBack'));
+                }
 
                 $isCredit = ($this->conf->get('CacheCardType') == 'CREDIT' || $this->conf->get('CacheCardType') == '') ? true : false;
                 $needSig = ($this->conf->get('paycard_amount') > $this->conf->get('CCSigLimit') || $this->conf->get('paycard_amount') < 0) ? true : false;
@@ -400,6 +409,7 @@ class MercuryE2E extends BasicCCModule
                 } elseif (($isCredit || $this->conf->get('EmvSignature') === true) && $needSig) {
                     $this->conf->set("boxMsg",
                             "<b>$apprType</b>
+                            {$cbMsg}
                             <font size=-1>
                             <p>Please verify cardholder signature
                             <p>[enter] to continue
@@ -412,6 +422,7 @@ class MercuryE2E extends BasicCCModule
                 } else {
                     $this->conf->set("boxMsg",
                             "<b>$apprType</b>
+                            {$cbMsg}
                             <font size=-1>
                             <p>No signature required
                             <p>[enter] to continue
@@ -916,12 +927,19 @@ class MercuryE2E extends BasicCCModule
             <Amount>
                 <Purchase>'.$request->formattedAmount().'</Purchase>';
         $cval =new CardValidator();
+        $cbMax = $this->conf->get('PaycardsTermCashBackLimit');
         if ($request->cashback > 0 && $cval->allowCashback($request->type)) {
                 $msgXml .= "<CashBack>" . $request->formattedCashBack() . "</CashBack>";
         } elseif ($this->conf->get('PaycardsOfferCashBack') == 3 && strtoupper($request->type) == 'DEBIT') {
             $msgXml .= "<CashBack>Prompt</CashBack>";
+            if (is_numeric($cbMax) && $cbMax > 0) {
+                $msgXml .= sprintf('<MaximumCashBack>%.2f</MaximumCashBack>', $cbMax);
+            }
         } elseif ($this->conf->get('PaycardsOfferCashBack') == 4 && in_array(strtoupper($request->type), array('DEBIT','EMV'))) {
             $msgXml .= "<CashBack>Prompt</CashBack>";
+            if (is_numeric($cbMax) && $cbMax > 0) {
+                $msgXml .= sprintf('<MaximumCashBack>%.2f</MaximumCashBack>', $cbMax);
+            }
         }
         if ($tipped) {
             $msgXml .= '<Gratuity>Prompt</Gratuity>';

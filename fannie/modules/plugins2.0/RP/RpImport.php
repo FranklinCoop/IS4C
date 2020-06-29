@@ -114,8 +114,8 @@ class RpImport extends FannieRESTfulPage
         $lcSortP = $this->connection->prepare("UPDATE likeCodes SET sortRetail=? WHERE likeCode=?");
         $makeP = $this->connection->prepare("INSERT INTO RpOrderCategories (name) VALUES (?)");
         $insP = $this->connection->prepare("INSERT INTO RpOrderItems
-            (upc, storeID, categoryID, vendorID, vendorSKU, vendorItem, backupID, backupSKU, backupItem, caseSize)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            (upc, storeID, categoryID, vendorID, vendorSKU, vendorItem, backupID, backupSKU, backupItem, caseSize, cost)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $this->connection->query('TRUNCATE TABLE RpOrderItems');
         $this->connection->startTransaction();
         $added = array();
@@ -183,11 +183,12 @@ class RpImport extends FannieRESTfulPage
                     $catID,
                     $vendorID,
                     ($mainCatalog ? $mainCatalog['sku'] : null),
-                    ($mainCatalog ? $mainCatalog['description'] : $name),
+                    $name,
                     $backupID,
                     ($backupCatalog ? $backupCatalog['sku'] : null),
                     ($backupCatalog ? $backupCatalog['description'] : $backupName),
                     $info['units'],
+                    $info['cost'],
                 );
                 $this->connection->execute($insP, $args);
             }
@@ -297,6 +298,7 @@ class RpImport extends FannieRESTfulPage
 
         $dbc = $this->connection;
         $lcP = $dbc->prepare('UPDATE likeCodes SET organic=?, preferredVendorID=?, origin=? WHERE likeCode=?');
+        $lcNoOriginP = $dbc->prepare('UPDATE likeCodes SET organic=?, preferredVendorID=? WHERE likeCode=?');
         $orgP = $dbc->prepare('
             UPDATE upcLike AS u
                 INNER JOIN products AS p ON u.upc=p.upc
@@ -319,13 +321,22 @@ class RpImport extends FannieRESTfulPage
                 ($i['organic'] ? 'Yes' : 'No'),
                 ($i['scale'] ? 'Yes' : 'No')
             );
-            $args = array(
-                $i['organic'] ? 1 : 0,
-                $this->vendorToID($i['vendor']),
-                $i['origin'],
-                $i['lc'],
-            );
-            $dbc->execute($lcP, $args);
+            if ($i['origin']) {
+                $args = array(
+                    $i['organic'] ? 1 : 0,
+                    $this->vendorToID($i['vendor']),
+                    $i['origin'],
+                    $i['lc'],
+                );
+                $dbc->execute($lcP, $args);
+            } else {
+                $args = array(
+                    $i['organic'] ? 1 : 0,
+                    $this->vendorToID($i['vendor']),
+                    $i['lc'],
+                );
+                $dbc->execute($lcNoOriginP, $args);
+            }
             if ($i['organic']) {
                 $dbc->execute($orgP, array($orgBits, $i['lc']));
             } else {
@@ -441,9 +452,11 @@ if (php_sapi_name() == 'cli' && basename($_SERVER['PHP_SELF']) == basename(__FIL
                             if (!in_array($lc, $dupes)) {
                                 $dupes[] = $lc;
                             }
-                            $lcPlus = $lc . '-' . uniqid();
+                            $lcPlus = substr($lc . '-' . md5($data[9]), 0, 11);
+                            $collide = 1;
                             while (isset($otherData[$lcPlus])) {
-                                $lcPlus = $lc . '-' . uniqid();
+                                $lcPlus = substr($lc . '-' . md5($data[9] . $collide), 0, 11);
+                                $collide++;
                             }
                             $lc = $lcPlus;
                             $otherData[$lc] = array();
@@ -459,6 +472,7 @@ if (php_sapi_name() == 'cli' && basename($_SERVER['PHP_SELF']) == basename(__FIL
                         $otherData[$lc]['rdwSKU'] = (int)$data[23];
                         $otherData[$lc]['sort'] = $data[11];
                         $otherData[$lc]['units'] = $data[42];
+                        $otherData[$lc]['cost'] = $data[40];
                     }
 
                 }

@@ -69,6 +69,16 @@ var rpOrder = (function ($) {
         });
     };
 
+    mod.save = function() {
+        $.ajax({
+            type: 'post',
+            data: 'json=' + encodeURIComponent(JSON.stringify(state))
+        }).done(function() {
+            var now = new Date();
+            $('.last-save').html(now.toLocaleTimeString());
+        });
+    }
+
     function saveLoop() {
         $.ajax({
             type: 'get',
@@ -81,7 +91,7 @@ var rpOrder = (function ($) {
     function clearIncoming() {
         $('input.onHand').each(function () {
             $(this).attr('data-incoming', 0);
-            $(this).closest('td').removeClass('success').attr('title', '');;
+            $(this).closest('td').find('span.incoming-notice').html('');
         });
     };
 
@@ -93,17 +103,22 @@ var rpOrder = (function ($) {
             dataType: 'json'
         }).done(function (resp) {
             var qtyMap = {};
+            var textMap = {};
             for (var i=0; i<resp.length; i++) {
                 var obj = resp[i];
                 qtyMap[obj.upc] = obj.qty;
+                textMap[obj.upc] = obj.text;
             }
+            console.log(qtyMap);
             $('td.upc a').each(function () {
                 var upc = $(this).text();
                 if (qtyMap.hasOwnProperty(upc)) {
+                    console.log(upc);
                     var row = $(this).closest('tr');
                     var onHand = $(row).find('input.onHand');
                     $(onHand).attr('data-incoming', qtyMap[upc]);
-                    $(onHand).closest('td').addClass('success').attr('title', 'Incoming: ' + qtyMap[upc]);
+                    $(onHand).closest('td').find('span.incoming-notice').html(textMap[upc]);
+                    //$(onHand).closest('td').addClass('alert-success').attr('title', 'Incoming: ' + qtyMap[upc] + ' from ' + brandMap[upc]);
                     mod.reCalcRow(row);
                 }
             });
@@ -111,7 +126,7 @@ var rpOrder = (function ($) {
     };
 
     mod.initState = function(s) {
-        if (s) {
+        if (typeof s == 'object') {
             state = s;
             if (state['onHand'].__proto__ == Array.prototype) {
                 state['onHand'] = {};
@@ -134,7 +149,9 @@ var rpOrder = (function ($) {
             var oIDs = Object.keys(state['orderAmt']);
             for (i=0; i<oIDs.length; i++) {
                 var elemID = oIDs[i];
-                document.getElementById(elemID).value = Number(state['orderAmt'][elemID]);
+                if (state['orderAmt'][elemID] !== '') {
+                    document.getElementById(elemID).value = Number(state['orderAmt'][elemID]);
+                }
             }
 
             var hIDs = Object.keys(state['onHand']);
@@ -148,25 +165,43 @@ var rpOrder = (function ($) {
             var oIDs = Object.keys(state['orderAmt']);
             for (i=0; i<oIDs.length; i++) {
                 var elemID = oIDs[i];
-                document.getElementById(elemID).value = Number(state['orderAmt'][elemID]);
+                if (state['orderAmt'][elemID] !== '') {
+                    document.getElementById(elemID).value = Number(state['orderAmt'][elemID]);
+                }
             }
         }
-        saveLoop();
+        //saveLoop();
     };
 
     mod.updateOnHand = function(elem) {
         var onHand = state['onHand'];
         onHand[elem.id] = elem.value;
         state['onHand'] = onHand;
+        mod.save();
     };
 
     mod.updateOrder = function(elem) {
         state['orderAmt'][elem.id] = elem.value;
+        mod.save();
+        var inOrder = $(elem).closest('tr').find('input:checked');
+        if (inOrder.length > 0) {
+            var ids = inOrder.first().val();
+            $.ajax({
+                'type': 'post',
+                'data': 'id=' + ids + '&qty=' + elem.value,
+                'dataType': 'json'
+            }).done(function (resp) {
+                // order is updated!
+            });
+        }
     };
 
     mod.updateDays = function() {
         clearIncoming();
-        var week = $('#projSales').html().replace(',', '');
+        var week = $('#modProj').html();
+        if (week == 0) {
+            week = $('#projSales').html().replace(',', '');
+        }
         var selectedDays = 0;
         minDate = false;
         maxDate = false;
@@ -215,12 +250,19 @@ var rpOrder = (function ($) {
         if (minDate !== false && maxDate !== false) {
             getIncoming(minDate, maxDate);
         }
+        mod.save();
     };
 
     mod.reCalcRow = function(elem) {
         var caseSize = $(elem).find('td.caseSize').html();
         var adj = $(elem).find('td.parCell').html();
         var onHand = $(elem).find('input.onHand').val();
+        if (onHand <= 0) {
+            return;
+        }
+        if ($('input#autoOrderCheck').prop('checked') == false) {
+            return;
+        }
         if (!retainElem) {
             retainElem = $('#retention');
         }
@@ -236,7 +278,10 @@ var rpOrder = (function ($) {
             cases += 1;
             start -= caseSize;
         }
-        $(elem).find('input.orderAmt').val(cases);
+        orderField = $(elem).find('input.orderAmt');
+        if (orderField.val() <= 0 && orderField.is(':visible')) {
+            orderField.val(cases);
+        }
     };
 
     mod.inc = function(btn, amt) {
@@ -251,13 +296,28 @@ var rpOrder = (function ($) {
 
     function nextRow(elem) {
         var myRow = $(elem).closest('tr');
-        var next = $(myRow).next('tr');
-        if (next.length > 0) {
-            return next.get(0);
+        var limit = 0;
+        while (true) {
+            var next = $(myRow).next('tr');
+            if (next.length == 0) {
+                break;
+            }
+            if ($(next).css('display') == 'none') {
+                myRow = next;
+            } else if (next.length > 0) {
+                return next.get(0);
+            }
+            limit++;
+            if (limit > 10) {
+                break;
+            }
         }
         var myTable = $(elem).closest('table');
         var nextTable = $(myTable).next().next('table');
         next = $(nextTable).find('td').first().parent();
+        if ($(next).css('display') == 'none') {
+            return nextRow(next);
+        }
         if (next.length > 0) {
             return next.get(0);
         }
@@ -267,13 +327,28 @@ var rpOrder = (function ($) {
 
     function prevRow(elem) {
         var myRow = $(elem).closest('tr');
-        var prev = $(myRow).prev('tr');
-        if ($(prev).find('td').length > 0) {
-            return prev.get(0);
+        var limit = 0;
+        while (true) {
+            var prev = $(myRow).prev('tr');
+            if (prev.length == 0) {
+                break;
+            }
+            if ($(prev).css('display') == 'none') {
+                myRow = prev;
+            } else if ($(prev).find('td').length > 0) {
+                return prev.get(0);
+            }
+            limit++;
+            if (limit > 10) {
+                break;
+            }
         }
         var myTable = $(elem).closest('table');
         var prevTable = $(myTable).prev().prev('table');
         prev = $(prevTable).find('td').last().parent();
+        if ($(prev).css('display') == 'none') {
+            return prevRow(prev);
+        }
         if (prev.length > 0) {
             return prev.get(0);
         }
@@ -328,12 +403,14 @@ var rpOrder = (function ($) {
                 'data': 'id=' + id + '&qty=' + qty,
                 'dataType': 'json'
             }).done(function (resp) {
+                mod.all--;
                 $(elem).closest('td').addClass('info');
                 if ($('#openOrders').find('#link'+resp.orderID).length == 0) {
                     var newlink = '<li id="link' + resp.orderID + '">';
                     newlink += '<a href="../../../purchasing/ViewPurchaseOrders.php?id=' + resp.orderID + '">';
                     newlink += resp.name + '</a></li>';
                     $('#openOrders').append(newlink);
+                    $('#altOpenOrders').append(newlink);
                 }
                 var orderIDs = "";
                 $('#openOrders li').each(function () {
@@ -342,6 +419,7 @@ var rpOrder = (function ($) {
                 if (orderIDs) {
                     var printLink = '<a href="RpPrintOrders.php?id=' + orderIDs + '">Print these</a>';
                     $('#printLink').html(printLink);
+                    $('#altPrintLink').html(printLink);
                 }
             });
         } else {
@@ -351,26 +429,46 @@ var rpOrder = (function ($) {
                 'dataType': 'json'
             }).done(function (resp) {
                 $(elem).closest('td').removeClass('info');
+                mod.all--;
             });
         }
     };
 
+    function endOrderAll(count, meters, buttons) {
+        if (count > 15 || mod.all <= 0) {
+            meters.hide();
+            buttons.prop('disabled', false);
+        } else {
+            setTimeout(function () { endOrderAll(count + 1, meters, buttons) }, 1000);
+        }
+    };
+
+    mod.all = 0;
     mod.orderAll = function() {
         var buttons = $('button.orderAll');
         var meters = $('.progress');
         buttons.prop('disabled', true);
         meters.show();
+        mod.all = 0;
 
         $('input.orderPri').each(function () {
             var qty = $(this).closest('tr').find('input.orderAmt').val();
-            if (qty > 0 && !$(this).prop('checked')) {
+            var secondary = $(this).closest('tr').find('input.orderSec');
+            if (qty > 0 && !$(this).prop('checked') && !secondary.prop('checked')) {
                 $(this).prop('checked', true);
+                mod.all++;
                 mod.placeOrder(this);
             }
         });
 
-        meters.hide();
-        buttons.prop('disabled', false);
+        setTimeout(function () { endOrderAll(1, meters, buttons) }, 1000);
+    };
+
+    mod.vendorFilter = function() {
+        $('tr.item-row').hide();
+        $('input.vFilter:checked').each(function () {
+            $('tr.vendor-' + $(this).val()).show();
+        });
     };
 
     return mod;

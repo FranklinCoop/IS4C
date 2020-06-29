@@ -74,6 +74,9 @@ a[type="submit"] {
     onclick="location='SaPriceChangePage.php';return false;" />
     -->
 <a class="btn btn-default btn-lg" type="submit"
+    href="../../../item/shrink/ShrinkTool.php" />Shrink</a>
+<hr />
+<a class="btn btn-default btn-lg" type="submit"
     href="SaItemList.php" />Quick List</a>
 <hr />
 <a class="btn btn-default btn-lg" type="submit"
@@ -84,19 +87,22 @@ a[type="submit"] {
 <hr />
 {$wfcTools[0]}
 <a class="btn btn-default btn-lg" type="submit"
-    href="../../../../../Scannie/content/Scanning/BatchCheck/SCS.php" />Batch Check</a>
+    href="../../../../../Scannie/content/Scanning/BatchCheck/newMenu.php" />Batch Check</a>
 <hr />
 <a class="btn btn-default btn-lg" type="submit"
     href="../../../item/CoopDealsLookupPage.php" />C+D Check Sale</a>
 <hr />
 <a class="btn btn-default btn-lg" type="submit"
-    href="../../../../../Scannie/content/Scanning/AuditScanner/AuditScanner.php" />Audie</a>
+    href="../../../../../Scannie/content/Scanning/AuditScanner/ProductScanner.php" />Audie</a>
 <hr />
 <a class="btn btn-default btn-lg" type="submit"
     href="../DeliInventory/DIScanner.php" />Prepared Inventory</a>
 <hr />
 <a class="btn btn-default btn-lg" type="submit"
     href="SaOutOfStock.php" />Out of Stocks</a>
+<hr />
+<a class="btn btn-default btn-lg" type="submit"
+    href="../../../item/FloorSections/EditLocations.php?upc=0" />Physical Product Locations</a>
 <hr />
 {$wfcTools[1]}
 </p>

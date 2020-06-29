@@ -7,8 +7,8 @@ if (!class_exists('FannieAPI')) {
 
 class RpSegmentation extends FannieRESTfulPage
 {
-    protected $header = 'RP Segmentation';
-    protected $title = 'RP Segmentation';
+    protected $header = 'Segmentation';
+    protected $title = 'Segmentation';
 
     public function preprocess()
     {
@@ -30,15 +30,63 @@ class RpSegmentation extends FannieRESTfulPage
         $sales = str_replace(',', '', $sales);
         $retain = FormLib::get('retention');
 
+        $ts = strtotime($this->segID);
+        $ts = mktime(0, 0, 0, date('n', $ts), date('j', $ts), date('Y', $ts) - 1);
+        $direction = date('N', $ts) <= 4 ? -1 : 1;
+        while (date('N', $ts) != 1) {
+            $ts = mktime(0, 0, 0, date('n', $ts), date('j', $ts) + $direction, date('Y', $ts));
+        }
+        $lyStart = date('Y-m-d', $ts);
+        $lyEnd = date('Y-m-d', mktime(0, 0, 0, date('n', $ts), date('j', $ts) + 6, date('Y', $ts)));
+        $dlog = DTransactionsModel::selectDlog($lyStart, $lyEnd);
+        $DoW = $this->connection->dayofweek('tdate');
+        $prep = $this->connection->prepare("SELECT {$DoW} AS DoW, SUM(total) AS ttl
+            FROM {$dlog} AS d
+                INNER JOIN MasterSuperDepts AS m ON d.department=m.dept_ID
+            WHERE d.trans_type in ('I', 'D')
+                AND m.superID=6
+                AND d.store_id=?
+                AND d.tdate BETWEEN ? AND ?
+            GROUP BY {$DoW}
+            ORDER BY {$DoW}");
+        $args = array($this->store, $lyStart, $lyEnd . ' 23:59:59');
+        $rows = $this->connection->getAllRows($prep, $args);
+        $lastYear = array('Mon'=>0, 'Tue'=>0, 'Wed'=>0, 'Thu'=>0, 'Fri'=>0, 'Sat'=>0, 'Sun'=>0);
+        foreach ($rows as $row) {
+            switch ($row['DoW']) {
+                case 1:
+                    $lastYear['Sun'] = round($row['ttl'], 2);
+                    break;
+                case 2:
+                    $lastYear['Mon'] = round($row['ttl'], 2);
+                    break;
+                case 3:
+                    $lastYear['Tue'] = round($row['ttl'], 2);
+                    break;
+                case 4:
+                    $lastYear['Wed'] = round($row['ttl'], 2);
+                    break;
+                case 5:
+                    $lastYear['Thu'] = round($row['ttl'], 2);
+                    break;
+                case 6:
+                    $lastYear['Fri'] = round($row['ttl'], 2);
+                    break;
+                case 7:
+                    $lastYear['Sat'] = round($row['ttl'], 2);
+                    break;
+            }
+        }
+
         $existsP = $this->connection->prepare("SELECT rpSegmentID FROM RpSegments WHERE storeID=? AND startDate=?");
         $exists = $this->connection->getValue($existsP, array($this->store, $this->segID));
         if ($exists) {
-            $prep = $this->connection->prepare("UPDATE RpSegments SET sales=?, retention=?, segmentation=? WHERE rpSegmentID=?");
-            $saved = $this->connection->execute($prep, array($sales, $retain, json_encode($segment), $exists));
+            $prep = $this->connection->prepare("UPDATE RpSegments SET sales=?, retention=?, segmentation=?, lastYear=? WHERE rpSegmentID=?");
+            $saved = $this->connection->execute($prep, array($sales, $retain, json_encode($segment), json_encode($lastYear), $exists));
         } else {
             $prep = $this->connection->prepare("INSERT INTO RpSegments
-                (storeID, startDate, sales, retention, segmentation) VALUES (?, ?, ?, ?, ?)");
-            $saved = $this->connection->execute($prep, array($this->store, $this->segID, $sales, $retain, json_encode($segment)));
+                (storeID, startDate, sales, retention, segmentation, lastYear) VALUES (?, ?, ?, ?, ?, ?)");
+            $saved = $this->connection->execute($prep, array($this->store, $this->segID, $sales, $retain, json_encode($segment), json_encode($lastYear)));
         }
 
         $json['err'] = $saved ? false : true;
@@ -71,7 +119,8 @@ class RpSegmentation extends FannieRESTfulPage
             <th><input type="text" name="sales" value="%s" class="form-control" /></th></tr>',
             number_format($plan));
         $ret .= sprintf('<tr><th>Retention</th><th><div class="input-group">
-            <input type="text" name="retention" value="%s" class="form-control" />
+            <input type="text" name="retention" value="%s" class="form-control"
+                style="z-index: 1;" />
             <span class="input-group-addon">%%</span></th></tr>',
             number_format($retain));
         $sum = 0;
@@ -142,6 +191,11 @@ class RpSegmentation extends FannieRESTfulPage
         }
         $sSelect = FormLib::storePicker();
         $sSelect['html'] = str_replace('<select', '<select onchange="location=\'RpSegmentation.php?store=\' + this.value;"', $sSelect['html']);
+        $ts = time();
+        while (date('N', $ts) != 1) {
+            $ts = mktime(0, 0, 0, date('n', $ts), date('j', $ts) - 1, date('Y', $ts));
+        }
+        $monday = date('Y-m-d', $ts);
 
         $segs = '';
         $prep = $this->connection->prepare("SELECT * FROM RpSegments WHERE storeID=? ORDER BY startDate DESC");
@@ -158,6 +212,7 @@ class RpSegmentation extends FannieRESTfulPage
                 $cur = $row;
             }
         }
+        $this->addOnloadCommand("\$('#segID').trigger('change');");
 
         return <<<HTML
 <div class="row">
@@ -168,8 +223,8 @@ class RpSegmentation extends FannieRESTfulPage
         <form id="segForm" onsubmit="saveSegment(); return false;">
         <label>Store:</label> {$sSelect['html']}
         <label>Week of:</label>
-        <input type="text" class="form-control date-field" name="segID"
-            onchange="getPlan(this.value, {$store});" />
+        <input type="text" class="form-control date-field" id="segID" name="segID"
+            onchange="getPlan(this.value, {$store});" value="{$monday}" />
         <div id="segFields"></div>
         </form>
     </p>

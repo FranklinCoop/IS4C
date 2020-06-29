@@ -2,6 +2,8 @@
 
 namespace COREPOS\Fannie\API\jobs;
 use \FannieConfig;
+use \FannieLogger;
+use \COREPOS\common\ErrorHandler;
 use \Exception;
 
 class QueueManager
@@ -93,7 +95,7 @@ class QueueManager
             $this->runJob($json);
         }
 
-        $json = $redis->brpop('jobHigh', 30);
+        $json = $redis->brpop('jobHigh', 10);
         if ($json !== null) {
             $this->runJob($json);
         }
@@ -121,6 +123,7 @@ class QueueManager
                 $this->runJobs($redis);
 
             } catch (Exception $ex) {
+                $this->log($ex->getMessage());
                 if ($redis === false || !$redis->isConnected()) {
                     sleep(5);
                     $this->redisConnect();
@@ -136,6 +139,11 @@ if (!class_exists('\\FannieAPI')) {
 }
 if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)) {
     // run
+
+    $logger = FannieLogger::factory();
+    ErrorHandler::setLogger($logger);
+    ErrorHandler::setErrorHandlers();
+
     $qm = new QueueManager();
     $qm->start();
 }

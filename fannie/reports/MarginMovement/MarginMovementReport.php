@@ -28,7 +28,7 @@ if (!class_exists('FannieAPI')) {
 
 class MarginMovementReport extends FannieReportPage 
 {
-    public $description = '[Margin Movement] lists item movement with margin information.';
+    public $description = '[Margin Movement] (Achived Margin) lists item movement with margin information.';
     public $report_set = 'Movement Reports';
 
     protected $title = "Fannie : Margin Movement Report";
@@ -185,8 +185,9 @@ class MarginMovementReport extends FannieReportPage
             $sum_cost += $row[5];
             $sum_ttl += $row[6];
         }
+        $sum_margin = (1-($sum_cost/$sum_ttl))*100;
 
-        return array('Totals', null, null, null, null, sprintf('%.2f',$sum_cost), sprintf('%.2f',$sum_ttl), '', null, null);
+        return array('Totals', null, null, null, null, sprintf('%.2f',$sum_cost), sprintf('%.2f',$sum_ttl), sprintf("%.2f%%", $sum_margin), null, null);
     }
 
     public function form_content()

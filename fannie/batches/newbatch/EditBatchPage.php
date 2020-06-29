@@ -1138,7 +1138,7 @@ HTML;
             $ret .= "<a href=\"EditBatchPage.php?id=$id&paste=1\">Paste Items ($cpCount)</a> | ";
         }
 
-        if ($dtype == 0 || (time() >= $start && time() <= $end)) {
+        //if ($dtype == 0 || (time() >= $start && time() <= $end)) {
         if (($dtype == 0 || (time() >= $start && time() <= $end)) && !$limited) {
             $ret .= "<a href=\"\" class=\"{$noprices}\" onclick=\"batchEdit.forceNow($id); return false;\">Force batch</a> | ";
         }

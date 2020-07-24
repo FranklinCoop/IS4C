@@ -5,24 +5,27 @@ if (!class_exists('FannieAPI')) {
     include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 if (!class_exists('RpOrderCategoriesModel')) {
-    include(__DIR__ . '/RpOrderCategoriesModel.php');
+    include(__DIR__ . '/models/RpOrderCategoriesModel.php');
 }
 if (!class_exists('RpOrderItemsModel')) {
-    include(__DIR__ . '/RpOrderItemsModel.php');
+    include(__DIR__ . '/models/RpOrderItemsModel.php');
 }
 if (!class_exists('RpSessionsModel')) {
-    include(__DIR__ . '/RpSessionsModel.php');
+    include(__DIR__ . '/models/RpSessionsModel.php');
+}
+if (!class_exists('RpFarmsModel')) {
+    include(__DIR__ . '/models/RpFarmsModel.php');
 }
 
 class RpDirectPage extends FannieRESTfulPage
 {
-    protected $header = 'RP Direct Guide';
-    protected $title = 'RP Direct Guide';
+    protected $header = 'Daily Direct Guide';
+    protected $title = 'Daily Direct Guide';
     protected $must_authenticate = true;
 
     public function preprocess()
     {
-        $this->addRoute('get<searchVendor>', 'get<searchLC>', 'get<json>', 'get<date1><date2>');
+        $this->addRoute('get<searchVendor>', 'get<searchLC>', 'get<json>', 'get<date1><date2>', 'get<clear>', 'post<json>');
         $this->userID = FannieAuth::getUID($this->current_user);
 
         return parent::preprocess();
@@ -30,7 +33,24 @@ class RpDirectPage extends FannieRESTfulPage
 
     protected function get_date1_date2_handler()
     {
-        $prep = $this->connection->prepare("SELECT internalUPC, SUM(quantity) AS qty
+        $date1 = date('Y-m-d', strtotime(FormLib::get('date1')));
+        $date2 = date('Y-m-d', strtotime(FormLib::get('date2')));
+        $args = array(FormLib::get('store'), $date1, $date2);
+        $ignore = '0 AS ignored';
+
+        $date3 = false;
+        $extra = FormLib::get('date3');
+        $d3ts = strtotime($extra);
+        if ($d3ts && $extra) {
+            $date3 = date('Y-m-d', $d3ts);
+            // safe embed because it's a formatted date string or false
+            // for any user input
+            $ignore = "CASE WHEN receivedDate > {$date2} THEN 1 ELSE 0 END AS ignored";
+            $args[2] = $date3;
+        }
+
+        $prep = $this->connection->prepare("SELECT receivedDate, internalUPC AS upc, brand, quantity AS qty,
+                {$ignore}
             FROM PurchaseOrderItems AS i
                 INNER JOIN PurchaseOrder AS o ON i.orderID=o.orderID
             WHERE o.vendorID=-2
@@ -38,29 +58,51 @@ class RpDirectPage extends FannieRESTfulPage
                 AND o.placed=1
                 AND o.storeID=?
                 AND i.receivedDate IS NOT NULL
-                AND i.receivedDate BETWEEN ? AND ?
-            GROUP BY internalUPC");
-        $date1 = date('Y-m-d', strtotime(FormLib::get('date1')));
-        $date2 = date('Y-m-d', strtotime(FormLib::get('date2')));
-        $qtys = $this->connection->getAllRows($prep, array(FormLib::get('store'), $date1, $date2));
+                AND (
+                    i.receivedDate BETWEEN ? AND ?
+                    OR i.receivedDate = " . $this->connection->curdate() . "
+                )
+            ORDER BY i.receivedDate
+            ");
+        $qtys = $this->connection->getAllRows($prep, $args);
 
         $ret = array();
         foreach ($qtys as $row) {
-            $ret[] = array('upc' => $row['internalUPC'], 'qty' => $row['qty']);
+            if (!isset($ret[$row['upc']])) {
+                $ret[$row['upc']] = array('upc' => $row['upc'], 'qty' => 0, 'text' => '');
+            }
+            if ($row['ignored'] != 1) {
+                $ret[$row['upc']]['qty'] += $row['qty'];
+            }
+            if ($ret[$row['upc']]['text'] != '') {
+                $ret[$row['upc']]['text'] .= '<br />';
+            }
+            $ts = strtotime($row['receivedDate']);
+            $text = date('n/j', $ts) . ' ' . $row['qty'] . ' ' . $row['brand'];
+            $ret[$row['upc']]['text'] .= $text;
         }
-        echo json_encode($ret);
+        $dekey = array();
+        foreach ($ret as $upc => $row) {
+            $dekey[] = $row;
+        }
+        echo json_encode($dekey);
 
         return false;
     }
 
     protected function get_clear_handler()
     {
-        unset($_SESSION['rpState']);
+        $_SESSION['rpState'] = 'false';
         $model = new RpSessionsModel($this->connection);
         $model->userID($this->userID);
         $model->delete();
 
         return 'RpDirectPage.php';
+    }
+
+    protected function post_json_handler()
+    {
+        return $this->get_json_handler();
     }
 
     protected function get_json_handler()
@@ -70,7 +112,6 @@ class RpDirectPage extends FannieRESTfulPage
         $model->userID($this->userID);
         $model->data($this->json);
         $model->save();
-        var_dump($_SESSION['rpState']);
         echo 'OK';
 
         return false;
@@ -139,9 +180,16 @@ class RpDirectPage extends FannieRESTfulPage
             FROM PurchaseOrder WHERE placed=0 AND storeID=? AND vendorID=? AND userID=-99");
         $orderID = $this->connection->getValue($findP, array($store, $vendor));
 
-        $delP = $this->connection->prepare("DELETE FROM PurchaseOrderItems
-            WHERE orderID=? AND internalUPC=?");
-        $this->connection->execute($delP, array($orderID, $upc));
+        $delQ = "DELETE FROM PurchaseOrderItems
+            WHERE orderID=? AND internalUPC=?";
+        $args = array($orderID, $upc);
+        $farm = FormLib::get('farm', false);
+        if ($farm) {
+            $delQ .= ' AND brand=?';
+            $args[] = $farm;
+        }
+        $delP= $this->connection->prepare($delQ);
+        $this->connection->execute($delP, $args);
 
         echo json_encode(array('unlink' => false));
 
@@ -177,6 +225,8 @@ class RpDirectPage extends FannieRESTfulPage
             $prodP = $this->connection->prepare("SELECT brand, size, cost FROM products WHERE upc=?");
             $prod = $this->connection->getRow($prodP, array($upc));
         }
+        // use RP cost
+        $prod['cost'] = $item['cost'] / $item['caseSize'];
         $mapP = $this->connection->prepare("SELECT sku FROM RpFixedMaps WHERE likeCode=?");
         $mapped = $this->connection->getValue($mapP, array(str_replace('LC', '', $upc)));
         if ($mapped) {
@@ -194,6 +244,13 @@ class RpDirectPage extends FannieRESTfulPage
             $sku = $upc;
         }
 
+        $farm = FormLib::get('farm');
+        if ($farm) {
+            $words = array_map('trim', explode(' ', $farm));
+            $initials = array_reduce($words, function($c, $i) { return $c . $i[0]; });
+            $sku = $initials . $sku;
+        }
+
         $poi = new PurchaseOrderItemsModel($this->connection);
         $poi->orderID($orderID);
         $poi->sku($sku);
@@ -201,7 +258,7 @@ class RpDirectPage extends FannieRESTfulPage
         $poi->unitCost($prod['cost']);
         $poi->caseSize(1);
         $poi->unitSize($prod['size']);
-        $poi->brand(FormLib::get('farm'));
+        $poi->brand($farm);
         $poi->description($vendor == $item['backupID'] ? $item['backupItem'] : $item['vendorItem']);
         $poi->internalUPC($upc);
         $poi->save();
@@ -250,16 +307,28 @@ class RpDirectPage extends FannieRESTfulPage
         return $ret . $this->get_view();
     }
 
+    protected function isMobile()
+    {
+        $userAgent = strtolower(filter_input(INPUT_SERVER, 'HTTP_USER_AGENT'));
+        if (strstr($userAgent, 'android')) {
+            return true;
+        } elseif (strstr($userAgent, 'iphone os')) {
+            return true;
+        }
+
+        return false;
+    }
+
     protected function get_view()
     {
-        $this->addScript('rpDirect.js?date=20190612');
+        $this->addScript('rpDirect.js?date=20200622');
         $this->addOnloadCommand('rpOrder.initAutoCompletes();');
         $store = FormLib::get('store');
         if (!$store) {
             $store = COREPOS\Fannie\API\lib\Store::getIdByIp();
         }
         $sSelect = FormLib::storePicker();
-        $sSelect['html'] = str_replace('<select', '<select onchange="location=\'RpOrderPage.php?store=\' + this.value;"', $sSelect['html']);
+        $sSelect['html'] = str_replace('<select', '<select onchange="location=\'RpDirectPage.php?store=\' + this.value;"', $sSelect['html']);
         $jsState = isset($_SESSION['rpState']) ? json_encode($_SESSION['rpState']) : "false";
         if ($jsState === "false") {
             $sModel = new RpSessionsModel($this->connection);
@@ -270,6 +339,8 @@ class RpDirectPage extends FannieRESTfulPage
             }
         }
         $this->addOnloadCommand("rpOrder.initState({$jsState});");
+
+        $fieldType = $this->isMobile() ? 'type="number" min="0" max="99999" step="0.01"' : 'type="text"';
 
         $ordersP = $this->connection->prepare("
             SELECT o.orderID, v.vendorName
@@ -308,14 +379,24 @@ class RpDirectPage extends FannieRESTfulPage
             WHERE u.likeCode=?");
         $costP = $this->connection->prepare("SELECT cost, units FROM vendorItems WHERE vendorID=? and sku=?");
         $mapP = $this->connection->prepare("SELECT * FROM RpFixedMaps WHERE likeCode=?");
-        $lcnameP = $this->connection->prepare("SELECT likeCodeDesc FROM likeCodes WHERE likeCode=?");
+        $lcP = $this->connection->prepare("SELECT likeCodeDesc, organic FROM likeCodes WHERE likeCode=?");
+
+        $dow = date('N');
+        $saleDate = date('Y-m-d');
+        if ($dow >= 6 || $dow <= 2) {
+            $ts = time();
+            while (date('N', $ts) != 3) {
+                $ts = mktime(0, 0, 0, date('n',$ts), date('j',$ts) + 1, date('Y',$ts));
+            }
+            $saleDate = date('Y-m-d', $ts);
+        }
 
         $saleP = $this->connection->prepare("SELECT endDate
             FROM batchList AS l
                 INNER JOIN batches AS b ON l.batchID=b.batchID
                 INNER JOIN StoreBatchMap AS m ON l.batchID=m.batchID
             WHERE l.upc=? AND m.storeID=?
-                AND " . $this->connection->curdate() . " BETWEEN startDate AND endDate
+                AND '{$saleDate}' BETWEEN startDate AND endDate
                 AND b.discountType > 0");
 
         $ago = date('Y-m-d', strtotime('-3 days'));
@@ -360,7 +441,8 @@ class RpDirectPage extends FannieRESTfulPage
                 r.backupItem,
                 r.caseSize,
                 r.vendorID,
-                r.backupID
+                r.backupID,
+                r.cost
             FROM RpOrderItems AS r
                 LEFT JOIN RpOrderCategories AS c ON r.categoryID=c.rpOrderCategoryID
                 LEFT JOIN vendors AS v ON r.vendorID=v.vendorID
@@ -373,8 +455,12 @@ class RpDirectPage extends FannieRESTfulPage
         $hiddenItems = '';
         while ($row = $this->connection->fetchRow($res)) {
             $likeCode = substr($row['upc'], 2);
+            $localLC = $likeCode;
+            if (strpos($localLC, '-')) {
+                list($localLC,) = explode('-', $localLC, 2);
+            }
             $appendTables = true;
-            if (!in_array($likeCode, $directLCs) && $row['vendorID'] != -2 && $row['backupID'] != -2) {
+            if (!in_array($localLC, $directLCs) && $row['vendorID'] != -2 && $row['backupID'] != -2) {
                 $appendTables = false;
             }
             if ($row['categoryID'] !== $category && $appendTables) {
@@ -386,25 +472,31 @@ class RpDirectPage extends FannieRESTfulPage
                 $category = $row['categoryID'];
                 $tables .= '<table class="table table-bordered table-striped small">
                     <tr><th>LC</th><th>Primary</th><th>Secondary</th><th>Item</th>
-                    <th>On Hand</th><th>Par</th><th>Order</th></tr>';
+                    <th>On Hand</th><th>Par</th><th colspan="2">Order</th></tr>';
             }
             $mapped = $this->connection->getRow($mapP, array(str_replace('LC', '', $row['upc'])));
             if ($mapped) {
                 $row['vendorSKU'] = $mapped['sku'];
                 $row['lookupID'] = $mapped['vendorID'];
             }
-            $lcName = $this->connection->getValue($lcnameP, array(str_replace('LC', '', $row['upc'])));
+            $lcRow = $this->connection->getRow($lcP, array(str_replace('LC', '', $row['upc'])));
+            $lcName = $lcRow['likeCodeDesc'];
+            $organic = $lcRow['organic'] ? true : false;
             $par = $this->connection->getValue($parP, array($store, $row['upc']));
             if (($par / $row['caseSize']) < 0.1) {
                 $par = 0.1 * $row['caseSize'];
             }
             // reset case size *after* setting min par at 0.1 standard cases
+            $row['realSize'] = $row['caseSize'];
             $row['caseSize'] = 1;
             $price = $this->connection->getValue($priceP, array(substr($row['upc'], 2)));
             $cost = $this->connection->getRow($costP,
                 array(isset($row['lookupID']) ? $row['lookupID'] : $row['vendorID'], $row['vendorSKU']));
             if ($cost['units'] > 1 && $cost['units'] != $row['caseSize']) {
                 $cost['cost'] /= $cost['units'];
+            }
+            if (!$cost) {
+                $cost = array('cost' => $row['cost'] / $row['caseSize'], 'units' => $row['caseSize']);
             }
             $onSale = $this->connection->getValue($saleP, array($row['upc'], $store));
             $startIcon = '';
@@ -424,7 +516,7 @@ class RpDirectPage extends FannieRESTfulPage
                 $row['upc'] = sprintf('<a href="../../../item/likecodes/LikeCodeEditor.php?start=%d">%s</a>',
                     substr($row['upc'], 2), $row['upc']);
             }
-            $orderAmt = 0;
+            $orderAmt = '';
             /** no auto-fill on direct
             $start = $par;
             while ($start > (0.25 * $row['caseSize'])) {
@@ -456,49 +548,75 @@ class RpDirectPage extends FannieRESTfulPage
             }
             $row['vendorName'] = str_replace(' (Produce)', '', $row['vendorName']);
             $row['backupVendor'] = str_replace(' (Produce)', '', $row['backupVendor']);
+            $highlight = '';
+            $tooltip = '';
+            if ($onSale) {
+                $highlight = 'rp-success';
+                $tooltip = "On sale through {$onSale}";
+            } elseif (!$organic) {
+                $highlight = 'alert-warning';
+                $tooltip = 'Conventional';
+            }
             $nextRow = sprintf('<tr class="%s">
-                <td class="upc">%s %s</td>
-                <td><select class="primaryFarm form-control input-sm">%s</option></td>
-                <td><select class="secondaryFarm form-control input-sm">%s</option></td>
+                <td class="upc %s">%s %s</td>
+                <td class="%s"><select class="primaryFarm form-control input-sm" data-default="%s">%s</option></td>
+                <td class="%s"><select class="secondaryFarm form-control input-sm">%s</option></td>
                 <td class="%s" title="%s">$%.2f %s %s %s%s</td>
                 <td style="display:none;" class="caseSize">%s</td>
-                <td><input type="text" class="form-control input-sm onHand" value="0" 
+                <td style="display:none;" class="realSize">%s</td>
+                <td><input %s class="form-control input-sm onHand" value="" 
                     style="width: 5em;" id="onHand%s" data-incoming="0"
                     onchange="rpOrder.reCalcRow($(this).closest(\'tr\')); rpOrder.updateOnHand(this);"
-                    onfocus="this.select();" onkeyup="rpOrder.onHandKey(event);" /></td>
+                    onfocus="this.select();" onkeyup="rpOrder.onHandKey(event);" />
+                    <span class="incoming-notice"></span></td>
                 <input type="hidden" class="price" value="%.2f" />
                 <input type="hidden" class="basePar" value="%.2f" />
                 <td class="parCell">%.2f</td>
                 <td class="form-inline %s">
-                    <input type="text" style="width: 5em;"class="form-control input-sm orderAmt"
+                    <input %s style="width: 5em;"class="form-control input-sm orderAmt"
                         id="orderAmt%s" onkeyup="rpOrder.orderKey(event); rpOrder.updateOrder(this);"
-                        onfocus="this.select();" value="%d" />
-                    <button class="btn btn-success btn-sm" onclick="rpOrder.inc(this, 1);">+</button>
-                    <button class="btn btn-danger btn-sm" onclick="rpOrder.inc(this, -1);">-</button>
-                    <label><input type="checkbox" class="orderPri" onchange="rpOrder.placeOrder(this);" value="%s,%d,%d" %s /> Pri</label>
-                    <label><input type="checkbox" onchange="rpOrder.placeOrder(this);" value="%s,%d,%d" %s /> Sec</label>
+                        onfocus="this.select();" value="%s" />
+                    <label><input type="checkbox" onchange="rpOrder.placeOrder(this);" value="%s,%d,%d" %s 
+                        class="orderPri" tabindex="-1" /> Pri</label>
+                </td>
+                <td class="form-inline %s">
+                    <input %s style="width: 5em;"class="form-control input-sm secondAmt"
+                        id="secondAmt%s" onkeyup="rpOrder.secondaryKey(event); rpOrder.updateOrder(this);"
+                        onfocus="this.select();" value="%s" />
+                    <label><input type="checkbox" onchange="rpOrder.placeOrder(this);" value="%s,%d,%d" %s 
+                        class="orderSec" tabindex="-1" /> Sec</label>
                 </td>
                 </tr>',
                 (in_array($likeCode, $directLCs) && $row['vendorID'] != -2 && $row['backupID'] != -2) ? 'extraLocal' : '',
-                $row['upc'], $lcName,
+                $highlight, $row['upc'], $lcName,
+                $highlight,
+                $farm1,
                 $opt1,
+                $highlight,
                 $opt2,
-                ($onSale ? 'success' : ''),
-                ($onSale ? "On sale through {$onSale}" : ''),
+                $highlight,
+                $tooltip,
                 $cost['cost'] * $row['caseSize'],
                 ($row['vendorSKU'] ? '(' . $row['vendorSKU'] . ')' : ''),
                 $row['vendorItem'],
                 $startIcon, $endIcon,
                 $row['caseSize'],
+                $row['realSize'],
+                $fieldType,
                 $upc,
                 $price,
                 $par,
                 $par / $row['caseSize'],
                 ($inOrder ? 'info' : ''),
+                $fieldType,
                 $upc,
                 $orderAmt,
                 $upc, $store, $row['vendorID'],
                 ($inOrder['vendorID'] == $row['vendorID'] ? 'checked' : ''),
+                '', // in secondary order ($inOrder ? 'info' : ''),
+                $fieldType,
+                $upc,
+                '', // secondary order amount
                 $upc, $store, $row['backupID'],
                 ($inOrder['vendorID'] == $row['backupID'] ? 'checked' : '')
             );
@@ -532,11 +650,39 @@ class RpDirectPage extends FannieRESTfulPage
             'Sun' => 'n/a',
         );
         $week = $this->connection->getRow($weekP, array($weekStart, $store));
+        $modProj = 0;
         if ($week) {
             $projected = number_format($week['sales']);
             $baseRetain = $week['retention'];
             $days = json_decode($week['segmentation'], true);
             $days = array_map(function ($i) { return sprintf('%.2f%%', $i*100); }, $days);
+            $thisYear = json_decode($week['thisYear'], true);
+            $thisYear = is_array($thisYear) ? $thisYear : array();
+            $lastYear = json_decode($week['lastYear'], true);
+            $sums = array('this' => 0, 'last' => 0, 'proj' => 0);
+            $dataPoints = 0;
+            foreach ($thisYear as $key => $val) {
+                if ($val > 0 && $lastYear[$key] > 0) {
+                    $sums['this'] += $val;
+                    $sums['last'] += $lastYear[$key];
+                    $sums['proj'] += str_replace(',', '', $projected) * (str_replace('%', '', $days[$key]) / 100.00);
+                    $dataPoints++;
+                }
+            }
+            if ($dataPoints > 0) {
+                $growth = ($sums['this'] - $sums['proj']) / $sums['proj'];
+                $growth *= ($dataPoints / 7);
+                foreach ($days as $day) {
+                    $val = str_replace(',', '', $projected) * (str_replace('%', '', $day) / 100.00);
+                    $modProj += ($val * (1 + $growth));
+                }
+                /*
+                foreach ($lastYear as $key => $val) {
+                    $modProj += ($val * (1 + $growth));
+                }
+                 */
+                $modProj = round($modProj, 2);
+            }
         }
 
         $mStamp = date('N') == 1 ? strtotime('today') : strtotime('last monday');
@@ -547,6 +693,8 @@ class RpDirectPage extends FannieRESTfulPage
 
         $cats = new RpOrderCategoriesModel($this->connection);
         $catOpts = $cats->toOptions();
+        $farms = new RpFarmsModel($this->connection);
+        $farmOpts = $farms->toOptions();
 
         return <<<HTML
 <div class="row">
@@ -581,6 +729,9 @@ class RpDirectPage extends FannieRESTfulPage
             data-dateid="{$dateIDs[6]}"
             onchange="rpOrder.updateDays();" value="{$days['Sun']}" /> Sunday</label>
     </fieldset>
+    <label title="Based on sales growth so far this week">Modified Projection</label>:
+    <span id="modProj">{$modProj}</span>
+    <br />
     <label>Projected Sales these Days</label>:
     <span id="selectedSales">0</span>
     <br />
@@ -592,10 +743,19 @@ class RpDirectPage extends FannieRESTfulPage
     <div class="form-inline">
         <div class="input-group">
             <span class="input-group-addon">Retention</span>
-            <input type="number" value="{$baseRetain}" id="retention" class="form-control input-sm" />
+            <input type="number" disabled value="{$baseRetain}" id="retention" class="form-control input-sm" />
             <span class="input-group-addon">%</span>
         </div> 
     </div> 
+    <div class="form-inline">
+        <div class="input-group">
+            <span class="input-group-addon">Single Farm</span>
+            <select onchange="rpOrder.defaultFarm(this.value);" class="form-control">
+                <option></option>
+                {$farmOpts}
+            </select>
+        </div>
+    </div>
     <div class="form-group">
         <label title="Show only items currently set to DIRECT">
             <input type="checkbox" onchange="if (this.checked) $('tr.extraLocal').hide(); else $('tr.extraLocal').show();" />
@@ -666,6 +826,12 @@ class RpDirectPage extends FannieRESTfulPage
 </div>
 </div>
 <p>
+    <div class="form-group">
+        <label>
+            <input type="checkbox" checked id="autoOrderCheck" />
+            Auto-fill order amounts
+        </label>
+    </div>
     <button class="btn btn-default orderAll" onclick="rpOrder.orderAll();">Order All</button>
     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
     <a href="RpOrderPage.php" class="btn btn-default">Switch to Regular</a>
@@ -688,10 +854,35 @@ class RpDirectPage extends FannieRESTfulPage
         </div>
     </div>
     <br />
+</p>
+<p>
+    <ul id="altOpenOrders">{$orderLinks}</ul>
+    <span id="altPrintLink">{$printLink}</span>
+</p>
+<hr />
+<p>
     <a href="RpDirectPage.php?clear=1" class="btn btn-default">Clear Session Data</a>
 </p>
 HTML;
     }
+
+    protected function css_content()
+    {
+        return <<<CSS
+.rp-success {
+    background-color: #f772d2;
+}
+.table-striped>tbody>tr:nth-child(odd)>td.rp-success {
+    background-color: #f772d2;
+}
+.incoming-notice {
+    font-weight: bold;
+    color: #15AF23;
+}
+CSS;
+    }
+
+
 }
 
 FannieDispatch::conditionalExec();

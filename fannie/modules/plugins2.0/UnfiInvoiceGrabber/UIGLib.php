@@ -48,9 +48,9 @@ class UIGLib
                             placedDate, userID, vendorOrderID, vendorInvoiceID, storeID) VALUES
                             (?, ?, 1, ?, 0, ?, ?, ?)');
         $find = $dbc->prepare('SELECT orderID FROM PurchaseOrder WHERE vendorID=? AND storeID=? AND vendorInvoiceID=?');
-        $findPO = $dbc->prepare('SELECT orderID FROM PurchaseOrder WHERE vendorID=? AND storeID=? AND vendorOrderID=?');
         $plu = $dbc->prepare('SELECT upc FROM VendorAliases WHERE isPrimary=1 AND vendorID=? AND sku LIKE ?');
         $clear = $dbc->prepare('DELETE FROM PurchaseOrderItems WHERE orderID=?');
+        $codeP = $dbc->prepare('SELECT sku, salesCode FROM PurchaseOrderItems WHERE orderID=?');
         $storeID = FannieConfig::config('STORE_ID');
 
         for ($i=0; $i<$za->numFiles; $i++) {
@@ -83,12 +83,16 @@ class UIGLib
                 $id = false;
                 // check whether order already exists
                 $idR = $dbc->execute($find, array($vendorID, $storeID, $header_info['vendorInvoiceID']));
+                $new = false;
+                $codeMap = array();
                 if ($dbc->num_rows($idR) > 0) {
                     $idW = $dbc->fetch_row($idR);
                     $id = $idW['orderID'];
+                    $codeR = $dbc->execute($codeP, array($id));
+                    while ($codeW = $dbc->fetchRow($codeR)) {
+                        $codeMap[$codeW['sku']] = $codeW['salesCode'];
+                    }
                     $dbc->execute($clear, array($id));
-                } elseif (!empty($header_info['vendorOrderID'])) {
-                    $id = $dbc->getValue($findPO, array($vendorID, $storeID, $header_info['vendorOrderID']));
                 }
                 if (!$id) {
                     // date has not been downloaded before OR
@@ -98,7 +102,12 @@ class UIGLib
                     $id = $dbc->insertID();
                 }
 
+                $fakeSku = 1;
                 foreach($item_info as $item) {
+                    if ($item['sku'] == 0) {
+                        $item['sku'] = $fakeSku;
+                        $fakeSku++;
+                    }
                     $model = new PurchaseOrderItemsModel($dbc);
                     $model->orderID($id);
                     $model->sku($item['sku']);
@@ -128,9 +137,17 @@ class UIGLib
                         $pluInfo = $dbc->fetch_row($pluCheck);
                         $model->internalUPC($pluInfo['upc']);
                     }
-                    if ($model->salesCode() == '') {
+                    if (!$new && isset($codeMap[$item['sku']])) {
+                        $model->salesCode($codeMap[$item['sku']]);
+                    } elseif ($model->salesCode() == '') {
                         $code = $model->guessCode();
                         $model->salesCode($code);
+                    }
+
+                    switch ($item['sku']) { // anomoly handler
+                        case '0473850';
+                            $model->unitSize('#');
+                            break;
                     }
 
                     $model->save();

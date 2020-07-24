@@ -1188,9 +1188,20 @@ static public function code39($barcode, $forcePaper=false)
     return $printMod->printBarcode(PrintHandler::BARCODE_CODE39, $barcode);
 }
 
+static private function haveMailer()
+{
+    if (class_exists('PHPMailer')) {
+        return true;
+    } else if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+        return true;
+    }
+
+    return false;
+}
+
 static public function emailReceiptMod()
 {
-    if (class_exists('PHPMailer') && CoreLocal::get('emailReceiptHtml') != '' && class_exists(CoreLocal::get('emailReceiptHtml'))) {
+    if (self::haveMailer() && CoreLocal::get('emailReceiptHtml') != '' && class_exists(CoreLocal::get('emailReceiptHtml'))) {
         return self::$HTML;
     }
 

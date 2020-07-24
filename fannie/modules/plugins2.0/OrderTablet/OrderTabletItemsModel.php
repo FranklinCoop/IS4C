@@ -24,20 +24,16 @@
         
 
 /**
-  @class RpSegmentsModel
+  @class OrderTabletItemsModel
 */
-class RpSegmentsModel extends BasicModel
+class OrderTabletItemsModel extends BasicModel
 {
+    protected $name = "OrderTabletItems";
     protected $preferred_db = 'op';
-    protected $name = "RpSegments";
 
     protected $columns = array(
-    'rpSegmentID' => array('type'=>'INT', 'primary_key'=>true, 'increment'=>true),
-    'storeID' => array('type'=>'INT'),
-    'startDate' => array('type'=>'DATETIME'),
-    'sales' => array('type'=>'MONEY'),
-    'retention' => array('type'=>'MONEY', 'default'=>60),
-    'segmentation' => array('type'=>'VARCHAR(255)'),
+    'upc' => array('type'=>'VARCHAR(13)', 'primary_key'=>true),
     );
+
 }
 

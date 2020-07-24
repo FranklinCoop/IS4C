@@ -15,7 +15,7 @@ class USFTask extends FannieTask
             . escapeshellarg($settings['USFInvoiceUser'])
             . ' -p '
             . escapeshellarg($settings['USFInvoicePass']);
-        exec($cmd);
+        exec($cmd, $output);
 
         $za = new ZipArchive();
         $try = $za->open("/tmp/usf/invoiceDetails.ZIP");
@@ -34,14 +34,27 @@ class USFTask extends FannieTask
             if (!$fp) {
                 continue;
             }
+            echo $info['name'] . "\n";
 
             $this->connection->startTransaction();
             $first = true;
+            $orderTotal = 0;
+            $invoiceTotal = 0;
+            $orderID = false;
+            $shipDate = false;
+            $csvout = tempnam(sys_get_temp_dir(), 'usf');
+            $csvFP = fopen($csvout, 'w');
             while (!feof($fp)) {
                 $data = fgetcsv($fp);
+                fputcsv($csvFP, $data);
 
                 $invoice = $this->getField($data, 0);
                 $orderDate = $this->getField($data, 9);
+                $credit = $this->getField($data, 16);
+                if ($credit) {
+                    $invoice = $credit;
+                    $orderDate = $this->getField($data, 17);
+                }
                 $orderDate = date('Y-m-d', strtotime($orderDate));
                 $shipDate = $this->getField($data, 12);
                 $shipDate = date('Y-m-d', strtotime($shipDate));
@@ -55,6 +68,8 @@ class USFTask extends FannieTask
                 $price = $this->getField($data, 55);
                 $fullPrice = $this->getField($data, 56);
                 $unitPrice = $price;
+                $invoiceTotal = $this->getField($data, 14);
+                $orderTotal += $fullPrice;
 
                 if (!is_numeric($sku)) continue;
                 if ($priceType == '') continue;
@@ -76,7 +91,7 @@ class USFTask extends FannieTask
                 } elseif ($priceType == 'EA') {
                     list($units, $size) = explode(' ', $sizeInfo, 2);
                     $size = '#';
-                    $unitPrice = $price / $units;
+                    $unitPrice = $units == 0 ? $price : $price / $units;
                 } elseif ($priceType == 'CS') {
                     if (strstr($sizeInfo, '/')) {
                         list($units, $size) = explode('/', $sizeInfo, 2);
@@ -95,7 +110,34 @@ class USFTask extends FannieTask
                 $orders[$orderID] = $invoice;
                 $first = false;
             }
+            fclose($csvFP);
+            if ($orderID && abs($orderTotal - $invoiceTotal) > 0.005) {
+                $tax = $invoiceTotal - $orderTotal;
+                $descriptor = abs($tax - 4) < 0.005 ? 'FUEL' : 'TAX';
+                $poi = new PurchaseOrderItemsModel($this->connection);
+                $poi->orderID($orderID);
+                $poi->sku($descriptor);
+                $poi->quantity(1);
+                $poi->unitCost($tax);
+                $poi->caseSize(1);
+                $poi->receivedQty(1);
+                $poi->receivedDate($shipDate);
+                $poi->receivedTotalCost($tax);
+                $poi->brand($descriptor);
+                $poi->description($descriptor);
+                $poi->unitSize('n/a');
+                $poi->internalUPC('0000000000000');
+                $poi->save();
+
+                $dest = __DIR__ . '/../../../purchasing/noauto/invoices/' . $orderID . '.csv';
+                rename($csvout, $dest);
+                chmod($dest, 0644);
+                
+            }
             $this->connection->commitTransaction();
+            if (file_exists($csvout)) {
+                unlink($csvout);
+            }
         }
 
         if (count($orders) == 0) {
@@ -131,6 +173,30 @@ class USFTask extends FannieTask
         return $upc;
     }
 
+    private function getCode($upc, $sku)
+    {
+        $upcP = $this->connection->prepare("SELECT d.salesCode
+            FROM products AS p
+                INNER JOIN departments AS d ON p.department=d.dept_no
+            WHERE p.upc=?");
+        $code = $this->connection->getValue($upcP, array($upc));
+        if ($code == 41201 || $code == 41205) {
+            return $code;
+        }
+        $skuP = $this->connection->prepare("SELECT d.salesCode
+            FROM vendorItems AS v
+                INNER JOIN products AS p ON v.upc=p.upc
+                INNER JOIN departments AS d ON p.department=d.dept_no
+            WHERE v.sku=?
+                AND v.vendorID=35");
+        $code = $this->connection->getValue($upcP, array($upc));
+        if ($code == 41201 || $code == 41205) {
+            return $code;
+        }
+
+        return 41201;
+    }
+
     private $poi = false;
     private function updatePO($orderID, $shipDate, $ordered, $shipped, $sku, $upc, $item, $brand, $size, $units, $price, $fullPrice)
     {
@@ -139,10 +205,17 @@ class USFTask extends FannieTask
         }
         $poi->orderID($orderID);
         $poi->sku($sku);
+        $code = $this->getCode($upc, $sku);
+        if (trim($brand) == 'ECOLAB') {
+            $code = 63320;
+        }
         if ($poi->load()) {
             $poi->quantity($poi->quantity() + $ordered);
             $poi->receivedQty($poi->receivedQty() + ($shipped * $units));
             $poi->receivedTotalCost($poi->receivedTotalCost() + $fullPrice);
+            if ($poi->salesCode() == 0 || $code == 63320) {
+                $poi->salesCode($code);
+            }
             $poi->save();
         } else {
             $poi->quantity($ordered);
@@ -155,6 +228,7 @@ class USFTask extends FannieTask
             $poi->brand($brand);
             $poi->description($item);
             $poi->internalUPC($upc);
+            $poi->salesCode($code);
             $poi->save();
         }
     }

@@ -7,8 +7,17 @@ if (!class_exists('FannieAPI')) {
 
 class RpLocalLCsPage extends FannieRESTfulPage
 {
-    protected $header = 'RP Local Like Codes';
-    protected $title = 'RP Local Like Codes';
+    protected $header = 'Local Like Codes';
+    protected $title = 'Local Like Codes';
+
+    protected function delete_id_view()
+    {
+        $prep = $this->connection->prepare('DELETE FROM RpLocalLCs WHERE likeCode=?');
+        $this->connection->execute($prep, array($this->id));
+
+        return '<div class="alert alert-success">Like Code Deleted</div>'
+            . $this->get_view();
+    }
 
     protected function post_id_view()
     {
@@ -45,23 +54,37 @@ class RpLocalLCsPage extends FannieRESTfulPage
             ORDER BY l.likeCodeDesc');
         $table = '';
         while ($row = $this->connection->fetchRow($res)) {
-            $table .= sprintf('<tr><td>%d</td><td>%s</td></tr>', $row['likeCode'], $row['likeCodeDesc']);
+            $table .= sprintf('<tr><td>%d</td><td>%s</td>
+                <td><a href="RpLocalLCsPage.php?_method=delete&id=%s">%s</a>
+                </tr>',
+                $row['likeCode'], $row['likeCodeDesc'],
+                $row['likeCode'],
+                COREPOS\Fannie\API\lib\FannieUI::deleteIcon()
+            );
         }
 
+        $model = new LikeCodesModel($this->connection);
+        $opts = '<option value="">' . $model->toOptions();
+        $this->addScript('../../../src/javascript/chosen/chosen.jquery.min.js');
+        $this->addCssFile('../../../src/javascript/chosen/bootstrap-chosen.css');
+        $this->addOnloadCommand("\$('select.chosen').chosen({search_contains: true});");
+
         return <<<HTML
+<form method="post" action="RpLocalLCsPage.php">
+<div class="form-group">
+    <label>Add Like Code</label>
+    <select name="id" class="form-control chosen">{$opts}</select>
+</div>
+<div class="form-group">
+    <button type="submit" class="btn btn-default">Add</button>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    <a href="RpDirectPage.php" class="btn btn-default">Direct Order Guide</a>
+</div>
+</form>
 <b>Locally-Available Like Codes</b>
 <table class="table">
     {$table}
 </table>
-<form method="post" action="RpLocalLCsPage.php">
-<div class="form-group">
-    <label>Add Like Code</label>
-    <input type="text" name="id" class="form-control" />
-</div>
-<div class="form-group">
-    <button type="submit" class="btn btn-default">Add</button>
-</div>
-</form>
 <form method="post" action="RpLocalLCsPage.php">
 <div class="form-group">
     <label>Replace List of Like Codes</label>

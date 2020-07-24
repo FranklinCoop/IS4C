@@ -66,8 +66,9 @@ class SaHandheldPage extends FannieRESTfulPage
             }
             $ret['upc'] = $upc;     
             $store = FormLib::get('store', 0);
-            $q = 'SELECT p.description,v.brand,s.quantity,v.units,p.normal_price FROM
+            $q = 'SELECT p.description,v.brand,s.quantity,v.units,p.normal_price,i.bycount FROM
                 products AS p LEFT JOIN vendorItems AS v ON p.upc=v.upc
+                LEFT JOIN scaleItems AS i ON p.upc=i.plu
                 LEFT JOIN '.$settings['ShelfAuditDB'].$dbc->sep().
                 'sa_inventory AS s ON p.upc=s.upc AND s.clear=0 AND s.storeID=?
                     AND s.section=?
@@ -118,6 +119,9 @@ class SaHandheldPage extends FannieRESTfulPage
                 }
                 if (!isset($this->current_item_data['case_sizes'])){
                     $ret['case_sizes'] = array();
+                }
+                if (!isset($this->current_item_data['bycount'])){
+                    $ret['bycount'] = $w['bycount'];
                 }
                 if ($scalePrice && $w['normal_price']) {
                     $ret['case_sizes'][] = sprintf('%.2f', $scalePrice / $w['normal_price']);
@@ -240,6 +244,9 @@ function doubleBeep() {
         <?php if ($this->linea_ios_mode){ ?>
 Device = new ScannerDevice({
     barcodeData: function (data, type){
+        if (typeof(data) === 'undefined') {
+            return;
+        }
         var upc = data.substring(0,data.length-1);
         if ($('#upc_in').length > 0){
             $('#upc_in').val(upc);
@@ -262,6 +269,9 @@ ScannerDevice.registerListener(Device);
 if (typeof WebBarcode != 'undefined') {
     WebBarcode.onBarcodeScan(function(ev) {
         var data = ev.value;
+        if (typeof(data) === 'undefined') {
+            return;
+        }
         var upc = data.substring(0,data.length-1);
         $('#upc_in').val(upc);
         $('#goBtn').click();
@@ -269,10 +279,26 @@ if (typeof WebBarcode != 'undefined') {
 }
 document.addEventListener("BarcodeScanned", function (ev) {
     var data = ev.value;
+    if (typeof(data) === 'undefined') {
+        return;
+    }
     var upc = data.substring(0,data.length-1);
     $('#upc_in').val(upc);
     $('#goBtn').click();
 }, false);
+
+var socketm = document.createElement("input");
+socketm.id = 'socketm';
+socketm.type = "hidden";
+Object.defineProperty(socketm, "value", {
+    get: function() { return this._value; },
+    set: function(v) {
+        var upc = v.substring(0,v.length-1);
+        $('#upc_in').val(upc);
+        $('#goBtn').click();
+    }
+});
+document.body.appendChild(socketm);
         <?php } ?>
 
         <?php
@@ -317,6 +343,15 @@ document.addEventListener("BarcodeScanned", function (ev) {
                 <button type="button" tabindex="-1" onclick="handheld.updateQty(%s)" class="btn btn-danger btn-lg">-%s</button>',
                 $s,$s,-1*$s,$s);
         }
+        $defaultBtns = <<<HTML
+    <button tabindex="-1" type="button" onclick="handheld.updateQty(1);" class="btn btn-success btn-lg">+1</button>
+    <button tabindex="-1" type="button" onclick="handheld.updateQty(-1);" class="btn btn-danger btn-lg">-1</button>
+HTML;
+        if ($data['bycount'] === '0' ) {
+            $defaultBtns = '';
+        } elseif ($data['bycount'] > 0) {
+            $cases = '';
+        }
         echo <<<HTML
 <p>
     {$data['upc']} {$data['desc']}<br />
@@ -331,8 +366,7 @@ document.addEventListener("BarcodeScanned", function (ev) {
         onkeyup="handheld.qtyTyped(event);" id="cur_qty" 
         onkeydown="handheld.catchTab(event);" />
     <input type="hidden" id="cur_upc" value="{$data['upc']}" />
-    <button tabindex="-1" type="button" onclick="handheld.updateQty(1);" class="btn btn-success btn-lg">+1</button>
-    <button tabindex="-1" type="button" onclick="handheld.updateQty(-1);" class="btn btn-danger btn-lg">-1</button>
+    {$defaultBtns}
     {$cases}
 </div>
 HTML;

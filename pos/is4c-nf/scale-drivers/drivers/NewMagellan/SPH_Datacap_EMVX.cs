@@ -78,7 +78,7 @@ public class SPH_Datacap_EMVX : SerialPortHandler
         emv_active = false;
         emv_reset = true;
 
-        if (device_identifier == "INGENICOISC250_MERCURY_E2E") {
+        if (device_identifier.Substring(0, 8) == "INGENICO") {
             rba = new RBA_Stub("COM"+com_port);
             rba.SetEMV(RbaButtons.EMV);
         }
@@ -103,22 +103,16 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                 pdc_active = false;
             }
         }
-        /*
         lock (emvLock) {
             if (emv_active) {
-                try {
-                    Console.WriteLine("Reset EMV");
+                Console.WriteLine("Reset EMV");
+                var type = emv_ax_control.GetType();
+                if (type.GetMethod("CancelRequest") != null) {
                     emv_ax_control.CancelRequest();
                     emv_active = false;
-                } catch (Exception) {
-                    // I assume this will through if either the ActiveX DLL
-                    // was generated against an older OCX that doesn't have
-                    // this method or if the DLL has the method but the
-                    // OCX does not. OCX v1.22+ should have the method.
                 }
             }
         }
-        */
 
         if (emv_ax_control == null) {
             emv_ax_control = new DsiEMVX();
@@ -224,7 +218,6 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                         byte[] response = System.Text.Encoding.ASCII.GetBytes(result);
                         stream.Write(response, 0, response.Length);
                         stream.Close();
-                        Console.WriteLine("Wrote response");
                         if (message.Contains("EMV")) {
                             FlaggedReset();
                         }
@@ -301,6 +294,9 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                 if (rba != null) {
                     rba.stubStop();
                 }
+                lock(emvLock) {
+                    emv_reset = true;
+                }
                 ReInitDevice();
                 break;
             case "termManual":
@@ -375,6 +371,10 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             is used but not all verbose output is treated as an error & logged
         * logXML [boolean] default false
             Log XML requests & responses to "xml.log" in the current directory.
+        * servers [string] default "x1.mercurypay.com;x2.backuppay.com"
+            Set PDCX server list
+        * terminalID [string] default ""
+            Whether this is required varies by processor
 
         -- Ingencio Specific Options --
         * disableRBA [boolean] default false
@@ -383,6 +383,9 @@ public class SPH_Datacap_EMVX : SerialPortHandler
         * disableButtons [boolean] default false
             Does not display payment type or cashback selection buttons.
             RBA commands can still be used to display static text
+            Irrelevant if disableRBA is true
+        * disableMessages [boolean] default false
+            Does not display approved/declined on screen via RBA
             Irrelevant if disableRBA is true
         * buttons [string] default EMV
             Change labeling of the buttons. Valid options are "credit"
@@ -395,8 +398,6 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             Show cashback selections if payment type debit or ebt cash
             is selected.
             Irrelevant if disableRBA or disableButtons is true
-        * servers [string] default "x1.mercurypay.com;x2.backuppay.com"
-            Set PDCX server list
     */
     public override void SetConfig(Dictionary<string,string> d)
     {
@@ -411,6 +412,10 @@ public class SPH_Datacap_EMVX : SerialPortHandler
 
         if (this.rba != null && d.ContainsKey("disableButtons") && d["disableButtons"].ToLower() == "true") {
             this.rba.SetEMV(RbaButtons.None);
+        }
+
+        if (this.rba != null && d.ContainsKey("disableMessages") && d["disableMessages"].ToLower() == "true") {
+            this.rba.DisableMessages();
         }
 
         if (this.rba != null && d.ContainsKey("buttons")) {
@@ -645,7 +650,6 @@ public class SPH_Datacap_EMVX : SerialPortHandler
         string ret = "";
         lock(emvLock) {
             if (emv_reset) {
-                Console.WriteLine("resetting");
                 ret  = PadReset();
                 emv_reset = false;
             }

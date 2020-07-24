@@ -5,13 +5,13 @@ if (!class_exists('FannieAPI')) {
     include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 if (!class_exists('RpOrderCategoriesModel')) {
-    include(__DIR__ . '/RpOrderCategoriesModel.php');
+    include(__DIR__ . '/models/RpOrderCategoriesModel.php');
 }
 
 class RpCategoriesPage extends FannieRESTfulPage
 {
-    protected $header = 'RP Categories';
-    protected $title = 'RP Categories';
+    protected $header = 'Produce Ordering Categories';
+    protected $title = 'Produce Ordering Categories';
     protected $must_authenticate = true;
 
     protected function post_id_view()

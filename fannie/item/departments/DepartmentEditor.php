@@ -90,6 +90,7 @@ class DepartmentEditor extends FannieRESTfulPage
             'margin' => sprintf('%.2f', 100*$dept->margin()),
             'pcode' => $dept->salesCode(),
             'tax' => '',
+            'active' => $dept->active() == 1 ? 'checked' : '',
         );
         foreach ($taxes as $k=>$v) {
             if ($k == $dept->dept_tax()) {
@@ -166,6 +167,7 @@ class DepartmentEditor extends FannieRESTfulPage
         $model->modified(date('Y-m-d H:i:s'));
         $model->margin($margin);
         $model->salesCode($pcode);
+        $model->active(FormLib::get('active', 0));
         if (FormLib::get('new', 0) == 1) {
             $model->modifiedby(1);
             $model->dept_see_id(0);

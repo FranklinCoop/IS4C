@@ -21,6 +21,12 @@ class InstaFileV3
         $instaDB = $settings['InstaCartDB'];
         $includeP = $this->dbc->prepare('SELECT upc FROM ' . $instaDB . $this->dbc->sep() . 'InstaIncludes WHERE upc=?');
         $excludeP = $this->dbc->prepare('SELECT upc FROM ' . $instaDB . $this->dbc->sep() . 'InstaExcludes WHERE upc=?');
+        $saleP = $this->dbc->prepare("SELECT salePrice
+            FROM batchList AS l
+                INNER JOIN batches AS b ON l.batchID=b.batchID
+            WHERE l.upc=?
+                AND batchType=16
+                AND " . $this->dbc->curdate() . " BETWEEN b.startDate AND b.endDate");
         $instaMode = $settings['InstaCartMode'];
         $sep = ',';
         $newline = "\r\n";
@@ -47,7 +53,8 @@ class InstaFileV3
                 y.datedSigns,
                 CASE WHEN (numflag & (1<<16)) <> 0 THEN 1 ELSE 0 END AS organic,
                 CASE WHEN (numflag & (1<<17)) <> 0 THEN 1 ELSE 0 END AS glutenfree,
-                f.sections,
+                s.name AS sections,
+                z.subSection,
                 m.superID,
                 p.department,
                 p.subdept,
@@ -59,9 +66,12 @@ class InstaFileV3
                 LEFT JOIN batches AS b ON p.batchID=b.batchID
                 LEFT JOIN batchType AS y on b.batchType=y.batchTypeID
                 LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
-                LEFT JOIN FloorSectionsListTable AS f ON p.upc=f.upc AND p.store_id=f.storeID
+                LEFT JOIN FloorSectionMinIdView AS f ON p.upc=f.upc AND p.store_id=f.storeID
+                LEFT JOIN FloorSections AS s ON f.floorSectionID=s.floorSectionID
+                LEFT JOIN FloorSubSections AS z ON f.floorSectionID=z.floorSectionID AND f.upc=z.upc
             WHERE m.superID <> 0
-                AND p.inUse=1";
+                AND p.inUse=1
+                AND (numflag & (1<<18)) = 0";
         $args = array();
         if ($this->config->get('STORE_MODE') == 'HQ') {
             $args[] = $this->config->get('STORE_ID');
@@ -210,9 +220,8 @@ class InstaFileV3
             $location = "";
             if (strlen($row['sections']) > 0) {
                 $location = $row['sections'];
-                if (strpos($location, ',')) {
-                    list($location,) = explode(',', $location, 2);
-                    $location = trim($location);
+                if ($row['subSection']) {
+                    $location .= ' ' . $row['subSection'];
                 }
                 $location = '"{""Aisle"": ""' . $location . '""}"';
             }
@@ -223,7 +232,13 @@ class InstaFileV3
                 fprintf($csv, $sep);
             }
 
-            if (!$settings['InstaSalePrices'] || $row['special_price'] == 0 || $row['special_price'] >= $row['normal_price'] || !$row['datedSigns'] || $row['specialpricemethod'] != 0 || $row['discounttype'] != 1) {
+            if ($row['special_price'] != 0 && $row['special_price'] < $row['normal_price'] && $row['datedSigns'] && $row['specialpricemethod'] == 0 && $row['discounttype'] == 1 && $this->dbc->getValue($saleP, array($row['upc']))) {
+                fprintf($csv, '%.2f%s', $row['special_price'], $sep);
+                fwrite($csv, date('m/d/Y', strtotime($row['start_date'])) . $sep);
+                $ts = strtotime($row['end_date']);
+                $next = mktime(0,0,0, date('n',$ts), date('j',$ts)+1, date('Y', $ts));
+                fwrite($csv, date('m/d/Y', $next) . $sep);
+            } elseif (!$settings['InstaSalePrices'] || $row['special_price'] == 0 || $row['special_price'] >= $row['normal_price'] || !$row['datedSigns'] || $row['specialpricemethod'] != 0 || $row['discounttype'] != 1) {
                 fwrite($csv, $sep . $sep . $sep);
             } else {
                 fprintf($csv, '%.2f%s', $row['special_price'], $sep);

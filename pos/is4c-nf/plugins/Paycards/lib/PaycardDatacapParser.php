@@ -44,6 +44,8 @@ class PaycardDatacapParser extends Parser
         'DATACAP',
         'DATACAPEMV',
         'DATACAPEMVTIP',
+        'DATACAPEMVCC',
+        'DATACAPEMVDC',
         'DATACAPCC',
         'DATACAPCCAUTO',
         'DATACAPDC',
@@ -112,6 +114,14 @@ class PaycardDatacapParser extends Parser
                 break;
             case 'DATACAPEMVTIP': 
                 $this->conf->set('CacheCardType', 'EMVTIP');
+                $this->conf->set('CacheCardCashBack', 0);
+                break;
+            case 'DATACAPEMVDC': 
+                $this->conf->set('CacheCardType', 'EMVDC');
+                $this->conf->set('CacheCardCashBack', 0);
+                break;
+            case 'DATACAPEMVCC': 
+                $this->conf->set('CacheCardType', 'EMVCC');
                 $this->conf->set('CacheCardCashBack', 0);
                 break;
             case 'DATACAPCC':

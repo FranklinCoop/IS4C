@@ -85,6 +85,7 @@ class GumLoanPayoffPage extends FannieRESTfulPage
                 $loan_info = GumLib::loanSchedule($this->loan); 
                 $this->check_info->amount($loan_info['balance']);
                 $this->check_info->issueDate(date('Y-m-d'));
+                $this->check_info->checkNumber(0);
                 $this->check_info->save();
                 $this->check_info->load();
             }
@@ -118,7 +119,7 @@ class GumLoanPayoffPage extends FannieRESTfulPage
         $pdf->SetFont('Arial', '', 8);
         $line_height = 3.5;
         $pdf->SetXY(6.35, 43);
-        $text = 'Thank you for investing in the Denfeld expansion. Pursuant to the terms of your Promissory Note with WFC, below please find a check for the principal and, as applicable, compound interest due.   A statement showing the terms of your loan and annual compounding of the interest thereon is provided. If you have questions regarding this payment, please contact Financial Manager Doug Welnetz (dwelnetz@wholefoods.coop).  Thank you very much for your support.';
+        $text = 'Thank you for investing in the Denfeld expansion. Pursuant to the terms of your Promissory Note with WFC, below please find a check for the principal and, as applicable, compound interest due.   A statement showing the terms of your loan and annual compounding of the interest thereon is provided. If you have questions regarding this payment, please contact Financial Manager Josephine Lepak (jlepak@wholefoods.coop).  Thank you very much for your support.';
         $pdf->Write($line_height, $text);
 
         $col_width = 40.64;
@@ -215,9 +216,6 @@ class GumLoanPayoffPage extends FannieRESTfulPage
         $form =  new GumTaxFormTemplate($this->custdata, $this->meminfo, $ssn, date('Y'), $fields, $this->loan->accountNumber());
         $ret = $form->renderAsPDF($pdf, 105);
 
-        $check = new GumCheckTemplate($this->custdata, $this->meminfo, $loan_info['balance'], 'Loan Repayment', $this->check_info->checkNumber());
-        $check->renderAsPDF($pdf);
-
         $pdf->Output('LoanPayoff.pdf', 'I');
 
         if (FormLib::get('issued') == '1') {
@@ -268,7 +266,7 @@ class GumLoanPayoffPage extends FannieRESTfulPage
             $ret .= '<img src="img/new_letterhead_horizontal.png" style="width: 100%;" />';
         }
 
-        $ret .= '<p>Thank you for investing in the Denfeld expansion. Pursuant to the terms of your Promissory Note with WFC, below please find a check for the principal and, as applicable, compound interest due.   A statement showing the terms of your loan and annual compounding of the interest thereon is provided. If you have questions regarding this payment, please contact Financial Manager Doug Welnetz (dwelnetz@wholefoods.coop).  Thank you very much for your support.</p>';
+        $ret .= '<p>Thank you for investing in the Denfeld expansion. Pursuant to the terms of your Promissory Note with WFC, below please find a check for the principal and, as applicable, compound interest due.   A statement showing the terms of your loan and annual compounding of the interest thereon is provided. If you have questions regarding this payment, please contact Financial Manager Josephine Lepak (jlepak@wholefoods.coop).  Thank you very much for your support.</p>';
 
         $ret .= '<div>';
         $ret .= '<table style="border: solid 1px black; border-collapse: collapse; width: 20%; float:left;">';
@@ -353,9 +351,6 @@ class GumLoanPayoffPage extends FannieRESTfulPage
         $ret .= $form->renderAsHTML();
 
         $ret .= '<hr />';
-
-        $check = new GumCheckTemplate($this->custdata, $this->meminfo, $loan_info['balance'], 'Loan Repayment', $this->check_info->checkNumber());
-        $ret .= $check->renderAsHTML();
 
         return $ret;
     }

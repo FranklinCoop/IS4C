@@ -293,3 +293,23 @@ function appendTokens(token) {
     }
 }
 
+function logJsErrors(urlStem) {
+    window.onerror = function(msg, scriptURL, lineNo, colNo, error) {
+        if (msg && msg.toLowerCase().substring(0, 12) != 'script error') {
+            var logEntry = { 
+                message: msg,
+                url: scriptURL,
+                line: lineNo,
+                col: colNo,
+                detail: error,
+                page: window.location
+            };
+            $.ajax({
+                url: urlStem + 'logs/LogJS.php',
+                method: 'get',
+                data: 'id=' + JSON.stringify(logEntry)
+            });
+        }
+    };
+}
+

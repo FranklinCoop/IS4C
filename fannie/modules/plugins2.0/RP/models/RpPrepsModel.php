@@ -24,25 +24,15 @@
         
 
 /**
-  @class RpOrderItemsModel
+  @class RpPrepsModel
 */
-class RpOrderItemsModel extends BasicModel
+class RpPrepsModel extends BasicModel
 {
-    protected $preferred_db = 'op';
-    protected $name = "RpOrderItems";
+    protected $name = "RpPreps";
 
     protected $columns = array(
-    'upc' => array('type'=>'VARCHAR(25)', 'primary_key'=>true),
-    'storeID' => array('type'=>'INT', 'primary_key'=>true),
-    'categoryID' => array('type'=>'INT'),
-    'addedBy' => array('type'=>'TINYINT', 'default'=>0),
-    'caseSize' => array('type'=>'INT', 'default'=>1),
-    'vendorID' => array('type'=>'INT'),
-    'vendorSKU' => array('type'=>'VARCHAR(13)'),
-    'vendorItem' => array('type'=>'VARCHAR(255)'),
-    'backupID' => array('type'=>'INT'),
-    'backupSKU' => array('type'=>'VARCHAR(13)'),
-    'backupItem' => array('type'=>'VARCHAR(255)'),
+    'likeCode' => array('type'=>'INT', 'primary_key'=>true),
     );
+
 }
 

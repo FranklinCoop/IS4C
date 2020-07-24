@@ -31,7 +31,7 @@ if (!class_exists('FannieAPI')) {
     Name matching is important
 */
 
-class WFC_Deli_Narrow_PDF extends FpdfWithBarcode
+class WFC_Dark_Shelf_Labels_PDF extends FpdfWithBarcode
 {
     private $tagdate;
     function setTagDate($str){
@@ -45,9 +45,9 @@ class WFC_Deli_Narrow_PDF extends FpdfWithBarcode
     }
 }
 
-function WFC_Deli_Narrow($data,$offset=0){
+function WFC_Dark_Shelf_Labels($data,$offset=0){
 
-$pdf=new WFC_Deli_Narrow_PDF('P','mm','Letter'); //start new instance of PDF
+$pdf=new WFC_Dark_Shelf_Labels_PDF('P','mm','Letter'); //start new instance of PDF
 $pdf->Open(); //open new PDF Document
 $pdf->setTagDate(date("m/d/Y"));
 $pdf->SetFillColor(0, 0, 0);
@@ -120,6 +120,7 @@ foreach($data as $k => $row){
    //$desc = str_replace("\n", "", $desc);
    //$desc = str_replace("\r", "", $desc);
    $brand = ucwords(strtolower(isset($row['brand']) ? $row['brand'] : ''));
+   if ($brand == 'Bulk') $brand = '';
    $pak = isset($row['units']) ? $row['units'] : 1;
    $size = $pak . "-" . (isset($row['size']) ? $row['size'] : '');
    $sku = isset($row['sku']) ? $row['sku'] : '';
@@ -138,12 +139,21 @@ foreach($data as $k => $row){
    $res = $dbc->execute($prep, $args);
    $row = $dbc->fetchRow($res);
    $desc = $row['description'];
+   $scale = $row['scale'];
+
+   $pScale = $dbc->prepare("SELECT weight FROM scaleItems WHERE plu = ?");
+   $rScale = $dbc->execute($pScale, $args);
+   $row = $dbc->fetchRow($rScale);
+   $weight = $row['weight'];
        
    $desc = str_replace("\n", "", $desc);
    $desc = str_replace("\r", "", $desc);
-   $scale = $row['scale'];
-   $price = ($scale == 0) ? "$".$price : "";
-   if ($scale != 0) continue;
+
+   if ($scale == 1 || $weight == 1 || $desc == '') {
+        $price = "";       
+   } else {
+        $price = "$".$price;
+   }
 
    // writing data
    // basically just set cursor position

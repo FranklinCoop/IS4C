@@ -413,6 +413,9 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
                 (!empty($item['last_sold']) ? $item['last_sold'] : 'n/a')
             );
         }
+        if (FannieConfig::config('COOP_ID') == 'WFC_Duluth') {
+            $ret .= ' | <a href="mapping/FindItem.php?id=' . $upc . '">Find it!</a>';
+        }
         $ret .= '</div>'; // end panel-heading
 
         $ret .= '<div class="panel-body">';
@@ -461,8 +464,8 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
     <td colspan="5">
         <div class="input-group" style="width:100%;">
             <input type="text" maxlength="30" class="form-control syncable-input descript-input" required
-                name="descript[]" id="descript" value="{$rowItem['description']}" 
-                onkeyup="$(this).next().html(30-(this.value.length));" />
+                name="descript[]" value="{$rowItem['description']}" 
+                onkeyup="$(this).next().html(30-(this.value.length)); $(this).val($(this).val().toUpperCase());" />
             <span class="input-group-addon">{$limit}</span>
         </div>
     </td>
@@ -712,10 +715,10 @@ HTML;
     </td>
     <th class="small text-right">SKU</th>
     <td colspan="2">
-        <input type="text" name="vendorSKU" class="form-control input-sm"
-            value="{$rowItem['sku']}" 
+        <input type="text" name="vendorSKU" value="{$rowItem['sku']}" 
+            class="form-control input-sm sku-field syncable-input"
             onchange="$('#vsku{$jsVendorID}').val(this.value);" 
-            {$vFieldsDisabled} {$aliasDisabled} id="product-sku-field" />
+            {$vFieldsDisabled} {$aliasDisabled} />
         <input type="hidden" name="isAlias" value="{$rowItem['isAlias']}" />
     </td>
 </tr>
@@ -1233,6 +1236,9 @@ HTML;
         $superID = '';
         $dbc = $this->db();
 
+        $dDef = $dbc->tableDefinition('departments');
+        $active = isset($dDef['active']) ? ' d.active=1 ' : '';
+
         $deptQ = '
             SELECT dept_no,
                 dept_name,
@@ -1244,9 +1250,10 @@ HTML;
                 LEFT JOIN subdepts AS s ON d.dept_no=s.dept_ID
                 LEFT JOIN superdepts AS m ON d.dept_no=m.dept_ID ';
         if (is_array($range_limit) && count($range_limit) == 2) {
-            $deptQ .= ' WHERE m.superID BETWEEN ? AND ? ';
+            $deptQ .= ' WHERE m.superID BETWEEN ? AND ? AND ' . $active;
         } else {
             $range_limit = array();
+            $deptQ .= ' WHERE ' . $active;
         }
         $deptQ .= '
             GROUP BY d.dept_no,

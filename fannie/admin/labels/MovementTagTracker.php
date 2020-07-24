@@ -43,29 +43,50 @@ class MovementTagTracker extends FannieRESTfulPage
         $this->__routes[] = "get<exclusionName>";
         $this->__routes[] = "post<upcs>";
         $this->__routes[] = "get<data>";
+        $this->__routes[] = "get<expired>";
 
         return parent::preprocess();
     }
 
+    public function get_expired_view()
+    {
+        $li = "<ul>";
+        $li .= "<li><a href=\"MovementTagTracker.php?data=view\">Data</a></li>";
+        $li .= "<li><a href='?id=config'>Settings</a></li>";
+        $li .= "<li><a href='ShelfTagIndex.php'>Shelftags Index</a></li>";
+        $li .= "<li><a href='MovementTagTracker.php'>Tracker</a></li>";
+        $li .= "</ul>";
+
+        return <<<HTML
+$li
+{$this->draw_expired_table()}
+HTML;
+    }
+
     public function get_data_view()
     {
-        $dbc = fanniedb::get($this->config->get('op_db'));
+        $dbc = Fanniedb::get($this->config->get('op_db'));
+        $storeID = FormLib::get('store');
 
         $args = array($storeID);
         $td = '';
         $th = '';
-        $cols = array('updateID', 'upc', 'brand', 'description', 'dept', 'storeID',
-            'auto_par', 'adjustment', 'modified');
+        $cols = array('count', 'upc', 'brand', 'description', 'dept', 'storeID',
+            'auto_par', 'adjustment', 'modified', 'loc');
         foreach ($cols as $col) {
             $th.= "<th>$col</th>";
         }
-        $prep = $dbc->prepare("SELECT m.*, DATE(m.modified) as modified,
+        $prep = $dbc->prepare("SELECT m.*, DATE(m.modified) as modified, m.updateID as count,
                 p.brand, p.description,
-                CONCAT(d.dept_no, ' ', d.dept_name) AS dept
+                CONCAT(d.dept_no, ' ', d.dept_name) AS dept,
+                f.name AS loc
             FROM MovementUpdate AS m
                 LEFT JOIN products AS p ON m.upc=p.upc
                 LEFT JOIN departments AS d ON p.department=d.dept_no
-            GROUP BY updateID
+                LEFT JOIN FloorSectionProductMap AS fspm ON m.upc=fspm.upc
+                LEFT JOIN FloorSections AS f ON fspm.floorSectionID=f.floorSectionID
+            GROUP BY m.upc, DATE(m.modified)
+            ORDER BY m.updateID DESC
             ");
         $res = $dbc->execute($prep, $args);
         while ($row = $dbc->fetchRow($res)) {
@@ -81,6 +102,9 @@ class MovementTagTracker extends FannieRESTfulPage
         $this->addOnloadCommand("$('#datepicker2').datepicker({dateFormat: 'yy-mm-dd'});");
         $this->addScript("movementTag.js");
         $this->addOnloadcommand("movementTableFilter.filter_table();");
+        $this->addScript('../../src/javascript/tablesorter-2.22.1/js/jquery.tablesorter.js');
+        $this->addScript('../../src/javascript/tablesorter-2.22.1/js/jquery.tablesorter.widgets.js');
+        $this->addOnloadCommand("$('#mu-table').tablesorter({theme:'bootstrap', headerTemplate: '{content} {icon}', widgets: ['uitheme','zebra']});");
 
         return <<<HTML
 <h2>Shelftag Replacement History</h2>
@@ -107,8 +131,21 @@ class MovementTagTracker extends FannieRESTfulPage
     <div class="col-lg-2"><div class="form-group">
         <button class="btn btn-default" style="width: 45%">Submit</button>
         <button class="btn btn-default" style="width: 45%" onclick="
-            $('input').each(function(){ $(this).val(''); $(this).trigger('change') });"
+            $('input').each(function(){ $(this).val(''); $(this).trigger('change') });
+            $('#dept-filter').val($('#dept-filter option:first').val());
+            $('#dept-filter').trigger('change');
+            $('#loc-filter').val($('#loc-filter option:first').val());
+            $('#loc-filter').trigger('change');
+            "
         >Clear</button>
+    </div></div>
+    <div class="col-lg-2"><div class="form-group">
+        <select class="form-control" name="dept-filter" id="dept-filter" data-var="dept">
+        </select>
+    </div></div>
+    <div class="col-lg-2"><div class="form-group">
+        <select class="form-control" name="loc-filter" id="loc-filter" data-var="loc">
+        </select>
     </div></div>
 </div>
 <table id="mu-table" class="table table-bordered table-sm small"><thead>$th</thead><tbody>$td</tbody></table>
@@ -276,6 +313,9 @@ HTML;
                 AND p.store_id = ?
                 AND p.inUse = 1
                 AND f.name IS NOT NULL
+                AND p.upc NOT IN (SELECT value FROM MovementTrackerParams WHERE parameter = 'Product')
+                AND p.numflag & (1 << 19) = 0
+                AND not numflag & (1 << 1)
             GROUP BY p.upc, DATE(m.modified), p.brand, p.description, f.name
             ORDER BY f.name
         ");
@@ -299,15 +339,13 @@ HTML;
 
     public function get_view()
     {
+        $storeID = COREPOS\Fannie\API\lib\Store::getIdByIp();
         $ret = "";
 
         $li = "<ul>";
         $tables = array();
-        foreach ($this->stores as $id => $name) {
-            $tables[] = $this->draw_table($name, $id);
-            $li .= "<div><a href='#$name'>$name</a></div>";
-        }
-        $li .= "<div><a href='#expired-heading'>Expired Tags</a></div>";
+        $tables[] = $this->draw_table($this->stores[$storeID], $storeID);
+        $li .= "<li><a href='?expired=1'>Expired Tags</a></li>";
         $li .= "<li><a href='ShelfTagIndex.php'>Shelftags Index</a></li>";
         $li .= "<li><a href='?id=config'>Settings</a></li>";
         $li .= "<li><a href=\"MovementTagTracker.php?data=view\">Data</a></div></li>";
@@ -315,7 +353,6 @@ HTML;
         foreach ($tables as $table) {
             $ret .= $table;
         }
-        $ret .= $this->draw_expired_table();
         $status = FormLib::get('status');
         $alert = '';
         if ($status == 'success') {
@@ -597,30 +634,34 @@ HTML;
             $thead .= "<th>$colName</th>";
         $table .= "<h2 id='$storeName'>$storeName Tags</h2>
             <table class='table table-bordered table-condensed table-striped tablesorter tablesorter-bootstrap myTables' id='my-table-$storeID'><thead >$thead</thead><tbody>";
-        foreach ($this->item as $row => $array) {
-            $table .= "<tr>";
-            foreach ($colNames as $colName) {
-                if ($colName == 'upc') {
-                    $table .= "<td><a href='../../item/ItemEditorPage.php?searchupc={$array[$colName]}'
-                        target='_blank'>{$array[$colName]}</a></td>";
-                } else {
-                    $table .= "<td>{$array[$colName]}</td>";
+        if (isset($this->item) && is_array($this->item)) {
+            foreach ($this->item as $row => $array) {
+                $table .= "<tr>";
+                foreach ($colNames as $colName) {
+                    if ($colName == 'upc') {
+                        $table .= "<td><a href='../../item/ItemEditorPage.php?searchupc={$array[$colName]}'
+                            target='_blank'>{$array[$colName]}</a></td>";
+                    } else {
+                        $table .= "<td>{$array[$colName]}</td>";
+                    }
                 }
+                $table .= "</tr>";
             }
-            $table .= "</tr>";
         }
         $table .= "</tbody></table>";
 
         $form = '<form method="post"><input type="hidden" name="storeID" value="'.$storeID.'"/>';
-        foreach ($this->item as $k => $row) {
-            $form .= sprintf("<input type=\"hidden\" name=\"upcs[]\" value=\"%s\" />
-                <input type=\"hidden\" name=\"adjustments[]\" value=\"%f\" />
-                <input type=\"hidden\" name=\"auto_par[]\" value=\"%f\" />
-                ",
-                $row['upc'],
-                $row['diff'],
-                $row['auto_par']
-            );
+        if (isset($this->item) && is_array($this->item)) {
+            foreach ($this->item as $k => $row) {
+                $form .= sprintf("<input type=\"hidden\" name=\"upcs[]\" value=\"%s\" />
+                    <input type=\"hidden\" name=\"adjustments[]\" value=\"%f\" />
+                    <input type=\"hidden\" name=\"auto_par[]\" value=\"%f\" />
+                    ",
+                    $row['upc'],
+                    $row['diff'],
+                    $row['auto_par']
+                );
+            }
         }
 
         $authorized = false;
@@ -634,7 +675,7 @@ HTML;
             $table = $form . $table;
         }
 
-        if (count($this->item) > 0) {
+        if (isset($this->item) && count($this->item) > 0) {
             unset($this->item);
             return $table;
         } else {

@@ -23,6 +23,7 @@
 
 namespace COREPOS\common;
 use COREPOS\common\sql\CharSets;
+use COREPOS\common\sql\Result;
 use \Exception;
 
 if (!function_exists("ADONewConnection")) {
@@ -579,6 +580,10 @@ class SQLManager
         $ret = $result_object->fields;
         if ($result_object) {
             $result_object->MoveNext();
+        }
+        // only wrap postgres results for now
+        if (is_array($ret) && $this->connectionType($which_connection) == 'postgres9') {
+            $ret = new Result($ret);
         }
 
         return $ret;
@@ -1492,6 +1497,9 @@ class SQLManager
         $vals = "(";
         $args = array();
         foreach ($values as $k=>$v) {
+            if (strtolower($this->connectionType($which_connection)) === 'postgres9') {
+                $k = strtolower($k);
+            }
             if (isset($t_def[$k])) {
                 $vals .= '?,';
                 $args[] = $v;
@@ -1539,6 +1547,9 @@ class SQLManager
         $sets = "";
         $args = array();
         foreach($values as $k=>$v) {
+            if (strtolower($this->connectionType($which_connection)) === 'postgres9') {
+                $k = strtolower($k);
+            }
             if (isset($t_def[$k])) {
                 $sets .= $this->identifierEscape($k) . ' = ?,';
                 $args[] = $v;
@@ -1616,7 +1627,8 @@ class SQLManager
         $res = $this->execute($sql, $input_array, $which_connection);
         if ($res && $this->numRows($res) > 0) {
             $row = $this->fetchRow($res);
-            return $row[0];
+            $keys = array_keys($row);
+            return array_key_exists($keys[0], $row) ? $row[$keys[0]] : false;
         } elseif ($res && $this->numRows($res) == 0) {
             return false;
         } else {
@@ -1923,6 +1935,20 @@ class SQLManager
         $query = $adapter->setCharSet($db_charset);
 
         return $con->query($query);
+    }
+
+    public function space($num, $which_connection='')
+    {
+        $which_connection = $which_connection === '' ? $this->default_db : $which_connection;
+        $adapter = $this->getAdapter($this->connectionType($which_connection));
+        return $adapter->space($num);
+    }
+
+    public function numberFormat($num, $which_connection='')
+    {
+        $which_connection = $which_connection === '' ? $this->default_db : $which_connection;
+        $adapter = $this->getAdapter($this->connectionType($which_connection));
+        return $adapter->numberFormat($num);
     }
 }
 

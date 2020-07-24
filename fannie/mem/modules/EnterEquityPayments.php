@@ -89,7 +89,7 @@ class EnterEquityPayments extends \COREPOS\Fannie\API\member\MemberModule {
                 maxlength="10" value="" id="paymentDate"
                 class="form-control date-field" /> </td>'; 
         $ret .= '<td> <input type ="number" name="payment_amt" maxlength="10"
-                value="" class="form-control" /></td>';
+                step=".01" value="" class="form-control" /></td>';
         $ret .= '<td><input name="payment_note" maxlength="15"
                 value="" class="form-control" /></td>';
         while ($row = $dbc->fetchRow($paymentsR)) {

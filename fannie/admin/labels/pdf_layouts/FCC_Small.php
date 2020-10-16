@@ -260,7 +260,7 @@ if (!class_exists('FpdfWithBarcode')) {
   
         $pdf->SetFont('arialnarrow','',6);
         $pdf->SetXY($genLeft+1, $unitTop+18.5); //desc of tiem
-        $pdf->Cell($w,4,"$brand $desc",0,0,'L');
+        $pdf->Cell(0,4,"$brand $desc",0,0,'L');
         $pdf->SetFont('Arial','',6);
         $pdf->SetXY($genLeft+25, $unitTop+16.2);
         //please use the order  "Local, Organic, NONGMO, Gluten Free
@@ -269,14 +269,14 @@ if (!class_exists('FpdfWithBarcode')) {
         if ($showNONGMO) {$pdf->Image($FANNIE_ROOT.'src/images/non-gmo.jpg',$genLeft+33,$unitTop+16,3);}
         if ($showGlutenFree) {$pdf->Image($FANNIE_ROOT.'src/images/Gluten-Free.jpg',$genLeft+36.5,$unitTop+16,3);}        
         
-        $pdf->Cell($w,4,$cs_size,0,0,'L');
+        $pdf->Cell(0,4,$cs_size,0,0,'L');
         //$pdf->Cell($w,4,"1/".$size_value." ".$size_unit,0,0,'L');
         $pdf->SetFont('Arial','',7);
         //$pdf->SetXY($priceLeft-22,$skuTop+10);
   
 
         $pdf->SetXY($genLeft+1, $unitTop+28.5);
-        $pdf->Cell($w,4,"$vendor $sku",0,0,'L');
+        $pdf->Cell(0,4,"$vendor $sku",0,0,'L');
         $pdf->SetXY($genLeft+28-.5, $unitTop+28.5);
         $pdf->Cell(12,4,$tagdate,0,0,'R'); 
         /** 
@@ -291,7 +291,7 @@ if (!class_exists('FpdfWithBarcode')) {
 
         //  $pdf->SetFont('Arial','',7);
         $pdf->SetXY($genLeft+1.3, $unitTop+23.6);
-        $pdf->Cell(5,5,$caseqty,0,0,'L'); 
+        //$pdf->Cell(5,5,$caseqty,0,0,'L'); 
         /**
         * increment label parameters for next label
         */

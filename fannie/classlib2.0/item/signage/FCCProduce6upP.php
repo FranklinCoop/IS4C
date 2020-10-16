@@ -191,7 +191,10 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
 
             //varity
             $descParts = explode(', ',$item['description']);
-            $varity = $descParts[1];
+            $varity = '';
+            if (sizeof(descParts) > 1) {
+                $varity = $descParts[1];
+            }
             $description = $descParts[0];
             $x = $this->startX + $xOffset*$column + $this->outerBorderWidth/2;
             $y += $fontSize +10;

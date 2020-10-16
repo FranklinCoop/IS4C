@@ -214,7 +214,7 @@ class PriceLib
         $resUnitInfo = $dbc->execute($prepUnitInfo, array($upc));
         
         if (!$resUnitInfo || $dbc->numRows($resUnitInfo) == 0) {
-            return 'missing unit info';
+            return PriceLib::pricePerUnit($price,$sizeStr,$upc); //defaults to old method if data is missing.
         }
         $rowUnitInfo = $dbc->fetchRow($resUnitInfo);
 

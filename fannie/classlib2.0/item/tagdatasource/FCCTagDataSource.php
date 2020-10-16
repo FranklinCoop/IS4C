@@ -81,7 +81,7 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
 
         $ret['size'] = $row['units'];
 
-        $ret['pricePerUnit'] = \COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $upc, $row['normal_price'], $row['size']);
+        $ret['pricePerUnit'] = \COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $upc, $row['normal_price'], $row['p_size']);
 
         return $ret;
     }

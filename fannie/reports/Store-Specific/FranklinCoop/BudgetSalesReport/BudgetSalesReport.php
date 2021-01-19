@@ -661,9 +661,9 @@ class BudgetSalesReport extends FannieReportPage
 			$intervals[] = $startDate->format('Y-m-d');
 			$historicals[] = $startDateLastYear->format('Y-m-d');
 			if ($today > $startDate->format('Y-m-d')) {
-				$startDate->modify('-1 day');
+				#$startDate->modify('-1 day');
 				$cutOffDate = $startDate->format('Y-m-d');
-				$startDate->modify('+1 day');
+				#$startDate->modify('+1 day');
 			}
 		}
 

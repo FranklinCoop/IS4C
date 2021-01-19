@@ -512,8 +512,8 @@ private function getSalesTotals($dbc,$dlog,$args) {
 
 private function getTaxTotals($dbc,$dlog,$args) {
     $query = $dbc->prepare("SELECT sum(regPrice),description FROM {$dlog} 
-                          WHERE upc ='TAXLINEITEM' AND `datetime` BETWEEN ? AND ? AND store_id =? AND trans_status != 'X'
-                          GROUP BY RIGHT(description,7) ORDER BY RIGHT(description,7)  AND emp_no != 9999");
+                          WHERE upc ='TAXLINEITEM' AND `datetime` BETWEEN ? AND ? AND store_id =? AND trans_status != 'X' and emp_no != 9999
+                          GROUP BY RIGHT(description,7) ORDER BY RIGHT(description,7)");
     $result = $dbc->execute($query,$args);
     $return = array();
     $description;
@@ -521,9 +521,10 @@ private function getTaxTotals($dbc,$dlog,$args) {
         $return[] = $row[0];
         $description = $row[1];
     }
-    if (sizeof($return) < 2 && $description = '6.25000% SalesTax') {
+    $size = sizeof($return);
+    if ($size == 1 && $description = '6.25000% SalesTax') {
         $return[] = 0;
-    } else {
+    } elseif ($size ==1) {
         array_unshift($return, 0);
     }
 

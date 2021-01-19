@@ -64,7 +64,8 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			$mostRecentDate = new DateTime($row['mostRecent']);
 			$mostRecentDate->modify('first day of this month')->setTime(0,0,0);
 			$interval = $now->diff($mostRecentDate);
-			$months = $interval->m;
+			$years = $interval->y;
+			$months = ($interval->m) + $years*12;
 			$days = $interval->d;
 			$blueLine = $row['blueLine'];
 			$newLine = '';
@@ -101,6 +102,8 @@ class FCC_EquityPaymentDueTask extends FannieTask
 				echo $this->cronMsg("Blue Line: ".$blueLine.'  mostRecent:'.$row['mostRecent']. "   Now:".$now->format('Y-m-d')."  Months/Days:".$months.'/'.$days);
 				$memType = 1;
 				$type = 'PC';
+				$updateAccount = true;
+			} else if ($memType == 12) {
 				$updateAccount = true;
 			}
 			//$updateAccount = true;

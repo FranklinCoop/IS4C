@@ -237,9 +237,13 @@ class PriceLib
             $strRow = $dbc->fetchRow($ret);
             $str = $strRow[0];
             $strArray = explode('/', $str);
-            $unitSize = $strArray[0];
-            $packUnit = $strArray[1];
-            $stdUnit = $strArray[2];
+            if (sizeof($strArray) < 3) {
+                return PriceLib::pricePerUnit($price,$sizeStr,$upc); //defaults to old method if data is missing.
+            } else {
+                $unitSize = $strArray[0];
+                $packUnit = $strArray[1];
+                $stdUnit = $strArray[2]; 
+            }
         }
 
 

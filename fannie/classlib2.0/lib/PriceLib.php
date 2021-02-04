@@ -229,7 +229,7 @@ class PriceLib
             }
 
             $rowUnitInfo = $dbc->fetchRow($resUnitInfo);
-            $unitSize = $rowUnitInfo[];
+            $unitSize = $rowUnitInfo['size'];
             $packUnit = $rowUnitInfo['unit'];
             $stdUnit = $rowUnitInfo['unitStandard'];
         } else {

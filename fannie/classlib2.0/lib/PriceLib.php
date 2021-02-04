@@ -210,7 +210,7 @@ class PriceLib
     public static function FCC_PricePerUnit($dbc, $upc, $price, $sizeStr) {
         $query = "SELECT p.unitofmeasure FROM products p where p.upc = ? GROUP BY p.upc";
         $prep = $dbc->prepare($query);
-        $ret = $dbc->execute($prepUnitInfo, array($upc));
+        $ret = $dbc->execute($prep, array($upc));
 
 
         $unitSize = '';

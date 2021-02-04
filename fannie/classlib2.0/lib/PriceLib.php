@@ -208,19 +208,46 @@ class PriceLib
     unit cost needs to be reported.
     */
     public static function FCC_PricePerUnit($dbc, $upc, $price, $sizeStr) {
-        // get the unit info.
-        $queryUnitInfo = "SELECT p.unitStandard, p.size, p.unit FROM prodStandardUnit p WHERE p.upc = ?";
-        $prepUnitInfo = $dbc->prepare($queryUnitInfo);
-        $resUnitInfo = $dbc->execute($prepUnitInfo, array($upc));
+        $query = "SELECT p.unitofmeasure FROM products p where p.upc = ? GROUP BY p.upc";
+        $prep = $dbc->prepare($query);
+        $ret = $dbc->execute($prepUnitInfo, array($upc));
+
+
+        $unitSize = '';
+        $packUnit = '';
+        $strUnit = '';
+        if (!$ret || $dbc->numRows($ret) == 0) {
+            //failed to get proper unit info, defualt to old scheme.
+            // get the unit info from the FCC Legacy table.
+            $queryUnitInfo = "SELECT p.unitStandard, p.size, p.unit FROM prodStandardUnit p WHERE p.upc = ?";
+            $prepUnitInfo = $dbc->prepare($queryUnitInfo);
+            $resUnitInfo = $dbc->execute($prepUnitInfo, array($upc));
         
-        if (!$resUnitInfo || $dbc->numRows($resUnitInfo) == 0) {
-            return PriceLib::pricePerUnit($price,$sizeStr,$upc); //defaults to old method if data is missing.
+            if (!$resUnitInfo || $dbc->numRows($resUnitInfo) == 0) {
+                //Legacy method failed use CORE default method
+                return PriceLib::pricePerUnit($price,$sizeStr,$upc); //defaults to old method if data is missing.
+            }
+
+            $rowUnitInfo = $dbc->fetchRow($resUnitInfo);
+            $unitSize = $rowUnitInfo[];
+            $packUnit = $rowUnitInfo['unit'];
+            $stdUnit = $rowUnitInfo['unitStandard'];
+        } else {
+            // break up the string
+            $strRow = $dbc->fetchRow($ret);
+            $str = $strRow[0];
+            $strArray = explode('/', $str);
+            $unitSize = $strArray[0];
+            $packUnit = $strArray[1];
+            $stdUnit = $strArray[2];
         }
-        $rowUnitInfo = $dbc->fetchRow($resUnitInfo);
+
+
+
 
         //look up the unit conversion.
         $queryConversion = "SELECT c.rate FROM unitConversion c WHERE c.unit_name = ? AND c.unit_std = ?";
-        $args = array($rowUnitInfo['unit'], $rowUnitInfo['unitStandard']);
+        $args = array($packUnit, $stdUnit);
         $prepConversion = $dbc->prepare($queryConversion);
         $resConversion = $dbc->execute($prepConversion, $args);
         if (!$resConversion || $dbc->numRows($resConversion) == 0) {
@@ -239,8 +266,8 @@ class PriceLib
         $price = $rowPrice['normal_price'];
 
         //return the unit price.
-        $pricePerUnit = $price*($rowConversion['rate']/$rowUnitInfo['size']);
-        if ($pricePerUnit == 0) {return "Size: ".$rowUnitInfo['unit'] ."\n Conversion Factor: ". $rowConversion['rate']; }
+        $pricePerUnit = $price*($rowConversion['rate']/$unitSize);
+        if ($pricePerUnit == 0) {return "Size: ".$packUnit."\n Conversion Factor: ". $rowConversion['rate']; }
         else { return round($pricePerUnit,2); }
     }
 }

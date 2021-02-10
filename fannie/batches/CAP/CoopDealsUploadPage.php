@@ -38,12 +38,12 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
     protected $preview_opts = array(
         'upc' => array(
             'display_name' => 'UPC',
-            'default' => 4,
+            'default' => 0,
             'required' => true
         ),
         'price' => array(
             'display_name' => 'Sale Price',
-            'default' => 18,
+            'default' => 1,
             'required' => true
         ),
         'abt' => array(
@@ -53,27 +53,19 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
         ),
         'sku' => array(
             'display_name' => 'SKU',
-            'default' => 5,
+            'default' => 3,
         ),
         'mult' => array(
             'display_name' => 'Line Notes',
-            'default' => 11,
+            'default' => 4,
         ),
         'promoDiscount' => array(
             'display_name' => 'Promo Discount',
-            'default' => 14,
+            'default' => 5,
         ),
         'cost' => array(
             'display_name' => 'Promo Cost',
-            'default' => 16,
-        ),
-        'order' => array(
-            'display_name' => 'Quantity',
-            'default' => 9,
-        ),
-        'flyer' => array(
-            'display_name' => 'Featured Item',
-            'default' => 22,
+            'default' => 6,
         ),
     );
 
@@ -172,9 +164,6 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
         foreach ($linedata as $data) {
             if (!is_array($data)) continue;
             if (count($data) < $col_max) continue;
-            $order = $data[$indexes['order']];
-            $flyer = $data[$indexes['flyer']];
-            if ($order==0 && $flyer != 'X') continue;
 
             $upc = str_replace("-","",$data[$indexes['upc']]);
             $upc = str_replace(" ","",$upc);

@@ -112,7 +112,7 @@ class CoopDealsReviewPage extends FanniePage
                 startDate,
                 endDate
             )
-            VALUES (?, ?, ?, 0, ?, ?)
+            VALUES (?, ?, ?, 1, ?, ?)
         ');
 
         $blDef = $dbc->tableDefinition('batchList');

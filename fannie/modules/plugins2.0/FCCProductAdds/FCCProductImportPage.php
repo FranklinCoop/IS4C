@@ -67,32 +67,40 @@ class FCCProductImportPage extends \COREPOS\Fannie\API\FannieUploadPage
             'default' => 6,
         ),
         'local' => array(
-            'display_name' =>'Local',
+            'display_name' => 'Local',
             'default' => 7,
         ),
         'organic' => array(
-            'display_name' =>'Organic',
+            'display_name' => 'Organic',
             'default' => 8,
         ),
         'nongmo' => array(
-            'display_name' =>'NON-GMO',
+            'display_name' => 'NON-GMO',
             'default' => 9,
         ),
         'glutenfree' => array(
-            'display_name' =>'Gluten Free',
+            'display_name' => 'Gluten Free',
             'default' => 10,
         ),
         'vegan' => array(
-            'display_name' =>'Vegan',
+            'display_name' => 'Vegan',
             'default' => 11,
         ),
         'traitor' => array(
-            'display_name' =>'Traitor Brand',
+            'display_name' => 'Traitor Brand',
             'default' => 12,
         ),
         'coopbasic' => array(
-            'display_name' =>'Coop Basics',
+            'display_name' => 'Coop Basics',
             'default' => 13,
+        ),
+        'pack_size' => array(
+            'display_name' => 'pack_size',
+            'default' => 14,
+        ),
+        'unitOfMesure' => arrry(
+            'display_name' => 'Tag Format',
+            'default' = 15,
         )
 
 
@@ -165,6 +173,9 @@ class FCCProductImportPage extends \COREPOS\Fannie\API\FannieUploadPage
             $dept = ($indexes['dept'] !== false) ? $line[$indexes['dept']] : 0;
             list($tax, $fstamp, $discount) = $this->getDefaultableSettings($dept, $defaults_table);
             $brand = $line[$indexes['brand']];
+            $vendor = $line[$indexes['vendor']];
+            $pack_size = $line[$indexes['pack_size']];
+            $unitOfMesure = $line[$indexes['unitOfMesure']];
 
             //item flags 1 or 0 multiplied by 
             $flags = array($line[$indexes['local']]*1,
@@ -193,9 +204,9 @@ class FCCProductImportPage extends \COREPOS\Fannie\API\FannieUploadPage
             $model->upc($upc);
             $model->store_id(1);
             $exists = $model->load();
-            if ($exists && $skipExisting) {
-                continue;
-            }
+            //if ($exists && $skipExisting) {
+            //    continue;
+            //}
             $model->description($desc);
             $model->normal_price($price);
             $model->department($dept);
@@ -205,6 +216,9 @@ class FCCProductImportPage extends \COREPOS\Fannie\API\FannieUploadPage
             $model->cost($cost);
             $model->brand($brand);
             $model->numflag($numflag);
+            $model->default_vendor_id($vendor);
+            $model->size($pack_size);
+            $model->unitofmeasure($unitOfMesure);
             if (!$exists) {
                 // fully init new record
                 $model->pricemethod(0);

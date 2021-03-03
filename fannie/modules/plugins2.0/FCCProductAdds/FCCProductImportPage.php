@@ -100,7 +100,7 @@ class FCCProductImportPage extends \COREPOS\Fannie\API\FannieUploadPage
         ),
         'unitOfMesure' => array(
             'display_name' => 'Tag Format',
-            'default' = 15,
+            'default' => 15,
         )
 
 

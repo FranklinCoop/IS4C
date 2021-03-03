@@ -21,9 +21,9 @@
 
 *********************************************************************************/
 
-include(dirname(__FILE__) . '/../../config.php');
+require(dirname(__FILE__) . '/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class FCCProductImportPage extends \COREPOS\Fannie\API\FannieUploadPage 

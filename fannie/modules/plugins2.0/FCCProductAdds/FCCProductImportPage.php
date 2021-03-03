@@ -204,7 +204,7 @@ class FCCProductImportPage extends \COREPOS\Fannie\API\FannieUploadPage
             $model->upc($upc);
             $model->store_id(1);
             $exists = $model->load();
-            if ($upc = 'upc') {
+            if ($upc == 'upc') {
                 continue; //skip first line
             }
             $model->description($desc);

@@ -260,7 +260,7 @@ class FCCProductImportPage extends \COREPOS\Fannie\API\FannieUploadPage
         $dbc = $this->connection;
         $attrs = array(1,2,3,4,6,8,10);
         $fnames = array('Local','Organic','Coop Basic','Non_GMO','Gluten Free','Traitor Brand','Vegan');
-        $bits = arrry(1,2,3,4,6,8,10);
+        $bits = array(1,2,3,4,6,8,10);
         /**
           Collect known flags and initialize
           JSON object with all flags false

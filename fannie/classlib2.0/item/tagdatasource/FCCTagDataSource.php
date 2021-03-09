@@ -81,8 +81,8 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
 
         $str = $row['unitofmeasure'];
         $strArray = explode('/', $str);
-        $ret['size'] = $strArray[0];
-        $ret['units'] = $strArray[1];
+        $ret['size'] = $strArray[1];
+        $ret['units'] = $strArray[0];
         $ret['unitStandard'] = $strArray[2];
 
         //            $strRow = $dbc->fetchRow($ret);

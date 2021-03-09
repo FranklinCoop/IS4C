@@ -36,14 +36,11 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
                 COALESCE(v.vendorName, x.distributor) AS vendor,
                 p.size AS p_size,
                 p.unitofmeasure,
-                i.sku,
-                s.unit AS units,  
-                s.size AS vi_size
+                i.sku
             FROM products AS p
                 LEFT JOIN prodExtra AS x ON p.upc=x.upc
                 LEFT JOIN vendors AS v ON p.default_vendor_id=v.vendorID
                 LEFT JOIN vendorItems AS i ON p.upc=i.upc AND v.vendorID=i.vendorID
-                LEFT JOIN prodStandardUnit s ON p.upc=s.upc
             WHERE p.upc=?';
         $prep = $dbc->prepare($query);
         $res = $dbc->execute($prep, array($upc));
@@ -72,7 +69,7 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
         //$ret['normal_price'] = $row['normal_price'];
         $ret['vendor'] = $row['vendor'];
         $ret['sku'] = $row['sku'];
-        $ret['units'] = $row['vi_size'];
+        //$ret['units'] = $row['p_size'];
 
         if ($price !== false) {
             $ret['normal_price'] = $price;
@@ -80,10 +77,12 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
             $ret['normal_price'] = $row['normal_price'];
         }
 
-        $ret['size'] = $row['units'];
+        //$ret['size'] = $row['units'];
 
         $str = $row['unitofmeasure'];
         $strArray = explode('/', $str);
+        $ret['size'] = $strArray[0];
+        $ret['units'] = $strArray[1];
         $ret['unitStandard'] = $strArray[2];
 
         //            $strRow = $dbc->fetchRow($ret);

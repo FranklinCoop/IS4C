@@ -59,6 +59,7 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
             'units' => 0,
             'vendor' => '',
             'pricePerUnit' => '',
+            'unitStandard' => '',
         );
         if (!$res || $dbc->numRows($res) == 0) {
             return $ret;
@@ -81,7 +82,9 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
 
         $ret['size'] = $row['units'];
 
-        $ret['unitStandard'] = explode('/', $row['unitofmeasure'])[2];
+        $str = $row['unitofmeasure'];
+        $strArray = explode('/', $str);
+        $ret['unitStandard'] = $strArray[2];
 
         //            $strRow = $dbc->fetchRow($ret);
         //    $str = $strRow[0];

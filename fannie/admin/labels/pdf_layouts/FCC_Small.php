@@ -141,7 +141,7 @@ if (!class_exists('FpdfWithBarcode')) {
         * if we have reset all left hands back to initial values
         */
         if($barLeft > 175){
-            $barLeft = $leftshift;
+            $barLeft = $LeftShift;
             $barTop = $barTop + $down;
             $priceLeft = $priceLeft + $LeftShift;
             $priceTop = $priceTop + $down;
@@ -269,7 +269,7 @@ if (!class_exists('FpdfWithBarcode')) {
         if ($showNONGMO) {$pdf->Image($FANNIE_ROOT.'src/images/non-gmo.jpg',$genLeft+33,$unitTop+16,3);}
         if ($showGlutenFree) {$pdf->Image($FANNIE_ROOT.'src/images/Gluten-Free.jpg',$genLeft+36.5,$unitTop+16,3);}        
         
-        $pdf->Cell(0,4,$cs_size,0,0,'L');
+        $pdf->Cell(0,4,$size,0,0,'L');
         //$pdf->Cell($w,4,"1/".$size_value." ".$size_unit,0,0,'L');
         $pdf->SetFont('Arial','',7);
         //$pdf->SetXY($priceLeft-22,$skuTop+10);

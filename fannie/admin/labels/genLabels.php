@@ -86,7 +86,8 @@ class genLabels extends FannieRESTfulPage
         $query = "
             SELECT s.*,
                 p.scale,
-                p.numflag
+                p.numflag,
+                p.unitofmeasure
             FROM shelftags AS s
                 " . DTrans::joinProducts('s', 'p', 'INNER') . "
             WHERE s.id IN ($inStr) ";
@@ -118,6 +119,10 @@ class genLabels extends FannieRESTfulPage
                 } elseif (strlen($row['sku']) > 7) {
                     $row['sku'] = ltrim($row['sku'], '0');
                 }
+
+                $str = $row['unitofmeasure'];
+                $strArray = explode('/', $str);
+
                 $myrow = array(
                     'normal_price' => $row['normal_price'],
                     'description' => $row['description'],
@@ -129,7 +134,8 @@ class genLabels extends FannieRESTfulPage
                     'upc' => $row['upc'],
                     'vendor' => $row['vendor'],
                     'scale' => $row['scale'],
-                    'numflag' => $row['numflag']
+                    'numflag' => $row['numflag'],
+                    'unitStandard' => $strArray[2];
                 );          
                 $data[] = $myrow;
             }
@@ -145,7 +151,7 @@ class genLabels extends FannieRESTfulPage
         }
         list($batchIDList, $args) = $dbc->safeInClause($batchID);
         
-        $testQ = $dbc->prepare("select b.*,p.scale,p.numflag
+        $testQ = $dbc->prepare("select b.*,p.scale,p.numflag,p.unitofmeasure
             FROM batchBarcodes as b 
                 " . DTrans::joinProducts('b', 'p', 'INNER') . "
             WHERE b.batchID in ($batchIDList) and b.description <> ''
@@ -166,6 +172,9 @@ class genLabels extends FannieRESTfulPage
                 $pricePerUnit = COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($row['normal_price'], $row['size']);
             }
 
+            $str = $row['unitofmeasure'];
+            $strArray = explode('/', $str);
+
             $myrow = array(
             'normal_price' => $row['normal_price'],
             'description' => $row['description'],
@@ -177,7 +186,8 @@ class genLabels extends FannieRESTfulPage
             'upc' => $row['upc'],
             'vendor' => $row['vendor'],
             'scale' => $row['scale'],
-            'numflag' => $row['numflag']
+            'numflag' => $row['numflag'],
+            'unitStandard' => $strArray[2];
             );          
             $data[] = $myrow;
         }

@@ -225,7 +225,7 @@ if (!class_exists('FpdfWithBarcode')) {
         $size = $row['units'] . "-" . $row['size'];
         $sku = $row['sku'];
         $num_unit = $row['pricePerUnit'];
-        $alpha_unit = "per ".$iStdUnit['unitStandard'];
+        $alpha_unit = "per ".$row['unitStandard'];
 
        $upc = ltrim($row['upc'],0);
        $check = $pdf->GetCheckDigit($upc);

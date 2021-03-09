@@ -172,9 +172,11 @@ function FCC_Large($data,$offset=0){
         */
 
         //get unit and flagging data;
+        /******
         $qStdUnit = "SELECT u.unitStandard FROM prodStandardUnit u WHERE u.upc =?";
         $rStdUnit = $dbc->execute($dbc->prepare($qStdUnit),array($row['upc']));
         $iStdUnit = $dbc->fetchRow($rStdUnit);
+        */
         
         $query = "
             SELECT f.description,
@@ -191,7 +193,7 @@ function FCC_Large($data,$offset=0){
         }
         $prep = $dbc->prepare($query);
         $res = $dbc->execute($prep,$args);
-        
+
         if ($dbc->numRows($res) == 0){
             // item does not exist
             $prep = $dbc->prepare('
@@ -220,7 +222,7 @@ function FCC_Large($data,$offset=0){
         $size = $row['units'] . "-" . $row['size'];
         $sku = $row['sku'];
         $num_unit = $row['pricePerUnit'];
-        $alpha_unit = "per ".$iStdUnit['unitStandard'];
+        $alpha_unit = "per ".$row['unitStandard'];
 
        $upc = ltrim($row['upc'],0);
        $check = $pdf->GetCheckDigit($upc);

@@ -801,21 +801,6 @@ static private function messageModFooters($receipt, $where, $ref, $reprint, $nth
 {
     // check if message mods have data
     // and add them to the receipt
-    $validMods = self::validateMessageMods($where);
-    foreach($validMods as $class =>$thing){   
-        if ($thing['val'] != 0) {
-            $obj = $thing[$class];
-            if ($obj->paper_only)
-                $receipt['print'] .= $obj->message($thing['val'], $ref, $reprint);
-            else
-                $receipt['any'] .= $obj->message($thing['val'], $ref, $reprint);
-        }
-    }
-
-    return $receipt;
-}
-
-static private function validateMessageMods($where) {
     $dbc = Database::tDataConnect();
     $modQ = "SELECT ";
     $selectMods = array();
@@ -839,13 +824,16 @@ static private function validateMessageMods($where) {
         $modR = $dbc->query($modQ);
         $row = array();
         if ($dbc->numRows($modR) > 0) $row = $dbc->fetchRow($modR);
-        foreach($selectMods as $class => $mod){
-            if (!isset($row[$class])) continue; 
-            $returnMods[$class]= array($class=>$mod, 'val'=>$row[$class]);
+        foreach($selectMods as $class => $obj){
+            if (!isset($row[$class])) continue;    
+            if ($obj->paper_only)
+                $receipt['print'] .= $obj->message($row[$class], $ref, $reprint);
+            else
+                $receipt['any'] .= $obj->message($row[$class], $ref, $reprint);
         }
     }
-    return $returnMods;
 
+    return $receipt;
 }
 
 static private function messageMods($nth)
@@ -987,38 +975,18 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
     // skip signature slips if using electronic signature capture (unless it's a reprint)
     if ((is_array($tmap) && isset($tmap['MI']) && $tmap['MI'] != 'SignedStoreChargeTender') || $reprint) {
         if (CoreLocal::get("chargeTotal") != 0 && ((CoreLocal::get("End") == 1 && !$second) || $reprint)) {
+            /** PLACEHOLDER: deal with charge stuff via StoreChargeMessage
+            $msg = new StoreChargeMessage();
+            $msg->setPrintHandler(self::$PRINT);
+            */
             if (is_array($receipt)) {
                 $receipt['print'] .= self::printChargeFooterStore($dateTimeStamp, $ref, $chargeProgram);
+                // $receipt['print'] .= $msg->standalone_receipt($ref);
             } else {
                 $receipt .= self::printChargeFooterStore($dateTimeStamp, $ref, $chargeProgram);
+                // $receipt .= $msg->standalone_receipt($ref);
             }
         }
-    }
-
-    /*
-     Check which standalone mods should print.
-    */
-    $validSlips = array();
-    foreach (self::validateMessageMods($where) as $modClass => $mod) {
-        if ($mod['val'] !=0) {
-            $modObj = $mod[$modClass];
-            $validSlips[$modObj->standalone_receipt_type] = $modObj;
-        } 
-    }
-    /*
-     Finds slips neede for each tender.
-    */
-    foreach ($tmap as $tender => $tenderClass) {
-        if (!class_exists($tenderClass)) { // try namespaced version
-            $tenderClass = 'COREPOS\\pos\\lib\\Tenders\\' . $tenderClass;
-        }
-        $tenderObject = new $tenderClass($tender,0);
-        $slipType = $tenderObject->getSlip();
-        if (isset($typeMap[$slipType]) && isset($validSlips[$slipType])) {
-            $mod = $validSlips[$slipType];
-            $receipt = self::cutReceipt($receipt, $second);
-            $receipt .= $mod->standalone_receipt($ref);
-        } 
     }
             
     $receipt = self::cutReceipt($receipt, $second);
@@ -1188,9 +1156,20 @@ static public function code39($barcode, $forcePaper=false)
     return $printMod->printBarcode(PrintHandler::BARCODE_CODE39, $barcode);
 }
 
+static private function haveMailer()
+{
+    if (class_exists('PHPMailer')) {
+        return true;
+    } else if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+        return true;
+    }
+
+    return false;
+}
+
 static public function emailReceiptMod()
 {
-    if (class_exists('PHPMailer') && CoreLocal::get('emailReceiptHtml') != '' && class_exists(CoreLocal::get('emailReceiptHtml'))) {
+    if (self::haveMailer() && CoreLocal::get('emailReceiptHtml') != '' && class_exists(CoreLocal::get('emailReceiptHtml'))) {
         return self::$HTML;
     }
 

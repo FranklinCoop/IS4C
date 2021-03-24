@@ -111,10 +111,11 @@ class PaycardCashBackPrompt extends BasicCorePage
     function head_content(){
         $url = $this->page_url."plugins/Paycards/gui/PaycardCashBackPrompt.php?reginput=";
         
-        echo '<script type="text/javascript" src="<?php echo $this->page_url; ?>js/ajax-parser.js"></script>';
-        echo '<script type="text/javascript" src="<?php echo $this->page_url; ?>js/CustomerDisplay.js"></script>';
-        echo '<script type="text/javascript" src="../js/PaycardParserFunctions.js?date=20180308"></script>';
         ?>
+        <script type="text/javascript" src="<?php echo $this->page_url; ?>js/ajax-parser.js"></script>
+        <script type="text/javascript" src="<?php echo $this->page_url; ?>js/CustomerDisplay.js"></script>
+        <script type="text/javascript" src="../js/PaycardParserFunctions.js?date=20180308"></script>
+        
         <script type="text/javascript">
         setUrl('<?php echo $url?>');
         function parseWrapper(str) {

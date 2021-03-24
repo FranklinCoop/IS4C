@@ -28,7 +28,6 @@ use COREPOS\pos\lib\MiscLib;
 use COREPOS\pos\lib\PrintHandlers\PrintHandler;
 use COREPOS\pos\lib\PrintHandlers\ESCNetRawHandler;
 use COREPOS\pos\lib\ReceiptBuilding\Messages\StoreChargeMessage;
-use COREPOS\pos\lib\Tenders;
 use \CoreLocal;
 
 /**
@@ -801,21 +800,6 @@ static private function messageModFooters($receipt, $where, $ref, $reprint, $nth
 {
     // check if message mods have data
     // and add them to the receipt
-    $validMods = self::validateMessageMods($where);
-    foreach($validMods as $class =>$thing){   
-        if ($thing['val'] != 0) {
-            $obj = $thing[$class];
-            if ($obj->paper_only)
-                $receipt['print'] .= $obj->message($thing['val'], $ref, $reprint);
-            else
-                $receipt['any'] .= $obj->message($thing['val'], $ref, $reprint);
-        }
-    }
-
-    return $receipt;
-}
-
-static private function validateMessageMods($where) {
     $dbc = Database::tDataConnect();
     $modQ = "SELECT ";
     $selectMods = array();
@@ -839,13 +823,16 @@ static private function validateMessageMods($where) {
         $modR = $dbc->query($modQ);
         $row = array();
         if ($dbc->numRows($modR) > 0) $row = $dbc->fetchRow($modR);
-        foreach($selectMods as $class => $mod){
-            if (!isset($row[$class])) continue; 
-            $returnMods[$class]= array($class=>$mod, 'val'=>$row[$class]);
+        foreach($selectMods as $class => $obj){
+            if (!isset($row[$class])) continue;    
+            if ($obj->paper_only)
+                $receipt['print'] .= $obj->message($row[$class], $ref, $reprint);
+            else
+                $receipt['any'] .= $obj->message($row[$class], $ref, $reprint);
         }
     }
-    return $returnMods;
 
+    return $receipt;
 }
 
 static private function messageMods($nth)
@@ -987,10 +974,16 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
     // skip signature slips if using electronic signature capture (unless it's a reprint)
     if ((is_array($tmap) && isset($tmap['MI']) && $tmap['MI'] != 'SignedStoreChargeTender') || $reprint) {
         if (CoreLocal::get("chargeTotal") != 0 && ((CoreLocal::get("End") == 1 && !$second) || $reprint)) {
+            /** PLACEHOLDER: deal with charge stuff via StoreChargeMessage
+            $msg = new StoreChargeMessage();
+            $msg->setPrintHandler(self::$PRINT);
+            */
             if (is_array($receipt)) {
                 $receipt['print'] .= self::printChargeFooterStore($dateTimeStamp, $ref, $chargeProgram);
+                // $receipt['print'] .= $msg->standalone_receipt($ref);
             } else {
                 $receipt .= self::printChargeFooterStore($dateTimeStamp, $ref, $chargeProgram);
+                // $receipt .= $msg->standalone_receipt($ref);
             }
         }
     }

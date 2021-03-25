@@ -531,7 +531,13 @@ class MercuryDC extends MercuryE2E
             'curlHTTP' => 200,
         ), PaycardLib::paycard_db());
 
-        $xml = new BetterXmlData($xml);
+        try {
+            $xml = new BetterXmlData($xml);
+        } catch (Exception $e) {
+            $this->conf->set("boxMsg",$ex->getMessage()."<br />Blank String");
+        }
+
+        
 
         $responseCode = $xml->query('/RStream/CmdResponse/CmdStatus');
         $resultMsg = $responseCode;

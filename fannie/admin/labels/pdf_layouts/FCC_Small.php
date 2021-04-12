@@ -141,7 +141,7 @@ if (!class_exists('FpdfWithBarcode')) {
         * if we have reset all left hands back to initial values
         */
         if($barLeft > 175){
-            $barLeft = $LeftShift;
+            $barLeft = $left;
             $barTop = $barTop + $down;
             $priceLeft = $priceLeft + $LeftShift;
             $priceTop = $priceTop + $down;

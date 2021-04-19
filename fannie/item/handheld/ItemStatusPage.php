@@ -178,6 +178,7 @@ class ItemStatusPage extends FannieRESTfulPage
 
 
         $ret .= '<p><strong>Price</strong>: $' . sprintf('%.2f', $product->normal_price());
+        $ret .= '    <strong>Price</strong>: $' . sprintf('%.2f', $product->cost());
         if ($product->discounttype() > 0) {
             $ret .= ', <span class="alert-success"><strong>On Sale</strong> $' . sprintf('%.2f', $product->special_price());
             $batchP = $dbc->prepare('

@@ -42,10 +42,11 @@ based on expiration and/or use.';
         $dbc = FannieDB::get($this->config->get('OP_DB'));
 
         // delete expired entries
-        $expireR = $dbc->query("
-            DELETE FROM HouseVirtualCoupons
-            WHERE end_date < " . $dbc->curdate()
+        $expire = $dbc->query("
+            DELETE FROM core_op.houseVirtualCoupons
+            WHERE end_date <= (SELECT DATE_SUB(CURDATE(), INTERVAL 1 DAY) AS yesterday_date)"
         );
+        
 
         /**
           Pull all current coupons and
@@ -54,13 +55,13 @@ based on expiration and/or use.';
           entry.
         */
         $delP = $dbc->prepare("
-            DELETE FROM HouseVirtualCoupons
+            DELETE FROM houseVirtualCoupons
             WHERE card_no=?
                 AND coupID=?
         ");
         $currentP = $dbc->prepare("
             SELECT card_no, coupID, start_date, end_date
-            FROM HouseVirtualCoupons
+            FROM houseVirtualCoupons
             WHERE start_date >= ?
         ");
         $yesterday = date('Y-m-d', strtotime('yesterday'));

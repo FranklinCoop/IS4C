@@ -222,7 +222,7 @@ if (!class_exists('FpdfWithBarcode')) {
         $desc = strtoupper(substr($row['description'],0,27));
         $brand = ucwords(strtolower(substr($row['brand'],0,13)));
         $pak = $row['units'];
-        $size = $row['units'];
+        $size = $row['size'];
         $sku = $row['sku'];
         $num_unit = $row['pricePerUnit'];
         $alpha_unit = "per ".$row['unitStandard'];
@@ -262,6 +262,9 @@ if (!class_exists('FpdfWithBarcode')) {
         $pdf->SetXY($genLeft+1, $unitTop+18.5); //desc of tiem
         $pdf->Cell(0,4,"$brand $desc",0,0,'L');
         $pdf->SetFont('Arial','',6);
+        
+        $pdf->SetXY($genLeft+1, $unitTop+16.2);
+        $pdf->Cell(24,4,$size,0,0,'R');
         $pdf->SetXY($genLeft+25, $unitTop+16.2);
         //please use the order  "Local, Organic, NONGMO, Gluten Free
         if ($showLocal) {$pdf->Image($FANNIE_ROOT.'src/images/Local.jpg',$genLeft+26,$unitTop+16,3);}
@@ -269,7 +272,7 @@ if (!class_exists('FpdfWithBarcode')) {
         if ($showNONGMO) {$pdf->Image($FANNIE_ROOT.'src/images/non-gmo.jpg',$genLeft+33,$unitTop+16,3);}
         if ($showGlutenFree) {$pdf->Image($FANNIE_ROOT.'src/images/Gluten-Free.jpg',$genLeft+36.5,$unitTop+16,3);}        
         
-        $pdf->Cell(0,4,$size,0,0,'L');
+        
         //$pdf->Cell($w,4,"1/".$size_value." ".$size_unit,0,0,'L');
         $pdf->SetFont('Arial','',7);
         //$pdf->SetXY($priceLeft-22,$skuTop+10);

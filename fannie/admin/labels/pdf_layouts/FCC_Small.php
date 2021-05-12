@@ -222,7 +222,7 @@ if (!class_exists('FpdfWithBarcode')) {
         $desc = strtoupper(substr($row['description'],0,27));
         $brand = ucwords(strtolower(substr($row['brand'],0,13)));
         $pak = $row['units'];
-        $size = $row['units'] . "-" . $row['size'];
+        $size = $row['units'];
         $sku = $row['sku'];
         $num_unit = $row['pricePerUnit'];
         $alpha_unit = "per ".$row['unitStandard'];

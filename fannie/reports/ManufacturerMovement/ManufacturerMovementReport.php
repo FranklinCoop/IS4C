@@ -95,9 +95,9 @@ class ManufacturerMovementReport extends FannieReportPage
     private function weekQuery($dlog, $type_condition, $store)
     {
         return "
-            SELECT YEAR(t.tdate) AS year,
-                MONTH(t.tdate) AS month,
-                DAY(t.tdate) AS day, "
+            SELECT MIN(YEAR(t.tdate)) AS year,
+                MIN(MONTH(t.tdate)) AS month,
+                MIN(DAY(t.tdate)) AS day, "
                 . DTrans::sumQuantity('t') . " AS qty,
                 SUM(t.total) AS ttl
             FROM $dlog AS t "

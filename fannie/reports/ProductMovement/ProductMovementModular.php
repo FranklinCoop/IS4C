@@ -211,7 +211,7 @@ class ProductMovementModular extends FannieReportPage
 function showGraph() {
     var xLabels = $('td.reportColumn0').toArray().map(x => x.innerHTML.trim());
     var yData = $('td.reportColumn4').toArray().map(x => Number(x.innerHTML.trim()));
-    CoreChart.lineChart('chartCanvas', xLabels, [yData], ["Daily Qty Sold"]);
+    CoreChart.barChart('chartCanvas', xLabels, [yData], ["Daily Qty Sold"]);
 }
         <?php
         return ob_get_clean();

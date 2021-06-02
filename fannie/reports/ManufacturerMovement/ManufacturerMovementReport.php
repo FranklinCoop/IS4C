@@ -92,6 +92,25 @@ class ManufacturerMovementReport extends FannieReportPage
                 DAY(t.tdate)";
     }
 
+    private function weekQuery($dlog, $type_condition, $store)
+    {
+        return "
+            SELECT YEAR(t.tdate) AS year,
+                MONTH(t.tdate) AS month,
+                DAY(t.tdate) AS day, "
+                . DTrans::sumQuantity('t') . " AS qty,
+                SUM(t.total) AS ttl
+            FROM $dlog AS t "
+                . DTrans::joinProducts('t', 'p', 'INNER') . "
+            WHERE $type_condition
+                AND t.tdate BETWEEN ? AND ?
+                AND " . DTrans::isStoreID($store, 't') . "
+            GROUP BY YEAR(t.tdate),
+                WEEK(t.tdate)
+            ORDER BY YEAR(t.tdate),
+                WEEK(t.tdate)";
+    }
+
     private function deptQuery($dlog, $type_condition, $store)
     {
         return "
@@ -149,6 +168,9 @@ class ManufacturerMovementReport extends FannieReportPage
                 break;
             case 'dept':
                 $query = $this->deptQuery($dlog, $type_condition, $store);
+                break;
+            case 'week':
+                $query = $this->weekQuery($dlog, $type_condition, $store);
                 break;
         }
 
@@ -248,6 +270,7 @@ class ManufacturerMovementReport extends FannieReportPage
                 <select name=groupby class="form-control">
                     <option value="upc">UPC</option>
                     <option value="date">Date</option>
+                    <option value="week">Week</option>
                     <option value="dept">Department</option>
                 </select>
             </div>

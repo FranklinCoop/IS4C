@@ -183,6 +183,10 @@ class ManufacturerMovementReport extends FannieReportPage
                 $record[] = $row['month'] . '/' . $row['day'] . '/' . $row['year'];
                 $record[] = number_format($row['qty'], 2);
                 $record[] = number_format($row['ttl'], 2);
+            }else if ($groupby == "week") {
+                $record[] = $row['month'] . '/' . $row['day'] . '/' . $row['year'];
+                $record[] = number_format($row['qty'], 2);
+                $record[] = number_format($row['ttl'], 2);
             } else {
                 for ($i=0;$i<$dbc->numFields($result);$i++) {
                     if ($dbc->fieldName($result, $i) == 'qty' || $dbc->fieldName($result, $i) == 'ttl') {

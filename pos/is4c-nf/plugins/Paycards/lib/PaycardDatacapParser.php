@@ -117,8 +117,15 @@ class PaycardDatacapParser extends Parser
                 $this->conf->set('CacheCardCashBack', 0);
                 break;
             case 'DATACAPEMVDC': 
-                $this->conf->set('CacheCardType', 'EMVDC');
-                $this->conf->set('CacheCardCashBack', 0);
+$this->conf->set('CacheCardType', 'EMVDC');                
+if ($this->conf->get('PaycardsOfferCashBack') == 5 && !$this->conf->get('CardCashBackChecked')) {
+                    $ret['main_frame'] = $pluginInfo->pluginUrl().'/gui/PaycardCashBackPrompt.php';
+                    return $ret;
+                } else if ($this->conf->get('CacheCardCashBack')) {
+                    $this->conf->set('paycard_amount', $this->conf->get('amtdue') + $this->conf->get('CacheCardCashBack'));
+                } else  {              
+		 	$this->conf->set('CacheCardCashBack', 0);
+}
                 break;
             case 'DATACAPEMVCC': 
                 $this->conf->set('CacheCardType', 'EMVCC');

@@ -79,7 +79,7 @@ class PaycardCashBackPrompt extends BasicCorePage
                 if ($reginput === '' || $reginput === '0'){
                     $this->session->set("CacheCardCashBack",0);
                     $this->session->set("CardCashBackChecked", true);
-                    $this->change_page($pos_home.'?reginput=DATACAPDC&repeat=1');
+                    $this->change_page($pos_home.'?reginput=DATACAPEMVDC&repeat=1');
                     return false;
                 } 
                 if (is_numeric($reginput)) {
@@ -91,7 +91,7 @@ class PaycardCashBackPrompt extends BasicCorePage
                     } else {
                         $this->session->set("CacheCardCashBack",$cashBack);
                         $this->session->set("CardCashBackChecked", true);
-                        $this->change_page($pos_home.'?reginput=DATACAPDC&repeat=1');
+                        $this->change_page($pos_home.'?reginput=DATACAPEMVDC&repeat=1');
                         return false;
                     }
 

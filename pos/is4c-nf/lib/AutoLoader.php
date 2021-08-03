@@ -175,6 +175,7 @@ class AutoLoader
         'COREPOS\pos\lib\ReceiptBuilding\Messages\ReceiptMessage' => '/ReceiptBuilding/Messages',
         'COREPOS\pos\lib\ReceiptBuilding\CustMessages\CustomerReceiptMessage' => '/ReceiptBuilding/CustMessages',
         'COREPOS\pos\lib\Scanning\VariableWeightReWrite' => '/Scanning/VariableWeightReWrites',
+        'COREPOS\pos\lib\MemberActions\MemberAction' => '/MemberActions',
     );
 
     private static $baseClasses = array(

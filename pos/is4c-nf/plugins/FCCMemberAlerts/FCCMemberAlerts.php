@@ -1,9 +1,9 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2013 Whole Foods Co-op
+    Copyright 2019 Franklin Community Co-op
 
-    This file is part of CORE-POS.
+    This file is part of IT CORE.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,37 +21,17 @@
 
 *********************************************************************************/
 
-/**
-  @class StockpurchasesModel
-*/
-class StockpurchasesModel extends BasicModel 
+use COREPOS\pos\plugins\Plugin;
+use COREPOS\pos\lib\Database;
+
+class FCCMemberAlerts extends Plugin 
 {
 
-    protected $name = "stockpurchases";
+    public $plugin_description = 'Franklin Community Coop Plugin for alerting members';
 
-    protected $preferred_db = 'trans';
 
-    protected $columns = array(
-    'card_no' => array('type'=>'INT','index'=>True),
-    'stockPurchase' => array('type'=>'MONEY'),
-    'tdate' => array('type'=>'DATETIME'),
-    'trans_num' => array('type'=>'VARCHAR(50)'),
-    'trans_id' => array('type'=>'INT', 'default'=>0),
-    'dept' => array('type'=>'INT'),
+    public $plugin_settings = array(
     );
 
-    public function doc()
-    {
-        return '
-Depends on:
-* dlog (table)
-
-Use:
-This table equity related transaction info.
-This table should be updated in conjunction with
-any day-end polling system to copy appropriate
-rows from dtransactions to stockpurchases
-        ';
-    }
 }
 

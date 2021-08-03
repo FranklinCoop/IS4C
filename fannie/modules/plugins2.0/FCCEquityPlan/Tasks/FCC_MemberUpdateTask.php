@@ -1,9 +1,9 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2013 Whole Foods Co-op
+    Copyright 2021 Franklin Community Co-op
 
-    This file is part of CORE-POS.
+    This file is part of IT CORE.
 
     IT CORE is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,37 +21,21 @@
 
 *********************************************************************************/
 
-/**
-  @class StockpurchasesModel
-*/
-class StockpurchasesModel extends BasicModel 
+class FCC_MemberUpdateTask extends FannieTask
 {
+	public $name = 'FCC Member Update Task';
+	public $description = 'Checks Updates Member status after payments, removes virtual coupons.';
 
-    protected $name = "stockpurchases";
+	function run(){
+        global $FANNIE_OP_DB;
+        $TransDB = $this->config->get('TRANS_DB');
+        $OpDB = $FANNIE_OP_DB;
+        $dbc = FannieDB::get($OpDB);
 
-    protected $preferred_db = 'trans';
+        $equityToday = "SELECT card_no FROM core_trans.localtemp";
 
-    protected $columns = array(
-    'card_no' => array('type'=>'INT','index'=>True),
-    'stockPurchase' => array('type'=>'MONEY'),
-    'tdate' => array('type'=>'DATETIME'),
-    'trans_num' => array('type'=>'VARCHAR(50)'),
-    'trans_id' => array('type'=>'INT', 'default'=>0),
-    'dept' => array('type'=>'INT'),
-    );
 
-    public function doc()
-    {
-        return '
-Depends on:
-* dlog (table)
+	}
 
-Use:
-This table equity related transaction info.
-This table should be updated in conjunction with
-any day-end polling system to copy appropriate
-rows from dtransactions to stockpurchases
-        ';
-    }
+
 }
-

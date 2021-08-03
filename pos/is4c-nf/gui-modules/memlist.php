@@ -35,6 +35,7 @@
 use COREPOS\pos\lib\gui\NoInputCorePage;
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DisplayLib;
+use COREPOS\pos\lib\MemberActions\MemberAction;
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
 class memlist extends NoInputCorePage 
@@ -107,6 +108,7 @@ class memlist extends NoInputCorePage
 
     function preprocess()
     {
+        echo("<script>console.log('preprocess');</script>");
         $entered = $this->getInput();
         if ($entered === false) {
             return true;
@@ -121,6 +123,8 @@ class memlist extends NoInputCorePage
         $this->submitted = true;
         if (strstr($entered, "::") !== false) {
             // User selected a :: delimited item from the list interface
+            echo("<script>console.log('list');</script>");
+
             list($memberID, $personNum) = explode("::", $entered, 2);
         } else {
             // search for the member
@@ -137,14 +141,12 @@ class memlist extends NoInputCorePage
             }
         }
 
-
+echo("<script>console.log('here');</script>");
         // we have exactly one row and 
         // don't need to confirm any further
         if ($memberID !== false && $personNum !== false) {
-            $callback = $this->getCallbackAction($memberID);
-            if ($callback != false) {
-                $callback->apply();
-            }
+            echo("<script>console.log('singleperson');</script>");
+
             if ($memberID == $this->session->get('defaultNonMem')) {
                 $personNum = 1;
             }
@@ -161,6 +163,13 @@ class memlist extends NoInputCorePage
 
             // don't bother with unpaid balance check if there is no balance
             $url = $this->page_url."gui-modules/pos2.php";
+
+            //check for callback messages.
+            $callback = $this->getCallbackAction($memberID);
+            if ($callback != false) {
+                $url = $callback->apply();
+            }
+            
             if ($memberID != $this->session->get("defaultNonMem") && $this->session->get('balance') > 0) {
                 $unpaid = COREPOS\pos\lib\MemberLib::checkUnpaidAR($memberID);
                 if ($unpaid) {
@@ -169,10 +178,12 @@ class memlist extends NoInputCorePage
             } elseif ($redirect !== true) {
                 $url = $redirect;
             }
+            echo("<script>console.log('end');</script>");
             $this->change_page($url);
 
             return false;
         }
+echo("<script>console.log('ture');</script>");
 
         return true;
 
@@ -184,8 +195,10 @@ class memlist extends NoInputCorePage
     */
     private function getCallbackAction($cardNo)
     {
+        echo("<script>console.log('getCallbackAction');</script>");
         $dbc = Database::pDataConnect();
         if ($this->session->get('NoCompat') != 1 && !$dbc->tableExists('CustomerNotifications')) {
+            echo("<script>console.log('no notifications');</script>");
             echo 'no notifications';
             return false;
         }
@@ -197,12 +210,16 @@ class memlist extends NoInputCorePage
                 AND cardNo=?"
         );
         $res = $dbc->getRow($prep, array($cardNo));
-        if ($res === false || !class_exists($res['modifierModule']) || !is_subclass_of($res['modifierModule'], 'COREPOS\\pos\\lib\\TotalActions\\MemTotalAction')) {
+        $className = 'MemberAction';
+        $className = 'COREPOS\\pos\\lib\\MemberActions\\' . $className;
+        if ($res === false || !class_exists($className)) {
+            var_dump($res);
+            echo("<script>console.log('PHP: " . !is_subclass_of($res['modifierModule'], 'COREPOS\\pos\\lib\\TotalActions\\MemTotalAction') . "');</script>");
             return false;
         }
 
         $class = $res['modifierModule'];
-        $obj = new $class();
+        $obj = new $className();
         $obj->setMember($cardNo);
         $obj->setMessage($res['message']);
 

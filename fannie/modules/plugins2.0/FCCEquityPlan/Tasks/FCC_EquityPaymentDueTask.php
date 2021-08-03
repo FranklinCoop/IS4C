@@ -105,6 +105,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			}
 			//$updateAccount = true;
 			if ($updateAccount) {
+				$memNo = $row['card_no'];
 				$opDBC = FannieDB::get($OpDB);
 				$args = array($blueLine,$memType,$type,$row['card_no']);
 				$updateQ = "UPDATE {$OpDB}.custdata c 
@@ -113,8 +114,60 @@ class FCC_EquityPaymentDueTask extends FannieTask
 				$updateP = $opDBC->prepare($updateQ);
 				$updateR = $opDBC->execute($updateP,$args);
 				echo $this->cronMsg("Blue Line: ".$blueLine.'  '.$newLine.' start_date. '.$row['mostRecent']);
+				
+				/*****
+				Update EquityPaymentPlans Table;
+				*****/
+				//find the next payment date
+				$mostRecentDate->modify('next month');
+				$nextPaymentDate = $mostRecentDate->format('Y-m-d').' 00:00:00';
+				
+				//find the last payment using the StockpurchasesModel model doesn't work so I am
+				//writing the sql.
+				$lastQ = "SELECT card_no, SUM(stockPurchase) as stockPurchase, MAX(tdate) as tdate
+						  FROM {$TransDB}.stockpurchases 
+						  WHERE card_no = ? AND tdate = ?
+						  GROUP BY card_no
+						";
+				$lastP = $dbc->prepare($lastQ);
+				$lastR = $dbc->execute($lastP, array($memNo,$row['mostRecent']));
+				$lastPayment = $dbc->fetch_row($results);
+
+				$lastPaymentDate = null;
+				$lastPaymentAmount = 0;
+				if ($lastPayment) {
+					//$lastPayment = $objs[0];
+					$lastPaymentDate = $lastPayment[2];
+					$lastPaymentAmount = $lastPayment[1];
+				}
+
+				$plan = new EquityPaymentPlanAccountsModel($opDBC);
+				$plan->cardNo($memNo,'=');
+
+				if (!$plan->find()) {
+					//if plan is new
+					$plan->cardNo($memNo);
+					$plan->equityPaymentPlanID(1);
+					$plan->lastPaymentDate($lastPaymentDate);
+					$plan->lastPaymentAmount($lastPaymentAmount);
+					$plan->nextPaymentDate($nextPaymentDate);
+					$plan->nextPaymentAmount($paymentDue);
+					$saved = $plan->save();
+				}else{
+					$objs = $plan->find();
+					$ojb = $objs[0];
+					$ojb->lastPaymentDate($lastPaymentDate);
+					$ojb->lastPaymentAmount($lastPaymentAmount);
+					$ojb->nextPaymentDate($nextPaymentDate);
+					$ojb->nextPaymentAmount($paymentDue);
+					$saved = $ojb->save();
+				}
+				// update the plan
+
+				
+
 			}
-		}
+		}//end while loop
 	}
 
 }

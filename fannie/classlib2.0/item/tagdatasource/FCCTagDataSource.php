@@ -36,14 +36,11 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
                 COALESCE(v.vendorName, x.distributor) AS vendor,
                 p.size AS p_size,
                 p.unitofmeasure,
-                i.sku,
-                s.unit AS units,  
-                s.size AS vi_size
+                i.sku
             FROM products AS p
                 LEFT JOIN prodExtra AS x ON p.upc=x.upc
                 LEFT JOIN vendors AS v ON p.default_vendor_id=v.vendorID
                 LEFT JOIN vendorItems AS i ON p.upc=i.upc AND v.vendorID=i.vendorID
-                LEFT JOIN prodStandardUnit s ON p.upc=s.upc
             WHERE p.upc=?';
         $prep = $dbc->prepare($query);
         $res = $dbc->execute($prep, array($upc));
@@ -59,6 +56,7 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
             'units' => 0,
             'vendor' => '',
             'pricePerUnit' => '',
+            'unitStandard' => '',
         );
         if (!$res || $dbc->numRows($res) == 0) {
             return $ret;
@@ -71,7 +69,7 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
         //$ret['normal_price'] = $row['normal_price'];
         $ret['vendor'] = $row['vendor'];
         $ret['sku'] = $row['sku'];
-        $ret['units'] = $row['vi_size'];
+        //$ret['units'] = $row['p_size'];
 
         if ($price !== false) {
             $ret['normal_price'] = $price;
@@ -79,7 +77,17 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
             $ret['normal_price'] = $row['normal_price'];
         }
 
-        $ret['size'] = $row['units'];
+        //$ret['size'] = $row['units'];
+
+        $str = $row['unitofmeasure'];
+        $strArray = explode('/', $str);
+        $ret['size'] = $row['p_size'];
+        $ret['units'] = $strArray[0];
+        $ret['unitStandard'] = $strArray[2];
+
+        //            $strRow = $dbc->fetchRow($ret);
+        //    $str = $strRow[0];
+        //    $strArray = explode('/', $str);
 
         $ret['pricePerUnit'] = \COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $upc, $row['normal_price'], $row['p_size']);
 

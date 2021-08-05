@@ -521,9 +521,10 @@ private function getTaxTotals($dbc,$dlog,$args) {
         $return[] = $row[0];
         $description = $row[1];
     }
-    if (sizeof($return) < 2 && $description = '6.25000% SalesTax') {
+    $size = sizeof($return);
+    if ($size == 1 && $description = '6.25000% SalesTax') {
         $return[] = 0;
-    } else {
+    } elseif ($size ==1) {
         array_unshift($return, 0);
     }
 

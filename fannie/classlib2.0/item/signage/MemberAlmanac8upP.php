@@ -51,7 +51,7 @@ class MemberAlmanac8upP extends \COREPOS\Fannie\API\item\FannieSignage
         $pdf->AddFont('ModestoOpenInlineFill', '', 'ModestoOpenInlineFill.php');
         $pdf->SetMargins(45, 55, 45);
         $pdf->SetAutoPageBreak(false);
-        $pdf = $this->loadPluginFonts($pdf);
+        //$pdf = $this->loadPluginFonts($pdf);
         $pdf->SetFont($this->font, '', 16);
 
         $data = $this->loadItems();

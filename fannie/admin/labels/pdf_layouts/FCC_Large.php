@@ -172,10 +172,11 @@ function FCC_Large($data,$offset=0){
         */
 
         //get unit and flagging data;
+        /****** 
         $qStdUnit = "SELECT u.unitStandard FROM prodStandardUnit u WHERE u.upc =?";
         $rStdUnit = $dbc->execute($dbc->prepare($qStdUnit),array($row['upc']));
         $iStdUnit = $dbc->fetchRow($rStdUnit);
-        
+        */
         $query = "
             SELECT f.description,
                 f.bit_number,
@@ -217,10 +218,10 @@ function FCC_Large($data,$offset=0){
         $desc = strtoupper(substr($row['description'],0,27));
         $brand = ucwords(strtolower(substr($row['brand'],0,13)));
         $pak = $row['units'];
-        $size = $row['units'] . "-" . $row['size'];
+        $size = $row['size'];
         $sku = $row['sku'];
         $num_unit = $row['pricePerUnit'];
-        $alpha_unit = "per ".$iStdUnit['unitStandard'];
+        $alpha_unit = "per ".$row['unitStandard'];
 
        $upc = ltrim($row['upc'],0);
        $check = $pdf->GetCheckDigit($upc);

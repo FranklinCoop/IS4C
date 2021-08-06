@@ -264,7 +264,7 @@ if (!class_exists('FpdfWithBarcode')) {
         $pdf->SetFont('Arial','',6);
                 
         $pdf->SetXY($genLeft+1, $unitTop+16.2);
-        $pdf->Cell(24,4,$size,0,0,'R');
+        $pdf->Cell(0,4,$size,0,0,'L');
         $pdf->SetXY($genLeft+25, $unitTop+16.2);
         //please use the order  "Local, Organic, NONGMO, Gluten Free
         if ($showLocal) {$pdf->Image($FANNIE_ROOT.'src/images/Local.jpg',$genLeft+26,$unitTop+16,3);}

@@ -120,8 +120,8 @@ class genLabels extends FannieRESTfulPage
                     $row['sku'] = ltrim($row['sku'], '0');
                 }
 
-                $str = $row['unitofmeasure'];
-                $strArray = explode('/', $str);
+                //$str = $row['unitofmeasure'];
+                //$strArray = explode('/', $str);
 
                 $myrow = array(
                     'normal_price' => $row['normal_price'],
@@ -135,7 +135,7 @@ class genLabels extends FannieRESTfulPage
                     'vendor' => $row['vendor'],
                     'scale' => $row['scale'],
                     'numflag' => $row['numflag'],
-                    'unitStandard' => $strArray[2]
+                    'unitStandard' => $row['unitStandard'];
                 );          
                 $data[] = $myrow;
             }

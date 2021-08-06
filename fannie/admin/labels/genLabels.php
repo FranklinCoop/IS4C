@@ -135,7 +135,7 @@ class genLabels extends FannieRESTfulPage
                     'vendor' => $row['vendor'],
                     'scale' => $row['scale'],
                     'numflag' => $row['numflag'],
-                    'unitStandard' => $row['unitStandard'];
+                    'unitStandard' => $row['unitStandard']
                 );          
                 $data[] = $myrow;
             }

@@ -68,7 +68,7 @@ Make sure to set MassStateTaxFreeOff to run to reenable taxes.';
             if (isset($FANNIE_LANES[$i]['offline']) && $FANNIE_LANES[$i]['offline']) {
                 continue;
             }
-            $lane = $FANNIE_LANES($i);
+            $lane = $FANNIE_LANES[$i];
 		    $dbc->addConnection($lane['host'],$lane['type'],$lane['trans'],$lane['user'],$lane['pw']);
 		    if ($dbc->connections[$lane['trans']] === False){
 		        echo cron_msg('Cannot connect to '.$lane['host']);

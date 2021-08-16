@@ -64,7 +64,13 @@ Make sure to set MassStateTaxFreeOff to run to reenable taxes.';
 		global $FANNIE_OP_DB, $FANNIE_TRANS_DB;
 		$FANNIE_LANES = FannieConfig::config('LANES');
         $dbc = FannieDB::get($FANNIE_TRANS_DB);
-		for ($i = 0; $i < count($FANNIE_LANES); $i++) {
+		//tax off server
+        $query = 'UPDATE core_op.taxrates SET rate = ? WHERE id = ?';
+        $args = array(0.0, 1);//asummes sales tax is id 1 change as needed
+        $prep = $dbc->prepare($query);
+        $result = $dbc->execute($prep,$args,$lane['trans']);
+        
+        for ($i = 0; $i < count($FANNIE_LANES); $i++) {
             if (isset($FANNIE_LANES[$i]['offline']) && $FANNIE_LANES[$i]['offline']) {
                 continue;
             }
@@ -82,7 +88,6 @@ Make sure to set MassStateTaxFreeOff to run to reenable taxes.';
                 continue;
 		    }
 			
-			$args = array(0.0, 1);//asummes sales tax is id 1 change as needed
 			$query = 'UPDATE taxrates SET rate = ? WHERE id = ?';
 			
 			$prep = $dbc->prepare($query);

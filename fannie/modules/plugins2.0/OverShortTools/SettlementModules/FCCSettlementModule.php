@@ -513,7 +513,8 @@ private function getSalesTotals($dbc,$dlog,$args) {
 private function getTaxTotals($dbc,$dlog,$args) {
     $query = $dbc->prepare("SELECT sum(regPrice),description FROM {$dlog} 
                           WHERE upc ='TAXLINEITEM' AND `datetime` BETWEEN ? AND ? AND store_id =? AND trans_status != 'X'
-                          GROUP BY RIGHT(description,7) ORDER BY RIGHT(description,7)  AND emp_no != 9999");
+                          AND emp_no != 9999
+                          GROUP BY RIGHT(description,7) ORDER BY RIGHT(description,7)");
     $result = $dbc->execute($query,$args);
     $return = array();
     $description;

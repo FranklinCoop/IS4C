@@ -326,6 +326,15 @@ class MemberLib
         \CoreLocal::set("SSI",$row["SSI"]);
         \CoreLocal::set('isMember', $row['Type'] == 'PC' ? 1 : 0);
 
+        //handel franklincommunity coop divergent cashback limits
+        $storeCheck = (\CoreLocal::get('store') == 'McCuskers' || \CoreLocal::get('store')=='GreenFieldsMarket' 
+            || \CoreLocal::get('store') == 'FranklinCoop' || \CoreLocal::get('store') == 'Atlas');
+        if ($row['Type'] == 'REG' && $storeCheck) {
+            \CoreLocal::set("PaycardsTermCashBackLimit",20);
+        } else if ($row['Type'] == 'PC' && $storeCheck) {
+            \CoreLocal::set("PaycardsTermCashBackLimit",50);
+        }
+
         /**
           Optinonally use memtype table to normalize attributes
           by member type

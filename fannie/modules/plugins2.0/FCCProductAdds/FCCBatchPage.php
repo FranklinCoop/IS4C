@@ -107,7 +107,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             'default' => 15,
         ),
         'sku' => array(
-            'display_name' => 'Vendor SKU'
+            'display_name' => 'Vendor SKU',
             'default' => 16,
         )
 
@@ -358,7 +358,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $sku = $line[$indexes['sku']];
 
             //item flags 1 or 0 multiplied by only if flags are present
-            $numflag = ''
+            $numflag = '';
             if (
                 $line[$indexes['local']] != '' &&
                 $line[$indexes['organic']] !='' &&

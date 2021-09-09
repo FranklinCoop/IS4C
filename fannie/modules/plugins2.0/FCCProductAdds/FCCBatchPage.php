@@ -360,12 +360,12 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             //item flags 1 or 0 multiplied by only if flags are present
             $numflag = '';
             if (
-                $line[$indexes['local']] != '' &&
-                $line[$indexes['organic']] !='' &&
-                $line[$indexes['coopbasic']] !='' &&
-                $line[$indexes['nongmo']] !='' &&
-                $line[$indexes['glutenfree']] !='' &&
-                $line[$indexes['traitor']] !='' &&
+                $line[$indexes['local']] != '' ||
+                $line[$indexes['organic']] !='' ||
+                $line[$indexes['coopbasic']] !='' ||
+                $line[$indexes['nongmo']] !='' ||
+                $line[$indexes['glutenfree']] !='' ||
+                $line[$indexes['traitor']] !='' ||
                 $line[$indexes['vegan']] !=''
             ) {
                     $flags = array($line[$indexes['local']]*1,

@@ -105,6 +105,10 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         'unitOfMesure' => array(
             'display_name' => 'Tag Format',
             'default' => 15,
+        ),
+        'sku' => array(
+            'display_name' => 'Vendor SKU'
+            'default' => 16,
         )
 
     );
@@ -331,6 +335,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $checks = FormLib::get('has_checks') !== '' ? True : False;
         //$skipExisting = FormLib::get('skipExisting', 0);
         $model = new ProductsModel($dbc);
+        $vendModel = new VendorItems($dbc);
         $dbc->startTransaction();
         foreach($linedata as $line) {
             // get info from file and member-type default settings
@@ -350,17 +355,31 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $vendor = $line[$indexes['vendor']];
             $pack_size = $line[$indexes['pack_size']];
             $unitOfMesure = $line[$indexes['unitOfMesure']];
+            $sku = $line[$indexes['sku']];
 
-            //item flags 1 or 0 multiplied by 
-            $flags = array($line[$indexes['local']]*1,
-                        $line[$indexes['organic']]*2,
-                        $line[$indexes['coopbasic']]*3,
-                        $line[$indexes['nongmo']]*4,
-                        $line[$indexes['glutenfree']]*6,
-                        $line[$indexes['traitor']]*8,
-                        $line[$indexes['vegan']]*10,);
-            
-            $numflag = $this->proc_flags($upc, '', $flags);
+            //item flags 1 or 0 multiplied by only if flags are present
+            $numflag = ''
+            if (
+                $line[$indexes['local']] != '' &&
+                $line[$indexes['organic']] !='' &&
+                $line[$indexes['coopbasic']] !='' &&
+                $line[$indexes['nongmo']] !='' &&
+                $line[$indexes['glutenfree']] !='' &&
+                $line[$indexes['traitor']] !='' &&
+                $line[$indexes['vegan']] !=''
+            ) {
+                    $flags = array($line[$indexes['local']]*1,
+                    $line[$indexes['organic']]*2,
+                    $line[$indexes['coopbasic']]*3,
+                    $line[$indexes['nongmo']]*4,
+                    $line[$indexes['glutenfree']]*6,
+                    $line[$indexes['traitor']]*8,
+                    $line[$indexes['vegan']]*10,);
+                    $numflag = $this->proc_flags($upc, '', $flags);
+                } 
+
+
+
 
             // upc cleanup
             $upc = str_replace(" ","",$upc);
@@ -384,7 +403,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $upc = BarcodeLib::padUPC($upc);
 
             if (strlen($desc) > 35) $desc = substr($desc,0,35);     
-
+            //update product model.
             $model->reset();
             $model->upc($upc);
             $model->store_id(1);
@@ -429,6 +448,24 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                     $model->save();
                 }
             }
+
+            //update catalog only if vendor number is present.
+            if($vendor != '') {
+                $vendModel->reset();
+                $vendModel->vendorID($vendor);
+                $vendModel->upc($upc);
+                $vendExist = $vendModel->load();
+                if($sku != '') $vendModel->sku($sku);
+                if ($cost !='') $vendModel->cost($cost);
+                if ($brand !='') $vendModel->brand($brand);
+                if ($pack_size !='') $vendModel->size($pack_size);
+                if ($dept !='') $vendModel->vendorDept($dept);
+                if ($desc !='') $vendModel->description($desc);
+                $vendModel->save();
+            }
+
+
+
             
 
             if ($try) {

@@ -335,7 +335,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $checks = FormLib::get('has_checks') !== '' ? True : False;
         //$skipExisting = FormLib::get('skipExisting', 0);
         $model = new ProductsModel($dbc);
-        $vendModel = new VendorItems($dbc);
+        $vendModel = new VendorItemsModel($dbc);
         $dbc->startTransaction();
         foreach($linedata as $line) {
             // get info from file and member-type default settings

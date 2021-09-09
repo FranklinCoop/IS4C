@@ -420,7 +420,12 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             if ($cost !='') $model->cost($cost);
             if ($brand !='') $model->brand($brand);
             if ($numflag !='') $model->numflag($numflag);
-            if ($vendor !='') $model->default_vendor_id($vendor);
+            //takes the currently set vendor if there is none to use for vendor cost updates.
+            if ($vendor !='' && $vendor!='#N/A') {
+                $model->default_vendor_id($vendor);
+            } else {
+                $vendor = $model->default_vendor_id();
+            }
             if ($pack_size !='') $model->size($pack_size);
             if ($unitOfMesure !='') $model->unitofmeasure($unitOfMesure);
             if (!$exists) {

@@ -65,7 +65,7 @@ if (!class_exists('FpdfWithBarcode')) {
     // above..this was two by shifing it to 4 we get two columns until I set $LeftShift at 66 or so
     // and it seems to shift them all right
     $space = 1.190625 * 2; //tried 3 to see if shift columns over
-  
+    
     $pdf=new FCC_Small_PDF('P', 'mm', 'Letter');
     $pdf->AddFont('arialnarrow');
     $pdf->AddFont('steelfish');

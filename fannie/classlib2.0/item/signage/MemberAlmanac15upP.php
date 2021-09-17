@@ -21,7 +21,7 @@
 
 *********************************************************************************/
 namespace COREPOS\Fannie\API\item\signage;
-if (!class_exists('PDF_ImageAlpha')) {
+if (!class_exists('FpdfWithMultiCellCount')) {
     include(dirname(__FILE__) . '/../FpdfWithMultiCellCount.php');
 }
 

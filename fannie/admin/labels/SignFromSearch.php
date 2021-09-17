@@ -41,6 +41,7 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
     protected $signage_mod;
     protected $selected_mod;
     protected $signage_obj;
+    protected $auth_classes = array('batches','batches_audited','barcodes');
 
     public function preprocess()
     {

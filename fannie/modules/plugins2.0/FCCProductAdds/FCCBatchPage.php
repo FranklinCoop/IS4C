@@ -90,25 +90,37 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             'display_name' => 'Vegan',
             'default' => 11,
         ),
+            'bipoc' => array(
+            'display_name' => 'BIPOC',
+            'default' => 12,
+        ),
+        'women_owned' => array(
+            'display_name' => 'Women Owned',
+            'default' => 13,
+        ),        
+        'lgbtq' => array(
+            'display_name' => 'LGBTQ',
+            'default' => 14,
+        ),
         'traitor' => array(
             'display_name' => 'Traitor Brand',
-            'default' => 12,
+            'default' => 15,
         ),
         'coopbasic' => array(
             'display_name' => 'Coop Basics',
-            'default' => 13,
+            'default' => 16,
         ),
         'pack_size' => array(
             'display_name' => 'pack_size',
-            'default' => 14,
+            'default' => 17,
         ),
         'unitOfMesure' => array(
             'display_name' => 'Tag Format',
-            'default' => 15,
+            'default' => 18,
         ),
         'sku' => array(
             'display_name' => 'Vendor SKU',
-            'default' => 16,
+            'default' => 19,
         )
 
     );
@@ -166,6 +178,8 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
         $ftype = FormLib::get('ftype','UPCs');
         $has_checks = FormLib::get('has_checks') !== '' ? True : False;
+        //used later for tag batches if they don't have needed
+        $btype = FormLib::get('btype',0);
 
         //update or adds products as needed
         if ($ftype=='UPCs') {
@@ -234,10 +248,26 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             if ($ftype == 'UPCs'){
                 $chkR = $dbc->execute($upcChk, array($upc));
                 if ($dbc->num_rows($chkR) ==  0) continue;
-            }   
+            }
 
             if (isset($line[5]) && trim($line[5]) == 's') {
                 $mult = 0;
+            }
+
+            //for tag batches
+            if ($btype == 6) {
+                $prodModel = new ProductsModel($dbc);
+                $prodModel->reset();
+                $prodModel->upc($upc);
+                $prodModel->store_id(1);
+                $exists = $prodModel->load();
+
+                if (($price == 0 || $price =='')&& $exists) {
+                    $price = $prodModel->price();
+                }
+                if (($cost == 0 || $cost =='')&& $exists) {
+                    $cost = $prodModel->cost();
+                }
             }
 
             $insArgs = array($batchID, $upc, $price, $price);
@@ -366,14 +396,20 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 $line[$indexes['nongmo']] !='' ||
                 $line[$indexes['glutenfree']] !='' ||
                 $line[$indexes['traitor']] !='' ||
-                $line[$indexes['vegan']] !=''
+                $line[$indexes['vegan']] !='' ||
+                $line[$indexes['bipoc']] !='' ||
+                $line[$indexes['women_owned']] !='' ||
+                $line[$indexes['lgbtq']]
             ) {
                     $flags = array($line[$indexes['local']]*1,
                     $line[$indexes['organic']]*2,
                     $line[$indexes['coopbasic']]*3,
                     $line[$indexes['nongmo']]*4,
+                    $line[$indexes['bipoc']]*5,
                     $line[$indexes['glutenfree']]*6,
+                    $line[$indexes['women_owned']]*7,
                     $line[$indexes['traitor']]*8,
+                    $line[$indexes['lgbtq']]*9,
                     $line[$indexes['vegan']]*10,);
                     $numflag = $this->proc_flags($upc, '', $flags);
                 } 
@@ -490,9 +526,9 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
     function proc_flags($upc, $store, $flags) {
         $dbc = $this->connection;
-        $attrs = array(1,2,3,4,6,8,10);
-        $fnames = array('Local','Organic','Coop Basic','Non_GMO','Gluten Free','Traitor Brand','Vegan');
-        $bits = array(1,2,3,4,6,8,10);
+        $attrs = array(1,2,3,4,5,6,7,8,9,10);
+        $fnames = array('Local','Organic','Coop Basic','Non_GMO','bipoc','Gluten Free','Woman Owned','Traitor Brand','LGBTQ','Vegan');
+        $bits = array(1,2,3,4,5,6,7,8,9,10);
         /**
           Collect known flags and initialize
           JSON object with all flags false

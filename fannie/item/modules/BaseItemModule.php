@@ -1027,7 +1027,7 @@ HTML;
             if (isset($local[$i])) {
                 $model->local($local[$i]);
             }
-            $deposit = FormLib::get('deposit-upc');
+            $deposit = FormLib::get('deposit-upc', array());
             if (isset($deposit[$i])) {
                 if ($deposit[$i] == '') {
                     $deposit[$i] = 0;

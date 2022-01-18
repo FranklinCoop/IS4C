@@ -765,9 +765,9 @@ HTML;
         </td>
         <th class="small text-right">Deposit</th>
         <td colspan="2">
-            <input type="text" name="deposit-upc" class="form-control input-sm syncable-input"
+            <input type="text" name="deposit-upc[]" class="form-control input-sm syncable-input"
                 value="{$deposit}" placeholder="Deposit Item PLU/UPC"
-                />
+                >
         </td>
     </tr>
     <tr>

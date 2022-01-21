@@ -64,8 +64,10 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			$mostRecentDate = new DateTime($row['mostRecent']);
 			$mostRecentDate->modify('first day of this month')->setTime(0,0,0);
 			$interval = $now->diff($mostRecentDate);
+			$years = $interal->y;
 			$months = $interval->m;
 			$days = $interval->d;
+			$months = $years*12+$months; //It wraps around so we need to track if it's been more than a year;
 			$blueLine = $row['blueLine'];
 			$newLine = '';
 			$memType = $row['memType'];

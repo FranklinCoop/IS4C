@@ -138,7 +138,7 @@ class CoopDealsReviewPage extends FanniePage
         $dbc->startTransaction();
         while ($row = $dbc->fetch_row($saleItemsR)) {
             if (!isset($batchIDs[$row['batch']])) {
-                $args = array($row['batch'] . ' ' . $naming, 1, 1);
+                $args = array($row['batch'] . ' ' . $naming, 2, 1);
                 if (substr($row['batch'],-2) == " A"){
                     $args[] = $start;
                     $args[] = $end;

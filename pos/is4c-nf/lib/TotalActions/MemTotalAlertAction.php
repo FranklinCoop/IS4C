@@ -28,7 +28,7 @@ namespace COREPOS\pos\lib\TotalActions;
   Define an action that is called when a member
   number is applied
 */
-class MemTotalAction extends TotalAction
+class MemTotalAlertAction extends TotalAction
 {
     protected $card_no = false;
     protected $message = false;

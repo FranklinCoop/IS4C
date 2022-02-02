@@ -93,7 +93,15 @@ class MemMailList extends FannieReportPage
                   AND LastName <> 'NEW MEMBER'
                   order by m.card_no";
                 break;
+            case 'Members Not in Good Standing':
+                $ret .= "c.memType=12
+                    AND c.personNum = 1
+                    AND m.street in('','*','.','\n')
+                    order by m.card_no
+                ";
+                break;
          }
+         //where c.personNum =1 and c.memType = 12 and (i.addressFirstLine is not null and i.addressFirstLine not in ('','*','.' ));
          
          return $ret;
     }
@@ -141,6 +149,7 @@ class MemMailList extends FannieReportPage
             <option>Members</option>
             <option>Members (All)</option>
             <option>Business</option>
+            <option>Members Not in Good Standing</option>
         </select>
     </div>
     <div class="form-group">
@@ -162,7 +171,7 @@ HTML;
     {
         $phpunit->assertNotEquals(0, strlen($this->form_content()));
         $form = new COREPOS\common\mvc\ValueContainer();
-        foreach (array('Members', 'Members (All)', 'Business') as $type) {
+        foreach (array('Members', 'Members (All)', 'Business','Members Not in Good Standing') as $type) {
             $form->type = $type;
             $this->setForm($form);
             $phpunit->assertInternalType('array', $this->fetch_report_data());

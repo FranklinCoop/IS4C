@@ -96,7 +96,7 @@ class MemMailList extends FannieReportPage
             case 'Members Not in Good Standing':
                 $ret .= "c.memType=12
                     AND c.personNum = 1
-                    AND m.street in('','*','.','\n')
+                    AND m.street not in ('','*','.','\n')
                     order by m.card_no
                 ";
                 break;

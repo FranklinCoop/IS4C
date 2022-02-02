@@ -91,6 +91,10 @@ class FCC_EquityPaymentDueTask extends FannieTask
 				$blueLine = $newLine;
 				$updateAccount = true;
 			}
+			// reactivate closed accounts if they have paid any money.
+			if ($memType ==0 && $paid > 0) {
+				$memType = 12; //set to inactive, the next if will reactivate if payments are upto date.
+			}
 			// check for member deactivation
 			if ($memType == 1 && $months > 2 && $paymentDue > 6) {
 				//deactivate member.

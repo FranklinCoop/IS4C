@@ -37,7 +37,9 @@ class FCC_EquityPaymentDueTask extends FannieTask
 		$TransDB = $this->config->get('TRANS_DB');
 		$OpDB = $FANNIE_OP_DB;
 		$dbc = FannieDB::get($TransDB);
-		$query = "SELECT e.card_no, e.payments,d.start_date, (case when s.lastPaymentDate is null then d.start_date else s.lastPaymentDate end) as mostRecent, c.LastName, c.FirstName, c.memType,c.blueLine,c.id,p.equityPaymentPlanID, p.nextPaymentAmount
+		$query = "SELECT e.card_no, e.payments,d.start_date, 
+				(case when s.lastPaymentDate is null then d.start_date else s.lastPaymentDate end) as mostRecent,
+				 c.LastName, c.FirstName, c.memType,c.blueLine,c.id,p.equityPaymentPlanID, p.nextPaymentAmount,c.`Type`
 				from {$TransDB}.equity_history_sum e
 				left join {$OpDB}.custdata c on e.card_no=c.CardNo AND c.PersonNum = 1
 				left join {$OpDB}.memDates d on e.card_no=d.card_no 
@@ -71,7 +73,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			$blueLine = $row['blueLine'];
 			$newLine = '';
 			$memType = $row['memType'];
-			$type = 'PC';
+			$type = $row['Type'];
 			$paid = $row['payments'];
 			$paymentDue = 3*$months;
 			//this will make the payment due correct nomater what had been paid before, also sets it to zero if 175 is reached.
@@ -80,9 +82,11 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			}
 			
 			$updateAccount = false;
-			if($months >= 1 && $row['equityPaymentPlanID'] == 1 && $row['payments'] < 175){
+			if($months >= 1 && $row['equityPaymentPlanID'] == 1 && $row['payments'] < 175 && $memType != 0){
 				$remainAmt = 175 - $paid;
 				$newLine = sprintf("%s %s. %s %d/%d",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName'],$remainAmt,$paymentDue); //$row['card_no'].' '.substr($row['FirstName'], 0, 1).'. '.$row['LastName'].' '.$remainAmt.'/'.$paymentDue;
+			} else if($memType == 0) {
+				$newLine = sprintf("%s %s. %s %d/%d",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName'],175,3);
 			} else {
 				$newLine = sprintf("%s %s. %s",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName']);
 			}

@@ -101,13 +101,13 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			// check for member deactivation
 			if ($memType == 1 && $months > 2 && $paymentDue > 6) {
 				//deactivate member.
-				echo $this->cronMsg("Blue Line: ".$blueLine.'  mostRecent:'.$row['mostRecent']. "   Now:".$now->format('Y-m-d')."  Months/Days:".$months.'/'.$days);
+				echo $this->cronMsg("SET STANDING BAD:\nBlue Line: ".$blueLine.'  mostRecent:'.$row['mostRecent']. "   Now:".$now->format('Y-m-d')."  Months/Days:".$months.'/'.$days);
 				$memType = 12;
 				$type = 'REG';
 				$updateAccount = true;
 			} else if ($memType == 12 && $paymentDue <= 6) {
 				//ractivate member.
-				echo $this->cronMsg("Blue Line: ".$blueLine.'  mostRecent:'.$row['mostRecent']. "   Now:".$now->format('Y-m-d')."  Months/Days:".$months.'/'.$days);
+				echo $this->cronMsg("SET STANDING GOOD:\nBlue Line: ".$blueLine.'  mostRecent:'.$row['mostRecent']. "   Now:".$now->format('Y-m-d')."  Months/Days:".$months.'/'.$days);
 				$memType = 1;
 				$type = 'PC';
 				$updateAccount = true;

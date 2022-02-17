@@ -43,15 +43,15 @@ class MercuryDC extends MercuryE2E
         if ($type == 'EMVTIP') {
             $tipped = true;
             $type = 'EMV';
-            $this->conf->set('CachedCardType', 'EMV');
+            $this->conf->set('CacheCardType', 'EMV');
         } elseif ($type == 'EMVCC') {
             $emvCardType = 'Credit';
             $type = 'EMV';
-            $this->conf->set('CachedCardType', 'EMV');
+            $this->conf->set('CacheCardType', 'EMVCC');
         } elseif ($type == 'EMVDC') {
             $emvCardType = 'Debit';
             $type = 'EMV';
-            $this->conf->set('CachedCardType', 'EMV');
+            $this->conf->set('CacheCardType', 'EMVDC');
         }
 
         if ($type == 'EMV') {
@@ -648,6 +648,7 @@ class MercuryDC extends MercuryE2E
         $entryMethod = $xml->query('/RStream/TranResponse/EntryMethod');
         $name = $respName ? $respName : 'Cardholder';
         $request->updateCardInfo($pan, $name, $issuer, $entryMethod);
+        $this->conf->set('paycard_issuer', $issuer);
         if (false && strtoupper($entryMethod) == 'CHIP' && $this->conf->get('EmvSignature')) {
             $this->conf->set('EmvSignature', false);
         }

@@ -27,6 +27,7 @@ class PaycardTenders
     { 
         switch ($type) {
             case 'DEBIT':
+            case 'EMVDC':
                 return array(
                     array($this->conf->get('PaycardsTenderCodeDebit')),
                     'DC',
@@ -45,6 +46,7 @@ class PaycardTenders
                     'EBT Food',
                 );
             case 'EMV':
+            case 'EMVCC':
                 return array(
                     array($this->conf->get('PaycardsTenderCodeEmv')),
                     'CC',

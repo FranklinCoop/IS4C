@@ -615,6 +615,83 @@ class FpdfWithMultiCellCount extends FPDF
 		$this->_putshaders();
 		parent::_putresources();
 	}
+
+    //extra info and barcode functions.
+    function getProdFlags($upc) {
+        $dbc = \FannieDB::get(\FannieConfig::config('OP_DB'));
+        $query = "
+            SELECT f.description,
+                f.bit_number,
+                (1<<(f.bit_number-1)) & p.numflag AS flagIsSet
+            FROM products AS p, 
+                prodFlags AS f
+            WHERE p.upc=?
+                " . (\FannieConfig::config('STORE_MODE') == 'HQ' ? ' AND p.store_id=? ' : '') . "
+                AND f.active=1";
+        $args = array($upc);
+        if (\FannieConfig::config('STORE_MODE') == 'HQ') {
+            $args[] = \FannieConfig::config('STORE_ID');
+        }
+        $prep = $dbc->prepare($query);
+        $res = $dbc->execute($prep,$args);
+        
+        if ($dbc->numRows($res) == 0){
+            // item does not exist
+            $prep = $dbc->prepare('
+                SELECT f.description,
+                    f.bit_number,
+                    0 AS flagIsSet
+                FROM prodFlags AS f
+                WHERE f.active=1');
+            $res = $dbc->execute($prep);
+        }//please use the order  "Local, Organic, NONGMO, Gluten Free
+        //please use the order  "Local, Organic, NONGMO, Gluten Free
+        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false);
+        
+        while($info = $dbc->fetchRow($res)){
+                $flags[$info['description']] = $info['flagIsSet'];
+       }
+       $showLocal = $flags['Local'];
+       $showOrganic = $flags['Organic'];
+       $showNONGMO = $flags['Non_GMO'];
+       $showGlutenFree = $flags['Gluten Free'];
+
+       return $flags; 
+    }
+
+    function getExtraInfo($upc)
+    {
+        $dbc = \FannieDB::get(\FannieConfig::config('OP_DB'));
+        $prep = $dbc->prepare('SELECT * FROM products WHERE upc=?');
+        return $dbc->getRow($prep, array($upc));
+    }
+
+    function barcodeText($barcode,$len)
+    {
+        if($len ==12) {
+            $barText = 'UPC: '.substr($barcode,0,2)."-".substr($barcode,2,5)."-".substr($barcode,7,5)."-".substr($barcode,12);
+            $len+=3;
+        } else {
+            $barText = 'PLU: '.ltrim($barcode,'0');
+        }
+        return $barText;
+    }
+
+    function GetCheckDigit($barcode)
+    {
+      //Compute the check digit
+      $sum=0;
+      for($i=1;$i<=11;$i+=2)
+        $sum+=3*(isset($barcode[$i])?$barcode[$i]:0);
+      for($i=0;$i<=10;$i+=2)
+        $sum+=(isset($barcode[$i])?$barcode[$i]:0);
+      $rem=$sum%10;
+      if($rem>0)
+        $rem=10-$rem;
+      return $rem;
+    }
+
+
     
 }
 

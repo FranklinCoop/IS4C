@@ -89,8 +89,8 @@ class WellnessSpecial9upP extends \COREPOS\Fannie\API\item\FannieSignage
 
             $row = floor($sign / 3);
             $column = $sign % 3;
-            $info = $this->getExtraInfo($item['upc']);
-            $flags = $this->getProdFlags($item['upc']);
+            $info = $pdf->getExtraInfo($item['upc']);
+            $flags = $pdf->getProdFlags($item['upc']);
             $y=$this->startY;
             $x=$this->startX;
             $textWidth = $this->width - ($this->width*.4) - 4;
@@ -177,7 +177,7 @@ class WellnessSpecial9upP extends \COREPOS\Fannie\API\item\FannieSignage
                 //$origin = $percentDisc;
             }
             
-            $x += 108;
+            $x += 106;
             $y = $this->startY + $row*$yOffset +9 - $this->borderLineWidth;
             $w = $this->width - 108;
             $fontSize = 18;
@@ -267,100 +267,14 @@ class WellnessSpecial9upP extends \COREPOS\Fannie\API\item\FannieSignage
                 $pdf->Cell($this->width, 7, 'Member Only', 0, 0, 'C');
             }
 
-            /*
-            
-            $pdf->SetTextColor(30, 77, 44);
-            //PLU or UPC
-            $plu = $this->barcodeText($item['upc'], strlen($item['upc']));
-            $fontSize = 10;
-            $x += 0;
-            $y += 3;
-            $w = $this->width;
-            $h = $fontSize;
-            $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
-            $pdf->SetFontSize($fontSize);
-            $pdf->SetXY($x, $y);
-            $pdf->Cell($w,$h, $plu, 0,0, 'L');
-            //Origin
-            $origin = ($item['originName'] == '') ? 'ORIGIN:                       ' : $item['originName'] ;
-            $x += 0;
-            $y += 0;
-            $w = $this->width - $this->borderLineWidth*2 -9;
-            $h = $fontSize;
-            //$pdf->SetFont($this->font,'',7);
-            //$pdf->SetFontSize($this->SMALL_FONT);
-            $pdf->SetXY($x, $y);
-            $pdf->Cell($w, $h, $origin, 0,0, 'R');
+        /*** Barcode and Size info   */
+            $x += $fontSize;
+            $y += 30;
+            $fontSize = 20;
+            $pdf->SetFont('ModesLigTex','',$fontSize); 
+            $plu = $pdf->barcodeText($item['upc'], strlen($item['upc']));
+            $pdf->Cell($this->width, 7, $plu, 0, 0, 'C');
 
-
-            //varity
-            $descParts = explode(', ',$item['description']);
-            $varity = '';
-            if (sizeof(descParts) > 1) {
-                $varity = $descParts[1];
-            }
-            $description = $descParts[0];
-            $x = $this->startX + $xOffset*$column + $this->outerBorderWidth/2;
-            $y += $fontSize +10;
-            $fontSize = 14;
-            $w = $this->width - $this->outerBorderWidth;
-            $h = $fontSize;
-            $spacing = 5;
-            $pdf->SetFont('ModestoIOpenPrimary','',$fontSize);
-            $pdf->SetXY($x, $y);            
-            
-            $pdf->Cell($w, $h, $varity, 0, 0, 'C');
-            //Description
-            $y += $fontSize + 1.5;
-            $fontSize = 26;
-            $h = $fontSize;
-            $pdf->SetFont('ModestoIOpenPrimary','',$fontSize);
-            $pdf->SetXY($x, $y);
-            $lines = $pdf->MultiCellRet($w, $h, $description,0, 'C');
-            $blankSpace = ($lines==1) ? $fontSize : 0;
-            // Vendor/Farm
-            $brand = $item['brand'];
-            $x = $this->startX + $xOffset*$column + $this->outerBorderWidth/2;
-            $y += $fontSize +1;
-            $fontSize = 12;
-            $w = $this->width - $this->outerBorderWidth;
-            $h = $fontSize;
-            $spacing = 5;
-            $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
-            $pdf->SetXY($x, $y);
-            $pdf->Cell($w, $h, $brand, 0, 0, 'C');           
-
-            //price
-            $price ='';
-            //if($item['normal_price'] > 1) {
-                $price = sprintf('$%.2f', $item['normal_price']);
-            //} else  {
-             //   $price = ltrim(sprintf('¢%d', $item['normal_price']*100),'A');
-            //}
-            
-            //$x -= 10;
-            $y += $fontSize + 10; //space bewtten top and start of first element.
-            $fontSize = 46;
-            $h = $fontSize;
-            $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
-            $pdf->SetXY($x, $y);
-            $pdf->Cell($w, $h, $price, 0, 0, 'C');
-
-            //units
-            $units = '';
-            if ($info['scale'] == 1) {
-                $units = 'per Pound';
-            } else {
-                $units = 'per Each';
-            }
-            //$x += 10;
-            $y += $fontSize; //space bewtten top and start of first element.
-            $fontSize = 14;
-            $h = $fontSize;
-            $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
-            $pdf->SetXY($x, $y);
-            $pdf->Cell($w, $h, $units, 0, 0, 'C');
-        */
 
             $count++;
             $sign++;
@@ -370,65 +284,6 @@ class WellnessSpecial9upP extends \COREPOS\Fannie\API\item\FannieSignage
         set_time_limit(30);
     }
 
-    protected function getProdFlags($upc) {
-        $dbc = \FannieDB::get(\FannieConfig::config('OP_DB'));
-        $query = "
-            SELECT f.description,
-                f.bit_number,
-                (1<<(f.bit_number-1)) & p.numflag AS flagIsSet
-            FROM products AS p, 
-                prodFlags AS f
-            WHERE p.upc=?
-                " . (\FannieConfig::config('STORE_MODE') == 'HQ' ? ' AND p.store_id=? ' : '') . "
-                AND f.active=1";
-        $args = array($upc);
-        if (\FannieConfig::config('STORE_MODE') == 'HQ') {
-            $args[] = \FannieConfig::config('STORE_ID');
-        }
-        $prep = $dbc->prepare($query);
-        $res = $dbc->execute($prep,$args);
-        
-        if ($dbc->numRows($res) == 0){
-            // item does not exist
-            $prep = $dbc->prepare('
-                SELECT f.description,
-                    f.bit_number,
-                    0 AS flagIsSet
-                FROM prodFlags AS f
-                WHERE f.active=1');
-            $res = $dbc->execute($prep);
-        }//please use the order  "Local, Organic, NONGMO, Gluten Free
-        //please use the order  "Local, Organic, NONGMO, Gluten Free
-        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false);
-        
-        while($info = $dbc->fetchRow($res)){
-                $flags[$info['description']] = $info['flagIsSet'];
-       }
-       $showLocal = $flags['Local'];
-       $showOrganic = $flags['Organic'];
-       $showNONGMO = $flags['Non_GMO'];
-       $showGlutenFree = $flags['Gluten Free'];
-
-       return $flags; 
-    }
-
-    protected function getExtraInfo($upc)
-    {
-        $dbc = \FannieDB::get(\FannieConfig::config('OP_DB'));
-        $prep = $dbc->prepare('SELECT * FROM products WHERE upc=?');
-        return $dbc->getRow($prep, array($upc));
-    }
-
-    private function barcodeText($barcode,$len)
-    {
-        if($len ==12) {
-            $barText = 'UPC: '.substr($barcode,0,2)."-".substr($barcode,2,5)."-".substr($barcode,7,5)."-".substr($barcode,12);
-            $len+=3;
-        } else {
-            $barText = 'PLU: '.ltrim($barcode,'0');
-        }
-        return $barText;
-    }
 
 }
 

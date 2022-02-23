@@ -260,14 +260,17 @@ class PriceLib
         $rowConversion = $dbc->fetchRow($resConversion);
 
         //get the price.
-        //$queryPrice = "SELECT p.normal_price FROM products p WHERE p.upc = ?";
-        //$prepPrice = $dbc->prepare($queryPrice);
-        //$resPrice = $dbc->execute($prepPrice, array($upc));
-        //if (!$resPrice || $dbc->numRows($resPrice) == 0) {
-        //    return 'missing price data';
-        //}
-        //$rowPrice = $dbc->fetchRow($resPrice);
-        //$price = $rowPrice['normal_price'];
+        if($price == 0 || is_null($price)) {
+            $queryPrice = "SELECT p.normal_price FROM products p WHERE p.upc = ?";
+            $prepPrice = $dbc->prepare($queryPrice);
+            $resPrice = $dbc->execute($prepPrice, array($upc));
+            if (!$resPrice || $dbc->numRows($resPrice) == 0) {
+                return 'missing price data';
+            }
+            $rowPrice = $dbc->fetchRow($resPrice);
+            $price = $rowPrice['normal_price'];
+        }
+
 
         //return the unit price.
         $pricePerUnit = $price*($rowConversion['rate']/$unitSize);

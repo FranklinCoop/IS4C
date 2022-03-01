@@ -614,7 +614,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
 
     private function getCardTotals($dbc,$dlog,$args){
         $query = $dbc->prepare("SELECT
-            0 as AmexTotal,
+            sum(case when trans_subtype='AX' AND trans_type ='T' then -total else 0 end) as AmexTotal,
             sum(case when trans_subtype='DC' AND trans_type ='T' then -total else 0 end) as debit_total,
             sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
             sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
@@ -643,9 +643,11 @@ private function getTaxTotals($dbc,$dlog,$args) {
         $result = $dbc->execute($query,$args);
         $row = $dbc->fetch_row($result);
         $args[] = $args[0];
-
-        $amexQ = $dbc->prepare("SELECT 
-            sum(case when p.`issuer` = 'AMEX' and trans_subtype='CC' then p.amount else 0 end) as AMEX
+        
+        
+        if($row[0] == 0){
+            $amexQ = $dbc->prepare("SELECT 
+            sum(case when p.`issuer` = 'AMEX' and trans_subtype='AX' then p.amount else 0 end) as AMEX
             FROM {$dlog} t LEFT JOIN core_trans.PaycardTransactions p on p.registerNo = t.register_no
             AND p.transNo = t.trans_no AND p.empNo = t.emp_no AND p.paycardTransactionID = t.numFlag
             WHERE t.trans_type ='T' AND t.trans_subtype IN ('CC','DC','EC','EF','GD')
@@ -653,19 +655,18 @@ private function getTaxTotals($dbc,$dlog,$args) {
             AND p.`issuer` != '0'                 AND p.httpCode=200
             AND p.xResultCode = 1 and t.trans_status <>'X' AND DATE(p.requestDateTime) = DATE(?)");
 
-        $amexR = $dbc->execute($amexQ, $args);
-        $amexW = $dbc->fetch_row($amexR);
-        $amexTotal = ($amexW) ? $amexW[0] : 0 ;
+            $amexR = $dbc->execute($amexQ, $args);
+            $amexW = $dbc->fetch_row($amexR);
+            $amexTotal = ($amexW) ? $amexW[0] : 0 ;
         
+            $row[0] = $amexTotal;
+            $credTotal = $row[4] - $amexTotal;
+            $row[4] = $credTotal;
+        }
         $return = array();
         for ($key=0;$key<$dbc->numFields($result);$key++) {
-            if ($key == 4)
-                $return[] = $row[$key] - $amexTotal;
-            elseif ($key == 0)
-                $return[] = $amexTotal;
-            else
-                $return[] = $row[$key];
-        }
+            $return[] = $row[$key];
+        }  
 
         $return[] = array_sum($return);
         return $return;

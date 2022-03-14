@@ -85,7 +85,7 @@ function pollLanes() {
             });
         });
     } else { 
-        setTimeout(pollLanes, 50);
+        setTimeout(pollLanes, 120);
     }
 }
 JAVASCRIPT;

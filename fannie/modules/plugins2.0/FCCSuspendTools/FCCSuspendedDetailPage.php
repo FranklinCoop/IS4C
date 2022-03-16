@@ -332,7 +332,7 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
         while($row = $dbc->fetch_row($result)){
             switch ($row['trans_type']) {
                 case 'C':
-                    if (str_contains($row['description'],'Subtotal')) {
+                    if ($this->inStr($row['description'],'Subtotal')) {
                         // we are on a sub total line set status to true if this is the last subtotal line it should stay ture.
                         $lastTotal = True;
                     }
@@ -539,10 +539,10 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
         $discount_total='';
         $display_subtotal=1;
         while($row = $dbc->fetch_row($result)){
-            if ($row['trans_type']=='C' && str_contains($row['description'],'Subtotal')) {
+            if ($row['trans_type']=='C' && $this->inStr($row['description'],'Subtotal')) {
                     $subtotal_desc = $row['description'];
                     $subtotal_total = $row['unitPrice'];
-            } else if ($row['trans_type']=='C' && str_contains($row['description'],'Discount')){
+            } else if ($row['trans_type']=='C' && $this->inStr($row['description'],'Discount')){
                 $discount_desc = $row['description'];
                 $discount_total = $row['unitPrice'];
             } else { // display lines.
@@ -629,6 +629,13 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
         return $ret;
     }
 
+    private function inStr($haystack, $needle) {
+        if(function_exists('str_contains')) {
+            return str_contains($haystack,$needle);
+        } else {
+            return empty($needle) || strpos($haystack, $needle) !== false;
+        }
+    }    
 
 
     public function helpContent()

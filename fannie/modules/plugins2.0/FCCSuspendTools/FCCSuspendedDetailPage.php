@@ -419,18 +419,21 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
 
         $inputArea = $this->getInputHeader($dbc);
         $table = $this->getTransaction($dbc);
-        $this->addScript('../../../src/javascript/tablesorter/jquery.tablesorter.min.js');
+        //$this->addScript('../../../src/javascript/tablesorter/jquery.tablesorter.min.js');
         //$this->addCssFile('index.css');
         //$this->addOnloadCommand("\$('.tablesorter').tablesorter();");
 
-        return <<<HTML
+        ob_start();
+        ?>
         <div id="inputarea">
-            {$inputArea}
+            <?php echo $inputArea; ?>
         </div>
         <div id="displayarea">
-            {$table}
+            <?php echo $table; ?>
         </div>
-        HTML;
+
+        <?php
+        return ob_get_clean();
 
     }
 

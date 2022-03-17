@@ -182,7 +182,7 @@ HTML;
     }
 
     private function getInputHeader($dbc) {
-                $dbc->selectDB($this->config->get('OP_DB'));
+        $dbc->selectDB($this->config->get('TRANS_DB'));
         //$model = new $this->model_name($dbc);        
 
         $ret = '';
@@ -223,8 +223,8 @@ HTML;
                         FROM core_trans.suspended 
                         GROUP BY DATE(`datetime`), store_id, register_no, emp_no, trans_no
                         ORDER BY DATE(`datetime`)';
-        $prep = $this->connection->prepare($sql);
-        $result = $this->connection->execute($prep, $args);
+        $prep = $dbc->prepare($sql);
+        $result = $dbc->execute($prep, $args);
         
         
         $ret = '<form method="post">';

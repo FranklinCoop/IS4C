@@ -208,7 +208,7 @@ class PriceLib
     unit cost needs to be reported.
     */
     public static function FCC_PricePerUnit($dbc, $upc, $price, $sizeStr) {
-        $query = "SELECT p.unitofmeasure FROM products p where p.upc = ? GROUP BY p.upc";
+        $query = "SELECT DISTINCT(p.unitofmeasure) FROM products p where p.upc = ?";
         $prep = $dbc->prepare($query);
         $ret = $dbc->execute($prep, array($upc));
 
@@ -271,9 +271,8 @@ class PriceLib
             $price = $rowPrice['normal_price'];
         }
 
-
         //return the unit price.
-        $pricePerUnit = $price*($rowConversion['rate']/$unitSize);
+        $pricePerUnit = ($unitSize || $unitSize == 0) ? $price*($rowConversion['rate']/$unitSize)  : 0 ;
         if ($pricePerUnit == 0) {return "Size: ".$packUnit."\n Conversion Factor: ". $rowConversion['rate']; }
         else { return round($pricePerUnit,2); }
     }

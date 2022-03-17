@@ -89,8 +89,6 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
     } 
 
     public function post_delete_date_empno_regno_transno_total_salestax_mealstax_handler() {
-        $dbc = $this->connection;
-        //get<delete><date><empno><regno><transno>
         $deleteMsg ='?flash=Old+Data+For+Review+Only+'.date('m');
         $doDelete = FormLib::get('delete');
         $dbc = $this->connection;
@@ -197,8 +195,8 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
                         SET `datetime` = ?, emp_no = 1001, register_no = 30, trans_no=?, store_id =?
                         WHERE DATE(`datetime`) = ?
                         AND emp_no = ? AND register_no = ? AND trans_no = ?';
-        $prep = $this->connection->prepare($updateDatesQ);
-        $result = $this->connection->execute($prep, $args);
+        $prep = $dbc->prepare($updateDatesQ);
+        $result = $dbc->execute($prep, $args);
 
         //add tender line first find trans line id
 
@@ -218,8 +216,8 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
         $insertSQL = 'INSERT INTO core_trans.suspended
                       VALUES(?, ?, 30, 1001, ?, 0, "PayPal", "T", "PY", "", 0, 0, 0, 0.00, 0.00, ?,
                       0.00, 0, 0, 0.00, 0.00, 0, 0, 0, ?, 0, 0, 0, 0.00, 0, 0, ?, ?, 0, "", ?, ?)';
-        $prep = $this->connection->prepare($insertSQL);
-        $result = $this->connection->execute($prep, $args);
+        $prep = $dbc->prepare($insertSQL);
+        $result = $dbc->execute($prep, $args);
         $trans_id++;
         // add change line it will be zero.
         $args = array(
@@ -235,8 +233,8 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
         $insertSQL = 'INSERT INTO core_trans.suspended
                       VALUES(?, ?, 30, 1001, ?, 0, "Change", "T", "CA", "", 0, 0, 0, 0.00, 0.00, 0.00,
                       0.00, 0, 0, 0.00, 0.00, 0, 0, 8, ?, 0, 0, 0, 0.00, 0, 0, ?, ?, 0, "", ?, ?)';
-        $prep = $this->connection->prepare($insertSQL);
-        $result = $this->connection->execute($prep, $args);
+        $prep = $dbc->prepare($insertSQL);
+        $result = $dbc->execute($prep, $args);
         $trans_id++;
 
         //add discount line
@@ -255,8 +253,8 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
         $insertSQL = 'INSERT INTO core_trans.suspended
                       VALUES(?, ?, 30, 1001, ?, "DISCOUNT", "Discount", "S", "", "", 0, 1, 0, 0.00, ?, ?,
                       0.00, 0, 0, 0.00, 0.00, 0, 0, 0, ?, 1, 0, 0, 0.00, 0, 0, ?, ?, 0, "", ?, ?)';
-        $prep = $this->connection->prepare($insertSQL);
-        $result = $this->connection->execute($prep, $args);
+        $prep = $dbc->prepare($insertSQL);
+        $result = $dbc->execute($prep, $args);
         $trans_id++;
 
         //add taxline
@@ -274,8 +272,8 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
         $insertSQL = 'INSERT INTO core_trans.suspended
                       VALUES(?, ?, 30, 1001, ?, "TAX", "Tax", "A", "", "", 0, 0, 0, 0.00, 0.00, ?,
                       0.00, 0, 0, 0.00, 0.00, 0, 0, 0, ?, 0, 0, 0, 0.00, 0, 0, ?, ?, 0, "", ?, ?)';
-        $prep = $this->connection->prepare($insertSQL);
-        $result = $this->connection->execute($prep, $args);
+        $prep = $dbc->prepare($insertSQL);
+        $result = $dbc->execute($prep, $args);
         $trans_id++;
 
         //transfer to dtransactions.
@@ -284,8 +282,8 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
         (`datetime`, store_id, register_no, emp_no, trans_no, upc, `description`, trans_type, trans_subtype, trans_status, department, quantity, scale, cost, unitPrice, total, regPrice, tax, foodstamp, discount, memDiscount, discountable, discounttype, voided, percentDiscount, ItemQtty, volDiscType, volume, VolSpecial, mixMatch, `matched`, memType, staff, numflag, charflag, card_no, trans_id, pos_row_id)
                         SELECT *, 123 FROM core_trans.suspended
                         WHERE `datetime` = ? AND emp_no = 1001 AND register_no=30 AND trans_no = ? AND store_id = ?';
-        $prep = $this->connection->prepare($transferSQL);
-        $result = $this->connection->execute($prep, $args);
+        $prep = $dbc->prepare($transferSQL);
+        $result = $dbc->execute($prep, $args);
 
         $url = "FCCSuspendedDetailPage.php?date={$ret_date}&empno=1001&regno=30&transno={$newTransNo}&total={$this->total}&salestax={$this->sales_tax}&mealstax={$this->meals_tax}";
         
@@ -324,8 +322,8 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
         $args = array($this->date, $this->emp_no, $this->register_no, $this->trans_no);
         $sql = "SELECT * FROM core_trans.suspended
                 WHERE DATE(`datetime`) =? AND emp_no = ? AND register_no = ? AND trans_no = ?";
-        $prep = $this->connection->prepare($sql);
-        $result = $this->connection->execute($prep, $args);
+        $prep = $dbc->prepare($sql);
+        $result = $dbc->execute($prep, $args);
         $lastTotal = False;
         $subTotal = 0;
         //touch each row and make sure there are no items entered after the subtotal.
@@ -513,11 +511,11 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
 
         $args = array($this->date,$this->emp_no,$this->register_no,$this->trans_no);
         $header = $this->date."<br>".$this->emp_no."-".$this->register_no."-".$this->trans_no;
-        $sql = 'SELECT *
+        $sql = 'SELECT upc, `description`, tax, trans_type, unitPrice, total, numflag, foodstamp, ItemQtty
                 FROM core_trans.suspended
                 WHERE DATE(`datetime`) = ? AND emp_no =? AND register_no =? AND trans_no = ?';
-        $prep = $this->connection->prepare($sql);
-        $result = $this->connection->execute($prep, $args);
+        $prep = $dbc->prepare($sql);
+        $result = $dbc->execute($prep, $args);
         
         
         $ret = '<form method="post">';
@@ -630,10 +628,10 @@ class FCCSuspendedDetailPage extends FannieRESTfulPage
     }
 
     private function inStr($haystack, $needle) {
-        if(function_exists('str_contains')) {
-            return str_contains($haystack,$needle);
+        if (strpos($haystack, $needle) !== false) {
+            return True;
         } else {
-            return empty($needle) || strpos($haystack, $needle) !== false;
+            return False;
         }
     }    
 

@@ -175,7 +175,12 @@ class genLabels extends FannieRESTfulPage
             }
 
             $str = $row['unitofmeasure'];
-            $strArray = explode('/', $str);
+            
+            $strArray = array(0,'err','err');
+            if (explode('/', $str)){
+                $strArray = explode('/', $str);
+            }
+            
 
             $myrow = array(
             'normal_price' => $row['normal_price'],

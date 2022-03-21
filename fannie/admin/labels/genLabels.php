@@ -180,6 +180,10 @@ class genLabels extends FannieRESTfulPage
             if (explode('/', $str)){
                 $strArray = explode('/', $str);
             }
+            $unitStandard = 'ERR';
+            if(array_key_exists(2, $strArray)) {
+                $unitStandard = $strArray[2];
+            }
             
 
             $myrow = array(
@@ -194,7 +198,7 @@ class genLabels extends FannieRESTfulPage
             'vendor' => $row['vendor'],
             'scale' => $row['scale'],
             'numflag' => $row['numflag'],
-            'unitStandard' => $strArray[2]
+            'unitStandard' => $unitStandard
             );          
             $data[] = $myrow;
         }

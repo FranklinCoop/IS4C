@@ -53,6 +53,7 @@ class FCCSettlementReport extends FannieReportPage
 		$d1 = FormLib::get_form_value('date1',date('Y-m-d'));
 		$dates = array($d1.' 00:00:00',$d1.' 23:59:59');
 		$data = array();
+		$this->report_headers[0] = $d1;
 
 		if ( isset($FANNIE_COOP_ID) && $FANNIE_COOP_ID == 'WEFC_Toronto' )
 			$shrinkageUsers = " AND d.card_no not between 99900 and 99998";
@@ -83,6 +84,7 @@ class FCCSettlementReport extends FannieReportPage
 		'ERR' as staff_disc,
 		'ERR' as senior_disc,
     	'ERR' as food_for_all_disc,
+		sum(case when trans_subtype='AX' AND trans_type ='T' then -total else 0 end) as amex_total,
 		sum(case when trans_subtype='CC' AND trans_type ='T' then -total else 0 end) as credit_total,
 		sum(case when trans_subtype='DC' AND trans_type ='T' then -total else 0 end) as debit_total,
 		sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
@@ -109,7 +111,7 @@ class FCCSettlementReport extends FannieReportPage
 		$record = array();
 
 		$row_names = array("Department Sales Totals", "Sales Tax", "Meals Tax", "Member Payments", "Charge Payments",
-				"Gift Cards Sold", "Paid In", "Working Discount", "Staff Discount", "Senior Discount", "Food For All Disc", "Credit Card Total", "Debit Card Total", "SNAP Total",
+				"Gift Cards Sold", "Paid In", "Working Discount", "Staff Discount", "Senior Discount", "Food For All Disc", "Amex Total", "Credit Card Total", "Debit Card Total", "SNAP Total",
 				"SNAP Cash Total", "Gift Card Total", "Paper Gift Total", "In Store Charge Total",
 				"Paid Out Total", "Store Coupon Total", "Manufactures Coupon Total");
 		$row[1] = $row_tax[0]; //sales tax
@@ -161,7 +163,7 @@ class FCCSettlementReport extends FannieReportPage
 		$row = $dbc->fetch_row($discR);
 		
 		//correct rounding errors
-		for($key=0;$key<=5;$key++) {
+		for($key=0;$key<=4;$key++) {
 			$info = number_format($row[$key], 2, '.', '');
 			if ($key < 4) {
 				$discSum += $info;
@@ -185,34 +187,6 @@ class FCCSettlementReport extends FannieReportPage
 
 	function calculate_footers($data)
     {
-		/*switch($this->multi_counter){
-		case 1:
-			$this->report_headers[0] = 'Tenders';
-			break;
-		case 2:
-			$this->report_headers[0] = 'Sales';
-			break;
-		case 3:
-			$this->report_headers[0] = 'Discounts';
-			break;
-		case 4:
-			$this->report_headers[0] = 'Tax';
-			break;
-		case 5:
-			$this->report_headers = array('Type','Trans','Items','Avg. Items','Amount','Avg. Amount');
-			return array();
-			break;
-		case 6:
-			$this->report_headers = array('Mem#','Equity Type', 'Amount');
-			break;
-		}
-		$sumQty = 0.0;
-		$sumSales = 0.0;
-		foreach($data as $row){
-			$sumQty += $row[1];
-			$sumSales += $row[2];
-		}
-		return array(null,$sumQty,$sumSales);*/
 		return array();
 	}
 
@@ -228,14 +202,6 @@ class FCCSettlementReport extends FannieReportPage
             </label>
             <input type=text id=date1 name=date1 
                 class="form-control date-field" required />
-        </div>
-        <div class="form-group">
-            <label>List Sales By</label>
-            <select name="sales-by" class="form-control">
-                <option>Super Department</option>
-                <option>Department</option>
-                <option>Sales Code</option>
-            </select>
         </div>
         <div class="form-group">
             <label>Excel <input type=checkbox name=excel /></label>

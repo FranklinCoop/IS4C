@@ -44,7 +44,7 @@ class OverShortSettlementPage extends FannieRESTfulPage
     public function preprocess()
     {
         $this->__routes[] = 'get<date><store><pdf>';
-        $this->__routes[] = 'post<date><store><recalc>';
+        $this->__routes[] = 'post<recalc><date><store>';
         $this->__routes[] = 'post<date><store>';
         $this->__routes[] = 'post<id><value>';
         $this->__routes[] = 'post<id><total>';
@@ -54,6 +54,7 @@ class OverShortSettlementPage extends FannieRESTfulPage
 
     public function post_date_store_handler()
     {
+        echo '<script>console.log("POST DATE STORE")</script>';
         //$date = FormLib::get('date');]
         if (FormLib::get('pdf')==='print') {
             echo '<html>we in here </html>';
@@ -70,7 +71,7 @@ class OverShortSettlementPage extends FannieRESTfulPage
         //$date = FormLib::get('date');]
         GLOBAL $FANNIE_PLUGIN_SETTINGS;
         $date = FormLib::get_form_value('date');
-        $store = 1;
+        $store = FormLib::get_from_value('storeID');
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
         $dlog = DTransactionsModel::selectDTrans($date);
         $pdf = new SettlementReportPDF($dbc,$date,$this->store,$dlog);
@@ -84,13 +85,16 @@ class OverShortSettlementPage extends FannieRESTfulPage
 
 
 
-    public function post_date_store_recalc_handler() {
+    public function post_recalc_date_store_handler() {
+        echo '<script>console.log("RECLACL POST'.$this->store.'")</script>';
         GLOBAL $FANNIE_PLUGIN_SETTINGS;
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
         $dlog = DTransactionsModel::selectDTrans($this->date);
         $controller = new FCCSettlementModule($dbc,$dlog,$this->date,$this->store);
         $controller->recalculatePosTotals($dbc,$dlog,$this->date,1);
         echo $this->getTable($dbc,$this->date,$this->store);
+
+        return false;
     }
 
     public function post_id_value_handler()
@@ -223,10 +227,11 @@ class OverShortSettlementPage extends FannieRESTfulPage
 
         function reCalc()
         {
+            console.log('RECALC');
             var setdate = $('#date').val();
             var store = $('#storeID').val();
             var action = $('#recalc').val();
-            var data = 'date='+setdate+'&store='+store+'&recalc'+action;
+            var data = 'recalc='+action+'&date='+setdate+'&store='+store;
             $('#loading-bar').show();
             $('#displayarea').html('');
             $.ajax({
@@ -301,6 +306,8 @@ class OverShortSettlementPage extends FannieRESTfulPage
         $ret .=  '<label>Store</label>';
         $ret .= $storeSelect;
         
+
+        $ret .= '<form method="post">';
         $ret .= '<button type="button" onclick="selectDay();"  class="btn btn-default">Set</button>';
         $ret .= '<button type="submit" name="pdf" value="print" class="btn btn-default">Report</button>';
         //$ret .= '<button type="button" name="recalc" value="1" onclick="reCalc();" class="btn btn-default">Recalculate POS Totals</buttons>';

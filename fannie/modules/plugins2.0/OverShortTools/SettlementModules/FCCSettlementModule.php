@@ -54,7 +54,7 @@ class FCCSettlementModule extends SettlementModule {
         $model->date($date,'=');
         $model->storeID($store,'=');
         $today = date('Y-m-d');
-        if (!$model->find() && $date < $today) {
+        if (!$model->find() && $date <= $today) {
             $model = $this->populateAccountTable($dbc,$dlog,$store,$date);
             $model->date($date,'=');
             $model->storeID($store,'=');
@@ -101,7 +101,7 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
 
     $model = new DailySettlementModel($dbc);
 
-    $tableData = $this->genRowData($dbc,$dlog,$args);
+    $tableData = $this->genRowData($dbc,$dlog,$args,$store);
     foreach ($tableData as $rowID => $rowArr) {
         $model->date($date);
         $model->lineNo($rowID);
@@ -128,6 +128,8 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
         $today = date('Y-m-d');
         // create model if day has no entry or update values
         if (!$model->find() && $date < $today) {
+            echo '<script>console.log("NEW TABLE")</script>';
+
             $model = $this->populateAccountTable($dbc,$dlog,$store,$date);
             $model->date($date,'=');
             $model->storeID($store,'=');
@@ -137,24 +139,44 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
             $noteModel->storeID($store);
             $noteModel->save();
         } else {
+            echo '<script>console.log("update table.")</script>';
             $date1 = $date.' 00:00:00';
             $date2 = $date.' 23:59:59';
             $args = array($date1,$date2,$store);
 
-            $tableData = $this->genRowData($dbc,$dlog,$args);
-            $saveModel = new DailySettlementNotesModel($dbc);
+            $tableData = $this->genRowData($dbc,$dlog,$args, $store);
+            $saveModel = new DailySettlementModel($dbc);
             foreach ($model->find() as $obj) {
+                $cellID = $obj->id();
+                $totalID = $obj[0]->totalRow();
+                $oldPOSTotal = $obj[0]->amt();
+                
+                //update cell
                 $rowArr = $tableData[$obj->lineNo()];
-                $saveModel->id($obj->id());
-                //$model->total($rowArr[4]);
+                $saveModel->id($cellID);
                 $saveModel->amt($rowArr[2]);
-                $saveModel->diff($obj->amt() - $rowArr[2]);
-                //$model->totalRow($lastID+$rowArr[6]);
-                //$model->diffShow($lastID+$rowArr[7]);
-                //$model->diffWith($lastID+$rowArr[8]);
-                //$model->reportOrder($rowID);
-                //$model->storeID($store);
+                $saveModel->diff($obj->count()-$obj->amt());
                 $saveModel->save();
+                //update section total
+                $totalModel = new DailySettlementModel($dbc);
+                $totalModel->id($totalID,'=');
+                $totalLine = $model->find();
+                //$total = $obj[0]->total();
+                //$posTotal = $obj[0]->amt();
+                //$newTotal = $total-$count+$value;
+                //$json['secID'] = $totalID;
+                //$json['secTotal'] = round($newTotal,2);
+                //$json['secDiff'] = round($newTotal - $posTotal,2);
+                $grandTotalID = $obj[0]->totalRow();
+        
+                $totalModel = new DailySettlementModel($dbc);
+                $totalModel->id($totalID);
+                $totalModel->total($newTotal);
+                $totalModel->diff($newTotal - $posTotal);
+                $totalModel->save();
+
+                //update grand total
+
             }
             
         }
@@ -166,6 +188,7 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
     public static function updateTotalCell($dbc, $value, $cellID) {
         $json = array('msg'=>'','secID'=>0, 'secTotal' => 0, 'secDiff'=>0, 'diff'=>0,
                         'grandTotalID'=>0,'grandTotal'=>0,'grandDiff'=>0);
+        //find the row that is being updated, safe the cell to diffwith and where to dispaly the diff.
         $model = new DailySettlementModel($dbc);
         $model->id($cellID);
         $obj = $model->find();
@@ -174,23 +197,23 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
         $diffWithID = $obj[0]->diffWith();
         $diffShowID = $obj[0]->diffShow();
         $secDiff = $value - $obj[0]->amt();
-
-
         $model->total($value);
         $model->save();
 
+        //Find the line to diff with and calculate the over short.
         $model = new DailySettlementModel($dbc);
         $model->id($diffWithID);
         $objs = $model->find();
         $obj = $objs[0];
         $overshort = $value - $obj->total();
 
+        //find the line to display the diff and display it.
         $model = new DailySettlementModel($dbc);
         $model->id($diffShowID);
         $model->total($overshort);
-
         $model->save();
 
+        //format return json to update table display cells
         $json['secID'] = $cellID;
         $json['secTotal'] = round($value,2);
         $json['secDiff'] = round($secDiff,2);
@@ -303,8 +326,8 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
         return $json;
     }
 
-private function genRowData($dbc,$dlog,$args) {
-    $store = $args[2];
+private function genRowData($dbc,$dlog,$args, $store) {
+    //$store = $args[2];
     $ret = array();
     $row = array();
     //Sales Totals
@@ -325,7 +348,7 @@ private function genRowData($dbc,$dlog,$args) {
     $rowNames = array('PLUS SALES TAX Collected','PLUS MEALS TAX Collected','TOTAL TAX');
     $gfmAcctNo = array('(2400G990)','(2450A990)','');
     $mccAcctNo = array('(2400M990)','(2450A990)','');
-    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
+    $accountNumbers = ($store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(1,2,3);
     $values = $this->getTaxTotals($dbc,$dlog,$args);
     $totalRow = 4;
@@ -350,7 +373,7 @@ private function genRowData($dbc,$dlog,$args) {
                       'PAYPAL TIPS','DELIVERY FEE','PLUS R/A OTHER (PAID-IN)','TOTAL R/A');
     $gfmAcctNo = array('(2500A990)','(2800A990)','aditional entry','(5255G500)','(5255G500)','aditional entry','');
     $mccAcctNo = array('(2500A990)','(2800A990)','aditional entry','(5255M500)','(5255M500)','aditional entry','');
-    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
+    $accountNumbers = ($store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(4,5,6,7,8,9,10);
     $values = $this->getRATotals($dbc,$dlog,$args);
     $totalRow = 11;
@@ -373,7 +396,7 @@ private function genRowData($dbc,$dlog,$args) {
     $rowNames = array('LESS Working Discount','LESS Staff Discount','LESS Senior Discount','LESS Food for All Discount','TOTAL DISCOUNTS');
     $gfmAcctNo = array('(4160G900)','(4150G900)','(4130G900)','(4110G900)','');
     $mccAcctNo = array('(4160M900)','(4150M900)','(4130M900)','(4110M900)','');
-    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
+    $accountNumbers = ($store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(11,12,13,14,15);
     $values = $this->getDiscountTotals($dbc,$dlog,$args);
     $totalRow = 16;
@@ -417,8 +440,8 @@ private function genRowData($dbc,$dlog,$args) {
     // other tenders
     $rowNames = array('LESS Paper GIFT CERT','LESS Staff GIFT CERT','LESS Greenfield $ GIFT CERT','BUZZ REWARDS','r CREDITS','PAYPAL','LESS STORE CHARGE','LESS PAID OUT','TOTAL Other Credits');
     $gfmAcctNo = array('(2500A990)','(7800G990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');
-    $mccAcctNo = array('(2500A990)','(7800M990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');$
-    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
+    $mccAcctNo = array('(2500A990)','(7800M990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');
+    $accountNumbers = ($store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(23,24,25,26,27,28,29,30,31);
     $values = $this->getOtherTotals($dbc,$dlog,$args);
     $totalRow = 32;
@@ -441,7 +464,7 @@ private function genRowData($dbc,$dlog,$args) {
     $rowNames = array('LESS STORE COUPON','LESS CO-OP DEALS COUPONS','LESS OTHER VENDOR COUPONS','TOTAL COUPON');
     $gfmAcctNo = array('(4170G900)','(1210A990)','(1215A990)','');
     $mccAcctNo = array('(4170M900)','(1210A990)','(1215A990)','');
-    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
+    $accountNumbers = ($store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(32,33,34,35);
     $values = $this->getCouponTotals($dbc,$dlog,$args);
     $totalRow = 36;
@@ -464,7 +487,7 @@ private function genRowData($dbc,$dlog,$args) {
     $rowNames = array('','TOTAL','BANK DEPOSIT','OVER / SHORT');
     $gfmAcctNo = array('','','','(419G900)');
     $mccAcctNo = array('','','','(419M900)');
-    $accountNumbers = ($this->store == 1) ? $gfmAcctNo : $mccAcctNo ;
+    $accountNumbers = ($store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(36,37,38,39);
     $total = $ret[0][2] + $ret[3][2] + $ret[10][2] - $ret[15][2] - $ret[22][2]-$ret[31][2] - $ret[35][2];
     $ctTotal = $ret[0][4] + $ret[3][4] + $ret[10][4] - $ret[15][4] - $ret[22][4]-$ret[31][4] - $ret[35][4];
@@ -511,10 +534,10 @@ private function getSalesTotals($dbc,$dlog,$args) {
 }
 
 private function getTaxTotals($dbc,$dlog,$args) {
-    $query = $dbc->prepare("SELECT sum(regPrice),description FROM {$dlog} 
+    $query = $dbc->prepare("SELECT sum(regPrice),ANY_VALUE(`description`) as `description` FROM {$dlog} 
                           WHERE upc ='TAXLINEITEM' AND `datetime` BETWEEN ? AND ? AND store_id =? AND trans_status != 'X'
                           AND emp_no != 9999
-                          GROUP BY RIGHT(description,7) ORDER BY RIGHT(description,7)");
+                          GROUP BY RIGHT(`description`,7) ORDER BY RIGHT(`description`,7)");
     $result = $dbc->execute($query,$args);
     $return = array();
     $description;
@@ -526,6 +549,9 @@ private function getTaxTotals($dbc,$dlog,$args) {
     if ($size == 1 && $description = '6.25000% SalesTax') {
         $return[] = 0;
     } elseif ($size ==1) {
+        array_unshift($return, 0);
+    } elseif ($size == 0) {
+        array_unshift($return, 0);
         array_unshift($return, 0);
     }
 

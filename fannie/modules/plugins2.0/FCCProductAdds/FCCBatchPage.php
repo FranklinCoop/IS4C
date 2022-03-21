@@ -491,12 +491,12 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             }
 
             //update catalog only if vendor number is present.
-            if($vendor != '') {
+            if($vendor != '' && $sku != '') {
                 $vendModel->reset();
                 $vendModel->vendorID($vendor);
-                $vendModel->upc($upc);
+                $vendModel->sku($sku);
                 $vendExist = $vendModel->load();
-                if($sku != '') $vendModel->sku($sku);
+                if($upc != '') $vendModel->upc($upc);
                 if ($cost !='') $vendModel->cost($cost);
                 if ($brand !='') $vendModel->brand($brand);
                 if ($pack_size !='') $vendModel->size($pack_size);

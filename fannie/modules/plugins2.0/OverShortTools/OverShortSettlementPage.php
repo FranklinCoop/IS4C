@@ -70,8 +70,8 @@ class OverShortSettlementPage extends FannieRESTfulPage
     {
         //$date = FormLib::get('date');]
         GLOBAL $FANNIE_PLUGIN_SETTINGS;
-        $date = FormLib::get_form_value('date');
-        $store = FormLib::get_from_value('storeID');
+        $date = FormLib::get('date');
+        $store = FormLib::get('storeID');
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
         $dlog = DTransactionsModel::selectDTrans($date);
         $pdf = new SettlementReportPDF($dbc,$date,$this->store,$dlog);

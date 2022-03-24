@@ -30,6 +30,8 @@ class PaycardConf
         $this->set("paycard_trans",'');
         $this->set('PaycardRetryBalanceLimit', 0);
         $this->set('EmvSignature', false);
+        $this->set("paycard_recurring", false);
+        $this->set("CacheCardCashBack",0);
     }
 
     /**

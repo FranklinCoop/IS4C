@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class OverShortIndexPage extends FanniePage {
@@ -49,6 +49,15 @@ class OverShortIndexPage extends FanniePage {
                         or short.
                         <li>Work can be saved and resumed later.
                         <li>The day can be marked "resolved".</ul>');
+            ?>
+        </li> 
+        <li><a href="OverShortSettlementPage.php" target="_Settlement">Settlement Day O/S</a>
+            <?php
+            echo \COREPOS\Fannie\API\lib\FannieHelp::ToolTip('<ul><li> Dialy Settlement with OverShorts 
+                        alot like the genral day report.
+                        <li>The tool will calculate how much the day is over/short
+                        <br />based on a number of variables.
+                        <li>Work can be saved and resumed later.</ul>');
             ?>
         </li> 
         <li><a href="OverShortCashierPage.php" target="_SingleCashier">Single Cashier O/S</a>

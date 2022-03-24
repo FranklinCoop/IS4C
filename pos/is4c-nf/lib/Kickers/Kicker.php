@@ -45,7 +45,6 @@ class Kicker
         'YPSI_Kicker',
     );
 
-    // @hintable
     public static function factory($class)
     {
         if ($class != '' && in_array($class, self::$builtin)) {
@@ -77,16 +76,16 @@ class Kicker
                     AND " . $this->refToWhere($trans_num);
 
         $result = $dbc->query($query);
-        $num_rows = $dbc->num_rows($result);
+        $numRows = $dbc->numRows($result);
 
-        return ($num_rows > 0) ? true : false;
+        return ($numRows > 0) ? true : false;
     }
 
     protected function refToWhere($ref)
     {
-        list($e, $r, $t) = explode('-', $ref, 3);
+        list($emp, $reg, $trans) = explode('-', $ref, 3);
         return sprintf(' emp_no=%d AND register_no=%d AND trans_no=%d ',
-                        $e, $r, $t);
+                        $emp, $reg, $trans);
     }
 
     /**

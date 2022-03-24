@@ -40,8 +40,23 @@ class ErrorHandler
       [filename]-[line#]-[error type]
     */
     private static $ignore = array(
-        'MiscLib.php-113-2' => true,
+        'MiscLib.php-120-2' => true,
     );
+
+    /**
+      Allow code using ErrorHandler to customize
+      where warnings can be safely suppressed.
+      @param $ignores [array] see format of ErrorHandler::$ignore above
+    */
+    static public function addIgnores($ignores)
+    {
+        if (!is_array($ignores)) {
+            $ignores = array($ignores);
+        }
+        foreach ($ignores as $i) {
+            self::$ignore[$i] = true;
+        }
+    }
 
     static public function setLogger($l)
     {
@@ -59,7 +74,7 @@ class ErrorHandler
                     . $errline
                     . ', '
                     . $errfile;
-            self::$logger->debug($msg);
+            self::$logger->warning($msg);
         }
 
         return true;
@@ -71,12 +86,12 @@ class ErrorHandler
     */
     static public function exceptionHandler($exception)
     {
-        $msg = $exception->getMessage()
+        $msg = 'Uncaught exception: (' . get_class($exception) . ') ' . $exception->getMessage()
                 . " Line "
                 . $exception->getLine()
                 . ", "
                 . $exception->getFile();
-        self::$logger->debug($msg);
+        self::$logger->warning($msg);
     }
 
     /**

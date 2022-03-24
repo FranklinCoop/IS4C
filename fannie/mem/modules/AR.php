@@ -31,7 +31,7 @@ class AR extends \COREPOS\Fannie\API\member\MemberModule
 
     function showEditForm($memNum,$country="US")
     {
-        global $FANNIE_URL,$FANNIE_TRANS_DB, $FANNIE_ROOT;
+        global $FANNIE_URL,$FANNIE_TRANS_DB;
 
         $dbc = $this->db();
         $trans = $FANNIE_TRANS_DB.$dbc->sep();
@@ -78,7 +78,10 @@ class AR extends \COREPOS\Fannie\API\member\MemberModule
     public function saveFormData($memNum, $json=array())
     {
         $limit = FormLib::get_form_value('AR_limit',0);
-        $json['chargeLimit'] = $json;
+        $json['chargeLimit'] = $limit;
+        foreach (array_keys($json['customers']) as $c) {
+            $json['customers'][$c]['chargeAllowed'] = $limit > 0 ? 1 : 0;
+        }
 
         return $json;
     }

@@ -97,11 +97,11 @@ class ScreenDisplayModel extends ViewModel
             as comment,
             CASE
             WHEN (voided = 3 or voided = 5 or voided = 7 or voided = 11 or voided = 17)
-                THEN unitPrice
+                THEN " . $con->numberFormat('unitPrice') . "
             WHEN (trans_status = 'D')
                 THEN ''
             ELSE
-                total
+                " . $con->numberFormat('total') . "
             END
             as total,
             CASE
@@ -118,9 +118,9 @@ class ScreenDisplayModel extends ViewModel
             WHEN (tax = 1 and foodstamp = 0)
                 THEN 'T' 
             WHEN (tax > 1 and foodstamp <> 0)
-                THEN ".$con->concat('SUBSTR(t.description,0,1)',"'F'",'')."
+                THEN ".$con->concat('SUBSTR(t.description,1,1)',"'F'",'')."
             WHEN (tax > 1 and foodstamp = 0)
-                THEN SUBSTR(t.description,0,1)
+                THEN SUBSTR(t.description,1,1)
             WHEN (tax = 0 and foodstamp <> 0)
                 THEN 'F'
             WHEN (tax = 0 and foodstamp = 0)

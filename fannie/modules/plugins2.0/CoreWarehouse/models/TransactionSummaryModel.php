@@ -28,15 +28,18 @@ if (!class_exists('CoreWarehouseModel')) {
 class TransactionSummaryModel extends CoreWarehouseModel {
 
     protected $name = 'transactionSummary';
+    protected $preferred_db = 'plugin:WarehouseDatabase';
     
     protected $columns = array(
     'date_id' => array('type'=>'INT','primary_key'=>True,'default'=>0),
+    'store_id' => array('type'=>'INT', 'default'=>1),
     'trans_num' => array('type'=>'VARCHAR(25)','primary_key'=>True,'default'=>''),
     'register_no' => array('type'=>'SMALLINT'),
     'emp_no' => array('type'=>'SMALLINT'),
     'tenderTotal' => array('type'=>'MONEY'),
     'taxTotal' => array('type'=>'MONEY'),
     'discountTotal' => array('type'=>'MONEY'),
+    'memDiscountTotal' => array('type'=>'MONEY'),
     'percentDiscount' => array('type'=>'DOUBLE'),
     'retailTotal' => array('type'=>'MONEY'),
     'retailQty' => array('type'=>'DOUBLE'),
@@ -47,7 +50,8 @@ class TransactionSummaryModel extends CoreWarehouseModel {
     'end_time' => array('type'=>'DATETIME'),
     'duration' => array('type'=>'INT'),
     'card_no' => array('type'=>'INT','index'=>True),
-    'memType' => array('type'=>'SMALLINT','index'=>True)
+    'memType' => array('type'=>'SMALLINT','index'=>True),
+    'usedCoupon' => array('type'=>'TINYINT', 'default' => 0),
     );
 
     public function refresh_data($trans_db, $month, $year, $day=False){
@@ -60,17 +64,32 @@ class TransactionSummaryModel extends CoreWarehouseModel {
 
         $target_table = DTransactionsModel::selectDlog($start_date, $end_date);
 
+        $isCoupon = FannieDB::fqn('IsMemCoupon', 'plugin:WarehouseDatabase');
+        $coups = "INSERT INTO {$isCoupon}
+            SELECT concat('00499999', lpad(coupID, 5, '0')), case when memberOnly > 0 then 1 else 0 end
+            FROM " . FannieDB::fqn('houseCoupons', 'op');
+        $sql->query("TRUNCATE TABLE {$isCoupon}");
+        $sql->query($coups);
+
         $this->clearDates($sql, $start_id, $end_id);
 
         // 5Jul2013 - percentDiscount not currently exposed via dlog
         $sql = "INSERT INTO ".$this->name." 
             SELECT DATE_FORMAT(tdate, '%Y%m%d') as date_id,
-            trans_num,
-            register_no,
-            emp_no,
+            MAX(store_id),
+            MAX(trans_num),
+            MAX(register_no),
+            MAX(emp_no),
             SUM(CASE WHEN trans_type='T' THEN total ELSE 0 END) as tenderTotal,
-            SUM(CASE WHEN upc='TAX' THEN total ELSE 0 END) as taxTotal,
-            SUM(CASE WHEN upc='DISCOUNT' THEN total ELSE 0 END) as discountTotal,
+            SUM(CASE WHEN t.upc='TAX' THEN total ELSE 0 END) as taxTotal,
+            SUM(CASE WHEN t.upc='DISCOUNT' THEN total ELSE 0 END) as discountTotal,
+            SUM(CASE 
+                WHEN t.upc LIKE '0049999%' AND c.memberOnly=1 THEN -1 * total
+                WHEN memDiscount <> 0 THEN memDiscount
+                wHEN charflag='SO' AND regPrice <> total AND trans_status <> 'V' THEN regPrice - total
+                wHEN charflag='SO' AND regPrice <> total AND trans_status = 'V' THEN -1 * (regPrice + total)
+                ELSE 0 
+            END) AS memDiscountTotal,
             0 as percentDiscount,
             SUM(CASE WHEN trans_type IN ('I','D') AND m.superID <> 0 THEN total else 0 END) as retailTotal,
             SUM(CASE WHEN trans_type IN ('I','D') AND m.superID <> 0 AND trans_status='M' THEN itemQtty 
@@ -87,11 +106,13 @@ class TransactionSummaryModel extends CoreWarehouseModel {
             MAX(tdate) as end_time, "
             .$this->connection->seconddiff('MIN(tdate)','MAX(tdate)')." as duration,
             MAX(card_no) as card_no,
-            MAX(memType) as memType
+            MAX(memType) as memType,
+            MAX(CASE WHEN trans_subtype IN ('IC') THEN 1 ELSE 0 END) AS usedCoupon
             FROM $target_table as t LEFT JOIN "
             .$FANNIE_OP_DB.$this->connection->sep()."MasterSuperDepts as m
             ON t.department=m.dept_ID
-            WHERE tdate BETWEEN ? AND ? AND upc <> 'RRR'
+            LEFT JOIN {$isCoupon} AS c ON t.upc=c.upc
+            WHERE tdate BETWEEN ? AND ? AND t.upc <> 'RRR'
             GROUP BY DATE_FORMAT(tdate,'%Y%m%d'), trans_num";
         $prep = $this->connection->prepare($sql);
         $result = $this->connection->execute($prep, array($start_date.' 00:00:00',$end_date.' 23:59:59'));

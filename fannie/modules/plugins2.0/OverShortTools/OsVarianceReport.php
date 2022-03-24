@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class OsVarianceReport extends FannieReportPage 
@@ -34,6 +34,7 @@ class OsVarianceReport extends FannieReportPage
     protected $auth_classes = array('overshorts');
     public $page_set = 'Plugin :: Over/Shorts';
     public $description = '[Variance Report] shows over/short variance info over time';
+    public $report_set = 'Finance';
     protected $report_headers = array('Date', 'Lane', 'POS Total', 'Count Total', 'Variance', 'Emp#', 'Name', 'Share');
     protected $report_cache = 'day';
     protected $required_fields = array('date1', 'date2');

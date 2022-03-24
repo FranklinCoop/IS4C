@@ -1,12 +1,19 @@
 var batchEdit = (function ($) {
     var mod = {};
 
+    var alerthi = function() {
+        alert('hi');
+    }
+
     var showFields = function(f_on, f_off) {
         $('.add-by-' + f_off.toLowerCase() + '-fields').hide();
         $('.add-by-' + f_off.toLowerCase() + '-fields :input').prop('disabled', true);
         $('.add-by-' + f_on.toLowerCase() + '-fields').show();
         $('.add-by-' + f_on.toLowerCase() + '-fields :input').prop('disabled', false);
         $('#addItem' + f_on.toUpperCase()).focus();
+        if (f_on == 'lc') {
+            $('#lcselect').chosen();
+        }
     };
 
     var colorName = function(resp) {
@@ -101,13 +108,16 @@ var batchEdit = (function ($) {
 
     mod.unsaleNow = function(batchID)
     {
-        $.ajax({
-            type: 'post',
-            data: 'id='+batchID+'&unsale=1',
-            dataType: 'json'
-        }).done(function(resp) {
-            inputAreaAlert(colorName(resp), resp.msg);
-        });
+        var r = confirm('Stop Sale: Are you sure?');
+        if (r == true) {
+            $.ajax({
+                type: 'post',
+                data: 'id='+batchID+'&unsale=1',
+                dataType: 'json'
+            }).done(function(resp) {
+                inputAreaAlert(colorName(resp), resp.msg);
+            });
+        }
     };
 
     mod.cutItem = function(upc, batchID, userID, cutOp)
@@ -125,6 +135,26 @@ var batchEdit = (function ($) {
                 $('#doCut'+upc).show();
             }
         });
+    };
+    
+    mod.cutAll = function(batchID, userID) {
+        var dataStr = 'id=' + batchID + '&uid=' + userID;
+        var r = confirm('Cut all products from this batch?');
+        if (r == true) {
+            $.ajax({
+                type: 'post',
+                url: 'cutBatch.php',
+                data: dataStr,
+                dataType: 'json',
+            }).done(function (resp) {
+                if (resp.error) {
+                    inputAreaAlert('danger', resp.error_msg);
+                } else {
+                    $('.cutLink').hide();
+                    $('.unCutLink').show();
+                }
+            });
+        }
     };
 
     mod.deleteUPC = function(id, upc)
@@ -299,6 +329,95 @@ var batchEdit = (function ($) {
             }
         });
     };
+
+    mod.updatePartial = function(batchID) {
+        var dstr = $('.partialBatch').serialize() + '&partialID=' + batchID;
+        $.ajax({
+            type: 'post',
+            data: dstr
+        }).done(function() {
+        });
+    };
+
+    mod.saveNotes = function(batchID) {
+        var dstr = $('#batchNotes').serialize() + '&noteID=' + batchID;
+        $.ajax({
+            type: 'post',
+            data: dstr
+        }).done(function() {
+        });
+    };
+
+    var noteToken = false;
+    mod.noteTyped = function(batchID) {
+        if (noteToken) {
+            clearTimeout(noteToken);
+        }
+        noteToken = setTimeout(function() { mod.saveNotes(batchID); }, 2000);
+    }
+
+    mod.logBatch = function(batchID) {
+        var c = confirm('Add batch no. ' + batchID + ' to Price Change Log?');
+        if (c == true) {
+            $.ajax({
+                type: 'get',
+                url: '../../item/ProdReviewPage.php',
+                data: 'bid='+batchID+'&batchLog=2&add=1'
+            }).done(function(resp) {
+                if (resp.error) {
+                    inputAreaAlert('danger', resp.error);
+                } else {
+                    inputAreaAlert('success', 'Batch no. ' + batchID + ' logged');
+                }
+            });
+        }
+    }
+
+    mod.renameBatch = function(oldname)
+    {
+        var name = $('#batchName').val();
+        var id = $('#batchID').val();
+        var c = confirm('Change batch name to '+name+ '?');
+        if (c == true) {
+            $.ajax({
+                type: 'post',
+                url: 'EditBatchPage.php',
+                data: 'editBatch=1&name='+name+'&id='+id,
+            }).done(function(resp) {
+                if (resp.error) {
+                    inputAreaAlert('danger', resp.error);
+                } else {
+                    inputAreaAlert('success', resp);
+                }
+            });
+        } else {
+            $('#batchName').val(oldname);
+        }
+    }
+
+    mod.editBatchDate = function(olddate, action)
+    {
+        //alert(olddate);
+        var start = $('#startDate').val();
+        var end = $('#endDate').val();
+        var id = $('#batchID').val();
+        var c = confirm('Change '+action+' date?');
+        if (c == true) {
+            $.ajax({
+                type: 'post',
+                url: 'EditBatchPage.php',
+                data: 'editDate=1&startDate='+start+'&endDate='+end+'&id='+id+'&action='+action,
+            }).done(function(resp) {
+                if (resp.error) {
+                    inputAreaAlert('danger', resp.error);
+                } else {
+                    inputAreaAlert('success', resp);
+                }
+            });
+        } else {
+            $('#'+action+'Date').val(olddate);
+        }
+    }
 
     return mod;
 

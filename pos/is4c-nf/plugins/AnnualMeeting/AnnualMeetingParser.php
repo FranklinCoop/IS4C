@@ -21,6 +21,7 @@
 
 *********************************************************************************/
 
+use COREPOS\pos\lib\DisplayLib;
 use COREPOS\pos\lib\TransRecord;
 use COREPOS\pos\parser\Parser;
 
@@ -34,12 +35,12 @@ class AnnualMeetingParser extends Parser {
 
     function check($str)
     {
-        if (strlen($str) < 4) return false;
+        if (strlen($str) < 4 || strlen($str) > 5) return false;
         $plu = substr($str,0,4);
         if (in_array($plu, $this->plus)){
             if (strlen($str)==4) {
                 return true;
-            } elseif(in_array(strtoupper($str[4]), array('M','V','K','N','W'))) {
+            } elseif(in_array(strtoupper($str[4]), array('S','C','K','T','D'))) {
                 return true;
             }
         }
@@ -53,10 +54,10 @@ class AnnualMeetingParser extends Parser {
             CoreLocal::set('qmInput',$str);
             $desc = $this->descriptions[$str];
             $opts = array(
-                $desc.' (Pork)' => 'M',
-                $desc.' (Ratatouille)' => 'V',
-                $desc.' (Pork, G/F)' => 'N',
-                $desc.' (Ratatouille, G/F)' => 'W',
+                $desc.' (Squash)' => 'S',
+                $desc.' (Squash G/F)' => 'T',
+                $desc.' (Chicken)' => 'C',
+                $desc.' (Chicken G/F)' => 'D',
             );
             if ($str == 1041){
                 $opts[$desc.' (Kids)'] = 'K';

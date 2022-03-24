@@ -26,6 +26,7 @@ use \CoreLocal;
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\TransRecord;
 use COREPOS\pos\lib\Scanning\SpecialUPCs\HouseCoupon;
+use COREPOS\pos\lib\LocalStorage\WrappedStorage;
 
 /**
   @class AutoCoupon
@@ -45,7 +46,12 @@ class AutoCoupon extends TotalAction
             }
         }
         if (isset($hc_table['description']) && isset($hc_table['auto'])) {
-            $autoR = $dbc->query('SELECT coupID, description FROM houseCoupons WHERE auto=1');
+            $today = date('Y-m-d');
+            $autoR = $dbc->query("
+                SELECT coupID, description 
+                FROM houseCoupons 
+                WHERE auto=1
+                    AND '$today' BETWEEN startDate AND endDate");
             while($autoW = $dbc->fetch_row($autoR)) {
                 $coupons[$autoW['coupID']] = $autoW['description'];
             }
@@ -68,7 +74,7 @@ class AutoCoupon extends TotalAction
         $repeat = CoreLocal::get('msgrepeat');
         $coupons = $this->getCoupons();
 
-        $hcoup = new HouseCoupon();
+        $hcoup = new HouseCoupon(new WrappedStorage());
         $prefix = CoreLocal::get('houseCouponPrefix');
         if ($prefix == '') {
             $prefix = '00499999';
@@ -98,13 +104,13 @@ class AutoCoupon extends TotalAction
             }
 
             $next_val = $add['value'] - $val;
-            if ($next_val == 0) {
+            if (abs($next_val) < 0.005) {
                 // no need to add another line item
                 // previous one(s) sum to correct total
                 continue;
             }
 
-            TransRecord::addhousecoupon($upc, $add['department'], -1 * $next_val, $description);
+            TransRecord::addhousecoupon($upc, $add['department'], -1 * $next_val, $description, $add['discountable']);
         }
 
         CoreLocal::set('msgrepeat', $repeat);

@@ -1,5 +1,7 @@
 <?php
 
+use COREPOS\pos\lib\MiscLib;
+
 /**
   @class quickkey
   A class for building menus from buttons
@@ -62,11 +64,12 @@ class quickkey {
         $this->img = $i;
     }
 
-    function display($id=""){
+    function display($id="",$tagType="submit",$onclick=""){
         $ret = "";
+        $baseURL = MiscLib::baseURL();
         if ($this->img == ""){
             $ret .= sprintf('
-                <button type="submit"
+                <button type="%s" onclick="%s"
                     name="quickkey_submit" id="%s"
                     value="%s"
                     class="quick_button pos-button coloredBorder">
@@ -74,20 +77,28 @@ class quickkey {
                 </button>
                 <input type="hidden" name="%s"
                     value="%s" />',
+                $tagType, $onclick,
                 $id,
                 $this->title,
                 $this->title,
                 md5($this->title),
                 $this->output_text);
         } else {
-            $ret .= sprintf("<input type=\"submit\"
-                name=\"quickkey_submit\" id=\"%s\"
-                value=\"%s\" class=\"quick_button\" 
-                src=\"%s\" />
+            $imgURL = $baseURL . 'plugins/QuickKeys/quickkeys/' 
+                . (is_numeric($this->img) ? 'noauto/img.php?imgID=' . $this->img : 'imgs/' . $this->img);
+            $fontSize = strlen($this->title) > 10 ? 75 : 100;
+            $ret .= sprintf("<button type=\"%s\" onclick=\"%s\"
+                name=\"quickkey_submit\" id=\"%s\" value=\"%s\"
+                class=\"quick_button pos-button coloredBorder quickButtonImage\">
+                <span style=\"font-size: %d%%; line-height: 0.2em;\">%s</span><br />
+                <img src=\"%s\" />
+                </button>
                 <input type=\"hidden\" name=\"%s\"
-                value=\"%s\" />",$id,$this->title,
-                MiscLib::base_url().
-                "quickkeys/imgs/".$this->img,
+                value=\"%s\" />",
+                $tagType, $onclick,
+                $id,$this->title,
+                $fontSize, $this->title,
+                $imgURL,
                 md5($this->title),
                 $this->output_text);
         }

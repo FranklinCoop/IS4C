@@ -23,7 +23,7 @@
 
 require(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class NutriFacts extends FannieRESTfulPage
@@ -350,6 +350,12 @@ HTML;
         $phpunit->assertEquals(0, $this->numericVal(''));
         $phpunit->assertEquals(1, $this->numericVal('1'));
         $phpunit->assertEquals(1, $this->numericVal('1 g'));
+    }
+
+    public function helpContent()
+    {
+        return '<p>Enter as many values as necessary to generate an image of a
+nutrition facts box. Consider this fairly alpha</p>'; 
     }
 }
 

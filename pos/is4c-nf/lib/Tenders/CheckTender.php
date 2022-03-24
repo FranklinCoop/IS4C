@@ -38,7 +38,7 @@ class CheckTender extends TenderModule
     */
     public function errorCheck()
     {
-        $clearButton = array('OK [clear]' => 'parseWrapper(\'CL\');');
+        $clearButton = array(_('OK [clear]') => 'parseWrapper(\'CL\');');
         if ( CoreLocal::get("isMember") != 0 && (($this->amount - CoreLocal::get("amtdue") - 0.005) > CoreLocal::get("dollarOver")) && (CoreLocal::get("cashOverLimit") == 1)) {
             return DisplayLib::boxMsg(
                 _("member check tender cannot exceed total purchase by over $") . CoreLocal::get("dollarOver"),
@@ -70,9 +70,11 @@ class CheckTender extends TenderModule
                     having sum(case when trans_subtype='CK' then total else 0 end) < 0 
                     and sum(Case when trans_subtype='CA' then total else 0 end) > 0";
                 $dbc = Database::mDataConnect();
-                $chkR = $dbc->query($chkQ);
-                if ($dbc->num_rows($chkR) > 0) {
-                    return DisplayLib::xboxMsg(_("already used check over benefit today"), $clearButton);
+                if ($dbc !== false) {
+                    $chkR = $dbc->query($chkQ);
+                    if ($dbc->num_rows($chkR) > 0) {
+                        return DisplayLib::xboxMsg(_("already used check over benefit today"), $clearButton);
+                    }
                 }
             }
         } elseif( CoreLocal::get("isMember") == 0  && ($this->amount - CoreLocal::get("amtdue") - 0.005) > 0) { 

@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class CwLoadDataPage extends FanniePage {
@@ -60,6 +60,7 @@ class CwLoadDataPage extends FanniePage {
             if ($file[0] == '.') continue;
             if (substr($file,-9) != 'Model.php') continue;
             if ($file == 'CoreWarehouseModel.php') continue;
+            if ($file == 'IsMemCouponModel.php') continue;
             $ret[] = substr($file,0,strlen($file)-4);
         }
         rsort($ret);
@@ -114,14 +115,14 @@ if (basename(__FILE__) == basename($_SERVER['PHP_SELF'])){
     }
     else {
         function print_cli_help(){
-            echo "Usage: php CwReloadDataPage.php [-a || -m <model file>]\n";
+            echo "Usage: php CwReloadDataPage.php [-a || -x || -m <model file>]\n";
             echo "\t[ -d <year-month-day] || [-s <start month> <start year> [-e <end month> <end year>]]\n";
             echo "Specify a single date or a range of months.\n";
         }
         function check_date($argv, $i, $type)
         {
             if (!isset($argv[$i+1])){
-                throw new Excepion("Missing $type month\n");
+                throw new Exception("Missing $type month\n");
             } elseif (!isset($argv[$i+2])) {
                 throw new Exception("Missing $type year\n");
             }
@@ -201,6 +202,9 @@ if (basename(__FILE__) == basename($_SERVER['PHP_SELF'])){
             case '--all':
                 $all = True;
                 break;
+            case '-x':
+                $all = 1;
+                break;
             case '-h':
             case '-?':
             case '--help':
@@ -235,6 +239,8 @@ if (basename(__FILE__) == basename($_SERVER['PHP_SELF'])){
 
         $con = FannieDB::get($FANNIE_PLUGIN_SETTINGS['WarehouseDatabase']);
         foreach($models as $class){
+            if ($all === 1 && $class == "MemberSummaryModel") continue;
+            if ($all === 1 && $class == "SmoothedModel") continue;
             echo "Reloading data for $class\n";
             if (!class_exists($class))
                 include(dirname(__FILE__).'/models/'.$class.'.php');

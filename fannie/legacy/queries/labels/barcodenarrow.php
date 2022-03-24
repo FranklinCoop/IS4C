@@ -2,7 +2,7 @@
 include('../../../config.php');
 
 define('FPDF_FONTPATH','font/');
-require($FANNIE_ROOT.'src/fpdf/fpdf.php');
+require(__DIR__ . '/../../../src/fpdf/fpdf.php');
 
 /****Credit for the majority of what is below for barcode generation
  has to go to Olivier for posting the script on the FPDF.org scripts
@@ -173,7 +173,7 @@ while($row = $sql->fetchRow($result)){
    //Start laying out a label 
    $pdf->SetFont('Arial','',8);  //Set the font 
 
-   $words = split("[ ,-]",$desc);
+   $words = preg_split("/[ ,-]/",$desc);
    $limit = 13;
    $lineheight = 0;
    $curStr = "";

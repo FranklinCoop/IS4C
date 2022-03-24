@@ -21,6 +21,8 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\lib\Store;
+
 if (!class_exists('FannieAPI')) {
     include(dirname(__FILE__) . '/../classlib2.0/FannieAPI.php');
 }
@@ -136,6 +138,9 @@ class ItemEditorPage extends FanniePage
         if (FormLib::get_form_value('searchupc') !== '') {
             $this->mode = 'searchResults';
         }
+        if (FormLib::get('superFilter', false) !== false) {
+            $this->session->__superFilter = FormLib::get('superFilter');
+        }
 
         if (FormLib::get_form_value('createBtn') !== ''){
             $this->msgs = $this->saveItem(true);
@@ -174,28 +179,45 @@ class ItemEditorPage extends FanniePage
                     . $this->msgs
                     . '</blockquote>';
         }
+        $model = new SuperDeptNamesModel($this->connection);
+        $sOpts = $model->toOptions($this->session->__superFilter);
+        if ($this->session->__superFilter !== '') {
+            $this->addOnloadCommand("EXTRA_AUTO_COMPLETE_PARAMS = { superID: " . $this->session->__superFilter . " };");
+        }
         $ret = <<<HTML
 {$vars['msgs']}
-<form action="{$vars['self']}" method=get>
+<form action="{$vars['self']}" name="searchform" method=get>
     <div class="container-fluid">
         <div class="row form-group form-inline">
             <input name=searchupc type=text id=upc class="form-control" /> 
             {$vars['enter']}
-            <select name="ntype" class="form-control">
+            <select name="ntype" id="searchselect" class="form-control">
                 <option>UPC</option>
                 <option>SKU</option>
                 <option>Brand Prefix</option>
+                <option>Batch ID</option>
+                <option>Vendor ID</option>
+                <option>Product Physical Location</option>
+                <option>Owner Number</option>
             </select> 
             {$vars['orName']}
         </div>
     </div>
     <p>
-        <button name=searchBtn type=submit class="btn btn-default">Go</button>
+        <a name=searchBtn id="searchbtn" type=submit class="btn btn-default">Go</a>
         &nbsp;&nbsp;&nbsp;&nbsp;
         <label>
             <input type="checkbox" name="inUse" value="1" />
             Include items that are not inUse
         </label>
+    </p>
+    <p class="form-inline">
+        <label>Filter</label>:
+        <select class="form-control input-sm" name="superFilter"
+            onchange="if (this.value == '') { EXTRA_AUTO_COMPLETE_PARAMS = {}; } else { EXTRA_AUTO_COMPLETE_PARAMS = { superID: this.value }; }">
+            <option value="">No Filter</option>
+            {$sOpts}
+        </select>
     </p>
 </form>
 <p><a href="AdvancedItemSearch.php">{$vars['advancedSearch']}</a>
@@ -204,17 +226,17 @@ class ItemEditorPage extends FanniePage
 </p>
 HTML;
         
-        $this->add_script('autocomplete.js');
+        $this->addScript('autocomplete.js');
         $wsUrl = $FANNIE_URL . 'ws/';
-        $this->add_onload_command("bindAutoComplete('#upc', '$wsUrl', 'item');\n");
-        $this->add_onload_command('$(\'#upc\').focus();');
+        $this->addOnloadCommand("bindAutoComplete('#upc', '$wsUrl', 'item');\n");
+        $this->addOnloadCommand('$(\'#upc\').focus();');
 
-        $this->add_script($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.js?v=1');
-        $this->add_css_file($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.css');
-        $this->add_onload_command('$(\'.fancyboxLink\').fancybox({\'width\':\'85%;\'});');
+        $this->addScript($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.js?v=1');
+        $this->addCssFile($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.css');
+        $this->addOnloadCommand('$(\'.fancyboxLink\').fancybox({\'width\':\'85%;\'});');
 
         // bind scanner to UPC field
-        $this->add_onload_command("enableLinea('#upc');\n");
+        $this->addOnloadCommand("enableLinea('#upc');\n");
 
         return $ret;
     }
@@ -226,39 +248,48 @@ HTML;
         if (is_numeric($upc)) {
             switch($numType) {
                 case 'SKU':
-                    $query = "SELECT p.*,x.distributor,p.brand AS manufacturer 
+                    $query = "SELECT p.*,n.vendorName AS distributor,p.brand AS manufacturer 
                         FROM products as p inner join 
                         vendorItems as v ON p.upc=v.upc 
-                        left join prodExtra as x on p.upc=x.upc 
+                        left join vendors AS n ON p.default_vendor_id=n.vendorID
                         WHERE v.sku LIKE ? ";
                     $args[] = '%'.$upc;
                     break;
                 case 'Brand Prefix':
-                    $query = "SELECT p.*,x.distributor,p.brand AS manufacturer 
-                        FROM products as p left join 
-                        prodExtra as x on p.upc=x.upc 
+                    $query = "SELECT p.*,n.vendorName AS distributor,p.brand AS manufacturer 
+                        FROM products as p 
+                        left join vendors AS n ON p.default_vendor_id=n.vendorID
                         WHERE p.upc like ? ";
                     $args[] = '%'.$upc.'%';
                     break;
                 case 'UPC':
                 default:
                     $upc = BarcodeLib::padUPC($upc);
-                    $query = "SELECT p.*,x.distributor,p.brand AS manufacturer 
-                        FROM products as p left join 
-                        prodExtra as x on p.upc=x.upc 
+                    $query = "SELECT p.*,n.vendorName AS distributor,p.brand AS manufacturer 
+                        FROM products as p
+                        left join vendors AS n ON p.default_vendor_id=n.vendorID
                         WHERE p.upc = ? ";
                     $args[] = $upc;
                     $inUseFlag = 1; // exact matches should be allowed
                     break;
             }
         } else {
-            $query = "SELECT p.*,x.distributor,p.brand AS manufacturer 
-                FROM products AS p LEFT JOIN 
-                prodExtra AS x ON p.upc=x.upc
-                WHERE description LIKE ? 
-                    OR p.brand LIKE ?";
-            $args[] = '%'.$upc.'%';    
-            $args[] = '%'.$upc.'%';    
+            $superFilter = isset($this->session->__superFilter) && $this->session->__superFilter !== '';
+            $superJoin = $superFilter ? ' left join superdepts AS s ON p.department=s.dept_ID ' : '';
+            $query = "SELECT p.*,n.vendorName AS distributor,p.brand AS manufacturer 
+                FROM products AS p
+                    left join vendors AS n ON p.default_vendor_id=n.vendorID
+                    {$superJoin}
+                WHERE (description LIKE ? 
+                    OR n.vendorName LIKE ?
+                    OR p.brand LIKE ?)";
+            $args[] = '%'.$upc.'%';
+            $args[] = '%'.$upc.'%';
+            $args[] = '%'.$upc.'%';
+            if ($superFilter) {
+                $query .= " AND s.superID=? ";
+                $args[] = $this->session->__superFilter;
+            }
         }
         if (!$inUseFlag) {
             $query .= ' AND inUse=1 ';
@@ -302,6 +333,9 @@ HTML;
         $numType = FormLib::get_form_value('ntype','UPC');
         $inUseFlag = FormLib::get('inUse', false);
         $store_id = $this->config->get('STORE_ID');
+        if ($this->config->get('STORE_MODE') == 'HQ') {
+            $store_id = COREPOS\Fannie\API\lib\Store::getIdByIp(); 
+        }
 
         $query = "";
         $args = array();
@@ -389,9 +423,9 @@ HTML;
         }
         $ret .= '</tbody></table>';
 
-        $this->add_css_file($FANNIE_URL . 'src/javascript/tablesorter/themes/blue/style.css');
-        $this->add_script($FANNIE_URL . 'src/javascript/tablesorter/jquery.tablesorter.min.js');
-        $this->add_onload_command('$(\'#itemSearchResults\').tablesorter();');
+        $this->addCssFile($FANNIE_URL . 'src/javascript/tablesorter/themes/blue/style.css');
+        $this->addScript($FANNIE_URL . 'src/javascript/tablesorter/jquery.tablesorter.min.js');
+        $this->addOnloadCommand('$(\'#itemSearchResults\').tablesorter();');
 
         return $ret;
     }
@@ -450,16 +484,16 @@ HTML;
                         to edit</a>', $url, $self, $upc);
             $this->addOnloadCommand("\$(':input').prop('disabled', true).prop('title','Login to edit');\n");
         } elseif ($isNew) {
-            $ret .= '<button type="submit" name="createBtn" value="1"
+            $ret .= '<button type="submit" name="createBtn" value="'.$upc.'"
                         class="btn btn-default">Create Item</button>';
         } else {
-            $ret .= '<button type="submit" name="updateBtn" value="1"
+            $ret .= '<button type="submit" name="updateBtn" value="'.$upc.'"
                         class="btn btn-default">Update Item</button>';
         }
         $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
             <a class="btn btn-default btn-sm" href="' . $self . '">Back</a>';
-        $this->add_script($url . 'src/javascript/fancybox/jquery.fancybox-1.3.4.js?v=1');
-        $this->add_css_file($url . 'src/javascript/fancybox/jquery.fancybox-1.3.4.css');
+        $this->addScript($url . 'src/javascript/fancybox/jquery.fancybox-1.3.4.js?v=1');
+        $this->addCssFile($url . 'src/javascript/fancybox/jquery.fancybox-1.3.4.css');
         if (!$isNew) {
             $ret .= <<<HTML
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -473,11 +507,14 @@ HTML;
 <a class="btn btn-default btn-sm iframe fancyboxLink" 
     href="{$url}reports/RecentSales/?upc={$upc}" title="Sales History">Sales</a>
 <a class="btn btn-default btn-sm iframe fancyboxLink" 
-    href="{$url}reports/ItemBatches/ItemBatchesReport.php?upc={$upc}" 
-    title="Batch History">Batches</a>
-<a class="btn btn-default btn-sm iframe fancyboxLink" 
     href="{$url}reports/ItemOrderHistory/ItemOrderHistoryReport.php?upc={$upc}" 
     title="Order History">Orders</a>
+<a class="btn btn-default btn-sm iframe fancyboxLink" 
+    href="{$url}reports/ItemBatches/ItemBatchesReport.php?upc={$upc}" 
+    title="Batch History">Batches</a>
+<a class="btn btn-default btn-sm iframe fancyboxLink"
+    href="{$url}batches/batchhistory/BatchHistoryPage.php?upc={$upc}&nomenu=1"
+    title="Extended Histocal Batch Data">Batch Historical</a>
 </span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <a class="btn btn-default btn-sm iframe fancyboxLink" 
@@ -489,19 +526,19 @@ HTML;
 HTML;
         }
         $ret .= '</p>';
-
+        
         return $ret;
     }
-
+    
     private function editForm($upc,$isNew)
     {
         $FANNIE_PRODUCT_MODULES = $this->getConfiguredModules();
         $FANNIE_URL = $this->config->get('URL');
         $shown = array();
 
-        $this->add_script('autocomplete.js');
-        $this->add_script($FANNIE_URL . 'src/javascript/chosen/chosen.jquery.min.js');
-        $this->add_css_file($FANNIE_URL . 'src/javascript/chosen/bootstrap-chosen.css');
+        $this->addScript('autocomplete.js');
+        $this->addScript($FANNIE_URL . 'src/javascript/chosen/chosen.jquery.min.js');
+        $this->addCssFile($FANNIE_URL . 'src/javascript/chosen/bootstrap-chosen.css');
         $wsUrl = $FANNIE_URL . 'ws/';
 
         $authorized = $this->userCanEdit($upc, $isNew);
@@ -590,7 +627,9 @@ HTML;
         }
 
         $this->add_onload_command('$(\'.fancyboxLink\').fancybox({\'width\':\'85%;\',\'titlePosition\':\'inside\'});');
-        $this->add_onload_command('$(\'.price-input:visible:first\').focus();');
+        if ($this->mode == 'new') {
+            $this->add_onload_command('$(\'.descript-input:visible:first\').focus();');
+        }
         
         return $ret;
     }
@@ -601,7 +640,7 @@ HTML;
         $FANNIE_URL = $this->config->get('URL');
 
         $upc = FormLib::get_form_value('upc','');
-        if ($upc === '' || !is_numeric($upc)) {
+        if (($upc === '' && !$isNew) || !is_numeric($upc)) {
             return '<span style="color:red;">Error: bad UPC:</span> '.$upc;
         }
         $upc = BarcodeLib::padUPC($upc);
@@ -622,6 +661,14 @@ HTML;
         $FANNIE_COOP_ID = $this->config->get('COOP_ID');
         if (isset($FANNIE_COOP_ID) && $FANNIE_COOP_ID == 'WEFC_Toronto') {
             updateAllLanes($upc, array('products','productUser'));
+        } elseif (isset($FANNIE_COOP_ID) && $FANNIE_COOP_ID == 'WFC_Duluth') {
+            $queue = new COREPOS\Fannie\API\jobs\QueueManager();
+            $queue->add(array(
+                'class' => 'COREPOS\\Fannie\\API\\jobs\\SyncItem',
+                'data' => array(
+                    'upc' => $upc,
+                ),
+            ));
         } else {
             COREPOS\Fannie\API\data\ItemSync::sync($upc);
         }
@@ -642,6 +689,7 @@ HTML;
     private function saveModules($mods, $upc)
     {
         $form = new \COREPOS\common\mvc\FormValueContainer();
+        $this->connection->startTransaction();
         foreach ($mods as $class => $params) {
             $mod = new $class();
             $mod->setConnection($this->connection);
@@ -649,6 +697,7 @@ HTML;
             $mod->setForm($form);
             $mod->SaveFormData($upc);
         }
+        $this->connection->commitTransaction();
     }
 
     private function modulesResult($mods, $upc)
@@ -707,7 +756,7 @@ HTML;
                         when the item is entered</li>
                     <li>Discount controls which type of discounts apply to the item:
                         <ul>
-                        <li>Trans only means the item is only eligible for discounts that apply to
+                        <li>Trxn only means the item is only eligible for discounts that apply to
                         the entire transaction such as a member\'s discount</li>
                         <li>Line only means the item is only eligible for percent discount
                         explictly applied by the cashier as they ring in the item.</li>
@@ -719,6 +768,77 @@ HTML;
         }
 
         return $ret;
+    }
+
+    public function javascript_content()
+    {
+        return <<<JAVASCRIPT
+$(document).ready(function(){
+    alterTable();
+
+    // don't use default keyup on inputs
+    $('#upc').keyup(function(e){
+        e.preventDefault();
+        if (e.keyCode == 13) {
+            $('#searchbtn').trigger('click');
+        }
+    });
+    $('#searchselect').keyup(function(e){
+        if (e.keyCode == 13) {
+            $('#searchbtn').trigger('click');
+        }
+    });
+    $('#searchbtn').on('click', function(){
+        var opt = $('#searchselect option:selected').text();
+        var val = $('#upc').val();
+        switch (opt) {
+            case 'UPC':
+            case 'SKU':
+            case 'Brand Prefix':
+                document.forms['searchform'].submit();
+                break;
+            case 'Batch ID':
+                window.location = '../batches/newbatch/EditBatchPage.php?id='+val;
+                break;
+            case 'Vendor ID':
+                window.location = 'vendors/VendorIndexPage.php?vid='+val;
+                break;
+            case 'Product Physical Location':
+                window.location = 'ProdLocationEditor.php?store_id=&upc='+val+'&batchCheck=&searchupc=Update+Locations+by+UPC';
+                break;
+            case 'Owner Number':
+                window.location = '../mem/MemRedirect.php?id='+val;
+                break;
+        }
+    });
+});
+$(window).on("resize", function(event){
+    alterTable();
+});
+function alterTable()
+{
+    var windowWidth = $(window).width();
+    if (windowWidth < 768) {
+        $('table').find('td').each(function(){
+            var html = $(this).html();
+            $(this).replaceWith('<div class="form-inline">'+html+'</div>');
+        });
+        $('table').find('th').each(function(){
+            var html = $(this).html();
+            $(this).replaceWith('<div class="th-alt"><strong>'+html+'</strong></div>');
+        });
+    } else {
+        $('table').find('div.form-inline').each(function(){
+            var html = $(this).html();
+            $(this).replaceWith('<td class="form-inline">'+html+'</td>');
+        });
+        $('table').find('div.th-alt').each(function(){
+            var html = $(this).html();
+            $(this).replaceWith('<th>'+html+'</th>');
+        });
+   } 
+}
+JAVASCRIPT;
     }
     
     public function unitTest($phpunit)

@@ -23,13 +23,13 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class PatronageChecksReport extends FannieReportPage 
 {
     public $description = '[Patronage Checks] reports how many checks have been cashed for a given year.';
-    public $report_set = 'Membership';
+    public $report_set = 'Membership :: Patronage';
     public $themed = true;
 
     protected $header = "Patronage Checks Report";
@@ -108,6 +108,7 @@ class PatronageChecksReport extends FannieReportPage
         $q = '
             SELECT FY
             FROM patronage
+            WHERE FY > 0
             GROUP BY FY
             ORDER BY FY DESC';
         $r = $dbc->query($q);

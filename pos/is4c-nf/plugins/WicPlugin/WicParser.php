@@ -23,6 +23,7 @@
 
 use COREPOS\pos\parser\Parser;
 use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\PrehLib;
 use COREPOS\pos\lib\DisplayLib;
 
 class WicParser extends Parser 
@@ -31,7 +32,11 @@ class WicParser extends Parser
 
     public function check($str)
     {
-        if (CoreLocal::get('WicMode') && is_numeric($str) && strlen($str) < 15 && !$this->wicUPC($str)) {
+        if (substr($str, -3) == 'WIC' && is_numeric(substr($str, 0, strlen($str)-3))) {
+            $this->mode = 'etender';
+        } elseif (CoreLocal::get('WicMode') === 2 && $str != 'WIC') {
+            return false;
+        } elseif (CoreLocal::get('WicMode') && is_numeric($str) && strlen($str) < 15 && !$this->wicUPC($str)) {
             $this->mode = 'upc';
         } elseif (CoreLocal::get('WicMode') && preg_match('/\d+DP\d+/', $str)) {
             $this->mode = 'openring';
@@ -58,6 +63,8 @@ class WicParser extends Parser
             case 'menu':
                 $ret['main_frame'] = $plugin->pluginURL() . '/WicMenuPage.php';
                 return $ret;
+            case 'etender':
+                return PrehLib::tender('WI', str_replace('WIC', '', $str));
         }
 
         return $ret;
@@ -72,6 +79,8 @@ class WicParser extends Parser
 
     private function wicUPC($str)
     {
+        $dbc = Database::tDataConnect();
+        $dbc->query('UPDATE localtemptrans SET percentDiscount=0');
         $arr = CoreLocal::get('WicOverride');
         $upc = substr('0000000000000' . $str, -13);
         if (is_array($arr) && in_array(ltrim($str, '0'), $arr)) {
@@ -83,6 +92,9 @@ class WicParser extends Parser
             return true;
         }
         $dbc = Database::pDataConnect();
+        if (substr($upc, 0, 3) == '002') {
+            $upc = substr($upc, 0, 7) . '000000';
+        }
         $itemP = $dbc->prepare('SELECT wicable FROM products WHERE upc=?');
         $wicable = $dbc->getValue($itemP, array($upc));
         if ($wicable !== false  && $wicable == 0 && !in_array($upc, $this->bulk)) {

@@ -22,7 +22,7 @@
 *********************************************************************************/
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class NewMemberTool extends FanniePage 
@@ -78,6 +78,8 @@ class NewMemberTool extends FanniePage
                 $w['memtype'],$w['memDesc']);
         }
 
+        $unused = $this->getUnusedNumbers($dbc);
+
         $ret = '';
         if (!empty($this->errors)) {
             $ret .= '<div class="alert alert-danger well">';
@@ -99,7 +101,7 @@ class NewMemberTool extends FanniePage
         <div class="form-group">
             <label class="col-sm-2">How Many</label>
             <div class="col-sm-4">
-                <input type="number" name="num" value="40" class="form-control" required />
+                <input type="number" name="num" value="80" class="form-control" required />
             </div>
         </div>
         <div class="form-group">
@@ -124,6 +126,13 @@ class NewMemberTool extends FanniePage
             <button type="submit" name="createMems" value="Create Members"
                 class="btn btn-default">Create Members</button>
         </p>
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr><th>Unused Numbers</th></tr>
+            </thead>
+            <tbody><?php echo $unused; ?></tbody>
+            </table>
+
         </form>
         <?php
         $ret .= ob_get_clean();
@@ -199,30 +208,13 @@ class NewMemberTool extends FanniePage
         }
         */
 
-        /* going to create memberships
-           part of the insert arrays can
-           be prepopulated */
-        $meminfo = array(
-            'last_name'=>"''",
-            'first_name'=>"''",
-            'othlast_name'=>"''",
-            'othfirst_name'=>"''",
-            'street'=>"''",
-            'city'=>"''",
-            'state'=>"''",
-            'zip'=>"''",
-            'phone'=>"''",
-            'email_1'=>"''",
-            'email_2'=>"''",
-            'ads_OK'=>1
-        );
-
         /* everything's set but the actual member #s */
-        $numQ = $dbc->prepare("SELECT MAX(CardNo) FROM custdata");
+        $limit = $this->config->get('CARDNO_MAX', 1000000000);
+        $numQ = $dbc->prepare("SELECT MAX(CardNo) FROM custdata WHERE CardNo <= ?");
         if ($FANNIE_SERVER_DBMS == 'MSSQL') {
-            $numQ = $dbc->prepare("SELECT MAX(CAST(CardNo AS int)) FROM custdata");
+            $numQ = $dbc->prepare("SELECT MAX(CAST(CardNo AS int)) FROM custdata WHERE CAST(CardNo AS int) <= ?");
         }
-        $numR = $dbc->execute($numQ);
+        $numR = $dbc->execute($numQ, array($limit));
         $start = 1;
         if ($dbc->num_rows($numR) > 0) {
             $numW = $dbc->fetch_row($numR);
@@ -243,7 +235,7 @@ class NewMemberTool extends FanniePage
         $model = new CustdataModel($dbc);
         $model->personNum(1);
         $model->LastName($name);
-        $model->FirstName('');
+        $model->FirstName('New');
         $model->CashBack(999.99);
         $model->Balance(0);
         $model->memCoupons(0);
@@ -257,6 +249,7 @@ class NewMemberTool extends FanniePage
         $chkP = $dbc->prepare('SELECT CardNo FROM custdata WHERE CardNo=?');
         $mdP = $dbc->prepare("INSERT INTO memDates VALUES (?,NULL,NULL)");
         $mcP = $dbc->prepare("INSERT INTO memContact (card_no,pref) VALUES (?,1)");
+        $dbc->startTransaction();
         for($i=$start; $i<=$end; $i++) {
             // skip if record already exists
             $chkR = $dbc->execute($chkP,array($i));
@@ -273,8 +266,35 @@ class NewMemberTool extends FanniePage
             $dbc->execute($mdP, array($i));
             $dbc->execute($mcP, array($i));
         }
+        $dbc->commitTransaction();
 
         return $ret;
+    }
+
+    private function getUnusedNumbers($dbc) {
+        $unusedQ = $dbc->prepare("SELECT
+                    CONCAT(z.expected, IF(z.got-1>z.expected, CONCAT(' thru ',z.got-1), '')) AS missing
+                    FROM (
+                    SELECT
+                    @rownum:=@rownum+1 AS expected,
+                    IF(@rownum=CardNo, 0, @rownum:=CardNo) AS got
+                    FROM
+                    (SELECT @rownum:=0) AS a
+                    JOIN core_op.custdata where PersonNum=1 AND FirstName !=''
+                    ORDER BY CardNo
+                    ) AS z
+                    WHERE z.got!=0 ");
+        $unusedR = $dbc->execute($unusedQ);
+        $unused ='';
+        if ($unusedR) {
+            while($w = $dbc->fetch_row($unusedR)) {
+                $unused .= sprintf("<tr><td>%s</td></tr>", $w[0]);
+            } 
+        } else {
+            $unused .= "<tr><td>99999 members? wow we are doing great!</td></tr>";
+        }
+
+        return $unused;
     }
 
     public function helpContent()

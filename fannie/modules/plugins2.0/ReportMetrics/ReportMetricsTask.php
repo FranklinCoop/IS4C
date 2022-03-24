@@ -21,9 +21,11 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\data\pipes\OutgoingEmail;
+
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 /**
@@ -105,8 +107,8 @@ class ReportMetricsTask extends FannieTask
             $msg .= $l . "\n";
         }
 
-        if (class_exists('PHPMailer')) {
-            $mail = new PHPMailer();
+        if (OutgoingEmail::available()) {
+            $mail = OutgoingEmail::get();
             $mail->isSMTP();
             $mail->Host = '127.0.0.1';
             $mail->Port = 25;

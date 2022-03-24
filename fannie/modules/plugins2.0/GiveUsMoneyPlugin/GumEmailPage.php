@@ -21,9 +21,11 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\data\pipes\OutgoingEmail;
+
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 /**
@@ -119,7 +121,7 @@ class GumEmailPage extends FannieRESTfulPage
 
     public function get_id_loanstatement_handler()
     {
-        global $FANNIE_PLUGIN_SETTINGS, $FANNIE_OP_DB, $FANNIE_ROOT;
+        global $FANNIE_PLUGIN_SETTINGS, $FANNIE_OP_DB;
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['GiveUsMoneyDB']);
         $loan = new GumLoanAccountsModel($dbc);
         $loan->accountNumber($this->id);
@@ -132,12 +134,14 @@ class GumEmailPage extends FannieRESTfulPage
         // bridge may change selected database
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['GiveUsMoneyDB']);
 
-        $preamble = 'Hello Owner, ' . "\n";
+        $preamble = 'Hello Owner, ' . "\n\n";
         $preamble .= 'Here is a statement on your Owner loan to WFC as of '
             . date('m/d/Y', mktime(0, 0, 0, GumLib::getSetting('FYendMonth'), GumLib::getSetting('FYendDay'), date('Y')))
             . ', the end of the Co-op\'s fiscal year. This is just for your information -'
             . ' no action is required and you do not have to report interest income until your'
-            . ' loan is repaid. Thank you for your support.'
+            . ' loan is repaid.'
+            . "\n\n"
+            . 'Thank you for your support.'
             . ' If you have any questions, please contact finance@wholefoods.coop  (218) 728-0884, ext. 1.';
 
         $info_section = 'First Name: ' . $this->custdata->FirstName() . "\n"
@@ -196,7 +200,7 @@ class GumEmailPage extends FannieRESTfulPage
         $log->uid($uid);
         $log->messageType('Statement (' . $this->id . ')');
 
-        $mail = new PHPMailer();
+        $mail = OutgoingEmail::get();
         $mail->isSMTP();
         $mail->Host = '127.0.0.1';
         $mail->Port = 25;
@@ -205,6 +209,8 @@ class GumEmailPage extends FannieRESTfulPage
         $mail->FromName = 'Whole Foods Co-op';
         $mail->addReplyTo('finance@wholefoods.coop');
         $mail->addAddress($this->meminfo->email_1());
+        $mail->addBCC('dwelnetz@wholefoods.coop');
+        $mail->addBCC('andy@wholefoods.coop');
         $mail->isHTML(true);
         $mail->Subject = 'Owner Loan Statement';
         $mail->Body = $html;
@@ -373,7 +379,7 @@ class GumEmailPage extends FannieRESTfulPage
         $subject = 'SAMPLE WFC Owner Financing: Class C Stock Dividend';
         $to = $this->meminfo->email_1();
 
-        $mail = new PHPMailer();
+        $mail = OutgoingEmail::get();
         $mail->From = 'finance@wholefoods.coop';
         $mail->FromName = 'Whole Foods Co-op';
         $mail->AddAddress('andy@wholefoods.coop');

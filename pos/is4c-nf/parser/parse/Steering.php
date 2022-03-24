@@ -27,10 +27,11 @@ use COREPOS\pos\lib\DisplayLib;
 use COREPOS\pos\lib\MiscLib;
 use COREPOS\pos\lib\PrehLib;
 use COREPOS\pos\lib\TransRecord;
-use \CoreLocal;
 use COREPOS\pos\parser\Parser;
 use COREPOS\pos\lib\Drawers;
+use COREPOS\pos\lib\FormLib;
 use COREPOS\pos\lib\Kickers\Kicker;
+use \CoreLocal;
 
 /* --COMMENTS - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
  *
@@ -45,18 +46,12 @@ use COREPOS\pos\lib\Kickers\Kicker;
  */
 class Steering extends Parser 
 {
-    private $dest_input_page;
-    private $dest_main_page;
-    private $dest_scale;
     private $ret;
 
     function check($str)
     {
-        $my_url = MiscLib::baseURL();
+        $myUrl = MiscLib::baseURL();
         
-        $this->dest_input_page = "";
-        $this->dest_main_page = "";
-        $this->dest_scale = False;
         $this->ret = $this->default_json();
 
         // Argument to PV, either before or after.
@@ -69,35 +64,43 @@ class Steering extends Parser
         }
 
         // common error message
-        $repeat = CoreLocal::get('msgrepeat');
+        $repeat = $this->session->get('msgrepeat');
         $in_progress_msg = DisplayLib::boxMsg(
             _("transaction in progress"),
             '',
             true,
             DisplayLib::standardClearButton()
         );
-        CoreLocal::set('msgrepeat', $repeat);
+        $this->session->set('msgrepeat', $repeat);
 
         switch($str) {
             
             case 'CAB':
-                if (CoreLocal::get("LastID") != "0") {
+                if ($this->session->get("LastID") != "0") {
                     $this->ret['output'] = $in_progress_msg;
                 } else {
-                    $this->ret['main_frame'] = $my_url."gui-modules/cablist.php";
+                    $this->ret['main_frame'] = $myUrl."gui-modules/cablist.php";
+                }
+                return true;
+
+            case 'GIFT':
+                if ($this->session->get("LastID") != "0") {
+                    $this->ret['output'] = $in_progress_msg;
+                } else {
+                    $this->ret['main_frame'] = $myUrl."gui-modules/giftReceiptList.php";
                 }
                 return true;
 
             case "PV":
-                $this->ret['main_frame'] = $my_url."gui-modules/productlist.php";
+                $this->ret['main_frame'] = $myUrl."gui-modules/productlist.php";
                 if (isset($pvsearch) && $pvsearch != '') {
                     $this->ret['main_frame'] .= "?search=" . $pvsearch;
                 }
                 return true;
 
             case "MSTG":
-                if (CoreLocal::get('memType') == 1 || CoreLocal::get('memType') == 2) {
-                    // could this be CoreLocal::get('isMember') == 1
+                if ($this->session->get('memType') == 1 || $this->session->get('memType') == 2) {
+                    // could this be $this->session->get('isMember') == 1
                     // to avoid relying on specific memTypes?
                     $this->ret['output'] = DisplayLib::boxMsg(
                         _("Cannot UNset a member status"),
@@ -105,8 +108,8 @@ class Steering extends Parser
                         true,
                         DisplayLib::standardClearButton()
                     );
-                } elseif (CoreLocal::get("SecuritySR") > 20){
-                    $this->ret['main_frame'] = $my_url."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-MemStatusAdminLogin";
+                } elseif ($this->session->get("SecuritySR") > 20){
+                    $this->ret['main_frame'] = $myUrl."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-MemStatusAdminLogin";
                 } else {
                     $this->ret['output'] = DisplayLib::boxMsg(
                         _("You must be an admin to do this."),
@@ -118,38 +121,51 @@ class Steering extends Parser
                 return true;
 
             case "UNDO":
-                if (CoreLocal::get("LastID") != "0") {
+                if ($this->session->get("LastID") != "0") {
                     $this->ret['output'] = $in_progress_msg;
                 } else {
-                    $this->ret['main_frame'] = $my_url."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-UndoAdminLogin";
+                    $this->ret['main_frame'] = $myUrl."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-UndoAdminLogin";
                 }
                 return true;
 
             case 'SK':
             case "DDD":
-                $this->ret['main_frame'] = $my_url."gui-modules/DDDReason.php";
+                $this->ret['main_frame'] = $myUrl."gui-modules/DDDReason.php";
                 return true;
             case 'MG':
-                if (CoreLocal::get("SecuritySR") > 20) {
-                    $this->ret['main_frame'] = $my_url."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-SusResAdminLogin";
+                $this->ret['main_frame'] = $myUrl."gui-modules/adminlist.php";
+                if ($this->session->get("SecuritySR") > 20) {
+                    $this->ret['main_frame'] = $myUrl."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-SusResAdminLogin";
+                }
+                return true;
+            case 'RESUME':
+                if ($this->session->get("LastID") != "0") {
+                    $this->ret['output'] = $in_progress_msg;
                 } else {
-                    $this->ret['main_frame'] = $my_url."gui-modules/adminlist.php";
+                    $this->ret['main_frame'] = $myUrl."gui-modules/suspendedlist.php";
+                    if ($this->session->get("SecuritySR") > 20) {
+                        $this->ret['main_frame'] = $myUrl."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-SusResAdminLogin";
+                    }
+                }
+                return true;
+            case 'SUSPEND':
+                $token = FormLib::generateToken();
+                $this->ret['main_frame'] = "{$myUrl}gui-modules/adminlist.php?selectlist=SUSPEND&crsfToken={$token}";
+                if ($this->session->get("SecuritySR") > 20) {
+                    $this->ret['main_frame'] = $myUrl."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-SusResAdminLogin";
                 }
                 return true;
             case 'RP':
-                if (CoreLocal::get("LastID") != "0") {
-                    if (CoreLocal::get('receiptToggle') == 1) {
-                        CoreLocal::set("receiptToggle",0);
-                    } else {
-                        CoreLocal::set("receiptToggle",1);
-                    }
-                    $this->ret['main_frame'] = $my_url."gui-modules/pos2.php";
+                if ($this->session->get("LastID") != "0") {
+                    $tgl = $this->session->get('receiptToggle');
+                    $this->session->set('receiptToggle', $tgl == 1 ? 0 : 1);
+                    $this->ret['main_frame'] = $myUrl."gui-modules/pos2.php";
                 } else {
                     $dbc = Database::tDataConnect();
                     $query = "select register_no, emp_no, trans_no, "
                         ."sum((case when trans_type = 'T' then -1 * total else 0 end)) as total "
-                        ."from localtranstoday where register_no = " . CoreLocal::get("laneno")
-                        ." and emp_no = " . CoreLocal::get("CashierNo")
+                        ."from localtranstoday where register_no = " . $this->session->get("laneno")
+                        ." and emp_no = " . $this->session->get("CashierNo")
                         ." AND datetime >= " . $dbc->curdate()
                         ." group by register_no, emp_no, trans_no order by 1000 - trans_no";
                     $result = $dbc->query($query);
@@ -163,32 +179,41 @@ class Steering extends Parser
                             DisplayLib::standardClearButton()
                         );
                     } else {
-                        $this->ret['main_frame'] = $my_url."gui-modules/rplist.php";
+                        $this->ret['main_frame'] = $myUrl."gui-modules/rplist.php";
                     }
                 }                
                 return true;
 
             case 'ID':
-                $this->ret['main_frame'] = $my_url."gui-modules/memlist.php";
+                $this->ret['main_frame'] = $myUrl."gui-modules/memlist.php";
                 return true;
 
             case 'DDM':
-                $this->ret['main_frame'] = $my_url.'gui-modules/drawerPage.php';
+                $this->ret['main_frame'] = $myUrl.'gui-modules/drawerPage.php';
                 return true;
+                
+            case 'RO':
+                if ($this->session->get("LastID") != 0) {
+                    $this->ret['output'] = $in_progress_msg;
+                } else {
+                    $this->ret['main_frame'] = $myUrl."gui-modules/TransList.php";
+                }
+                return true;
+
             case 'SS':
             case 'SO':
                 // sign off and suspend shift are identical except for
                 // drawer behavior
-                if (CoreLocal::get("LastID") != 0) {
+                if ($this->session->get("LastID") != 0) {
                     $this->ret['output'] = $in_progress_msg;
                 } else {
                     TransRecord::addLogRecord(array(
                         'upc' => 'SIGNOUT',
-                        'description' => 'Sign Out Emp#' . CoreLocal::get('CashierNo'),
+                        'description' => 'Sign Out Emp#' . $this->session->get('CashierNo'),
                     ));
                     Database::setglobalvalue("LoggedIn", 0);
-                    CoreLocal::set("LoggedIn",0);
-                    CoreLocal::set("training",0);
+                    $this->session->set("LoggedIn",0);
+                    $this->session->set("training",0);
                     /**
                       An empty transaction may still contain
                       invisible, logging records. Rotate those
@@ -199,45 +224,72 @@ class Steering extends Parser
                         Database::clearTempTables();
                     }
                     if ($str == 'SO') {
+                        $drawer = new Drawers($this->session, Database::pDataConnect());
                         if (session_id() != '') {
                             session_write_close();
                         }
-                        $kicker_object = Kicker::factory(CoreLocal::get('kickerModule'));
+                        $kicker_object = Kicker::factory($this->session->get('kickerModule'));
                         if ($kicker_object->kickOnSignOut()) {
-                            Drawers::kick();
+                            $drawer->kick();
                         }
-                        Drawers::free(Drawers::current());
+                        $drawer->free($drawer->current());
                     }
-                    $this->ret['main_frame'] = $my_url."login.php";
+                    $this->ret['main_frame'] = $myUrl."login.php";
                 }
                 return true;
 
             case 'NS':
-                if (CoreLocal::get("LastID") != 0) {
+                if ($this->session->get("LastID") != 0) {
                     $this->ret['output'] = $in_progress_msg;
                 } else {
-                    $this->ret['main_frame'] = $my_url."gui-modules/nslogin.php";
+                    $this->ret['main_frame'] = $myUrl."gui-modules/nslogin.php";
                 }
                 return true;
 
             case 'GD':
-                $this->ret['main_frame'] = $my_url."gui-modules/giftcardlist.php";
+                $this->ret['main_frame'] = $myUrl."gui-modules/giftcardlist.php";
                 return true;
 
             case 'IC':
-                $this->ret['main_frame'] = $my_url."gui-modules/HouseCouponList.php";
+                $this->ret['main_frame'] = $myUrl."gui-modules/HouseCouponList.php";
                 return true;
 
             case "CN":
-                $this->ret['main_frame'] = $my_url."gui-modules/mgrlogin.php";
+                if ($this->tenderApplied()) {
+                    $this->ret['output'] = DisplayLib::boxMsg(
+                        _("Tender Applied"),
+                        _('Cancel not allowed.'),
+                        true,
+                        DisplayLib::standardClearButton()
+                    );
+                } else {
+                  $this->ret['main_frame'] = $myUrl."gui-modules/mgrlogin.php";             
+                }
+
                 return true;
 
             case "PO":
-                $this->ret['main_frame'] = $my_url."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-PriceOverrideAdminLogin";
+                $this->ret['main_frame'] = $myUrl."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-PriceOverrideAdminLogin";
+                return true;
+
+            case 'HELP':
+                $this->ret['main_frame'] = $myUrl . 'gui-modules/help/HelpPage.php';
                 return true;
         }
 
         return false;
+    }
+
+    function tenderApplied() {
+        if (CoreLocal::get('store') == 'McCuskers' || CoreLocal::get('store')=='GreenFieldsMarket' || CoreLocal::get('store') == 'FranklinCoop') {
+            $dbc = Database::tDataConnect();
+            $query = "select * from localtemptrans where trans_type ='T' and trans_subtype IN('CC','DC','EF','EC','GD') group by trans_type;";
+            $result = $dbc->query($query);
+            if ($dbc->numRows($result) > 0){
+                return true;
+            }
+        }
+        return  false;
     }
 
     public function parse($str)

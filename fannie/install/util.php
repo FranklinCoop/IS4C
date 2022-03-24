@@ -75,6 +75,13 @@ function confset($key, $value)
     fclose($fptr);
 }
 
+/**
+  Briefly connect to host to verify it's accepting
+  network connections
+  @param $host [string] host name
+  @param $dbms [string] database software identifier
+  @return [boolean]
+*/
 function check_db_host($host,$dbms)
 {
     if (!function_exists("socket_create")) {
@@ -95,6 +102,7 @@ function check_db_host($host,$dbms)
             $port = 1433;
             break;    
         case 'PGSQL':
+        case 'POSTGRES9':
             $port = 5432;
             break;
         default:
@@ -119,7 +127,7 @@ function check_db_host($host,$dbms)
 
 function db_test_connect($host,$type,$db,$user,$pw){
     if (!check_db_host($host,$type))
-        return False;
+        return "Database host {$host} does not appear to be online";
 
     if (!class_exists('SQLManager'))
         include(dirname(__FILE__) . '/../src/SQLManager.php');
@@ -127,12 +135,14 @@ function db_test_connect($host,$type,$db,$user,$pw){
     try {
         $sql = new SQLManager($host,$type,$db,$user,$pw);
     }
-    catch(Exception $ex) {}
+    catch(Exception $ex) {
+        return $ex->getMessage();
+    }
     
     if ($sql === False || $sql->connections[$db] === False)
-        return False;
-    else
-        return $sql;
+        return 'Database connection failed';
+
+    return $sql;
 }
 
 function showInstallTabs($current,$path='') {
@@ -441,6 +451,33 @@ function installSelectField($name, &$current_value, $options, $default_value='',
         $ret .= "\n";
     }
     $ret .= '</select>' . "\n";
+
+    return $ret;
+}
+
+function installMultiSelectField($name, &$current_value, $options, $default_value=array())
+{
+    if (FormLib::get($name, false) !== false) {
+        $current_value = FormLib::get($name);
+    } elseif ($current_value === null) {
+        $current_value = $default_value;
+    }
+
+    if (!is_array($current_value)) {
+        $current_value = array();
+    }
+    $saveStr = 'array('
+        . implode(',', array_map(function ($i) { return "'" . $i . "'"; }, $current_value))
+        . ')';
+    confset($name, $saveStr);
+
+    $ret = '<select name="' . $name . '[]" class="form-control" multiple size="5">' . "\n";
+    foreach ($options as $opt) {
+        $cleaned = str_replace('\\', '-', $opt);
+        $selected = in_array($opt, $current_value) || in_array($cleaned, $current_value);
+        $ret .= sprintf('<option %s value="%s">%s</option>', ($selected ? 'selected' : ''), $cleaned, $opt);
+    }
+    $ret .= '</select>';
 
     return $ret;
 }

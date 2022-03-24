@@ -34,6 +34,7 @@ class LikeCodePricingReport extends FannieReportPage
     protected $required_fields = array();
 
     public $description = '[Like Code Pricing] lists current pricing for likecodes';
+    public $report_set = 'Price Reports';
     protected $report_headers = array('LC#', 'Price', 'Like Code');
     protected $new_tablesorter = true;
 
@@ -52,7 +53,7 @@ class LikeCodePricingReport extends FannieReportPage
             FROM upcLike AS u
                 INNER JOIN likeCodes AS l ON l.likeCode=u.likeCode
                 INNER JOIN products AS p ON p.upc=u.upc
-            GROUP BY u.likeCode
+            GROUP BY u.likeCode, l.likeCodeDesc
             ORDER BY u.likeCode");
         $data = array();
         while ($row = $dbc->fetchRow($res)) {

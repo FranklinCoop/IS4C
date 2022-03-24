@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class StoreDiffMovementReport extends FannieReportPage 
@@ -78,6 +78,9 @@ class StoreDiffMovementReport extends FannieReportPage
         }
 
         $upcs = array_keys($data);
+        if (count($upcs) == 0) {
+            return array();
+        }
         $start_date = FormLib::getDate('date1', date('Y-m-d'));
         $end_date = FormLib::getDate('date2', date('Y-m-d'));
         $dlog = DTransactionsModel::selectDlog($start_date, $end_date);

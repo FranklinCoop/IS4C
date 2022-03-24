@@ -61,28 +61,38 @@ Make sure to set MassStateTaxFreeOff to run to reenable taxes.';
     */
     public function run()
     {
-		global $FANNIE_OP_DB, $FANNIE_LANES, $FANNIE_TRANS_DB;
-		$dbc = FannieDB::get($FANNIE_TRANS_DB);
-		foreach($FANNIE_LANES as $f){
-		    $dbc->add_connection($f['host'],$f['type'],$f['trans'],$f['user'],$f['pw']);
-		    if ($dbc->connections[$f['trans']] === False){
-		        echo cron_msg('Cannot connect to '.$f['host']);
-				echo 'Cannot connect to '.$f['host'].'\n';
+		global $FANNIE_OP_DB, $FANNIE_TRANS_DB;
+		$FANNIE_LANES = FannieConfig::config('LANES');
+        $dbc = FannieDB::get($FANNIE_TRANS_DB);
+		//tax off server
+        $query = 'UPDATE core_op.taxrates SET rate = ? WHERE id = ?';
+        $args = array(0.0, 1);//asummes sales tax is id 1 change as needed
+        $prep = $dbc->prepare($query);
+        $result = $dbc->execute($prep,$args,$lane['trans']);
+        
+        for ($i = 0; $i < count($FANNIE_LANES); $i++) {
+            if (isset($FANNIE_LANES[$i]['offline']) && $FANNIE_LANES[$i]['offline']) {
+                continue;
+            }
+            $lane = $FANNIE_LANES[$i];
+		    $dbc->addConnection($lane['host'],$lane['type'],$lane['trans'],$lane['user'],$lane['pw']);
+		    if ($dbc->connections[$lane['trans']] === False){
+		        echo cron_msg('Cannot connect to '.$lane['host']);
+				echo 'Cannot connect to '.$lane['host'].'\n';
 		        continue;
 		    }
 			
-		    if (!$dbc->table_exists('taxrates', $f['trans'])) {
-		        continue;
+		    if (!$dbc->table_exists('taxrates', $lane['trans'])) {
+		        echo cron_msg('No tacrates table on: '.$lane['trans']);
+                echo 'No Tax Rates Table on:  '.$lane['trans'].'\n';
+                continue;
 		    }
 			
-			$args = array(0.0, 'SalesTax');
-			$query = 'UPDATE taxrates SET rate = ? WHERE description = ?';
+			$query = 'UPDATE taxrates SET rate = ? WHERE id = ?';
 			
-			$prep = $dbc->prepare_statement($query, $f['trans']);
-			$result = $dbc->exec_statement($prep,$args);
+			$prep = $dbc->prepare($query);
+			$result = $dbc->execute($prep,$args,$lane['trans']);
 			
-			
-		    //$resutls = $dbc->query('UPDATE taxrates SET rate = ? WHERE description = ?', $connection ,$args);
 			
 		}
     }

@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class NewMemsByZipReport extends FannieReportPage 
@@ -94,7 +94,7 @@ class NewMemsByZipReport extends FannieReportPage
         list($inStr, $args) = $dbc->safeInClause($eq_depts);
         $prep = $dbc->prepare('SELECT dept_no, dept_name FROM departments WHERE dept_no IN (' . $inStr . ') ORDER BY dept_no');
         $res = $dbc->execute($prep, $args);
-        $dOpts = array();
+        $dOpts = '';
         while ($row = $dbc->fetchRow($res)) {
             $dOpts .= sprintf('<option value="%d">%s</option>', $row['dept_no'], $row['dept_name']);
         }

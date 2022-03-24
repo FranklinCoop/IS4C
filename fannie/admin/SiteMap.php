@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT . 'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class SiteMap extends FannieRESTfulPage
@@ -43,10 +43,6 @@ class SiteMap extends FannieRESTfulPage
         $pages = FannieAPI::listModules('FanniePage');
         $sets = array();
         $help = array(
-            'done' => 0,
-            'total' => 0,
-        );
-        $test_stats = array(
             'done' => 0,
             'total' => 0,
         );
@@ -74,20 +70,13 @@ class SiteMap extends FannieRESTfulPage
             $help['total']++;
             if ($obj->helpContent() && substr($obj->helpContent(),0,17) != '<!-- need doc -->') {
                 $help['done']++;
-                $sets[$obj->page_set][$p]['help'] = 'alert-success';
+                $sets[$obj->page_set][$p]['help'] = 'collapse';
             } else {
                 $sets[$obj->page_set][$p]['help'] = 'alert-danger';
             }
-            $test_stats['total']++;
-            if ($obj->has_unit_tests) {
-                $test_stats['done']++;
-                $sets[$obj->page_set][$p]['test'] = 'alert-success';
-            } else {
-                $sets[$obj->page_set][$p]['test'] = 'alert-danger';
-            }
         }
 
-        return array($sets, $help, $test_stats);
+        return array($sets, $help);
     }
 
     private function printPageSet($sets, $set_name)
@@ -104,12 +93,10 @@ class SiteMap extends FannieRESTfulPage
                 $linked .= ' (<a href="' . $url . '">Link</a>)';
             }
             $ret .= sprintf('<li>%s 
-                <span class="%s">Help</span>
-                <span class="%s">Tested</span>
+                <span class="%s">Internal Help Missing</span>
                 </li>',
                 $linked,
-                $sets[$set_name][$page_key]['help'],
-                $sets[$set_name][$page_key]['test']
+                $sets[$set_name][$page_key]['help']
             );
         }
         $ret .= '</ul>';
@@ -120,14 +107,12 @@ class SiteMap extends FannieRESTfulPage
 
     public function get_view()
     {
-        list($sets, $help, $test_stats) = $this->getPages();
+        list($sets, $help) = $this->getPages();
 
         $ret = '';
         $ret .= '<div class="alert alert-info">';
         $ret .= sprintf('New UI help content percent: <strong>%.2f%%</strong><br />', 
             ((float)$help['done']) / $help['total'] * 100);
-        $ret .= sprintf('Unit test coverage for pages: <strong>%.2f%%</strong><br />', 
-            ((float)$test_stats['done']) / $test_stats['total'] * 100);
         $ret .= '</div>';
 
         $keys = array_keys($sets);
@@ -143,10 +128,10 @@ class SiteMap extends FannieRESTfulPage
 
     public function helpContent()
     {
-        return '<p>A list of all known Fannie tools and reports including those
+        return _('<p>A list of all known Fannie tools and reports including those
             provided by plugins. Pages <em>may</em> opt out of this list but the
             vast majority do not. This is provided to ensure users can locate
-            most everything regardless of how the menus are set up.</p>';
+            most everything regardless of how the menus are set up.</p>');
     }
 
     public function unitTest($phpunit)

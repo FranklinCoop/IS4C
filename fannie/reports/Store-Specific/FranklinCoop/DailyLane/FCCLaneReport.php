@@ -59,13 +59,13 @@ class FCCLaneReport extends FannieReportPage
 		else
 			$shrinkageUsers = "";
 
-		$dlog = DTransactionsModel::selectDlog($d1);
+		$dlog = DTransactionsModel::selectDTrans($d1);
 
 		$total_sales = $dbc->prepare("SELECT 
             sum(case when trans_subtype='CA' then -total else 0 end) + 500 as cash_total,
             sum(case when trans_subtype='CK' and total<0 then 1 else 0 end) as check_number,
             sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
-            sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
+            sum(case when department='902' then -total else 0 end) as gift_sold_number,
             sum(case when department='992' then total else 0 end) as member_payment_total,
             sum(case when department='990' then total else 0 end) as charge_payment_total,
             sum(case when department='995' then -total else 0 end) as paid_in_total,
@@ -74,14 +74,14 @@ class FCCLaneReport extends FannieReportPage
             sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
             sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
             sum(case when trans_subtype='GD' then -total else 0 end) as gift_total,
-            sum(case when trans_subtype in ('CC','EF','EC','DC','GD','TC') then -total else 0 end) as card_media_total,
+            sum(case when trans_subtype in ('CC','EF','EC','DC','GD') then -total else 0 end) as card_media_total,
             sum(case when trans_subtype='TC' AND trans_type ='T' then -total else 0 end) as paper_gift_total,
             sum(case when trans_subtype='MI' then -total else 0 end) as store_charge_total,
             sum(case when department='994' then -total else 0 end) as paid_out_total,
             sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
             sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total
-            FROM core_trans.dlog_90_view
-            WHERE tdate BETWEEN ? AND ?;");
+            FROM ".$dlog."
+            WHERE `datetime` BETWEEN ? AND ? AND store_id =2 and trans_status !='X'");
         $totalSalesR = $dbc->execute($total_sales,$dates);
         $totalSalesW = $dbc->fetch_row($totalSalesR);
 
@@ -89,7 +89,7 @@ class FCCLaneReport extends FannieReportPage
 			sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
 			sum(case when trans_subtype='CK' and total<0 then 1 else 0 end) as check_number,
 			sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
-			sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
+			sum(case when department='902' then -total else 0 end) as gift_sold_number,
 			sum(case when department='992' then total else 0 end) as member_payment_total,
 			sum(case when department='990' then total else 0 end) as charge_payment_total,
 			sum(case when department='995' then -total else 0 end) as paid_in_total,
@@ -98,14 +98,14 @@ class FCCLaneReport extends FannieReportPage
 			sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
 			sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
 			sum(case when trans_subtype='GD' then -total else 0 end) as gift_total,
-			sum(case when trans_subtype in ('CC','EF','EC','DC','GD','TC') then -total else 0 end) as card_media_total,
+			sum(case when trans_subtype in ('CC','EF','EC','DC','GD') then -total else 0 end) as card_media_total,
 			sum(case when trans_subtype='TC' AND trans_type ='T' then -total else 0 end) as paper_gift_total,
 			sum(case when trans_subtype='MI' then -total else 0 end) as store_charge_total,
 			sum(case when department='994' then -total else 0 end) as paid_out_total,
 			sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
 			sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total
-			FROM core_trans.dlog_90_view
-			WHERE register_no='1' and tdate BETWEEN ? AND ?;");
+			FROM ".$dlog."
+			WHERE register_no in (1,21) and `datetime` BETWEEN ? AND ? AND store_id =2 and trans_status !='X'");
         $lane1SalesR = $dbc->execute($lane1Sales,$dates);
         $lane1SalesW = $dbc->fetch_row($lane1SalesR); 
 
@@ -113,7 +113,7 @@ class FCCLaneReport extends FannieReportPage
 			sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
 			sum(case when trans_subtype='CK' and total<0 then 1 else 0 end) as check_number,
 			sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
-			sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
+			sum(case when department='902' then -total else 0 end) as gift_sold_number,
 			sum(case when department='992' then total else 0 end) as member_payment_total,
 			sum(case when department='990' then total else 0 end) as charge_payment_total,
 			sum(case when department='995' then -total else 0 end) as paid_in_total,
@@ -122,14 +122,14 @@ class FCCLaneReport extends FannieReportPage
 			sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
 			sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
 			sum(case when trans_subtype='GD' then -total else 0 end) as gift_total,
-			sum(case when trans_subtype in ('CC','EF','EC','DC','GD','TC') then -total else 0 end) as card_media_total,
+			sum(case when trans_subtype in ('CC','EF','EC','DC','GD') then -total else 0 end) as card_media_total,
 			sum(case when trans_subtype='TC' AND trans_type ='T' then -total else 0 end) as paper_gift_total,
 			sum(case when trans_subtype='MI' then -total else 0 end) as store_charge_total,
 			sum(case when department='994' then -total else 0 end) as paid_out_total,
 			sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
 			sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total
-			FROM core_trans.dlog_90_view
-			WHERE register_no='2' and tdate BETWEEN ? AND ?;");
+			FROM ".$dlog."
+			WHERE register_no in (2,22) and `datetime` BETWEEN ? AND ? AND store_id =2 and trans_status !='X'");
         $lane2SalesR = $dbc->execute($lane2Sales,$dates);
         $lane2SalesW = $dbc->fetch_row($lane2SalesR);
 
@@ -137,7 +137,7 @@ class FCCLaneReport extends FannieReportPage
 			sum(case when trans_subtype='CA' then -total else 0 end) + 250 as cash_total,
 			sum(case when trans_subtype='CK' and total<0 then 1 else 0 end) as check_number,
 			sum(case when trans_subtype='CK' then -total else 0 end) as check_total,
-			sum(case when upc='0000000001930' then -total else 0 end) as gift_sold_number,
+			sum(case when department='902' then -total else 0 end) as gift_sold_number,
 			sum(case when department='992' then total else 0 end) as member_payment_total,
 			sum(case when department='990' then total else 0 end) as charge_payment_total,
 			sum(case when department='995' then -total else 0 end) as paid_in_total,
@@ -146,14 +146,14 @@ class FCCLaneReport extends FannieReportPage
 			sum(case when trans_subtype='EF' AND trans_type ='T' then -total else 0 end) as snap_total,
 			sum(case when trans_subtype='EC' AND trans_type ='T' then -total else 0 end) as snap_cash_total,
 			sum(case when trans_subtype='GD' then -total else 0 end) as gift_total,
-			sum(case when trans_subtype in ('CC','EF','EC','DC','GD','TC') then -total else 0 end) as card_media_total,
+			sum(case when trans_subtype in ('CC','EF','EC','DC','GD') then -total else 0 end) as card_media_total,
 			sum(case when trans_subtype='TC' AND trans_type ='T' then -total else 0 end) as paper_gift_total,
 			sum(case when trans_subtype='MI' then -total else 0 end) as store_charge_total,
 			sum(case when department='994' then -total else 0 end) as paid_out_total,
 			sum(case when trans_subtype='IC' then -total else 0 end) as store_coupon_total,
 			sum(case when trans_subtype='CP' OR trans_subtype='MC' then -total else 0 end) as mfg_coupon_total
-			FROM core_trans.dlog_90_view
-			WHERE register_no='3' and tdate BETWEEN ? AND ?;");
+			FROM ".$dlog."
+			WHERE register_no in (3,23) and `datetime` BETWEEN ? AND ? AND store_id =2 and trans_status !='X'");
         $lane3SalesR = $dbc->execute($lane3Sales,$dates);
         $lane3SalesW = $dbc->fetch_row($lane3SalesR);
         $report = array();  

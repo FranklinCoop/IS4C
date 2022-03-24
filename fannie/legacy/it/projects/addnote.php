@@ -1,7 +1,7 @@
 <?php
 include('../../../config.php');
-if (!class_exists("SQLManager")) require_once($FANNIE_ROOT."src/SQLManager.php");
-include($FANNIE_ROOT.'src/Credentials/projects.wfc.php');
+if (!class_exists("SQLManager")) require_once(__DIR__ . "/../../../src/SQLManager.php");
+include(__DIR__ . '/../../../src/Credentials/projects.wfc.php');
 
 if(isset($_POST['name'])){
     
@@ -11,7 +11,7 @@ if(isset($_POST['name'])){
   $notes = preg_replace('/\n/','<br />',$_POST['notes']);
   $date = date("y/m/d : H:i:s",time());
 
-  $q $sql->prepare("insert into project_notes values(?, ?, ?, ?)");
+  $q = $sql->prepare("insert into project_notes values(?, ?, ?, ?)");
   $r = $sql->execute($q, array($projID, $name, $notes, $date));
 
   // get the project description
@@ -58,7 +58,7 @@ if(isset($_POST['name'])){
 else {
   $projID = $_GET['projID'];
 
-  require($FANNIE_ROOT.'auth/login.php');
+  require(__DIR__ . '/../../../auth/login.php');
   $user = validateUserQuiet('projects');
 
   ?>

@@ -22,6 +22,9 @@
 *********************************************************************************/
 
 namespace COREPOS\Fannie\API\member;
+use COREPOS\common\mvc\ValueContainer;
+use \FannieDB;
+use \FannieConfig;
 
 class MemberModule
 {
@@ -29,6 +32,13 @@ class MemberModule
     const META_WIDTH_FULL = 100;
     const META_WIDTH_HALF = 50;
     const META_WIDTH_THIRD = 33;
+
+    protected $form;
+
+    public function setForm(ValueContainer $form)
+    {
+        $this->form = $form;
+    }
 
     /**
       Get connection to member database
@@ -40,7 +50,7 @@ class MemberModule
             include_once(dirname(__FILE__) . '/../data/FannieDB.php');
         }
 
-        return \FannieDB::get(\FannieConfig::factory()->get('OP_DB'));
+        return FannieDB::get(FannieConfig::factory()->get('OP_DB'));
     }
 
     public function width()

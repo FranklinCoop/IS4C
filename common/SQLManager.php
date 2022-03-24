@@ -22,13 +22,12 @@
 *********************************************************************************/
 
 namespace COREPOS\common;
+use COREPOS\common\sql\CharSets;
+use COREPOS\common\sql\Result;
+use \Exception;
 
 if (!function_exists("ADONewConnection")) {
-    if (file_exists(dirname(__FILE__) . '/../vendor/adodb/adodb-php/adodb.inc.php')) {
-        include(dirname(__FILE__) . '/../vendor/adodb/adodb-php/adodb.inc.php');
-    } else {
-        include(dirname(__FILE__).'/adodb5/adodb.inc.php');
-    }
+    include(dirname(__FILE__).'/adodb5/adodb.inc.php');
 }
 
 
@@ -43,12 +42,23 @@ if (!function_exists("ADONewConnection")) {
 */
 class SQLManager 
 {
+    /**
+     Logging object (PSR-3)
+    */
     private $QUERY_LOG; 
+
+    /**
+     In debug mode all queries are logged
+     even if they succeed
+    */
+    private $debug_mode = false;
 
     /** Array of connections **/
     public $connections;
     /** Default database connection */
     public $default_db;
+
+    protected $reconnect_info = array();
 
     /** throw exception on failed query **/
     protected $throw_on_fail = false;
@@ -58,23 +68,27 @@ class SQLManager
 
     protected $last_connect_error = false;
 
-    /** Constructor
+    /** 
+        Create an initial connection to the database. Will
+        attempt to create the database if it does not exist
+        and permissions allow.
+
         @param $server Database server host
         @param $type Database type. Most supported are
-        'mysql' and 'mssql' but anything ADOdb supports
+        'mysqli' and 'pdo_mysql' but anything ADOdb supports
         will kind of work
         @param $database Database name
         @param $username Database username
         @param $password Database password
-        @param $persistent Make persistent connection.
-        @param $new Force new connection
+        @param [obsolete] $persistent Make persistent connection.
+        @param [obsolote] $new Force new connection
     */
     public function __construct($server,$type,$database,$username,$password='',$persistent=false, $new=false)
     {
         $this->connections=array();
-        $this->default_db = $database;
         $this->addConnection($server,$type,$database,$username,$password,$persistent,$new);
         if ($this->isConnected($database)) {
+            $this->default_db = $database;
             $adapter = $this->getAdapter(strtolower($type));
             $this->query($adapter->useNamedDB($database));
         }
@@ -106,16 +120,18 @@ class SQLManager
         return $conn;
     }
 
-    /** Add another connection
+    /** Add another connection. If the specified database does not
+        exist this method will attempt to create it.
+
         @param $server Database server host
         @param $type Database type. Most supported are
-        'mysql' and 'mssql' but anything ADOdb supports
+        'mysqli' and 'pdo_mysql' but anything ADOdb supports
         will kind of work
         @param $database Database name
         @param $username Database username
         @param $password Database password
-        @param $persistent Make persistent connection.
-        @param $new Force new connection
+        @param [obsolete] $persistent Make persistent connection.
+        @param [obsolete] $new Force new connection
 
         When dealing with multiple connections, user the
         database name to distinguish which is to be used
@@ -123,30 +139,72 @@ class SQLManager
     public function addConnection($server,$type,$database,$username,$password='',$persistent=false,$new=false)
     {
         if (empty($type)) {
-            return false;
+            throw new Exception("Database type is required");
+        } elseif (strtolower($type) == 'postgres9') {
+            // value here is really schema. Database name must match user name.
+            $savedDB = $database;
+            $database = $username;
+        } elseif (strtolower($type) == 'mysql' && version_compare(PHP_VERSION, '7.0.0') >= 0) {
+            if (function_exists('mysqli_connect')) {
+                $type = 'mysqli';
+            } elseif (class_exists('PDO', false)) {
+                $type = 'pdo_mysql';
+            } else {
+                throw new Exception("mysql driver is not supported on PHP 7+. Use msyqli or PDO");
+            }
         }
 
         $conn = ADONewConnection($this->isPDO($type) ? 'pdo' : $type);
         $conn->SetFetchMode(ADODB_FETCH_BOTH);
         $conn = $this->setConnectTimeout($conn, $type);
-        $connected = false;
-        if (isset($this->connections[$database]) || $new) {
-            $connected = $conn->NConnect($this->getDSN($server,$type,$database),$username,$password,$database);
-        } elseif ($persistent) {
-            $connected = $conn->PConnect($this->getDSN($server,$type,$database),$username,$password,$database);
-        } else {
+        if ($database) {
             $connected = $conn->Connect($this->getDSN($server,$type,$database),$username,$password,$database);
+        } else {
+            $connected = $conn->Connect($this->getDSN($server,$type,false),$username,$password);
         }
         $conn = $this->clearConnectTimeout($conn, $type);
-        $this->connections[$database] = $conn;
+
+        if (strtolower($type) == 'postgres9') {
+            $database = $savedDB;
+        }
+        $this->connections[$database ? $database : '_unselected'] = $conn;
 
         $this->last_connect_error = false;
-        if (!$connected) {
+        if (!$connected && $database) {
             $this->last_connect_error = $conn->ErrorMsg();
-            return $this->connectAndCreate($server, $type, $username, $password, $database);
+            $this->connectAndCreate($server, $type, $username, $password, $database);
         }
+        $this->saveConnection($server, $type, $username, $password, $database);
 
         return true;
+    }
+
+    /**
+     * Attempt to reconnect to database using cached credentials
+     *
+     * This exists to solve a very narrow issue in CI testing where enough
+     * time passes between database queries to result in a connection timeout.
+     * The default timeout on MySQL is in hours so this is unlikely to ever
+     * occur in a non-CI environment
+     */
+    private function restoreConnection($database)
+    {
+        $ret = false;
+        if (isset($this->reconnect_info[$database])) {
+            $info = $this->reconnect_info[$database];
+            $ret = $this->addConnection($info[0], $info[1], $database, $info[2], $info[3]);
+        }
+
+        return $ret;
+    }
+
+    /**
+     * Cache the arguments used to create the connection
+     * @see: restoreConnection method
+     */
+    private function saveConnection($server, $type, $username, $password, $database)
+    {
+        $this->reconnect_info[$database] = array($server, $type, $username, $password);
     }
 
     /**
@@ -180,29 +238,26 @@ class SQLManager
     */
     private function connectAndCreate($server, $type, $username, $password, $database)
     {
-        $conn = ADONewConnection($this->isPDO($type) ? 'pdo' : $type);
-        $conn->SetFetchMode(ADODB_FETCH_BOTH);
-        $conn = $this->setConnectTimeout($conn, $type);
-        $connected = $conn->Connect($this->getDSN($server,$type,false),$username,$password,$database);
-        $conn = $this->clearConnectTimeout($conn, $type);
-        if ($connected) {
-            $this->last_connect_error = false;
+        $connected = $this->addConnection($server, $type, null, $username, $password);
+        if ($connected && is_object($this->connections['_unselected'])) {
+            $conn = $this->connections['_unselected'];
+            unset($this->connections['_unselected']);
             $adapter = $this->getAdapter(strtolower($type));
             $stillok = $conn->Execute($adapter->createNamedDB($database));
             if (!$stillok) {
-                $this->last_connect_error = $conn->ErrorMsg();
+                $last_connect_error = $conn->ErrorMsg();
                 $this->connections[$database] = false;
-                return false;
+                throw new Exception("Could not create database {$database} ({$last_connect_error})");
             }
             $conn->Execute($adapter->useNamedDB($database));
             $conn->SelectDB($database);
             $this->connections[$database] = $conn;
             return true;
-        } else {
-            $this->last_connect_error = $conn->ErrorMsg();
-            $this->connections[$database] = false;
-            return false;
         }
+
+        unset($this->connections['_unselected']);
+        $last_connect_error = $conn->ErrorMsg();
+        throw new Exception("Could not connect to database. Check username and password. ({$last_connect_error})");
     }
 
     /**
@@ -268,30 +323,44 @@ class SQLManager
         return $con->Close();
     }
 
+    /**
+      Abstraction leaks here. Changing the connection's default DB
+      or SCHEMA via query works but calling SelectDB on the underying
+      ADOdb object is sometimes necessary to update the object's
+      internal state appropriately. This makes postgres a special case
+      where the SCHEMA should change but DB should not.
+    */
+    private function setDBorSchema($db_name)
+    {
+        if (strtolower($this->connectionType($db_name)) === 'postgres9') {
+            $adapter = $this->getAdapter($this->connectionType($db_name));
+            $selectDbQuery = $adapter->useNamedDB($db_name);
+            return $this->connections[$db_name]->Execute($selectDbQuery);
+        }
+
+        return $this->connections[$db_name]->SelectDB($db_name);
+    }
+
     public function setDefaultDB($db_name)
     {
         /** verify connection **/
-        if (!isset($this->connections[$db_name])) {
+        if (!is_string($db_name) || !isset($this->connections[$db_name])) {
             return false;
         }
 
         $this->default_db = $db_name;
-        $adapter = $this->getAdapter($this->connectionType($db_name));
         if ($this->isConnected()) {
-            $selected = $this->connections[$db_name]->SelectDB($db_name);
+            $selected = $this->setDBorSchema($db_name);
             if (!$selected) {
-                $this->query($adapter->createNamedDB($db_name), $db_name);
-                $selected = $this->connections[$db_name]->SelectDB($db_name);
+                $selected = $this->setDBorSchema($db_name);
             }
             if ($selected) {
                 $this->connections[$db_name]->database = $db_name;
                 return true;
-            } else {
-                return false;
             }
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     /**
@@ -322,6 +391,12 @@ class SQLManager
         return $this->setDefaultDB($db_name);
     }
 
+    private function getNamedConnection($which_connection)
+    {
+        $which_connection = ($which_connection === '') ? $this->default_db : $which_connection;
+        return isset($this->connections[$which_connection]) ? $this->connections[$which_connection] : null;
+    }
+
     /**
       Execute a query
       @param $query_text The query
@@ -330,10 +405,23 @@ class SQLManager
     */
     public function query($query_text,$which_connection='',$params=false)
     {
-        $which_connection = ($which_connection === '') ? $this->default_db : $which_connection;
-        $con = $this->connections[$which_connection];
+        if (php_sapi_name() != 'cli' && memory_get_usage() > 67108864) {
+            $this->logger("High memory on query: " . print_r($query_text, true));
+        }
+        $con = $this->getNamedConnection($which_connection);
 
         $result = (!is_object($con)) ? false : $con->Execute($query_text,$params);
+
+        // recover from "MySQL server has gone away" error
+        // @see: restoreConnection method
+        if (!$result && is_object($con) && $con->ErrorNo() == 2006) {
+            $dbName = ($which_connection === '') ? $this->default_db : $which_connection;
+            $restored = $this->restoreConnection($dbName);
+            if ($restored) {
+                $result = $con->Execute($query_text, $params);
+            }
+        }
+
         if (!$result) {
             $errorMsg = $this->failedQueryMsg($query_text, $params, $which_connection);
             $this->logger($errorMsg);
@@ -341,6 +429,11 @@ class SQLManager
             if ($this->throw_on_fail) {
                 throw new \Exception($errorMsg);
             }
+        } elseif ($this->debug_mode) {
+            $logMsg = 'Successful query on ' . filter_input(INPUT_SERVER, 'PHP_SELF') . "\n"
+                . $query_text . "\n"
+                . (is_array($params) ? 'Parameters: ' . implode("\n", $params) : '');
+            $this->logger($logMsg);
         }
 
         return $result;
@@ -487,6 +580,10 @@ class SQLManager
         $ret = $result_object->fields;
         if ($result_object) {
             $result_object->MoveNext();
+        }
+        // only wrap postgres results for now
+        if (is_array($ret) && $this->connectionType($which_connection) == 'postgres9') {
+            $ret = new Result($ret);
         }
 
         return $ret;
@@ -1052,10 +1149,6 @@ class SQLManager
     */
     public function tableExists($table_name,$which_connection='')
     {
-        if ($which_connection == '') {
-            $which_connection=$this->default_db;
-        }
-
         /**
           Check whether the definition is in cache
         */
@@ -1063,7 +1156,7 @@ class SQLManager
             return true;
         }
 
-        $conn = $this->connections[$which_connection];
+        $conn = $this->getNamedConnection($which_connection);
         if (!is_object($conn)) {
             return false;
         }
@@ -1338,17 +1431,14 @@ class SQLManager
     */
     public function error($which_connection='')
     {
-        if ($which_connection == '') {
-            $which_connection=$this->default_db;
-        }
-        $con = $this->connections[$which_connection];
+        $con = $this->getNamedConnection($which_connection);
 
         if (!is_object($con)) {
             if ($this->last_connect_error) {
                 return $this->last_connect_error;
-            } else {
-                return 'No database connection';
             }
+
+            return 'No database connection';
         }
 
         return $con->ErrorMsg();
@@ -1407,6 +1497,9 @@ class SQLManager
         $vals = "(";
         $args = array();
         foreach ($values as $k=>$v) {
+            if (strtolower($this->connectionType($which_connection)) === 'postgres9') {
+                $k = strtolower($k);
+            }
             if (isset($t_def[$k])) {
                 $vals .= '?,';
                 $args[] = $v;
@@ -1454,6 +1547,9 @@ class SQLManager
         $sets = "";
         $args = array();
         foreach($values as $k=>$v) {
+            if (strtolower($this->connectionType($which_connection)) === 'postgres9') {
+                $k = strtolower($k);
+            }
             if (isset($t_def[$k])) {
                 $sets .= $this->identifierEscape($k) . ' = ?,';
                 $args[] = $v;
@@ -1490,7 +1586,7 @@ class SQLManager
         }
         $con = $this->connections[$which_connection];
 
-        return $con->Prepare($sql);
+        return is_object($con) ? $con->Prepare($sql) : false;
     }
 
    /**
@@ -1531,7 +1627,8 @@ class SQLManager
         $res = $this->execute($sql, $input_array, $which_connection);
         if ($res && $this->numRows($res) > 0) {
             $row = $this->fetchRow($res);
-            return $row[0];
+            $keys = array_keys($row);
+            return array_key_exists($keys[0], $row) ? $row[$keys[0]] : false;
         } elseif ($res && $this->numRows($res) == 0) {
             return false;
         } else {
@@ -1541,6 +1638,20 @@ class SQLManager
                 return false;
             }
         }
+    }
+
+    public function getAllValues($sql, $input_array=array(), $which_connection='')
+    {
+        $res = $this->execute($sql, $input_array, $which_connection);
+        if ($res === false && $this->throw_on_fail) {
+            throw new \Exception('Record not found');
+        }
+        $ret = array();
+        while ($row = $this->fetchRow($res)) {
+            $ret[] = $row[0];
+        }
+
+        return $ret;
     }
 
     /**
@@ -1567,6 +1678,20 @@ class SQLManager
                 return false;
             }
         }
+    }
+
+    public function getAllRows($sql, $input_array=array(), $which_connection='')
+    {
+        $res = $this->execute($sql, $input_array, $which_connection);
+        if ($res === false && $this->throw_on_fail) {
+            throw new \Exception('Record not found');
+        }
+        $ret = array();
+        while ($row = $this->fetchRow($res)) {
+            $ret[] = $row;
+        }
+
+        return $ret;
     }
 
     /** 
@@ -1601,14 +1726,23 @@ class SQLManager
     }
 
     /**
+      Enable or disable debug mode
+      @param [boolean] true means enabled, false means disabled
+    */
+    public function setDebugMode($debug)
+    {
+        $this->debug_mode = $debug;
+    }
+
+    /**
        Log a string to the query log.
        @param $str The string
        @return [boolean] success
     */  
     public function logger($str)
     {
-        if (is_object($this->QUERY_LOG) && method_exists($this->QUERY_LOG, 'debug')) {
-            $this->QUERY_LOG->debug($str);
+        if (is_object($this->QUERY_LOG) && method_exists($this->QUERY_LOG, 'warning')) {
+            $this->QUERY_LOG->warning($str);
 
             return true;
         }
@@ -1739,12 +1873,14 @@ class SQLManager
         'pdo_mysql' => 'COREPOS\common\sql\MysqlAdapter',
         'pdo'       => 'COREPOS\common\sql\MysqlAdapter',
         'mssql'     => 'COREPOS\common\sql\MssqlAdapter',
+        'mssqlnative' => 'COREPOS\common\sql\MssqlAdapter',
         'pgsql'     => 'COREPOS\common\sql\PgsqlAdapter',
+        'postgres9' => 'COREPOS\common\sql\PgsqlAdapter',
         'pdo_pgsql'     => 'COREPOS\common\sql\PgsqlAdapter',
         'sqlite3'   => 'COREPOS\common\sql\SqliteAdapter',
     );
 
-    protected function getAdapter($type)
+    public function getAdapter($type)
     {
         if (isset($this->adapters[$type])) {
             return $this->adapters[$type];
@@ -1752,9 +1888,10 @@ class SQLManager
         if (isset($this->adapter_map[$type])) {
             $class = $this->adapter_map[$type];
             $this->adapters[$type] = new $class();
+            return $this->adapters[$type];
         }
 
-        return $this->adapters[$type];
+        return $this->getAdapter('mysqli');
     }
 
     /**
@@ -1766,6 +1903,9 @@ class SQLManager
     */
     public function safeInClause($arr, $args=array(), $dummy_value=-999999)
     {
+        if (!is_array($arr)) {
+            $arr = array($arr);
+        }
         if (count($arr) == 0) { 
             $arr = array($dummy_value);
         }
@@ -1774,6 +1914,41 @@ class SQLManager
         $inStr = substr($inStr, 0, strlen($inStr)-1);
 
         return array($inStr, $args);
+    }
+
+    public function setCharSet($charset, $which_connection='')
+    {
+        // validate connection
+        $con = $this->getNamedConnection($which_connection);
+        $type = $this->connectionType($which_connection);
+        if ($type == 'unknown' || !is_object($con)) {
+            return false;
+        }
+
+        // validate character set
+        $db_charset = CharSets::get($type, $charset);
+        if ($db_charset === false) {
+            return false;
+        }
+
+        $adapter = $this->getAdapter($type);
+        $query = $adapter->setCharSet($db_charset);
+
+        return $con->query($query);
+    }
+
+    public function space($num, $which_connection='')
+    {
+        $which_connection = $which_connection === '' ? $this->default_db : $which_connection;
+        $adapter = $this->getAdapter($this->connectionType($which_connection));
+        return $adapter->space($num);
+    }
+
+    public function numberFormat($num, $which_connection='')
+    {
+        $which_connection = $which_connection === '' ? $this->default_db : $which_connection;
+        $adapter = $this->getAdapter($this->connectionType($which_connection));
+        return $adapter->numberFormat($num);
     }
 }
 

@@ -95,39 +95,28 @@ class PriceCheckPage extends NoInputCorePage
             $info['regPrice'],($row['scale']>0?' /lb':''));
         if ($info['memDiscount'] > 0) {
             $this->pricing['memPrice'] = sprintf('$%.2f%s',
-                ($info['unitPrice']-$info['memDiscount']),
+                ($info['unitPrice'] -
+                 (($this->session->get('isMember') == 1) ? 0 : $info['memDiscount'])),
                 ($row['scale']>0?' /lb':''));
         }
     }
 
     private function getDiscountType($discounttype)
     {
-        $DTClasses = CoreLocal::get("DiscountTypeClasses");
-        if ($discounttype < 64 && isset(DiscountType::$MAP[$discounttype])) {
-            $class = DiscountType::$MAP[$discounttype];
-            $DiscountObject = new $class();
-        } else if ($discounttype > 64 && isset($DTClasses[($discounttype-64)])) {
-            $class = $DTClasses[($discounttype)-64];
-            $DiscountObject = new $class();
-        } else {
-            // If the requested discounttype isn't available,
-            // fallback to normal pricing. Debatable whether
-            // this should be a hard error.
-            $DiscountObject = new NormalPricing();
-        }
-
-        return $DiscountObject;
+        return DiscountType::getObject($discounttype, $this->session);
     }
 
     private function getItem()
     {
         $dbc = Database::pDataConnect();
-        $query = "select inUse,upc,description,normal_price,scale,deposit,
+        $query = "SELECT inUse,upc,description,normal_price,scale,deposit,
             qttyEnforced,department,local,cost,tax,foodstamp,discount,
             discounttype,specialpricemethod,special_price,groupprice,
             pricemethod,quantity,specialgroupprice,specialquantity,
-            mixmatchcode,idEnforced,tareweight,d.dept_name
-            from products, departments d where department = d.dept_no
+            mixmatchcode,idEnforced,tareweight,line_item_discountable,
+            d.dept_name
+            FROM products, departments d
+            WHERE department = d.dept_no
             AND upc = ?";
         $prep = $dbc->prepare($query);
         $result = $dbc->getRow($prep, array($this->upc));
@@ -195,7 +184,7 @@ class PriceCheckPage extends NoInputCorePage
         <?php echo $info ?>
         </span><br />
         <form name="form" id="formlocal" method="post" 
-            autocomplete="off" action="<?php echo filter_input(INPUT_SERVER, 'PHP_SELF'); ?>">
+            autocomplete="off" action="<?php echo AutoLoader::ownURL(); ?>">
         <input type="text" name="reginput" tabindex="0" 
             onblur="$('#reginput').focus();" id="reginput" />
         <input type="hidden" name="upc" value="<?php echo $this->upc; ?>" />

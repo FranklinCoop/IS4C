@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 /**
@@ -80,7 +80,7 @@ class StaffArDatesPage extends FannieRESTfulPage
     public function get_view()
     {
         global $FANNIE_URL;
-        $this->add_script('js/dates.js');
+        $this->addScript('js/dates.js');
 
         $ret = '<div id="mainDisplayDiv" class="col-sm-4">';
         $ret .= $this->dateTable();

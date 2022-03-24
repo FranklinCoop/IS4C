@@ -21,15 +21,16 @@ class SoPoBridge
     */
     private function getPurchaseOrderID($vendorID, $storeID)
     {
+        $cutoff = date('Y-m-d 00:00:00', strtotime('28 days ago'));
         $prep = $this->dbc->prepare('
             SELECT orderID
-            FROM PurchaseOrder
+            FROM ' . FannieDB::fqn('PurchaseOrder', 'op') . '
             WHERE vendorID=?
                 AND storeID=?
-                AND vendorOrderID LIKE \'SO-%\'
                 AND placed=0
+                AND creationDate >= ?
             ORDER BY creationDate DESC');
-        return $this->dbc->getValue($prep, array($vendorID, $storeID));
+        return $this->dbc->getValue($prep, array($vendorID, $storeID, $cutoff));
     }
 
     /**
@@ -40,10 +41,11 @@ class SoPoBridge
     {
         $pending = $this->config->get('TRANS_DB') . $this->dbc->sep() . 'PendingSpecialOrder';
         $prep = $this->dbc->prepare('
-            SELECT v.sku, n.vendorID
+            SELECT v.sku, n.vendorID, d.salesCode, o.trans_status AS altSKU
             FROM ' . $pending . ' AS o
-                INNER JOIN vendors AS n ON n.vendorName=o.mixMatch
-                INNER JOIN vendorItems AS v on n.vendorID=v.vendorID AND o.upc=v.upc
+                INNER JOIN ' . FannieDB::fqn('vendors', 'op') . ' AS n ON LEFT(n.vendorName, LENGTH(o.mixMatch)) = o.mixMatch
+                LEFT JOIN ' . FannieDB::fqn('vendorItems', 'op') . ' AS v on n.vendorID=v.vendorID AND o.upc=v.upc
+                LEFT JOIN ' . FannieDB::fqn('departments', 'op') . ' AS d ON o.department=d.dept_no
             WHERE o.order_id=?
                 AND o.trans_id=?
         ');
@@ -71,6 +73,9 @@ class SoPoBridge
         if ($vendorInfo === false) {
             return false;
         }
+        if (empty($vendorInfo['sku']) && !empty($vendorInfo['altSKU'])) {
+            $vendorInfo['sku'] = $vendorInfo['altSKU'];
+        }
         $poID = $this->getPurchaseOrderID($vendorInfo['vendorID'], $storeID);
         $porder = new PurchaseOrderModel($this->dbc);
         // init purchase order if necessary
@@ -87,10 +92,27 @@ class SoPoBridge
 
         $prep = $this->dbc->prepare('SELECT * FROM vendorItems WHERE sku=? AND vendorID=?');
         $item = $this->dbc->getRow($prep, array($vendorInfo['sku'], $vendorInfo['vendorID']));
+        $pending = $this->config->get('TRANS_DB') . $this->dbc->sep() . 'PendingSpecialOrder';
+        $prep = $this->dbc->prepare("SELECT description, quantity AS units, 0 AS cost, '' AS brand, upc
+            FROM {$pending} WHERE order_id=? AND trans_id=?");
+        $spoRow = $this->dbc->getRow($prep, array($soID, $transID));
+        if ($item === false) {
+            $item = $spoRow;
+            if ($vendorInfo['altSKU']) {
+                $item['sku'] = $vendorInfo['altSKU'];
+            } elseif (is_numeric($item['upc'])) {
+                $item['sku'] = $item['upc'];
+            } else {
+                $item['sku'] = uniqid();
+            }
+        }
+        $item['units'] = $spoRow['units'];
 
+        $poSKU = substr($item['sku'], -12) . '.';
         $poitem = new PurchaseOrderItemsModel($this->dbc);
         $poitem->orderID($poID);
-        $poitem->sku($vendorInfo['sku']);
+        $poitem->sku($poSKU);
+        $poitem->salesCode($vendorInfo['salesCode']);
         $poitem->isSpecialOrder(1);
         $poitem->unitCost($item['cost']);
         $poitem->quantity($cases);
@@ -114,27 +136,47 @@ class SoPoBridge
         if ($vendorInfo === false) {
             return false;
         }
-        $cases = $this->numCases($soID, $transID);
 
         $prep = $this->dbc->prepare('
             SELECT o.orderID
-            FROM PurchaseOrder AS o
-                INNER JOIN PurchaseOrderItems AS i ON o.orderID=i.orderID
+            FROM ' . FannieDB::fqn('PurchaseOrder', 'op') . ' AS o
+                INNER JOIN ' . FannieDB::fqn('PurchaseOrderItems', 'op') . ' AS i ON o.orderID=i.orderID
             WHERE o.vendorID=?
                 AND o.storeID=?
-                AND o.vendorOrderID LIKE \'SO-%\'
-                AND i.sku=?
-                AND i.quantity=?
                 AND i.isSpecialOrder=1
                 AND i.internalUPC=?
         ');
         return $this->dbc->getValue($prep, array(
             $vendorInfo['vendorID'],
             $storeID,
-            $vendorInfo['sku'],
-            $cases,
             str_pad($soID, 9, '0', STR_PAD_LEFT) . str_pad($transID, 4, '0', STR_PAD_LEFT),
         ));
+    }
+
+    /**
+      Delete a SPO item from a PO
+      @param $soID [int] special order ID
+      @param $transID [int] special order line item ID
+      @return [bool] success
+
+      An item is only deleted from a PO if it has not yet been received
+    */
+    public function removeItemFromPurchaseOrder($orderID, $transID)
+    {
+        $upc = str_pad($orderID, 9, '0', STR_PAD_LEFT) . str_pad($transID, 4, '0', STR_PAD_LEFT);
+
+        $itemP = $this->dbc->prepare('SELECT * FROM ' . FannieDB::fqn('PurchaseOrderItems', 'op')
+                                . ' WHERE internalUPC=? AND orderID=?');
+        $item = $this->dbc->getRow($itemP, array($upc, $orderID));
+        if ($item === false || $item['receivedDate'] || $item['receivedBy']) {
+            return false;
+        }
+
+        $cleanP = $this->dbc->prepare("DELETE FROM " . FannieDB::fqn('PurchaseOrderItems', 'op')
+                                . " WHERE sku=? AND orderID=?");
+        $cleanR = $this->dbc->execute($cleanP, array($item['sku'], $orderID));
+
+        return $cleanR ? true : false;
     }
 
     /**
@@ -151,7 +193,7 @@ class SoPoBridge
         $this->dbc->execute($itemP, array($soID, $transID));
 
         $all = $this->dbc->prepare('SELECT MIN(memType) FROM ' . $table . ' WHERE order_id=? AND trans_id > 0');
-        $min = $this->dbc->execute($all, array($soID));
+        $min = $this->dbc->getValue($all, array($soID));
         if ($min == 1) {
             $table = $this->config->get('TRANS_DB') . $this->dbc->sep() . 'SpecialOrders';
             $upP = $this->dbc->prepare('UPDATE ' . $table . ' SET statusFlag=?, subStatus=? WHERE specialOrderID=?');

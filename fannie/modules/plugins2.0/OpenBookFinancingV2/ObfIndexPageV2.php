@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 /**
@@ -40,11 +40,13 @@ class ObfIndexPageV2 extends FannieRESTfulPage
     public function get_view()
     {
         return '<ul>
-            <li><a href="ObfWeeklyReportV2.php">View Weekly Reports</a></li>
+            <li><a href="ObfSummaryReport.php">View Summary Weekly Reports</a></li>
+            <li><a href="ObfWeeklyReportV2.php">View Detailed Weekly Reports</a></li>
             <li><a href="ObfQuarterEntryPageV2.php">Enter Quarterly Sales and Labor Plan</a></li>
             <li><a href="ObfWeekEntryPageV2.php">Enter Weekly Labor and Forecast Data</a></li>
             <li><a href="ObfCategoriesPageV2.php">Manage OBF Categories</a></li>
             <li><a href="ObfMappingPageV2.php">Map OBF Categories to POS</a></li>
+            <li><a href="ObfBigBoardReport.php">View Big Board Report</a></li>
             </ul>';
     }
 }

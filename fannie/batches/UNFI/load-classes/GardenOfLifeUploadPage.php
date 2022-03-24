@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class GardenOfLifeUploadPage extends \COREPOS\Fannie\API\FannieUploadPage 
@@ -86,18 +86,6 @@ class GardenOfLifeUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
         }
         $idW = $dbc->fetchRow($idR);
         $VENDOR_ID = $idW['vendorID'];
-
-        $clean = $dbc->prepare('
-            DELETE 
-            FROM vendorItems
-            WHERE 
-            vendorID=?
-                AND upc NOT IN (
-                    SELECT upc
-                    FROM VendorBreakdowns
-                    WHERE vendorID=?
-                )');
-        $dbc->execute($clean, array($VENDOR_ID, $VENDOR_ID));
 
         $extraP = $dbc->prepare("update prodExtra set cost=? where upc=?");
         $prodP = $dbc->prepare('

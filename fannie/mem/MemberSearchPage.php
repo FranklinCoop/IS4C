@@ -22,7 +22,7 @@
 *********************************************************************************/
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class MemberSearchPage extends FanniePage {
@@ -218,9 +218,9 @@ class MemberSearchPage extends FanniePage {
             }
             $ret .= "</tbody></table>";
             $ret .= "</div></div>";
-            $this->add_css_file('../src/javascript/tablesorter/themes/blue/style.css');
+            $this->addCssFile('../src/javascript/tablesorter/themes/blue/style.css');
             $this->addScript('../src/javascript/tablesorter/jquery.tablesorter.js');
-            $this->add_onload_command('$(\'.tablesorter\').tablesorter();');
+            $this->addOnloadCommand('$(\'.tablesorter\').tablesorter();');
         }
 
         return $ret;

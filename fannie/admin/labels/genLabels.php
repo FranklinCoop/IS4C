@@ -23,11 +23,13 @@
 
 require(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    require_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class genLabels extends FannieRESTfulPage
 {
+    public $discoverable = false;
+
     /** wrapper since param "id" already in use **/
     protected function get_id_handler()
     {
@@ -50,7 +52,7 @@ class genLabels extends FannieRESTfulPage
         } elseif ($batchID !== false) {
             $data = $this->dataFromBatches($dbc, $batchID);
         }
-
+        
         if (!defined('FPDF_FONTPATH')) {
           define('FPDF_FONTPATH','font/');
         }
@@ -70,7 +72,7 @@ class genLabels extends FannieRESTfulPage
         } else {
             echo 'Invalid data and/or layout';
         }
-
+        
         return false;
     }
 
@@ -79,11 +81,13 @@ class genLabels extends FannieRESTfulPage
         if (!is_array($tagID)) {
             $tagID = array($tagID);
         }
+        
         list($inStr, $args) = $dbc->safeInClause($tagID);
         $query = "
             SELECT s.*,
                 p.scale,
-                p.numflag
+                p.numflag,
+                p.unitofmeasure
             FROM shelftags AS s
                 " . DTrans::joinProducts('s', 'p', 'INNER') . "
             WHERE s.id IN ($inStr) ";
@@ -110,9 +114,17 @@ class genLabels extends FannieRESTfulPage
                 $count = $row['count'];
             }
             for ($i=0; $i<$count; $i++) {
-                if (strlen($row['sku']) > 7) {
+                if ($row['sku'] == $row['upc']) {
+                    $row['sku'] = '';
+                } elseif (strlen($row['sku']) > 7) {
                     $row['sku'] = ltrim($row['sku'], '0');
                 }
+
+                $str = $row['unitofmeasure'];
+                $strArray = explode('/', $str);
+                $ustd = (array_key_exists(2,$strArray)) ? $strArray[2] : '' ;
+                    
+
                 $myrow = array(
                     'normal_price' => $row['normal_price'],
                     'description' => $row['description'],
@@ -124,7 +136,8 @@ class genLabels extends FannieRESTfulPage
                     'upc' => $row['upc'],
                     'vendor' => $row['vendor'],
                     'scale' => $row['scale'],
-                    'numflag' => $row['numflag']
+                    'numflag' => $row['numflag'],
+                    'unitStandard' => $ustd
                 );          
                 $data[] = $myrow;
             }
@@ -139,7 +152,8 @@ class genLabels extends FannieRESTfulPage
             $batchID = array($batchID);
         }
         list($batchIDList, $args) = $dbc->safeInClause($batchID);
-        $testQ = $dbc->prepare("select b.*,p.scale,p.numflag
+        
+        $testQ = $dbc->prepare("select b.*,p.scale,p.numflag,p.unitofmeasure
             FROM batchBarcodes as b 
                 " . DTrans::joinProducts('b', 'p', 'INNER') . "
             WHERE b.batchID in ($batchIDList) and b.description <> ''
@@ -147,6 +161,31 @@ class genLabels extends FannieRESTfulPage
         $result = $dbc->execute($testQ,$args);
         $data = array();
         while ($row = $dbc->fetchRow($result)) {
+            if ($row['sku'] == $row['upc']) {
+                $row['sku'] = '';
+            } elseif (strlen($row['sku']) > 7) {
+                $row['sku'] = ltrim($row['sku'], '0');
+            }
+            
+            $pricePerUnit = 0;
+            if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
+                $pricePerUnit =  COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $row['upc'],$row['normal_price'], $row['size']);
+            } else {
+                $pricePerUnit = COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($row['normal_price'], $row['size']);
+            }
+
+            $str = $row['unitofmeasure'];
+            
+            $strArray = array(0,'err','err');
+            if (explode('/', $str)){
+                $strArray = explode('/', $str);
+            }
+            $unitStandard = 'ERR';
+            if(array_key_exists(2, $strArray)) {
+                $unitStandard = $strArray[2];
+            }
+            
+
             $myrow = array(
             'normal_price' => $row['normal_price'],
             'description' => $row['description'],
@@ -154,11 +193,12 @@ class genLabels extends FannieRESTfulPage
             'units' => $row['units'],
             'size' => $row['size'],
             'sku' => $row['sku'],
-            'pricePerUnit' => COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($row['normal_price'], $row['size']),
+            'pricePerUnit' => $pricePerUnit,
             'upc' => $row['upc'],
             'vendor' => $row['vendor'],
             'scale' => $row['scale'],
-            'numflag' => $row['numflag']
+            'numflag' => $row['numflag'],
+            'unitStandard' => $unitStandard
             );          
             $data[] = $myrow;
         }

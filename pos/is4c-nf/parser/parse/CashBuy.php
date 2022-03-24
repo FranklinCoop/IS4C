@@ -24,7 +24,6 @@
 namespace COREPOS\pos\parser\parse;
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DisplayLib;
-use \CoreLocal;
 use COREPOS\pos\parser\Parser;
 
 class CashBuy extends Parser 
@@ -40,17 +39,19 @@ class CashBuy extends Parser
 
     function parse($str)
     {
-        
+        $ret = $this->default_json();
         $dbc = Database::mDataConnect();
+        if ($dbc === false) {
+            return $dbc;
+        }
         $query = $dbc->prepare('SELECT payments FROM equity_live_balance WHERE memnum= ? ');
-        $args = CoreLocal::get('memberID');
+        $args = $this->session->get('memberID');
         $result = $dbc->execute($query, $args);
         while ($row = $dbc->fetch_row($result)) {
             $equityPaid = $row['payments'];
         }
         
-        $ret = $this->default_json();
-        $title = _('Cash Buy') . _(''/*put register number here*/);
+        $title = _('Cash Buy') . $this->session->get('laneno');
         $msg = '
             <form method="post">
                 <table>

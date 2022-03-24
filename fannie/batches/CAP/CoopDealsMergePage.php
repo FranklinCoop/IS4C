@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class CoopDealsMergePage extends FannieRESTfulPage 
@@ -52,9 +52,11 @@ class CoopDealsMergePage extends FannieRESTfulPage
     {
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
+        $costs = FormLib::get('cost', array());
 
         $added = 0;
         $batchList = new BatchListModel($dbc);
+        $bu = new BatchUpdateModel($dbc);
         for ($i=0; $i<count($this->batchID); $i++) {
             if ($this->batchID[$i] == '') {
                 continue;
@@ -66,8 +68,13 @@ class CoopDealsMergePage extends FannieRESTfulPage
             $batchList->batchID($this->batchID[$i]);
             $batchList->upc(BarcodeLib::padUPC($this->upc[$i]));
             $batchList->signMultiplier($this->mult[$i]);
+            $batchList->cost(isset($costs[$i]) ? $costs[$i] : 0);
             if ($batchList->save()) {
                 $added++;
+                $bu->reset();
+                $bu->upc(BarcodeLib::padUPC($this->upc[$i]));
+                $bu->batchID($this->batchID[$i]);
+                $bu->logUpdate($bu::UPDATE_ADDED);
             }
         }
 
@@ -112,7 +119,8 @@ class CoopDealsMergePage extends FannieRESTfulPage
                 t.price,
                 CASE WHEN s.super_name IS NULL THEN 'sale' ELSE s.super_name END as batch,
                 t.abtpr as subbatch,
-                multiplier
+                multiplier,
+                t.cost
             FROM
                 CoopDealsItems as t
                 " . DTrans::joinProducts('t', 'p', 'INNER') . "
@@ -128,7 +136,7 @@ class CoopDealsMergePage extends FannieRESTfulPage
             FROM batchList AS l
                 INNER JOIN batches AS b ON l.batchID=b.batchID
             WHERE l.upc=?
-                AND b.endDate >= ' . $dbc->curdate()
+                AND b.endDate >= ' . $dbc->curdate() 
         );
 
         $allR = $dbc->query('
@@ -142,7 +150,7 @@ class CoopDealsMergePage extends FannieRESTfulPage
             $opts[$allW['batchID']] = $allW['batchName'];
         }
 
-        $ret = "<form action=CoopDealsMergePage.php method=post>
+        $ret = "
         <div class=\"form-group\">
             <label>Month</label>
             <select name=\"deal-set\" class=\"form-control\" 
@@ -155,6 +163,7 @@ class CoopDealsMergePage extends FannieRESTfulPage
         <tr><th>UPC</th><th>Brand</th><th>Desc</th><th>Sale Price</th>
         <th>Add to Batch</th></tr>\n
         </thead><tbody>";
+        $upcs = array('a'=>'', 'b'=>'', 'tpr'=>'');
         while ($row = $dbc->fetch_row($result)) {
             $upcoming = $dbc->getValue($upcomingP, array($row['upc']));
             if ($upcoming) {
@@ -167,14 +176,15 @@ class CoopDealsMergePage extends FannieRESTfulPage
                         </td>
                         <td>%s</td>
                         <td>%s</td>
-                        <td><input type="hidden" name="price[]" value="%.2f"/>%.2f</td>
+                        <td><input type="hidden" name="price[]" value="%.2f"/>%.2f
+                            <input type="hidden" name="cost[]" value="%.2f" /></td>
                         <td><select class="form-control input-sm" name="batchID[]">
                             <option value="">Select batch...</option>',
                         $row['upc'], \COREPOS\Fannie\API\lib\FannieUI::itemEditorLink($row['upc']),
                         $row['multiplier'],
                         $row['brand'],
-                        $row['description'],
-                        $row['price'],$row['price']
+                        $row['description'] . ' ' . $row['subbatch'],
+                        $row['price'],$row['price'], $row['cost']
             );
             foreach ($opts as $id => $batch) {
                 $ret .= sprintf('<option %s value="%d">%s</option>',
@@ -182,20 +192,39 @@ class CoopDealsMergePage extends FannieRESTfulPage
                             $id, $batch);
             }
             $ret .= '</select></td></tr>';
+            if ($row['subbatch'] == 'TPR') {
+                $upcs['tpr'] .= $row['upc'] . "\n";
+            } elseif ($row['subbatch'] == 'A') {
+                $upcs['a'] .= $row['upc'] . "\n";
+            } elseif ($row['subbatch'] == 'B') {
+                $upcs['b'] .= $row['upc'] . "\n";
+            } elseif ($row['subbatch'] == 'AB') {
+                $upcs['a'] .= $row['upc'] . "\n";
+                $upcs['b'] .= $row['upc'] . "\n";
+            }
         }
         $ret .= <<<html
         </tbody>
         </table>
-        <p>    
-            <button type=submit class="btn btn-default">Merge Items into Batch(es)</button>
-            <a href="CoopDealsReviewPage.php" class="pull-right btn btn-default">Create New Batch(es)</a>
-        </p>
         </form>
 html;
 
-        return $ret;
+        $lists = <<<html
+                <textarea rows="5" cols="15">A
+        {$upcs['a']}</textarea>
+                <textarea rows="5" cols="15">B
+        {$upcs['b']}</textarea>
+                <textarea rows="5" cols="15">TPR
+        {$upcs['tpr']}</textarea>
+                <form action=CoopDealsMergePage.php method=post>
+                <p>    
+                    <button type=submit class="btn btn-default">Merge Items into Batch(es)</button>
+                    <a href="CoopDealsReviewPage.php" class="pull-right btn btn-default">Create New Batch(es)</a>
+                </p>
+html;
+        return $lists.$ret;
     }
-    
+
     public function helpContent()
     {
         return '<p>This tool creates A, B, and TPR batches. The TPR batches will

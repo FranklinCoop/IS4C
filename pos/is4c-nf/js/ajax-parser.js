@@ -18,7 +18,9 @@ function parserError(xhr, statusText, err)
 
 function customerWindowHtml(selector, content)
 {
-    CustomerDisplay.updateCustomerDisplay(selector, content);
+    if (typeof CustomerDisplay !== "undefined") {
+        CustomerDisplay.updateCustomerDisplay(selector, content);
+    }
 }
 
 function parserHandler(data)
@@ -56,11 +58,19 @@ function parserHandler(data)
 			dataType: 'json',
 			cache: false
 		}).done(function(data) {
-            if (data.error) {
+            if (data && data.error) {
                 var icon = $('#receipticon').attr('src');
                 var newicon = icon.replace(/(.*graphics)\/.*/, "$1/deadreceipt.gif");
                 $('#receipticon').attr('src', newicon);
             }
+            $.ajax({
+                url: CORE_JS_PREFIX+'ajax/AjaxNotifiers.php',
+                type: 'GET',
+                cache: false
+            }).done(function (resp) {
+                $('#scaleIconBox').html(resp);
+                customerWindowHtml('#scaleIconBox', resp);
+            });
         }).fail(function() {
             var icon = $('#receipticon').attr('src');
             var newicon = icon.replace(/(.*graphics)\/.*/, "$1/deadreceipt.gif");
@@ -69,7 +79,7 @@ function parserHandler(data)
 	}
 
 	if (data.retry){
-		setTimeout("runParser('"+encodeURI(data.retry)+"','"+CORE_JS_PREFIX+"');",150);
+		setTimeout(function() { runParser(encodeURI(data.retry), CORE_JS_PREFIX); },150);
 	}
 }
 

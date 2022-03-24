@@ -1,4 +1,7 @@
 <?php
+
+use COREPOS\pos\lib\PrintHandlers\PrintHandler;
+
 /**
  * @backupGlobals disabled
  */
@@ -13,7 +16,7 @@ class PrintHandlersTest extends PHPUnit_Framework_TestCase
         $this->assertEquals("\r", $ph->CarriageReturn());
 
         $this->assertEquals(str_repeat(' ', 28) . 'foo', $ph->centerString('foo'));
-        $this->assertEquals(str_repeat(' ', 13) . 'foo', $ph->centerString('foo', true));
+        $this->assertEquals(str_repeat(' ', 28) . 'foo', $ph->centerString('foo', true));
 
         $blank_methods = array(
             'PageFeed',
@@ -83,7 +86,6 @@ class PrintHandlersTest extends PHPUnit_Framework_TestCase
     {
         $html = new COREPOS\pos\lib\PrintHandlers\HtmlEmailPrintHandler();
         $this->assertEquals('<div style="text-align:center">foo</div>', $html->centerString('foo'));
-        $this->assertEquals('<div style="text-align:center"><strong>foo</strong></div>', $html->centerString('foo', true));
         $this->assertEquals('<!-- foo -->', $html->addRenderingSpacer('foo'));
     }
 
@@ -163,16 +165,28 @@ class PrintHandlersTest extends PHPUnit_Framework_TestCase
         $ph->DotPitch();
         $ph->CutPaper();
         $ph->MoveY(-1);
-        $ph->BarcodeUPC('123456789012');
-        $ph->BarcodeEAN('1234567890123');
-        $ph->BarcodeITF('1234567890123');
-        $ph->BarcodeCODEABAR('1234567890123');
-        $ph->BarcodeCODE93('1234567890123');
-        $ph->BarcodeCODE128('1234567890123');
+        $ph->printBarcode(PrintHandler::BARCODE_UPCA, '123456789012');
+        $ph->printBarcode(PrintHandler::BARCODE_UPCE, '123456789012');
+        $ph->printBarcode(PrintHandler::BARCODE_EAN13, '1234567890123');
+        $ph->printBarcode(PrintHandler::BARCODE_EAN8, '1234567890123');
+        $ph->printBarcode(PrintHandler::BARCODE_ITF, '1234567890123');
+        $ph->printBarcode(PrintHandler::BARCODE_CODEABAR, '1234567890123');
+        $ph->printBarcode(PrintHandler::BARCODE_CODE39, '1234567890123');
+        $ph->printBarcode(PrintHandler::BARCODE_CODE93, '1234567890123');
+        $ph->printBarcode(PrintHandler::BARCODE_CODE128, '1234567890123');
         $ph->RasterBitmap('123456', 1, 1);
         $fn = dirname(__FILE__) . '/../../pos/is4c-nf/graphics/WfcLogo2014';
         $ph->RenderBitmapFromFile($fn);
         $ph->RenderBitmapFromRam(123);
+    }
+
+    public function testNetRaw()
+    {
+        $ph = new COREPOS\pos\lib\PrintHandlers\ESCNetRawHandler();
+        $this->assertEquals(0, $ph->writeLine('test'));
+        $ph->setTarget('localhost:9100');
+        $ph->setTarget('localhost');
+        $this->assertEquals(false, $ph->writeLine('test'));
     }
 }
 

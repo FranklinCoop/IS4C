@@ -75,6 +75,22 @@ class FannieUploadPage extends \FanniePage
     protected $error_details = 'n/a';
 
     /**
+        Some files contain a number of introductory lines
+        at the begging of the file before the actual data beings.
+        Showing them in the column preview isn't helpful and in
+        some cases may interfere with detecting the number of
+        data columns. This skipping only applies to the preview
+        screen. The lines are still present when the whole
+        file is processed.
+
+        Using a negative value here enables "automatic line skipping".
+        In this case all lines containing fewer than the number of 
+        columns defined in $preview_opts are skipped. This can be useful
+        if the information preceding the data varies in size.
+     */
+    protected $skip_first = 0;
+
+    /**
       Split uploaded file into multiple smaller files
       process_file() will be called separately for
       each smaller file. split_start() and split_end()
@@ -134,9 +150,9 @@ class FannieUploadPage extends \FanniePage
                 }
                 if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
                     // windows has trouble with symlinks
-                    $this->add_script($this->config->get('URL') . 'src/javascript/jquery-1.11.1/jquery-1.11.1.min.js');
+                    $this->addScript($this->config->get('URL') . 'src/javascript/jquery-1.11.1/jquery-1.11.1.min.js');
                 } else {
-                    $this->add_script($this->config->get('URL') . 'src/javascript/jquery.js');
+                    $this->addScript($this->config->get('URL') . 'src/javascript/jquery.js');
                 }
             } else {
                 $this->content_function = 'uploadError';
@@ -191,7 +207,7 @@ class FannieUploadPage extends \FanniePage
                         $lines = array();
                         for ($i=$offset; $i<count($fileData); $i++) {
                             $lines[] = $fileData[$i];
-                            if (count($lines) > $chunk_size) {
+                            if (count($lines) >= $chunk_size) {
                                 break;
                             }
                         }
@@ -289,9 +305,9 @@ class FannieUploadPage extends \FanniePage
                 $this->window_dressing = False;
                 if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
                     // windows has trouble with symlinks
-                    $this->add_script($this->config->get('URL') . 'src/javascript/jquery-1.11.1/jquery-1.11.1.min.js');
+                    $this->addScript($this->config->get('URL') . 'src/javascript/jquery-1.11.1/jquery-1.11.1.min.js');
                 } else {
-                    $this->add_script($this->config->get('URL') . 'src/javascript/jquery.js');
+                    $this->addScript($this->config->get('URL') . 'src/javascript/jquery.js');
                 }
             }
         }
@@ -577,15 +593,28 @@ class FannieUploadPage extends \FanniePage
         $fp = fopen($this->upload_file_name,'r');
         $width = 0;
         $table = "";
-        $linedata = $this->fileToArray(5);
+        $previewLength = 5 + $this->skip_first;
+        if ($this->skip_first < 0) {
+            $previewLength = 100;
+        }
+        $linedata = $this->fileToArray($previewLength);
+        $row = -1;
+        $shown = 0;
         foreach ($linedata as $data) {
             $j=0;
-            foreach($data as $d) {
-                $table .='<td>'.$d.'</td>';
-                $j++;
+            $row++;
+            if ($row < $this->skip_first && $this->skip_first > 0) continue;
+            if ($this->skip_first < 0 && count($data) < count($this->preview_opts)) continue;
+            if (is_array($data)) {
+                foreach($data as $d) {
+                    $table .='<td>'.$d.'</td>';
+                    $j++;
+                }
             }
             if ($j > $width) $width = $j;
             $table .= '</tr>';
+            $shown++;
+            if ($shown > 6) break;
         }
         fclose($fp);
 

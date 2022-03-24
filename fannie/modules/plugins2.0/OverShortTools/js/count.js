@@ -62,6 +62,11 @@ function saveAtmAmount(){
 	} else {
 		ret += '|reject:0';
     }
+	if ($('#atmCount').length !== 0) {
+		ret += '|count:'+$('#atmCount').val();
+	} else {
+		ret += '|count:0';
+    }
 	return ret;
 }
 
@@ -124,6 +129,7 @@ function updateChangeOrder(d){
 	resumRow('cashInTills');
 
 	updateDepositAmount(d);
+    updateCloseAmount(d);
 
 	updateAAVariance();
 }
@@ -142,6 +148,7 @@ function updateOpenSafeCount(d){
 	resumRow('cashInTills');
 
 	updateDepositAmount(d);
+    updateCloseAmount(d);
 
 	updateAAVariance();
 }
@@ -161,6 +168,7 @@ function updateDropAmount(d){
 	document.getElementById('dropAmount1.00').innerHTML = Math.round(ones*100)/100;
 
 	updateDepositAmount(d);
+    updateCloseAmount(d);
 }
 
 function updateAAVariance(){
@@ -211,6 +219,33 @@ function resumRow(rowname){
         }
 	});
 	$('#'+rowname+'Total').html(Math.round(sum*100) / 100);
+}
+
+function updateCloseAmount(d) {
+    var fields = ['changeOrder', 'safeCount1', 'dropAmount']; 
+    var sum = 0;
+    for (var i = 0; i < fields.length; i++) {
+        var id = fields[i] + "" + d;
+        var elem = document.getElementById(id);
+        if (elem) {
+            var inc = Number(elem.value);
+            console.log(inc);
+            if (!isNaN(inc)) {
+                sum += inc;
+            }
+        }
+    }
+
+    var deposit = document.getElementById('depositAmount' + d);
+    if (deposit) {
+        deposit = deposit.innerHTML;
+        deposit = Number(deposit);
+        if (!isNaN(deposit)) {
+            sum -= deposit;
+        }
+    }
+
+    document.getElementById('safeCount2' + d).value = sum;
 }
 
 function updateDepositAmount(d){
@@ -351,6 +386,12 @@ function updateBuyAmount(d){
 
 function updateAtmAmounts(){
 	updateDepositAmount('20.00');
+    var par = Number(document.getElementById('par20.00').innerHTML);
+    var cur = Number(document.getElementById('atmCount').value);
+    if (par - cur > 0) {
+        var buy = Math.round((par - cur) * 100) / 100;
+        document.getElementById('buyAmount20.00').innerHTML = buy;
+    }
 }
 
 function denom_overage(overage){

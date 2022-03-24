@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../../classlib2.0/FannieAPI.php');
 }
 
 class CWDemographicsReport extends FannieReportPage {
@@ -204,7 +204,7 @@ class CWDemographicsReport extends FannieReportPage {
                 $ttl[1] += $row[2];
             }
             $ret = array('Total', $ttl[0], $ttl[1],
-                sprintf('%.2f%%',100*$ttl[0]/($ttl[0]+$ttl[1]))
+                sprintf('%.2f%%',100*$ttl[1]/($ttl[0]))
             );
             $this->report_headers = array('Activated', '', 'Still Active', '');
             break;

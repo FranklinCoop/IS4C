@@ -27,7 +27,7 @@ class SatelliteRedisSend extends FannieTask
 {
     public $name = 'Satellite Store Redis Send';
 
-    public $log_start_stop = false;
+    public $log_start_stop = true;
 
     public $default_schedule = array(
         'min' => '2,7,12,17,22,27,32,37,42,47,52,57',
@@ -39,28 +39,59 @@ class SatelliteRedisSend extends FannieTask
     
     public function run()
     {
+        
+        if ($this->isLocked()) {
+            echo $this->cronMsg('Task Locked');
+            return false;
+        }
+        echo $this->cronMsg('Task Lock Enganged');
+        $this->lock();
+
         $conf = $this->config->get('PLUGIN_SETTINGS');
         $my_db = $conf['SatelliteDB'];
         $myID = $conf['SatelliteStoreID'];
         $redis_host = $conf['SatelliteRedis'];
+        
+        try { //when the vpn goes down the lock files stays with an error from here.
+            $remote = FannieDB::get($this->config->get('TRANS_DB'));
+        } catch (Exception $e) {
+            echo $this->cronMsg('Task Unlock Enganged');
+            $this->unlock();
+            echo $this->cronMsg("Connection Error ".$e);
+        }
+        
+        
 
-        $remote = FannieDB::get($this->config->get('TRANS_DB'));
         if (!$remote->isConnected()) {
-            echo "No connection";
+            echo $this->cronMsg("No connection");
+            echo $this->cronMsg('Task Unlock Enganged');
+            $this->unlock();
             return false;
         }
+        try {
+            $local = $this->localDB($remote, $myID, $my_db);
+            if (!$local->isConnected($my_db)) {
+                echo $this->cronMsg("No local connection");
+                echo $this->cronMsg('Task Unlock Enganged');
 
-        $local = $this->localDB($remote, $myID, $my_db);
-        if (!$local->isConnected($my_db)) {
-            echo "No local connection";
-            return false;
+                $this->unlock();
+                return false;
+            }
+
+            $redis = new Predis\Client($redis_host);
+
+            $this->sendTable($local, $redis, $myID, 'dtransactions', 'store_row_id');
+            $this->sendTable($local, $redis, $myID, 'PaycardTransactions', 'storeRowId');
+            $this->sendTable($local, $redis, $myID, 'CapturedSignature', 'capturedSignatureID');
+        } catch (Exception $ex) {
+            echo $this->cronMsg('Task Unlock Enganged');
+
+            $this->unlock();
+            echo $this->cronMsg("Send Fail: ".$ex);
         }
+        echo $this->cronMsg('Task Unlock Enganged');
 
-        $redis = new Predis\Client($redis_host);
-
-        $this->sendTable($local, $redis, $myID, 'dtransactions', 'store_row_id');
-        $this->sendTable($local, $redis, $myID, 'PaycardTransactions', 'storeRowId');
-        $this->sendTable($local, $redis, $myID, 'CapturedSignature', 'capturedSignatureID');
+        $this->unlock();
     }
 
     /**
@@ -87,20 +118,50 @@ class SatelliteRedisSend extends FannieTask
             if ($lastID === null) {
                 $lastID = 0;
             }
-            $prep = $local->prepare('SELECT * FROM ' . $table . ' WHERE ' . $column . ' > ?');
+            $prep = $local->prepare('SELECT * FROM ' . $table . ' WHERE ' . $column . ' > ? ORDER BY ' . $column);
             $res = $local->execute($prep, array($lastID));
             $max = $lastID;
             while ($row = $local->fetchRow($res)) {
                 if ($row[$column] > $max) {
                     $max = $row[$column];
                 }
-                $redis->lpush($table, json_encode($row));
+                $redis->lpush($table, $this->encode($row));
+                $redis->set($table . ':' . $column . ':' . $myID, $max);
             }
-            $redis->set($table . ':' . $column . ':' . $myID, $max);
         } catch (Exception $ex) {
-            // connection to redis failed. 
-            // no cleanup required
+            echo $this->cronMsg('Task Unlock Enganged');
+
+            $this->unlock();
+            echo $this->cronMsg("Send Fail: ".$ex);
+
         }
+    }
+
+    /**
+     * Encode row data for transmission through Redis
+     * By default the encoding is JSON. If the row cannot
+     * be JSON encoded, test each value and base64 encode
+     * any values that cannot be natively JSON encoded.
+     * Known situation where this occurs is binary data strings.
+     * @param $row [array] of values
+     * @return [string] encoded representation
+     */
+    private function encode($row)
+    {
+        $json = json_encode($row);
+        if ($json === false) {
+            $arr = array();
+            foreach (array_keys($row) as $i) {
+                if (json_encode($row[$i]) === false) {
+                    $arr[$i] = 'base64:' . base64_encode($row[$i]);
+                } else {
+                    $arr[$i] = $row[$i];
+                }
+            }
+            $json = json_encode($arr);
+        }
+
+        return $json;
     }
 
     private function localDB($dbc, $myID, $my_db)

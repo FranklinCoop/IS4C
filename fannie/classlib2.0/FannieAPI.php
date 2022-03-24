@@ -30,20 +30,34 @@ class FannieAPI
     */
     static public function init()
     {
-        if (ini_get('session.auto_start')==0 && !headers_sent() && php_sapi_name() != 'cli') {
-            @session_start();
+        $session = self::session();
+        if (!isset($session->FannieClassMap)) {
+            $session->FannieClassMap = array();
+        } elseif (!is_array($session->FannieClassMap)) {
+            $session->FannieClassMap = array();
         }
-        if (!isset($_SESSION['FannieClassMap'])) {
-            $_SESSION['FannieClassMap'] = array();
-        } elseif(!is_array($_SESSION['FannieClassMap'])) {
-            $_SESSION['FannieClassMap'] = array();
+        $map = $session->FannieClassMap;
+        if (!isset($map['SQLManager'])) {
+            $map['SQLManager'] = realpath(dirname(__FILE__).'/../src/SQLManager.php');
         }
-        if (!isset($_SESSION['FannieClassMap']['SQLManager'])) {
-            $_SESSION['FannieClassMap']['SQLManager'] = realpath(dirname(__FILE__).'/../src/SQLManager.php');
+        if (!isset($map['FPDF'])) {
+            $map['FPDF'] = realpath(dirname(__FILE__).'/../src/fpdf/fpdf.php');
         }
-        if (!isset($_SESSION['FannieClassMap']['FPDF'])) {
-            $_SESSION['FannieClassMap']['FPDF'] = realpath(dirname(__FILE__).'/../src/fpdf/fpdf.php');
+        $session->FannieClassMap = $map;
+    }
+
+    static private $namedSession = null;
+    static private function session()
+    {
+        if (self::$namedSession === null) {
+            if (!class_exists('COREPOS\\common\\NamedSession', false)) {
+                include(__DIR__ . '/../../common/NamedSession.php');
+            }
+            $path = realpath(__DIR__ . '/../');
+            self::$namedSession = new COREPOS\common\NamedSession($path);
         }
+
+        return self::$namedSession;
     }
 
     /**
@@ -118,7 +132,8 @@ class FannieAPI
     */
     static public function loadClass($name)
     {
-        $map = isset($_SESSION['FannieClassMap']) ? $_SESSION['FannieClassMap'] : array();
+        $session = self::session();
+        $map = isset($session->FannieClassMap) ? $session->FannieClassMap : array();
 
         // class map should be array
         // of class_name => file_name
@@ -126,7 +141,7 @@ class FannieAPI
             $map = array();
             $map['SQLManager'] = realpath(dirname(__FILE__).'/../src/SQLManager.php');
             $map['FPDF'] = realpath(dirname(__FILE__).'/../src/fpdf/fpdf.php');
-            $_SESSION['FannieClassMap'] = $map;
+            $session->FannieClassMap = $map;
         }
 
         // if class is known in the map, include its file
@@ -150,7 +165,8 @@ class FannieAPI
                 $found = self::loadFromNamespace($name);
                 if ($found) {
                     include_once($found);
-                    $_SESSION['FannieClassMap'][$name] = $found;
+                    $map[$name] = $found;
+                    $session->FannieClassMap = $map;
                 } 
                 return;
             }
@@ -159,6 +175,7 @@ class FannieAPI
             $file = self::findClass($name, dirname(__FILE__));
             if ($file !== false) {
                 include_once($file);
+                return;
             }
             // search plugins for definition
             $file = self::findClass($name, dirname(__FILE__).'/../modules/plugins2.0');
@@ -167,6 +184,7 @@ class FannieAPI
                 $owner = \COREPOS\Fannie\API\FanniePlugin::memberOf($file);
                 if (\COREPOS\Fannie\API\FanniePlugin::isEnabled($owner)) {
                     include_once($file);
+                    return;
                 }
             }
         }
@@ -208,13 +226,16 @@ class FannieAPI
             return false;
         }
 
+        $session = self::session();
+        $map = $session->FannieClassMap;
         $dir = opendir($path);
         $ret = false;
         while ($dir && ($file=readdir($dir)) !== false) {
             $fullname = realpath($path.'/'.$file);
-            if ($file[0] != '.' && $file != 'noauto' && is_dir($fullname)) {
+            if ($file[0] != '.' && $file != 'noauto' && $file != 'node_modules' && is_dir($fullname)) {
                 // recurse looking for file
                 $file = self::findClass($name, $fullname);
+                $map = array_merge($map, $session->FannieClassMap);
                 if ($file !== false) { 
                     $ret = $file;
                     break;
@@ -223,13 +244,14 @@ class FannieAPI
                 // map all PHP files as long as we're searching
                 // but only return if the correct file is found
                 $class = substr($file,0,strlen($file)-4);
-                $_SESSION['FannieClassMap'][$class] = $fullname;
+                $map[$class] = $fullname;
                 if ($class == $name) {
                     $ret = $fullname;
                     break;
                 }
             }
         }
+        $session->FannieClassMap = $map;
 
         return $ret;
     }
@@ -263,6 +285,7 @@ class FannieAPI
 
         switch($base_class) {
             case 'COREPOS\Fannie\API\item\ItemModule':
+            case 'COREPOS\Fannie\API\item\ItemRow':
                 $directories[] = dirname(__FILE__).'/../item/modules/';
                 break;
             case 'COREPOS\Fannie\API\member\MemberModule':
@@ -274,7 +297,6 @@ class FannieAPI
             case 'BasicModel':
                 $directories[] = dirname(__FILE__).'/data/models/';
                 break;
-            case 'BasicModelHook':
             case 'COREPOS\Fannie\API\data\hooks\BasicModelHook':
                 $directories[] = dirname(__FILE__).'/data/hooks/';
                 break;
@@ -288,8 +310,17 @@ class FannieAPI
             case 'COREPOS\Fannie\API\item\FannieSignage':
                 $directories[] = dirname(__FILE__) . '/item/signage/';
                 break;
+            case 'COREPOS\Fannie\API\item\TagDataSource':
+                $directories[] = dirname(__FILE__) . '/item/tagdatasource/';
+                break;
+            case 'COREPOS\Fannie\API\item\PriceRounder':
+                $directories[] = dirname(__FILE__) . '/item/';
+                break;
             case 'COREPOS\Fannie\API\monitor\Monitor':
                 $directories[] = dirname(__FILE__) . '/monitor/';
+                break;
+            case 'COREPOS\Fannie\API\data\SyncSpecial':
+                $directories[] = dirname(__FILE__) . '/data/lanesync/';
                 break;
             case 'FanniePage':
                 $directories[] = dirname(__FILE__).'/../admin/';
@@ -320,6 +351,10 @@ class FannieAPI
     */
     static public function listModules($base_class, $include_base=false, $debug=false)
     {
+        // leading backslash is ignored
+        if ($base_class[0] == '\\') {
+            $base_class = substr($base_class, 1);
+        }
         $directories = self::searchDirectories($base_class);
 
         // recursive search
@@ -332,6 +367,7 @@ class FannieAPI
                 while( ($file=readdir($dh)) !== false) {
                     if ($file == '.' || $file == '..') continue;
                     if ($file == 'noauto') continue;
+                    if ($file == 'node_modules') continue;
                     if ($file == 'index.php') continue;
                     if ($file == 'Store-Specific') continue;
                     $ret = array_merge($ret, $search($path.'/'.$file, $depth+1));
@@ -366,10 +402,11 @@ class FannieAPI
                 continue;
             }
 
+
             // if the file is part of a plugin, make sure
             // the plugin is enabled. The exception is when requesting
             // a list of plugin classes
-            if (strstr($file, 'plugins2.0') && $base_class != 'FanniePlugin' && $base_class != '\COREPOS\Fannie\API\FanniePlugin') {
+            if (strstr($file, 'plugins2.0') && $base_class != 'FanniePlugin' && $base_class != 'COREPOS\Fannie\API\FanniePlugin') {
                 $parent = \COREPOS\Fannie\API\FanniePlugin::memberOf($file);
                 if ($parent === false || !\COREPOS\Fannie\API\FanniePlugin::isEnabled($parent)) {
                     continue;

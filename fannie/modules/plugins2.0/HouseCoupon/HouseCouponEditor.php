@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 /**
@@ -107,11 +107,13 @@ class HouseCouponEditor extends FanniePage
             $hci = new HouseCouponItemsModel($this->connection);
             $hci->coupID(FormLib::get('add-to-coupon'));
             $hci->type(FormLib::get('add-to-as'));
+            $this->connection->startTransaction();
             foreach (FormLib::get('add-to-upc') as $upc) {
                 $upc = BarcodeLib::padUPC($upc);
                 $hci->upc($upc);
                 $hci->save();
             }
+            $this->connection->commitTransaction();
             header('Location: ' . filter_input(INPUT_SERVER, 'PHP_SELF') . '?edit_id=' . $hci->coupID());
             return false;
         } elseif (FormLib::get_form_value('edit_id','') !== '') {
@@ -158,6 +160,10 @@ class HouseCouponEditor extends FanniePage
             $mtype = FormLib::get_form_value('mtype','Q');
             $mval = FormLib::get_form_value('mval',0);
             $descript = FormLib::get_form_value('description',0);
+            $superID = FormLib::get_form_value('superID',0);
+            $summary = FormLib::get_form_value('summary',0);
+            $maxVal = FormLib::get_form_value('maxVal',0);
+            $label = FormLib::get_form_value('label',0);
             $auto = FormLib::get('autoapply', 0);
             $starts = FormLib::get('starts');
             if ($starts == '') {
@@ -176,6 +182,10 @@ class HouseCouponEditor extends FanniePage
             $model->department($dept);
             $model->description($descript);
             $model->memberOnly($mem);
+            $model->superID($superID);
+            $model->summary($summary);
+            $model->maxValue($maxVal);
+            $model->label($label);
             $model->auto($auto);
             $model->save();
 
@@ -218,8 +228,8 @@ class HouseCouponEditor extends FanniePage
     {
         $FANNIE_URL = $this->config->get('URL');
 
-        $this->add_script($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.js?v=1');
-        $this->add_css_file($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.css');
+        $this->addScript($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.js?v=1');
+        $this->addCssFile($FANNIE_URL . 'src/javascript/fancybox/jquery.fancybox-1.3.4.css');
         $dbc = FannieDB::get($this->config->get('OP_DB'));
         
         $ret = '<form action="HouseCouponEditor.php" method="get">';
@@ -229,14 +239,29 @@ class HouseCouponEditor extends FanniePage
         $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
         $ret .= '<button type="button" class="fancybox-btn btn btn-default"
             href="explainify.html">Explanation of Settings</button>';
-        $this->add_onload_command('$(\'.fancybox-btn\').fancybox();');
+        $ret .= ' <input type="checkbox" id="activeCoupons"> <label for="activeCoupons">View Only Active Coupons</label> | ';
+        $ret .= ' <input type="checkbox" id="summaryView"> <label for="summaryView">Summary View</label>';
+        $this->addOnloadCommand('$(\'.fancybox-btn\').fancybox();');
         $ret .= '</p>';
         $ret .= '</form>';
-        $ret .= '<table class="table">';
-        $ret .= '<tr><th>ID</th><th>Name</th><th>Value</th>';
-        $ret .= '<th>Begins</th><th>Expires</th></tr>';
+        $ret .= '<table class="table tablesorter">';
+        $ret .= '<thead><tr><th>ID</th><th>Name</th>
+            <th class="summary-view-td">Owner</th>
+            <th class="summary-view-td">Summary</th>
+            <th class="summary-view-td">Label</th>
+            <th>Value</th>';
+        $ret .= '<th>Begins</th><th>Expires</th><th>&nbsp;</th></tr></thead><tbody>';
         $model = new HouseCouponsModel($dbc);
-        foreach($model->find('coupID') as $obj) {
+        $superModel = new MasterSuperDeptsModel($dbc);
+        foreach($model->find('coupID', true) as $obj) {
+            //$superModel->reset();
+            //$superModel->superID($obj->superID);
+            $superModel->reset();
+            $superModel->superID($obj->superID());
+            $super = null;
+            foreach ($superModel->find() as $o) {
+                $super = $o->super_name();
+            }
             if (strstr($obj->startDate(), ' ')) {
                 $tmp = explode(' ', $obj->startDate());
                 $obj->startDate($tmp[0]);
@@ -250,29 +275,46 @@ class HouseCouponEditor extends FanniePage
                 date('Y-m-d', strtotime($obj->endDate())),
             );
             /**
-              If coupon period is more than 45 days, use the current month
-              as a reporting period
+              If coupon period is more than 365 days, use a narrower
+              90 day reporting period
             */
-            if (strtotime($report_dates[1]) - strtotime($report_dates[0]) > (86400 * 45)) {
-                $report_dates = array(date('Y-m-01'), date('Y-m-t'));
+            if (strtotime($report_dates[1]) - strtotime($report_dates[0]) > (86400 * 365)) {
+                $ts = strtotime($obj->startDate());
+                $report_dates = array(
+                    date('Y-m-d', $ts),
+                    date('Y-m-t', mktime(0, 0, 0, date('n',$ts), date('j',$ts)+90, date('Y',$ts))),
+                );
             }
             $ret .= sprintf('<tr><td>#%d <a href="HouseCouponEditor.php?edit_id=%d">Edit</a></td>
-                    <td>%s</td><td>%.2f%s</td><td>%s</td><td>%s</td>
-                    <td>
+                    <td>%s</td>
+                    <td class="summary-view-td">%s</td>
+                    <td class="summary-view-td">%s</td>
+                    <td class="summary-view-td">%s</td>
+                    <td>%.2f%s</td><td>%s</td><td>%s</td>
+                    <td class="report-btns">
                         <a href="%sws/barcode-pdf/?upc=%s&name=%s"
-                        class="btn btn-default">Print Barcode</a>
+                        class="btn btn-default btn-sm">Print Barcode</a>
                         <a href="%sreports/ProductMovement/ProductMovementModular.php?upc=%s&date1=%s&date2=%s"
-                        class="btn btn-default">Usage Report</a>
+                        class="btn btn-default btn-sm">Usage Report</a>
+                        <a href="HcBasketReport.php?upc=%s&date1=%s&date2=%s"
+                        class="btn btn-default btn-sm">Simple Baskets</a>
                         <a href="%smodules/plugins2.0/CoreWarehouse/reports/CWCouponReport.php?coupon-id=%d&date1=%s&date2=%s"
-                        class="btn btn-default %s">Member Baskets</a>
+                        class="btn btn-default btn-sm %s">Member Baskets</a>
                     </tr>',
                     $obj->coupID(),$obj->coupID(),$obj->description(),
-                    $obj->discountValue(), $obj->discountType(),
+                    $super,
+                    $obj->summary(),
+                    $obj->label(),
+                    $obj->discountValue(),
+                    $obj->discountType(),
                     $obj->startDate(), $obj->endDate(),
                     $FANNIE_URL,
                     ('499999' . str_pad($obj->coupID(), 5, '0', STR_PAD_LEFT)),
                     urlencode($obj->description()),
                     $FANNIE_URL,
+                    ('499999' . str_pad($obj->coupID(), 5, '0', STR_PAD_LEFT)),
+                    $report_dates[0],
+                    $report_dates[1],
                     ('499999' . str_pad($obj->coupID(), 5, '0', STR_PAD_LEFT)),
                     $report_dates[0],
                     $report_dates[1],
@@ -283,7 +325,10 @@ class HouseCouponEditor extends FanniePage
                     (\COREPOS\Fannie\API\FanniePlugin::isEnabled('CoreWarehouse') ? '' : 'collapse')
                 );
         }
-        $ret .= '</table>';
+        $ret .= '</tbody></table>';
+        
+        $this->addScript($FANNIE_URL . 'src/javascript/tablesorter/jquery.tablesorter.js');
+        $this->addOnloadCommand("\$('.tablesorter').tablesorter();");
         
         $dbc->close();
 
@@ -323,9 +368,26 @@ class HouseCouponEditor extends FanniePage
         $dept = $model->department();
         $description = $model->description();
         $auto = $model->auto();
+        $owner = $model->superID();
+        $superModel = new MasterSuperDeptsModel($this->connection);
+        $superOpts = $superModel->toOptions($owner);
+        $summary = $model->summary();
+        $maxVal = $model->maxValue();
+        $label_name = $model->label();
 
         $ret = '<form class="form-horizontal" action="HouseCouponEditor.php" method="post">';
         $ret .= '<input type="hidden" name="cid" value="'.$cid.'" />';
+
+        $memOpts = array(
+            0 => 'No',
+            1 => 'Yes',
+            2 => 'Plus',
+        );
+        $optStr = '';
+        foreach ($memOpts as $val => $label) {
+            $optStr .= sprintf('<option %s value="%d">%s</option>',
+                $mem == $val ? 'selected' : '', $val, $label);
+        }
 
         $ret .= sprintf('
             <div class="row">
@@ -335,9 +397,14 @@ class HouseCouponEditor extends FanniePage
                 <div class="col-sm-3 text-left">
                     <a href="%sws/barcode-pdf/?upc=%s&name=%s">%s</a>
                 </div>
+                <div class="col-sm-2 text-right">
+                    <a href="DuplicateCoupon.php?id=%d" class="btn btn-default">
+                        Duplicate Coupon
+                    </a>
+                </div>
             </div>
             <div class="row">
-                <label class="col-sm-1 control-label">Label</label>
+                <label class="col-sm-1 control-label">Receipt Label</label>
                 <div class="col-sm-3"><input type=text name=description value="%s" class="form-control" /></div>
                 <label class="col-sm-1 control-label">Limit</label>
                 <div class="col-sm-3"><input type=text name=limit class="form-control" value="%s" /></div>
@@ -355,9 +422,10 @@ class HouseCouponEditor extends FanniePage
                 </div>
             </div>
             <div class="row">
-                <label class="col-sm-2">Member Only
-                <input type=checkbox name=memberonly id=memberonly value="1" %s />
-                </label>
+                <label class="col-sm-1">Member Only</label>
+                <div class="col-sm-1">
+                    <select class="form-control input-sm" name="memberonly" id="memberonly">%s</select>
+                </div>
                 <label class="col-sm-2">Auto-apply
                 <input type=checkbox name=autoapply id=autoapply value="1" %s />
                 </label>
@@ -368,10 +436,11 @@ class HouseCouponEditor extends FanniePage
             "00499999".str_pad($cid,5,'0',STR_PAD_LEFT),
             urlencode($description),
             "00499999".str_pad($cid,5,'0',STR_PAD_LEFT),
+            $cid,
             $description,
             $limit,
             $starts, $expires,
-            ($mem==1?'checked':''),
+            $optStr,
             ($auto==1?'checked':'') 
         );
         foreach($depts as $k=>$v){
@@ -385,8 +454,11 @@ class HouseCouponEditor extends FanniePage
         $mts = array(
             'Q'=>'Quantity (at least)',
             'Q+'=>'Quantity (more than)',
+            'Q-'=>'Quantity (Per-Item Max)',
             'C'=>'Department (at least qty)',
             'C+'=>'Department (more than qty)',
+            'C!'=>'Dept w/o sales (at least qty)',
+            'C^'=>'Dept w/o sales (more than qty)',
             'D'=>'Department (at least $)',
             'D+'=>'Department (more than $)',
             'M'=>'Mixed (Item+Item)',
@@ -411,21 +483,34 @@ class HouseCouponEditor extends FanniePage
              </div>";
 
         $dts = array('Q'=>'Quantity Discount',
+            'QD' => 'Quantity Discount (Department)',
             'P'=>'Set Price Discount',
+            'P+'=>'Set Price (mixed price items)',
             'FI'=>'Scaling Discount (Item)',
             'FD'=>'Scaling Discount (Department)',
             'MD'=>'Capped Discount (Department)',
             'F'=>'Flat Discount',
+            'FC' => 'Flat Discount (Capped at amount due)',
             'PI'=>'Per-Item Discount',
             'PS'=>'Per-Set Discount',
             'BG'=>'BOGO (Buy one get one)',
+            'BQ'=>'BOGO (Qty limited)',
+            'BH'=>'BOHO (Buy one get one 1/2 off)',
+            'BM'=>'BOHO (Buy one get one 1/2 off, mixed items)',
             '%'=>'Percent Discount (End of transaction)',
             '%B' => 'Percent Discount (Coupon discount OR member discount)',
+            '%I'=>'Percent Discount (Specific Items)',
             '%D'=>'Percent Discount (Department)',
             '%S'=>'Percent Discount (Department excludes sale items)',
             'PD'=>'Percent Discount (Anytime)',
             'AD'=>'All Discount (Department)',
+            'SC'=>'Store Credit (WFC; maybe temporary)',
         );
+        if ($mType != '') {
+            unset($dts['%']);
+            unset($dts['%B']);
+            unset($dts['PD']);
+        }
         $ret .= '<div class="row">
             <label class="col-sm-1 control-label">Discount Type</label>
             <div class="col-sm-3">
@@ -441,6 +526,25 @@ class HouseCouponEditor extends FanniePage
             class=\"form-control\" /></div>
             </div>";
 
+
+        $ret .= '<div class="row">
+                <label class="col-sm-1 control-label">Owner</label>
+                <div class="col-sm-3">
+                    <select class="form-control" name=superID>'.$superOpts.'</select>
+                </div>
+                <label class="col-sm-1 control-label">Maximum value</label>
+                <div class="col-sm-3"><input type=text name=maxVal class="form-control" value="'.$maxVal.'" /></div>
+            </div>
+            <br/>
+            <div class="row">
+                <label class="col-sm-1 control-label">Internal Label</label>
+                <div class="col-sm-3"><input type=text name=label id="label" class="form-control" value="'.$label_name.'"/></div>
+                <label class="col-sm-1 control-label">Summary</label>
+                <div class="col-sm-3"><input type=text name=summary class="form-control" value="'.$summary.'" /></div>
+            </div>
+            ';
+
+
         $ret .= "<br /><button type=submit name=submit_save value=Save class=\"btn btn-default btn-core\">
             Save Settings</button>";
         $ret .= ' <button type="button" value="Back" class="btn btn-default btn-reset" 
@@ -451,9 +555,10 @@ class HouseCouponEditor extends FanniePage
         $ret .= '<div class="form-group form-inline" id="add-item-form">';
         if ($mType == "Q" || $mType == "Q+" || $mType == "M" || $mType == 'MX') {
             $ret .= '<label class="control-label">Add UPC</label>
-                <input type=text class="form-control add-item-field" name=new_upc /> ';
+                <input type=text class="form-control add-item-field" name=new_upc 
+                    onkeydown="addSubmitDown(event);" />';
         } 
-        if ($mType == "D" || $mType == "D+" || $mType == 'C' || $mType == 'C+' || $dType == '%D' || $dType == 'S' || $mType == 'MX') {
+        if ($mType == "D" || $mType == "D+" || $mType == 'C' || $mType == 'C+' || $dType == '%D' || $dType == 'S' || $mType == 'MX' || $mType == 'C!' || $mType == 'C^') {
             $ret .= '
                 <label class="control-label">Add Dept</label>
                 <select class="form-control add-item-field" name=new_dept>
@@ -487,23 +592,101 @@ class HouseCouponEditor extends FanniePage
 
     public function javascriptContent()
     {
-        ob_start();
-        ?>
-        function addItemToCoupon()
-        {
-            var dataStr = $('#add-item-form :input').serialize();
-            dataStr += '&ajax-add=1';
-            $.ajax({
-                type: 'post',
-                data: dataStr,
-                success: function(resp) {
-                    $('#coupon-item-table').html(resp);
-                    $('.add-item-field').val('');
-                }
-            });
+        $dbc = FannieDB::get($this->config->get('OP_DB'));
+        $prep = $dbc->prepare("SELECT label FROM houseCoupons GROUP BY label");
+        $res = $dbc->execute($prep);
+        $dlist = '[';
+        while ($row = $dbc->fetchRow($res)) {
+            $label = $row['label'];
+            if ($label != null) {
+                $dlist .= "'$label',";
+            }
         }
-        <?php
-        return ob_get_clean();
+        $dlist .= ']';
+
+        return <<<JAVASCRIPT
+var availableTags = $dlist;
+$( function() {
+    $("#label").autocomplete({
+        source: availableTags
+    });
+});
+function addItemToCoupon()
+{
+    var dataStr = $('#add-item-form :input').serialize();
+    dataStr += '&ajax-add=1';
+    $.ajax({
+        type: 'post',
+        data: dataStr,
+        success: function(resp) {
+            $('#coupon-item-table').html(resp);
+            $('.add-item-field').val('');
+        }
+    });
+}
+function addSubmitDown(ev) {
+    var keyCode = ev.which ? ev.which : ev.keyCode; 
+    if (keyCode == 13) {
+        ev.preventDefault();
+        addItemToCoupon();
+        return false;
+    }
+
+    return true;
+}
+$('#activeCoupons').change(function(){
+    var checked = $(this).prop('checked');
+    if (checked == true) {
+        viewActiveCoupons();
+    } else {
+        $('tr').each(function(){
+            $(this).show();
+        });
+    }
+});
+var viewActiveCoupons = function(){
+    var now = new Date();
+    $('tr').each(function(){
+        $(this).show();
+    });
+    $('table tr td:nth-child(7)').each(function(){
+        var begin = $(this).text();
+        console.log(begin);
+        begin = new Date(begin);
+        var end = $(this).next('td').text();
+        end = new Date(end);
+        if (now < end && now > begin) {
+            $(this).closest('tr').show();
+        } else {
+            $(this).closest('tr').hide();
+        }
+    });
+};
+$(document).ready(function(){
+    $('.summary-view-td').each(function(){
+        $(this).hide();
+    });
+});
+$('#summaryView').change(function(){
+    var checked = $(this).prop('checked');
+    if (checked == true) {
+        $('.report-btns').each(function(){
+            $(this).hide();
+        });
+        $('.summary-view-td').each(function(){
+            $(this).show();
+        });
+    } else {
+        $('.report-btns').each(function(){
+            $(this).show();
+        });
+        $('.summary-view-td').each(function(){
+            $(this).hide();
+        });
+    }
+});
+JAVASCRIPT;
+
     }
 
     private function couponItemTable($id)
@@ -528,7 +711,7 @@ class HouseCouponEditor extends FanniePage
                     LEFT JOIN products AS p ON p.upc=h.upc AND h.type='DISCOUNT'
                     LEFT JOIN departments AS d ON h.upc=d.dept_no AND h.type='QUALIFIER'
                 WHERE h.coupID=?";
-        } elseif ($hc->minType() == "D" || $hc->minType() == "D+" || $hc->minType() == 'C' || $hc->minType() == 'C+' || $hc->discountType() == '%D' || $hc->discountType() == 'S') {
+        } elseif ($hc->minType() == "D" || $hc->minType() == "D+" || $hc->minType() == 'C' || $hc->minType() == 'C+' || $hc->discountType() == '%D' || $hc->discountType() == 'S' || $hc->minType() == 'C!' || $hc->minType() == 'C^') {
             $query = '
                 SELECT h.upc,
                     COALESCE(d.dept_name, \'Unknown department\') AS description,
@@ -541,13 +724,14 @@ class HouseCouponEditor extends FanniePage
         $result = $dbc->execute($prep, array($id));
         $ret = '';
         while ($w = $dbc->fetch_row($result)) {
+            $link = strlen($w['upc']) == 13 ? "<a href=\"../../../item/ItemEditorPage.php?searchupc={$w['upc']}\">{$w['upc']}</a>" : $w['upc'];
             $ret .= sprintf('<tr>
                 <td>%s</td>
                 <td>%s</td>
                 <td>%s</td>
                 <td><input type="checkbox" name="del[]" value="%s" /></td>
                 </tr>',
-                $w['upc'],
+                $link,
                 $w['description'],
                 $w['type'],
                 $w['upc']);

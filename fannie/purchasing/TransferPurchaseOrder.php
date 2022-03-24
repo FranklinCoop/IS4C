@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class TransferPurchaseOrder extends FannieRESTfulPage 
@@ -68,9 +68,6 @@ class TransferPurchaseOrder extends FannieRESTfulPage
         $order1->placedDate(date('Y-m-d H:i:s'));
         $order1->creationDate(date('Y-m-d H:i:s'));
         $fromID = $order1->save();
-        $order1->vendorInvoiceID('XFER-' . $fromID);
-        $order1->orderID($fromID);
-        $order1->save();
 
         $order2 = new PurchaseOrderModel($dbc);
         $order1->vendorID(FormLib::get('vendor'));
@@ -79,7 +76,13 @@ class TransferPurchaseOrder extends FannieRESTfulPage
         $order2->placedDate(date('Y-m-d H:i:s'));
         $order1->creationDate(date('Y-m-d H:i:s'));
         $order2->vendorInvoiceID('XFER-' . $fromID);
+        $order2->transferID($fromID);
         $destID = $order2->save();
+
+        $order1->vendorInvoiceID('XFER-' . $destID);
+        $order1->transferID(-1 * $destID);
+        $order1->orderID($fromID);
+        $order1->save();
 
         $poi = new PurchaseOrderItemsModel($dbc);
         for ($i=0; $i<count($upcs); $i++) {
@@ -107,6 +110,16 @@ class TransferPurchaseOrder extends FannieRESTfulPage
         return 'ViewPurchaseOrders.php?id=' . $destID;
     }
 
+    private function getStoreVendor($dbc, $storeID)
+    {
+        $prep = $dbc->prepare("
+            SELECT v.vendorID
+            FROM vendors AS v
+                INNER JOIN Stores AS s ON v.vendorName=s.description
+            WHERE s.storeID=?");
+        return $dbc->getValue($prep, array($storeID));
+    }
+
     protected function post_id_handler()
     {
         $dbc = $this->connection;
@@ -124,24 +137,27 @@ class TransferPurchaseOrder extends FannieRESTfulPage
         $original->load();
 
         $order1 = new PurchaseOrderModel($dbc);
-        $order1->vendorID($original->vendorID());
+        $order1->vendorID($this->getStoreVendor($dbc, $dest));
         $order1->storeID($from);
         $order1->placed($original->placed());
         $order1->placedDate(date('Y-m-d H:i:s'));
         $order1->creationDate(date('Y-m-d H:i:s'));
         $fromID = $order1->save();
-        $order1->vendorInvoiceID('XFER-' . $fromID);
-        $order1->orderID($fromID);
-        $order1->save();
 
         $order2 = new PurchaseOrderModel($dbc);
-        $order2->vendorID($original->vendorID());
+        $order2->vendorID($this->getStoreVendor($dbc, $from));
         $order2->storeID($dest);
         $order2->placed($original->placed());
         $order2->placedDate(date('Y-m-d H:i:s'));
-        $order1->creationDate(date('Y-m-d H:i:s'));
-        $order2->vendorInvoiceID('XFER-' . $fromID);
+        $order2->creationDate(date('Y-m-d H:i:s'));
+        $order2->vendorInvoiceID('XFER-IN-' . $fromID);
+        $order2->transferID($fromID);
         $destID = $order2->save();
+
+        $order1->vendorInvoiceID('XFER-OUT-' . $destID);
+        $order1->transferID(-1 * $destID);
+        $order1->orderID($fromID);
+        $order1->save();
 
         $poi = new PurchaseOrderItemsModel($dbc);
         $poi->orderID($this->id);
@@ -159,6 +175,13 @@ class TransferPurchaseOrder extends FannieRESTfulPage
                 $item->save();
             }
         }
+
+        $note = new PurchaseOrderNotesModel($dbc);
+        $note->notes('Original invoice ' . $original->vendorInvoiceID());
+        $note->orderID($fromID);
+        $note->save();
+        $note->orderID($destID);
+        $note->save();
 
         return 'ViewPurchaseOrders.php?id=' . $destID;
     }
@@ -228,6 +251,21 @@ class TransferPurchaseOrder extends FannieRESTfulPage
             <p><button type="submit" class="btn btn-default btn-core">Transfer</button></p>';
         
         return $ret;
+    }
+
+    public function helpContent()
+    {
+        return '<p>Create a pair of purchase orders representing a transfer. Specify which store is sending the items,
+which is receiving them, and a vendor then fill in as many rows as necessary to represent all the items.</p>';
+    }
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertInternalType('string', $this->get_view());
+        $this->id = 999;
+        $phpunit->assertInternalType('string', $this->get_id_view());
+        $phpunit->assertInternalType('string', $this->post_id_handler());
+        $phpunit->assertInternalType('string', $this->post_handler());
     }
 }
 

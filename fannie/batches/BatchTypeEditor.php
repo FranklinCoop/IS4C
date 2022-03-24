@@ -22,7 +22,7 @@
 *********************************************************************************/
 include(dirname(__FILE__). '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class BatchTypeEditor extends FanniePage {
@@ -33,11 +33,14 @@ class BatchTypeEditor extends FanniePage {
         2 => "Sale for Members",
         3 => 'Sliding % Off for Members',
         5 => 'Sliding $ Off for Members',
+       -1 => 'Tracking (does not change any prices)',
     );
 
     private $editor_uis = array(
         1 => 'Standard',
         2 => 'Paired Sale',
+        3 => 'Partial',
+        4 => 'Tracking',
     );
 
     protected $title = 'Fannie - Batch Module';
@@ -100,7 +103,17 @@ class BatchTypeEditor extends FanniePage {
             $model->batchTypeID(FormLib::get('bid'));
             $model->allowSingleStore(FormLib::get('savePartial'));
             if ($model->save() === false) {
-                $json['error'] = 'Error saving SO eligibility';
+                $json['error'] = 'Error saving single store option';
+            }
+            echo json_encode($json);
+
+            return false; // ajax call
+        }
+        if (FormLib::get('saveExitInv') !== '') {
+            $model->batchTypeID(FormLib::get('bid'));
+            $model->exitInventory(FormLib::get('saveExitInv'));
+            if ($model->save() === false) {
+                $json['error'] = 'Error saving exit inventory';
             }
             echo json_encode($json);
 
@@ -118,8 +131,7 @@ class BatchTypeEditor extends FanniePage {
         }
         if (FormLib::get('addtype') !== ''){
             $prep = $dbc->prepare("SELECT MAX(batchTypeID) FROM batchType");
-            $res = $dbc->execute($prep);
-            $tid = array_pop($dbc->fetch_row($res));
+            $tid = $dbc->getValue($prep);
             $tid = (empty($tid)) ? 1 : $tid + 1;
 
             $ins = $dbc->prepare("INSERT INTO batchType (batchTypeID,typeDesc,discType)
@@ -148,6 +160,7 @@ class BatchTypeEditor extends FanniePage {
             <th>Dated Signs</th>
             <th title="Special Order Eligible">SO Eligible</th>
             <th title="Allow one-store only Batches">Partials</th>
+            <th title="Set ordering par to zero when batch is forced">Exit Inventory</th>
             <th>Editing Interface</th>
             <th>&nbsp;</td>
         </tr>';
@@ -186,6 +199,12 @@ class BatchTypeEditor extends FanniePage {
                     <input type="checkbox" %s onchange="batchTypeEditor.savePartial.call(this, %d);" />
                     </td>',
                     ($obj->allowSingleStore() ? 'checked' : ''),
+                    $obj->batchTypeID()
+                );
+        $ret .= sprintf('<td align="center">
+                    <input type="checkbox" %s onchange="batchTypeEditor.saveExitInv.call(this, %d);" />
+                    </td>',
+                    ($obj->exitInventory() ? 'checked' : ''),
                     $obj->batchTypeID()
                 );
         $ret .= sprintf('<td>

@@ -46,7 +46,7 @@ class CustomersModel extends BasicModel
     'staff' => array('type'=>'TINYINT', 'default'=>0),
     'phone' => array('type'=>'VARCHAR(20)'),
     'altPhone' => array('type'=>'VARCHAR(20)'),
-    'email' => array('type'=>'VARCHAR(50)'),
+    'email' => array('type'=>'VARCHAR(100)'),
     'memberPricingAllowed' => array('type'=>'TINYINT', 'default'=>0),
     'memberCouponsAllowed' => array('type'=>'TINYINT', 'default'=>0),
     'lowIncomeBenefits' => array('type'=>'TINYINT', 'default'=>0),
@@ -232,6 +232,17 @@ class CustomersModel extends BasicModel
         }
 
         return $saved;
+    }
+
+    public function doc()
+    {
+        return '
+Use:
+Part of an eventual replacement for a handful of existing customer tables including
+custdata, meminfo, memDates, and some others. At present data should be mirrored in
+both sets of tables. This table is meant to hold information that is only of one
+individual person on a given account.
+            ';
     }
 }
 

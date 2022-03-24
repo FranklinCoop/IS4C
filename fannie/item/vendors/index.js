@@ -58,7 +58,7 @@ var vendorEditor = (function($) {
             data: 'name='+name+'&new=1'
         }).fail(function(){
             window.alert('Error loading XML document');
-        }).done(function(){
+        }).done(function(resp){
             window.top.location='VendorIndexPage.php?vid='+resp;
         });
     };
@@ -126,7 +126,16 @@ var vendorEditor = (function($) {
             method: 'post',
             data: dstr
         });
-    }
+    };
+
+    mod.saveAutoOrder = function(vid) {
+        $.ajax({
+            url: 'VendorIndexPage.php',
+            method: 'post',
+            data: 'id='+vid+'&'+$('.auto-order').serialize()
+        }).done(function(resp) {
+        });
+    };
 
     return mod;
 

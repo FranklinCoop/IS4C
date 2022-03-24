@@ -1,7 +1,7 @@
 <?php
 include(dirname(__FILE__).'/../../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../../../classlib2.0/FannieAPI.php');
 }
 
 class TsAdminAdd extends FanniePage {
@@ -222,7 +222,7 @@ class TsAdminAdd extends FanniePage {
         $ts_db = FannieDB::get($FANNIE_PLUGIN_SETTINGS['TimesheetDatabase']);
         $query = $ts_db->prepare("SELECT * FROM shifts 
             WHERE ShiftID NOT IN (0, 13) ORDER BY ShiftID ASC");
-        var_dump($ts_db->tableExists('shifts'));
+        // var_dump($ts_db->tableExists('shifts'));
         for ($i = 1; $i <= $this->max; $i++) {
             $result = $ts_db->execute($query);
             

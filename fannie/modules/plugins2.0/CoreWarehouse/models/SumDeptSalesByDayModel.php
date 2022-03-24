@@ -28,10 +28,12 @@ if (!class_exists('CoreWarehouseModel')) {
 class SumDeptSalesByDayModel extends CoreWarehouseModel {
 
     protected $name = 'sumDeptSalesByDay';
+    protected $preferred_db = 'plugin:WarehouseDatabase';
     
     protected $columns = array(
     'date_id' => array('type'=>'INT','primary_key'=>True,'default'=>0),
     'department' => array('type'=>'INT','primary_key'=>True,'default'=>''),
+    'store_id' => array('type'=>'INT','primary_key'=>true,'default'=>1),
     'total' => array('type'=>'MONEY','default'=>0.00),
     'quantity' => array('type'=>'DOUBLE','default'=>0.00)
     );
@@ -51,13 +53,14 @@ class SumDeptSalesByDayModel extends CoreWarehouseModel {
         $sql = "INSERT INTO ".$this->name."
             SELECT DATE_FORMAT(tdate, '%Y%m%d') as date_id,
             department,
+            store_id,
             CONVERT(SUM(total),DECIMAL(10,2)) as total,
             CONVERT(SUM(CASE WHEN trans_status='M' THEN itemQtty 
                 WHEN unitPrice=0.01 THEN 1 ELSE quantity END),DECIMAL(10,2)) as quantity
             FROM $target_table WHERE
             tdate BETWEEN ? AND ? AND
             trans_type IN ('I','D') AND upc <> '0'
-            GROUP BY DATE_FORMAT(tdate,'%Y%m%d'), department";
+            GROUP BY DATE_FORMAT(tdate,'%Y%m%d'), department, store_id";
         $prep = $this->connection->prepare($sql);
         $result = $this->connection->execute($prep, array($start_date.' 00:00:00',$end_date.' 23:59:59'));
     }

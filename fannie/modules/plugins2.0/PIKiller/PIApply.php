@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'/classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class PIApply extends FannieRESTfulPage 
@@ -77,7 +77,7 @@ class PIApply extends FannieRESTfulPage
         }
         \COREPOS\Fannie\API\member\MemberREST::post($json['card_no'], $rest);
 
-        $custdata = new CustdataModel($this->connection);
+        $custdata = new CustdataModel(FannieDB::get(FannieConfig::config('OP_DB')));
         $custdata->CardNo($json['card_no']);
         foreach ($custdata->find() as $c) {
             $c->pushToLanes();

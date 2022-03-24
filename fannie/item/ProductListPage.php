@@ -23,10 +23,10 @@
 
 require(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 if (!function_exists('login'))
-    include($FANNIE_ROOT.'auth/login.php');
+    include(__DIR__ . '/../auth/login.php');
 
 class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool 
 {
@@ -201,8 +201,8 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
     private function saveExtra($dbc, $upc, $form)
     {
         try {
-            $brand = $this->form->brand;
-            $supplier = $this->form->supplier;
+            $brand = $form->brand;
+            $supplier = $form->supplier;
 
             $chkP = $dbc->prepare('SELECT upc FROM prodExtra WHERE upc=?');
             $chkR = $dbc->execute($chkP, array($upc));
@@ -358,14 +358,13 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
                 (CASE WHEN i.scale = 1 THEN 'X' ELSE '-' END) as WGHd,
                 (CASE WHEN i.local > 0 AND o.originID IS NULL THEN 'X' 
                   WHEN i.local > 0 AND o.originID IS NOT NULL THEN LEFT(o.shortName,1) ELSE '-' END) as local,
-                COALESCE(v.vendorName, x.distributor) AS distributor,
+                v.vendorName AS distributor,
                 i.cost,
                 i.store_id,
                 l.description AS storeName
             FROM products as i 
                 LEFT JOIN departments as d ON i.department = d.dept_no
                 LEFT JOIN taxrates AS t ON t.id = i.tax
-                LEFT JOIN prodExtra as x on i.upc = x.upc
                 LEFT JOIN vendors AS v ON i.default_vendor_id=v.vendorID
                 LEFT JOIN Stores AS l ON i.store_id=l.storeID
                 LEFT JOIN origins AS o ON i.local=o.originID";
@@ -376,8 +375,6 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
             } elseif ($super == -2) {
                 $query .= ' LEFT JOIN MasterSuperDepts AS s ON i.department=s.dept_ID ';                
             }
-        } elseif ($supertype == 'vendor') {
-            $query .= ' LEFT JOIN vendors AS z ON z.vendorName=x.distributor ';
         }
         /** build where clause and parameters based on
             the lookup type **/
@@ -411,11 +408,11 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
             $query .= ' AND i.upc LIKE ? ';
             $args = array('%' . $manufacturer . '%');
         } elseif ($supertype == 'manu' && $mtype != 'prefix') {
-            $query .= ' AND (i.brand LIKE ? OR x.manufacturer LIKE ?) ';
-            $args = array('%' . $manufacturer . '%','%' . $manufacturer . '%');
+            $query .= ' AND (i.brand LIKE ?) ';
+            $args = array('%' . $manufacturer . '%');
         } elseif ($supertype == 'vendor') {
-            $query .= ' AND (i.default_vendor_id=? OR z.vendorID=?) ';
-            $args = array($vendorID, $vendorID);
+            $query .= ' AND (i.default_vendor_id=?) ';
+            $args = array($vendorID);
         } elseif ($supertype == 'upc') {
             list($inStr, $args) = $dbc->safeInClause($upc_list, $args);
             $query .= ' AND i.upc IN (' . $inStr . ') ';
@@ -464,8 +461,8 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
             $array = \COREPOS\Fannie\API\data\DataConvert::htmlToArray($ret);
             $ret = \COREPOS\Fannie\API\data\DataConvert::arrayToCsv($array);
         } else {
-            $this->add_script('../src/javascript/tablesorter/jquery.tablesorter.min.js');
-            $this->add_onload_command("\$('.tablesorter').tablesorter();\n");
+            $this->addScript('../src/javascript/tablesorter/jquery.tablesorter.min.js');
+            $this->addOnloadCommand("\$('.tablesorter').tablesorter();\n");
         }
 
         return $ret;
@@ -494,7 +491,7 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
         $ret .= "<td align=center class=\"td_desc clickable\">{$row['description']}</td>";
         $ret .= "<td align=center class=\"td_dept clickable\">{$row['department']}</td>";
         $ret .= "<td align=center class=\"td_supplier clickable\">{$row['distributor']}</td>";
-        $ret .= "<td align=center class=\"td_cost clickable\">".sprintf('%.2f',$row['cost'])."</td>";
+        $ret .= "<td align=center class=\"td_cost clickable\">".sprintf('%.3f',$row['cost'])."</td>";
         $ret .= "<td align=center class=\"td_price clickable\">{$row['normal_price']}</td>";
         $ret .= "<td align=center class=td_tax>{$row['Tax']}</td>";
         $ret .= "<td align=center class=td_fs>{$row['FS']}</td>";

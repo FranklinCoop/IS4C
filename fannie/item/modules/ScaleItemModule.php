@@ -32,7 +32,8 @@ class ScaleItemModule extends \COREPOS\Fannie\API\item\ItemModule
         $p = $dbc->prepare('SELECT * FROM scaleItems WHERE plu=?');
         $r = $dbc->execute($p,array($upc));
         $scale = array('itemdesc'=>'','weight'=>0,'bycount'=>0,'tare'=>0,
-            'shelflife'=>0,'label'=>133,'graphics'=>0,'text'=>'', 'netWeight'=>0);
+            'shelflife'=>0,'label'=>133,'graphics'=>0,'text'=>'', 'netWeight'=>0,
+            'mosaStatement'=>0, 'originText'=>'', 'price'=>0);
         $found = false;
         if ($dbc->num_rows($r) > 0) {
             $scale = $dbc->fetch_row($r);
@@ -67,6 +68,7 @@ class ScaleItemModule extends \COREPOS\Fannie\API\item\ItemModule
         }
 
         $ret .= sprintf('<input type="hidden" name="s_plu" value="%s" />',$upc);
+        $ret .= sprintf('<input type="hidden" name="s_price" value="%s" />',$scale['price']);
         $ret .= "<table style=\"background:#ffffcc;\" class=\"table\">";
         $ret .= sprintf("<tr><th colspan=2>Longer description</th><td colspan=5><input size=35 
                 type=text name=s_longdesc maxlength=100 value=\"%s\" 
@@ -116,9 +118,26 @@ class ScaleItemModule extends \COREPOS\Fannie\API\item\ItemModule
         $ret .= "<tr><td colspan=7>";
         $ret .= '<div class="col-sm-6">';
         $ret .= "<b>Expanded text:<br />
-            <textarea name=s_text rows=4 cols=45 class=\"form-control\">";
+            <textarea name=s_text id=s_text rows=4 cols=45 class=\"form-control\">";
         $ret .= $scale['text'];
         $ret .= "</textarea>";
+        $ret .= '<br /><b>Linked PLU</b><br />';
+        $linkedPLU = isset($scale['linkedPLU']) ? $scale['linkedPLU'] : '';
+        $ret .= '<input type="text" class="form-control" name="s_linkedPLU" value="' . $linkedPLU . '" />';
+        $ret .= '</div>';
+        $ret .= '<div class="col-sm-4">';
+        $ret .= '<div class="form-group">
+            <button type="button" class="btn btn-default btn-sm" onclick="appendScaleTag(\'mosa\'); return false;">MOSA</button>
+            <label>
+                <input type="checkbox" name="scale_mosa" ' . ($scale['mosaStatement'] ? 'checked' : '') . ' />
+                Include MOSA statement
+            </label>
+            </div>';
+        $ret .= '<div class="form-group">
+            <button type="button" class="btn btn-default btn-sm" onclick="appendScaleTag(\'cool\'); return false;">COOL</button>
+            <input type="text" class="form-control" name="scale_origin" value="' . $scale['originText'] . '" 
+                placeholder="Country of origin text" />
+            </div>';
         $ret .= '</div>';
         $scales = new ServiceScalesModel($dbc);
         $mapP = $dbc->prepare('SELECT upc
@@ -130,7 +149,7 @@ class ScaleItemModule extends \COREPOS\Fannie\API\item\ItemModule
                                     INNER JOIN superdepts AS s ON p.department=s.dept_ID
                                 WHERE p.upc=?
                                     AND s.superID=?');
-        $ret .= '<div class="col-sm-6">';
+        $ret .= '<div class="col-sm-2">';
         foreach ($scales->find('description') as $scale) {
             $checked = false;
             $mapR = $dbc->execute($mapP, array($scale->serviceScaleID(), $upc));
@@ -165,6 +184,18 @@ class ScaleItemModule extends \COREPOS\Fannie\API\item\ItemModule
         return $ret;
     }
 
+    function getFormJavascript($upc)
+    {
+        return <<<STR
+function appendScaleTag(tag) {
+    var current = $('#s_text').val();
+    current += "{" + tag + "}";
+    $('#s_text').val(current);
+    console.log(current);
+}
+STR;
+    }
+
     function SaveFormData($upc)
     {
         /* check if data was submitted */
@@ -180,6 +211,9 @@ class ScaleItemModule extends \COREPOS\Fannie\API\item\ItemModule
         if (is_array($price)) {
             $price = array_pop($price);
         }
+        if ($price == 0) {
+            $price = FormLib::get('s_price', 0);
+        }
         $tare = FormLib::get('s_tare',0);
         $shelf = FormLib::get('s_shelflife',0);
         $bycount = FormLib::get('s_bycount',0);
@@ -189,6 +223,8 @@ class ScaleItemModule extends \COREPOS\Fannie\API\item\ItemModule
         $text = FormLib::get('s_text','');
         $align = FormLib::get('s_label','horizontal');
         $netWeight = FormLib::get('s_netwt', 0);
+        $linkedPLU = FormLib::get('s_linkedPLU', null);
+        $inUse = FormLib::get('prod-in-use', array());
 
         $label = \COREPOS\Fannie\API\item\ServiceScaleLib::attributesToLabel(
             $align,
@@ -215,9 +251,10 @@ class ScaleItemModule extends \COREPOS\Fannie\API\item\ItemModule
         if ($weight == 1 && $bycount == 1) {
             $p = new ProductsModel($dbc);
             $p->upc($upc);
-            $p->store_id(1);
-            if($p->load()) {
-                $p->Scale(0);
+            $stores = FormLib::get('store_id');
+            foreach ($stores as $s) {
+                $p->store_id($s);
+                $p->scale(0);
                 $p->enableLogging(false);
                 $p->save();
             }
@@ -240,15 +277,13 @@ class ScaleItemModule extends \COREPOS\Fannie\API\item\ItemModule
         $scaleItem->label($label);
         $scaleItem->graphics( ($graphics) ? 121 : 0 );
         $scaleItem->netWeight($netWeight);
+        $scaleItem->linkedPLU(BarcodeLib::padUPC($linkedPLU));
+        $scaleItem->mosaStatement(FormLib::get('scale_mosa',false) ? 1 : 0);
+        $scaleItem->originText(FormLib::get('scale_origin'));
         $scaleItem->save();
 
         // extract scale PLU
-        preg_match("/^002(\d\d\d\d)0/",$upc,$matches);
-        $s_plu = $matches[1];
-        if ($s_plu == '0000') {
-            preg_match("/^0020(\d\d\d\d)/",$upc,$matches);
-            $s_plu = $matches[1];
-        }
+        $s_plu = COREPOS\Fannie\API\item\ServiceScaleLib::upcToPLU($upc);
 
         $item_info = array(
             'RecordType' => $action,
@@ -260,6 +295,9 @@ class ScaleItemModule extends \COREPOS\Fannie\API\item\ItemModule
             'Label' => $label,
             'ExpandedText' => $text,
             'ByCount' => $bycount,
+            'OriginText' => $scaleItem->originText(),
+            'MOSA' => $scaleItem->mosaStatement(),
+            'inUse' => count($inUse) == 0 ? 0 : 1,
         );
         if ($netWeight != 0) {
             $item_info['NetWeight'] = $netWeight;

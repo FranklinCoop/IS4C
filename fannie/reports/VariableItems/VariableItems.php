@@ -23,13 +23,13 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class VariableItems extends FannieReportPage 
 {
     public $description = '[Variably Priced Items Report] lists all active variably priced items';
-    public $report_set = 'Reports';
+    public $report_set = 'Price Reports';
     public $themed = true;
 
     protected $report_headers = array('Upc', 'Brand', 'Description', 'Dept. No.', 'Dept. Name', 'Cost', 'Price', 'Desired Marg.', 'Actual Marg.', 'Marg. +/-');
@@ -99,9 +99,6 @@ class VariableItems extends FannieReportPage
                 $deptMarg[] = $uMarg;
             }
         }     
-        if (mysql_errno() > 0) {
-            echo mysql_errno() . ": " . mysql_error(). "<br>";
-        }
         
         for ($i=0; $i<count($upc); $i++){
             $margDiff[] = $marg[$i] - $deptMarg[$i];

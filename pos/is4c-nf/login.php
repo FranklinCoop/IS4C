@@ -23,6 +23,17 @@
 
 use COREPOS\pos\lib\CoreState;
 use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\LocalStorage\WrappedStorage;
+use COREPOS\pos\ajax\AjaxParser;
+use COREPOS\common\mvc\ValueContainer;
+
+/*
+$fp = fopen(__DIR__ . '/cache.php', 'w');
+if ($fp) {
+    fwrite($fp, "<?php\n");
+    fclose($fp);
+}
+ */
 
 if (!class_exists("AutoLoader")) include("lib/AutoLoader.php");
 
@@ -30,7 +41,19 @@ COREPOS\pos\lib\LocalStorage\LaneCache::clear();
 
 AutoLoader::loadMap();
 
-CoreState::initiate_session();
+CoreState::initiateSession();
+
+/**
+  Avoid infinite redirect. If a page discovers the current
+  session is invalid it redirects to here. If this script
+  can't initiate the session there's no way to continue.
+  The issue is most likely a failing DB connection
+*/
+if (CoreLocal::get('CashierNo') === '') {
+    trigger_error('Cannot initialize system', E_USER_ERROR);
+    echo "Initialization failed; check configuration" . PHP_EOL;
+    return;
+}
 
 CoreLocal::set('ValidJson', false);
 CoreLocal::refresh();
@@ -41,6 +64,17 @@ if (MiscLib::pingport('127.0.0.1:15674', 'not a database')) {
 } else {
     CoreLocal::set('MQ', false);
 }
+
+/**
+ * Force a command to run through input parsing
+ * This will increase the time it takes to draw an
+ * initial login screen but should reduce some of the
+ * delay on the first command entered by the user
+ */
+$form = new ValueContainer();
+$form->input = 'CL';
+$ajax = new AjaxParser(new WrappedStorage(), $form);
+$cacheWarm = $ajax->ajax();
 
 /**
   Go to login screen if no one is signed in

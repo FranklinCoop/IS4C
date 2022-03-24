@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class BackendTenderReport extends FannieReportPage
@@ -96,8 +96,12 @@ class BackendTenderReport extends FannieReportPage
                 AND trans_subtype=?
             ORDER BY tdate, trans_id');
 
+        $data = array();
         while ($row = $dbc->fetchRow($typeR)) {
             $data[] = $this->getSubReport($dbc, $detailP, $args, $row['trans_subtype']);
+        }
+        if (count($data) == 0) {
+            $data[] = array();
         }
 
         return $data;

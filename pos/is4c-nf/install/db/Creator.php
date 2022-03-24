@@ -48,9 +48,9 @@ class Creator
         $errors = array();
         if (\CoreLocal::get('laneno') == 0) {
             $errors[] = array(
-                'struct' => 'No structures created for lane #0',
-                'query' => 'None',
-                'details' => 'Zero is reserved for server',
+                'struct' => _('No structures created for lane #0'),
+                'query' => _('None'),
+                'details' => _('Zero is reserved for server'),
             );
 
             return $errors;
@@ -76,8 +76,9 @@ class Creator
                 if (!$loaded) {
                     $errors[] = array(
                         'struct' => $table,
-                        'query' => 'None',
-                        'details' => 'Failed loading sample data',
+                        'query' => _('None'),
+                        'error' => _('Failed loading sample data'),
+                        'details' => _('Failed loading sample data'),
                     );
                 }
             } else {
@@ -132,9 +133,9 @@ class Creator
 
         if (\CoreLocal::get('laneno') == 0) {
             $errors[] = array(
-                'struct' => 'No structures created for lane #0',
-                'query' => 'None',
-                'details' => 'Zero is reserved for server',
+                'struct' => _('No structures created for lane #0'),
+                'query' => _('None'),
+                'details' => _('Zero is reserved for server'),
             );
 
             return $errors;
@@ -234,14 +235,14 @@ class Creator
             select
             case 
                 when trans_type = 'T'
-                    then     ".$db->concat( "SUBSTR(".$db->concat('UPPER(TRIM(description))','space(44)','').", 1, 44)" 
-                        , "right(".$db->concat( 'space(8)', 'FORMAT(-1 * total, 2)','').", 8)" 
-                        , "right(".$db->concat( 'space(4)', 'status','').", 4)",'')."
+                    then     ".$db->concat( "SUBSTR(".$db->concat('UPPER(TRIM(description))',$db->space(44),'').", 1, 44)" 
+                        , "right(".$db->concat( $db->space(8), $db->numberFormat('-1 * total'),'').", 8)" 
+                        , "right(".$db->concat( $db->space(4), 'status','').", 4)",'')."
                 when voided = 3 
-                    then     ".$db->concat("SUBSTR(".$db->concat('description', 'space(30)','').", 1, 30)"
-                        , 'space(9)'
+                    then     ".$db->concat("SUBSTR(".$db->concat('description', $db->space(30),'').", 1, 30)"
+                        , $db->space(9)
                         , "'TOTAL'"
-                        , 'right('.$db->concat( 'space(8)', 'FORMAT(unitPrice, 2)','').', 8)','')."
+                        , 'right('.$db->concat( $db->space(8), $db->numberFormat('unitPrice'),'').', 8)','')."
                 when voided = 2
                     then     description
                 when voided = 4
@@ -249,16 +250,16 @@ class Creator
                 when voided = 6
                     then     description
                 when voided = 7 or voided = 17
-                    then     ".$db->concat("SUBSTR(".$db->concat('description', 'space(30)','').", 1, 30)"
-                        , 'space(14)'
-                        , 'right('.$db->concat( 'space(8)', 'FORMAT(unitPrice, 2)','').', 8)'
-                        , 'right('.$db->concat( 'space(4)', 'status','').', 4)','')."
+                    then     ".$db->concat("SUBSTR(".$db->concat('description', $db->space(30),'').", 1, 30)"
+                        , $db->space(14)
+                        , 'right('.$db->concat( $db->space(8), $db->numberFormat('unitPrice'),'').', 8)'
+                        , 'right('.$db->concat( $db->space(4), 'status','').', 4)','')."
                 else
-                    ".$db->concat("SUBSTR(".$db->concat('description', 'space(30)','').", 1, 30)"
+                    ".$db->concat("SUBSTR(".$db->concat('description', $db->space(30),'').", 1, 30)"
                     , "' '" 
-                    , "SUBSTR(".$db->concat('comment', 'space(13)','').", 1, 13)"
-                    , 'right('.$db->concat('space(8)', 'FORMAT(total, 2)','').', 8)'
-                    , 'right('.$db->concat('space(4)', 'status','').', 4)','')."
+                    , "SUBSTR(".$db->concat('comment', $db->space(13),'').", 1, 13)"
+                    , 'right('.$db->concat($db->space(8), $db->numberFormat('total'),'').', 8)'
+                    , 'right('.$db->concat($db->space(4), 'status','').', 4)','')."
             end
             as linetoprint,
             emp_no,
@@ -327,9 +328,9 @@ class Creator
         $type = $db->dbmsName();
         if (\CoreLocal::get('laneno') == 0) {
             $errors[] = array(
-                'struct' => 'No structures created for lane #0',
-                'query' => 'None',
-                'details' => 'Zero is reserved for server',
+                'struct' => _('No structures created for lane #0'),
+                'query' => _('None'),
+                'details' => _('Zero is reserved for server'),
             );
 
             return $errors;
@@ -419,6 +420,7 @@ class Creator
                 if (!(stristr($query, "DROP ") && stristr($query,"VIEW "))) {
                     $error['error'] = 1;
                     $error['details'] = $sql->error() . '; ';
+                    $error['error_msg'] = $error['details'];
                     $error['important'] = true;
                 }
             }

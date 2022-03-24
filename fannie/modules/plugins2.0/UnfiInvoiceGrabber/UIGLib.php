@@ -22,7 +22,7 @@
 *********************************************************************************/
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class UIGLib 
@@ -47,10 +47,10 @@ class UIGLib
         $create = $dbc->prepare('INSERT INTO PurchaseOrder (vendorID, creationDate, placed,
                             placedDate, userID, vendorOrderID, vendorInvoiceID, storeID) VALUES
                             (?, ?, 1, ?, 0, ?, ?, ?)');
-        $find = $dbc->prepare('SELECT orderID FROM PurchaseOrder WHERE vendorID=? AND vendorInvoiceID=?');
-        $findPO = $dbc->prepare('SELECT orderID FROM PurchaseOrder WHERE vendorID=? AND vendorOrderID=?');
-        $plu = $dbc->prepare('SELECT upc FROM vendorSKUtoPLU WHERE vendorID=? AND sku LIKE ?');
+        $find = $dbc->prepare('SELECT orderID FROM PurchaseOrder WHERE vendorID=? AND storeID=? AND vendorInvoiceID=?');
+        $plu = $dbc->prepare('SELECT upc FROM VendorAliases WHERE isPrimary=1 AND vendorID=? AND sku LIKE ?');
         $clear = $dbc->prepare('DELETE FROM PurchaseOrderItems WHERE orderID=?');
+        $codeP = $dbc->prepare('SELECT sku, salesCode FROM PurchaseOrderItems WHERE orderID=?');
         $storeID = FannieConfig::config('STORE_ID');
 
         for ($i=0; $i<$za->numFiles; $i++) {
@@ -61,8 +61,13 @@ class UIGLib
             }
 
             $fp = $za->getStream($info['name']);
+            if (!$fp) { // false or null in failure cases
+                continue;
+            }
             $header_info = array();
             $item_info = array();
+            $csvfile = tempnam(__DIR__ . '/noauto/originals/', 'inv');
+            $csvFP = fopen($csvfile, 'w');
             while(!feof($fp)) {
                 $line = fgetcsv($fp);
                 if (strtolower($line[0]) == 'header') {
@@ -71,18 +76,23 @@ class UIGLib
                     $item = self::parseItem($line, $vendorID);
                     $item_info[] = $item;
                 }
+                fputcsv($csvFP, $line);
             }
 
             if (count($item_info) > 0) {
                 $id = false;
                 // check whether order already exists
-                $idR = $dbc->execute($find, array($vendorID, $header_info['vendorInvoiceID']));
+                $idR = $dbc->execute($find, array($vendorID, $storeID, $header_info['vendorInvoiceID']));
+                $new = false;
+                $codeMap = array();
                 if ($dbc->num_rows($idR) > 0) {
                     $idW = $dbc->fetch_row($idR);
                     $id = $idW['orderID'];
+                    $codeR = $dbc->execute($codeP, array($id));
+                    while ($codeW = $dbc->fetchRow($codeR)) {
+                        $codeMap[$codeW['sku']] = $codeW['salesCode'];
+                    }
                     $dbc->execute($clear, array($id));
-                } elseif (!empty($header_info['vendorOrderID'])) {
-                    $id = $dbc->getValue($findPO, array($vendorID, $header_info['vendorOrderID']));
                 }
                 if (!$id) {
                     // date has not been downloaded before OR
@@ -92,7 +102,12 @@ class UIGLib
                     $id = $dbc->insertID();
                 }
 
+                $fakeSku = 1;
                 foreach($item_info as $item) {
+                    if ($item['sku'] == 0) {
+                        $item['sku'] = $fakeSku;
+                        $fakeSku++;
+                    }
                     $model = new PurchaseOrderItemsModel($dbc);
                     $model->orderID($id);
                     $model->sku($item['sku']);
@@ -122,13 +137,25 @@ class UIGLib
                         $pluInfo = $dbc->fetch_row($pluCheck);
                         $model->internalUPC($pluInfo['upc']);
                     }
-                    if ($model->salesCode() == '') {
+                    if (!$new && isset($codeMap[$item['sku']])) {
+                        $model->salesCode($codeMap[$item['sku']]);
+                    } elseif ($model->salesCode() == '') {
                         $code = $model->guessCode();
                         $model->salesCode($code);
                     }
 
+                    switch ($item['sku']) { // anomoly handler
+                        case '0473850';
+                            $model->unitSize('#');
+                            break;
+                    }
+
                     $model->save();
                 }
+
+                rename($csvfile, __DIR__ . '/noauto/originals/' . $id . '.csv');
+            } else {
+                unlink($csvfile);
             }
         }
 
@@ -148,6 +175,38 @@ class UIGLib
                 'vendorOrderID' => $line[$PO_NUMBER],
                 'vendorInvoiceID' => $line[$INVOICE],
         );
+    }
+
+    static private $lookups = null;
+    static private function getCaseSize($dbc, $upc, $sku, $vendorID)
+    {
+        if (self::$lookups === null) { 
+            $vend = $dbc->prepare('
+                SELECT units 
+                FROM vendorItems 
+                WHERE vendorID=? 
+                    AND (upc=? OR sku=?)
+                    AND units IS NOT NULL
+                    AND units > 0');
+            $order = $dbc->prepare('
+                SELECT caseSize
+                FROM PurchaseOrderItems AS i
+                    INNER JOIN PurchaseOrder AS o ON i.orderID=o.orderID
+                WHERE o.vendorID=?
+                    AND (i.internalUPC=? OR i.sku=?)
+                    AND i.caseSize <> 1
+                ORDER BY i.receivedDate DESC');
+            self::$lookups = array($vend, $order);
+        }
+
+        foreach (self::$lookups as $lookup) {
+            $size = $dbc->getValue($lookup, array($vendorID, $upc, $sku));
+            if ($size !== false) {
+                return $size;
+            }
+        }
+
+        return 1;
     }
 
     static private function parseItem($line, $vendorID)
@@ -171,43 +230,23 @@ class UIGLib
         $upc = str_replace(' ', '', $upc);
         $upc = substr($upc, 0, strlen($upc)-1);
         $upc = BarcodeLib::padUPC($upc);
+        $line[$SKU] = str_pad($line[$SKU], 7, '0', STR_PAD_LEFT);
 
         $caseSize = $line[$CASESIZE];
         // invoice does not include proper case size
         // try to find actual size in vendorItems table
         // via SKU or UPC
-        if (strtoupper($caseSize) == 'CS') {
+        if (strtoupper($caseSize) == 'CS' || !is_numeric($caseSize)) {
             $dbc = FannieDB::get($FANNIE_OP_DB);
-            $vmodel = new VendorItemsModel($dbc);
-            $vmodel->sku($line[$SKU]);
-            $vmodel->vendorID($vendorID);
-            $vmodel->load();
-            if ($vmodel->units() != '') {
-                $caseSize = $vmodel->units();
-            } else {
-                $vmodel->reset();
-                $vmodel->upc($upc);
-                $vmodel->vendorID($vendorID);
-                foreach($vmodel->find() as $item) {
-                    if ($item->units() != '') {
-                        $caseSize = $item->units();
-                    }
-                }
-            }
-
+            $caseSize = self::getCaseSize($dbc, $upc, $line[$SKU], $vendorID);
         } 
-
-        // never found a valid size
-        if (!is_numeric($caseSize)) {
-            $caseSize = 1;
-        }
 
         return array(
             'sku' => $line[$SKU],
             'quantity' => $line[$ORDERQTY],
             'unitCost' => $line[$UNITCOST],
             'caseSize' => $caseSize,
-            'receivedQty' => $line[$RECVQTY],
+            'receivedQty' => $line[$RECVQTY] * $caseSize,
             'receivedTotalCost' => $line[$TOTALCOST],
             'unitSize' => $line[$UNITSIZE],
             'brand' => $line[$BRAND],

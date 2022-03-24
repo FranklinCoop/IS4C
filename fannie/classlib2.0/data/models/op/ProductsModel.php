@@ -58,6 +58,7 @@ class ProductsModel extends BasicModel
     'scale'=>array('type'=>'TINYINT'),
     'scaleprice'=>array('type'=>'MONEY'),
     'mixmatchcode'=>array('type'=>'VARCHAR(13)'),
+    'created'=>array('type'=>'DATETIME','ignore_updates'=>true),
     'modified'=>array('type'=>'DATETIME','ignore_updates'=>true),
     'batchID'=>array('type'=>'INT', 'default'=>0, 'replaces'=>'advertised'),
     'tareweight'=>array('type'=>'DOUBLE'),
@@ -68,7 +69,9 @@ class ProductsModel extends BasicModel
     'wicable'=>array('type'=>'SMALLINT', 'default'=>0),
     'qttyEnforced'=>array('type'=>'TINYINT'),
     'idEnforced'=>array('type'=>'TINYINT'),
-    'cost'=>array('type'=>'MONEY', 'default'=>0),
+    'cost'=>array('type'=>'DECIMAL(10,3)', 'default'=>0),
+    'special_cost'=>array('type'=>'DECIMAL(10,3)', 'default'=>0),
+    'received_cost'=>array('type'=>'DECIMAL(10,3)', 'default'=>0),
     'inUse'=>array('type'=>'TINYINT'),
     'numflag'=>array('type'=>'INT','default'=>0),
     'subdept'=>array('type'=>'SMALLINT'),
@@ -119,73 +122,11 @@ class ProductsModel extends BasicModel
           If a custom data source has been specified, let
           that handle the calculations
         */
-        if (FannieConfig::config('TAG_DATA_SOURCE') !== '' && class_exists(FannieConfig::config('TAG_DATA_SOURCE'))) {
-            $source = FannieConfig::config('TAG_DATA_SOURCE');
+        //if (FannieConfig::config('FANNIE_TAG_DATA_SOURCE') !== '' && class_exists(FannieConfig::config('FANNIE_TAG_DATA_SOURCE'))) {
+            $source = FannieConfig::config('FANNIE_TAG_DATA_SOURCE');
             $obj = new $source();
             return $obj->getTagData($this->connection, $this->upc(), $price);
-        }
-
-        $query = '
-            SELECT p.upc,
-                p.description,
-                p.normal_price,
-                COALESCE(p.brand, x.manufacturer) AS brand,
-                COALESCE(v.vendorName, x.distributor) AS vendor,
-                p.size AS p_size,
-                p.unitofmeasure,
-                i.sku,
-                i.units,  
-                i.size AS vi_size
-            FROM products AS p
-                LEFT JOIN prodExtra AS x ON p.upc=x.upc
-                LEFT JOIN vendors AS v ON p.default_vendor_id=v.vendorID
-                LEFT JOIN vendorItems AS i ON p.upc=i.upc AND v.vendorID=i.vendorID
-            WHERE p.upc=?';
-        $prep = $this->connection->prepare($query);
-        $res = $this->connection->execute($prep, array($this->upc()));
-
-        $ret = array(
-            'upc' => $this->upc(),
-            'description' => $this->description(),
-            'brand' => $this->brand(),
-            'normal_price' => $this->normal_price(),
-            'sku' => '',
-            'size' => '',
-            'units' => '',
-            'vendor' => '',
-            'pricePerUnit' => '',
-        );
-        if (!$res || $this->connection->numRows($res) == 0) {
-            return $ret;
-        }
-
-        $row = $this->connection->fetchRow($res);
-        $ret['description'] = $row['description'];
-        $ret['brand'] = $row['brand'];
-        $ret['vendor'] = $row['vendor'];
-        $ret['sku'] = $row['sku'];
-        $ret['units'] = $row['units'];
-
-        if ($price !== false) {
-            $ret['normal_price'] = $price;
-        } else {
-            $ret['normal_price'] = $row['normal_price'];
-        }
-
-        if (is_numeric($row['p_size']) && !empty($row['p_size']) && !empty($row['unitofmeasure'])) {
-            $ret['size'] = $row['p_size'] . ' ' . $row['unitofmeasure'];
-        } elseif (!empty($row['p_size'])) {
-            $ret['size'] = $row['p_size'];
-        } elseif (!empty($row['vi_size'])) {
-            $ret['size'] = $row['vi_size'];
-        }
-
-        $ret['pricePerUnit'] = \COREPOS\Fannie\API\lib\PriceLib::pricePerUnit(
-            $ret['normal_price'],
-            $ret['size']
-        );
-
-        return $ret;
+        //}
     }
 
     public function doc()
@@ -292,7 +233,12 @@ date of birth. This flag should be set to the age
 required to purchase the product - e.g., 21 for 
 alcohol in the US.
 
-cost is the item\'s cost
+Cost:
+cost is the item\'s normal cost as used for calculating retail price. 
+special_cost is a temporary, promotional cost. received_cost is filled in
+via purchase orders. Most pricing tools  use normal cost to generate retail 
+prices. special_cost or received_cost is recorded in transaction logs to more 
+closely reflect actual cost at the time of sale.
 
 isUse indicates whether the item is currently
 available for sale. Whether cashiers can bypass this
@@ -378,7 +324,7 @@ it won\'t *do* anything.
             return false;
         }
 
-        $stores = new StoresModel($dbc);
+        $stores = new StoresModel($this->connection);
         $ret = true;
         foreach ($stores->find() as $store) {
             $this->store_id($store->storeID());

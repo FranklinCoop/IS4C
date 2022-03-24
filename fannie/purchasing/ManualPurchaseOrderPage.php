@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class ManualPurchaseOrderPage extends FannieRESTfulPage 
@@ -59,6 +59,10 @@ class ManualPurchaseOrderPage extends FannieRESTfulPage
         $total = FormLib::get('total', array());
         $brand = FormLib::get('brand', array());
         $description = FormLib::get('description', array());
+
+        $rCases = FormLib::get('recv-cases', array());
+        $rCosts = FormLib::get('recv-cost', array());
+        $rDates = FormLib::get('recv-date', array());
 
         if (count($sku) == 0) {
             $ret['error'] = true;
@@ -128,12 +132,28 @@ class ManualPurchaseOrderPage extends FannieRESTfulPage
             $pitem->caseSize($units);
             $pitem->unitSize('');
             $pitem->unitCost($unitCost);
-            $pitem->receivedDate($date);
-            $pitem->receivedQty($qty);
-            $pitem->receivedTotalCost($total[$i]);
+            /**
+             * Check whether recceiving fields were present
+             */
+            if (isset($rDates[$i]) && $rDates[$i]) {
+                $pitem->receivedDate($rDates[$i]);
+            } elseif (!isset($rDates[$i])) {
+                $pitem->receivedDate($date);
+            }
+            if (isset($rCases[$i]) && $rCases[$i]) {
+                $pitem->receivedQty($rCases[$i]);
+            } elseif (!isset($rCases[$i])) {
+                $pitem->receivedQty($qty);
+            }
+            if (isset($rCosts[$i]) && $rCosts[$i]) {
+                $pitem->receivedTotalCost($rCosts[$i]);
+            } elseif (!isset($rCosts[$i])) {
+                $pitem->receivedTotalCost($total[$i]);
+            }
             $pitem->brand($brand[$i]);
             $pitem->description($description[$i]);
             $pitem->internalUPC($upc[$i]);
+
 
             /**
               Try to look up unit size using
@@ -163,7 +183,7 @@ class ManualPurchaseOrderPage extends FannieRESTfulPage
               If no vendorItems record exists for this
               SKU or UPC then create one
             */
-            if ($size === false) {
+            if ($size === false && is_numeric($upc[$i]) && strlen($upc[$i]) == 13) {
                 $vitem->reset();
                 $vitem->vendorID($this->id);
                 $vitem->sku($sku[$i]);
@@ -255,9 +275,11 @@ class ManualPurchaseOrderPage extends FannieRESTfulPage
 
         $ret .= '</form>';
 
-        $this->addScript('js/manual.js');
+        $this->addScript('js/manual.js?date=20200616');
         $this->addScript('../item/autocomplete.js');
-        $this->addOnloadCommand('addInvoiceLine();');
+        if (FormLib::get('adjust') == '') {
+            $this->addOnloadCommand('addInvoiceLine();');
+        }
 
         return $ret;
     }

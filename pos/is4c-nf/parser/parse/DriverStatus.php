@@ -46,12 +46,13 @@ class DriverStatus extends Parser
         */
         if (@socket_recvfrom($socket, $buffer, 1024, 0, $host, $port)) {
             $msg = str_replace("\n", '<br>', $buffer);
+            $msg .= "\nPan Block: ".$this->session->get("CachePanEncBlock");
         } else {
-            $msg = 'No response to status request';
+            $msg = _('No response to status request');
         }
         socket_close($socket);
         $ret = $this->default_json();
-        $ret['output'] = DisplayLib::boxMsg($msg, 'Status Check', true, DisplayLib::standardClearButton());
+        $ret['output'] = DisplayLib::boxMsg($msg, _('Status Check'), true, DisplayLib::standardClearButton());
 
         return $ret;
     }

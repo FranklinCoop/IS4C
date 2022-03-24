@@ -22,8 +22,13 @@
 *********************************************************************************/
 
 namespace COREPOS\Fannie\API\webservices; 
+use COREPOS\Fannie\API\data\DataCache;
+use COREPOS\Fannie\API\member\MemberREST;
+use COREPOS\Fannie\API\item\ItemText;
+use \FannieDB;
+use \FannieConfig;
 
-class FannieAutoComplete extends \COREPOS\Fannie\API\webservices\FannieWebService 
+class FannieAutoComplete extends FannieWebService 
 {
     
     public $type = 'json'; // json/plain by default
@@ -53,39 +58,79 @@ class FannieAutoComplete extends \COREPOS\Fannie\API\webservices\FannieWebServic
             return $ret;
         }
 
-        $dbc = \FannieDB::getReadOnly(\FannieConfig::factory()->get('OP_DB'));
+        $dbc = FannieDB::getReadOnly(FannieConfig::factory()->get('OP_DB'));
         switch (strtolower($args->field)) {
             case 'item':
                 $res = false;
                 if (!is_numeric($args->search)) {
+                    $term = '%' . $args->search . '%';
+                    $queryArgs = array($term, $term, $term, $term);
+                    $also = "";
+                    if (property_exists($args, 'superID')) {
+                        $also = " AND m.superID=? ";
+                        $queryArgs[] = $args->superID;
+                    }
                     $prep = $dbc->prepare('SELECT p.upc,
-                                            p.description
+                                            p.description AS posDesc,
+                                            MAX(p.size) AS size,
+                                            ' . ItemText::longBrandSQL() . ',
+                                            ' . ItemText::longDescriptionSQL() . ',
+                                            MAX(l.likeCode) AS likeCode,
+                                            MAX(p.scale) AS scale
                                            FROM products AS p
                                             LEFT JOIN productUser AS u ON u.upc=p.upc
-                                           WHERE p.description LIKE ?
+                                            LEFT JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
+                                            LEFT JOIN upcLike AS l ON p.upc=l.upc
+                                           WHERE (p.description LIKE ?
                                             OR p.brand LIKE ?
                                             OR u.description LIKE ?
-                                            OR u.brand LIKE ?
+                                            OR u.brand LIKE ?)
+                                            ' . $also . '
+                                            AND p.inUse=1
                                            GROUP BY p.upc,
-                                            p.description
-                                           ORDER BY p.description');
-                    $term = '%' . $args->search . '%';
-                    $res = $dbc->execute($prep, array($term, $term, $term, $term));
+                                            p.brand,
+                                            u.brand,
+                                            p.description,
+                                            u.description
+                                           ORDER BY MAX(p.last_sold) DESC, p.description');
+                    $res = $dbc->execute($prep, $queryArgs);
                 } elseif (ltrim($args->search, '0') != '') {
                     $prep = $dbc->prepare('
                         SELECT p.upc,
-                            p.upc AS description
+                            p.upc AS description,
+                            p.upc AS posDesc,
+                            \'\' AS brand,
+                            \'\' AS size,
+                            \'\' AS likeCode,
+                            MAX(p.scale) AS scale
                         FROM products AS p
                         WHERE p.upc LIKE ?
                         GROUP BY p.upc');
                     $res = $dbc->execute($prep, array('%'.$args->search . '%'));
                 }
+                $wide = (isset($args->wide) && $args->wide) ? true : false;
+                $lc = (isset($args->lc) && $args->lc) ? true : false;
                 while ($res && $row = $dbc->fetch_row($res)) {
+                    $bigLabel = (!empty($row['brand']) ? $row['brand'] . ' ' : '') . $row['description'];
+                    if ($row['size']) {
+                        $bigLabel .= ' (' . $row['size'] . ')';
+                    }
+                    if ($lc && $row['likeCode']) {
+                        $bigLabel .= ' LC' . $row['likeCode'];
+                        $row['posDesc'] = ' LC' . $row['likeCode'] . ' ' . $row['posDesc'];
+                    } elseif ($lc) {
+                        continue;
+                    }
+                    if ($lc) {
+                        $row['posDesc'] .= ' ' . ($row['scale'] ? '(lb)' : '(ea)');
+                    }
                     $ret[] = array(
-                        'label' => $row['description'],
+                        'label' => $wide ? $bigLabel : $row['posDesc'],
                         'value' => $row['upc'],
                     );
                 }
+
+                return $ret;
 
             case 'brand':
                 $prep = $dbc->prepare('SELECT brand
@@ -128,12 +173,38 @@ class FannieAutoComplete extends \COREPOS\Fannie\API\webservices\FannieWebServic
 
                 return $ret;
 
+            case 'catalog':
+                list($vID,$search) = explode(':', $args->search);
+                $prep = $dbc->prepare('SELECT sku, description, cost, size, units
+                                       FROM vendorItems
+                                       WHERE vendorID=?
+                                        AND vendorDept > 1
+                                        AND (sku LIKE ? OR description LIKE ?)
+                                       ORDER BY description');
+                $search = '%' . $search . '%';
+                $res = $dbc->execute($prep, array($vID, $search, $search));
+                while ($row = $dbc->fetch_row($res)) {
+                    $str = "{$row['sku']} {$row['description']} {$row['size']}/{$row['units']} \${$row['cost']}";
+                    $ret[] = array(
+                        'label' => $str,
+                        'value' => $str,
+                    );
+                }
+                return $ret;
+
             case 'mfirstname':
             case 'mlastname':
             case 'maddress':
             case 'mcity':
             case 'memail':
-                return \COREPOS\Fannie\API\member\MemberREST::autoComplete($args->field, $args->search);
+                return MemberREST::autoComplete($args->field, $args->search);
+
+            case 'mfirstnamen':
+            case 'mlastnamen':
+            case 'maddressn':
+            case 'mcityn':
+            case 'memailn':
+                return MemberREST::autoComplete(substr($args->field, 0, strlen($args->field)-1), $args->search, true);
 
             case 'sku':
                 $query = 'SELECT sku
@@ -172,6 +243,69 @@ class FannieAutoComplete extends \COREPOS\Fannie\API\webservices\FannieWebServic
                     if (count($ret) > 50) {
                         break;
                     }
+                }
+
+                return $ret;
+
+            case 'page':
+                $pages = DataCache::getFile('forever', 'pageAutoComplete');
+                if ($pages === false) {
+                    return $ret;
+                }
+                $pages = unserialize($pages);
+                if (!is_array($pages) || !isset($pages['ttl']) || time() > $pages['ttl']) {
+                    $all = array();
+                    $acceptsNumbers = array();
+                    $url = FannieConfig::config('URL');
+                    $root = FannieConfig::config('ROOT');
+                    foreach (\FannieAPI::listModules('FanniePage') as $obj) {
+                        if (!$obj->discoverable) {
+                            continue;
+                        }
+                        $refl = new \ReflectionClass($obj);
+                        $link = $url . str_replace($root, '', $reflect->getFileName());
+                        $all[$obj->description] = $link;
+                        if (isset($obj->accepts['numbers'])) {
+                            $acceptsNumbers[$obj->description] = $link . '?' . urlencode($obj->accepts['numbers']);
+                        }
+                    }
+                    $pages = array(
+                        'all' => $all,
+                        'numbers' => $acceptsNumbers,
+                        'ttl' => time() + (24*60*60),
+                    );
+                    DataCache::putFile('forever', serialize($pages), 'pageAutoComplete');
+                }
+                if (!is_numeric($this->search)) {
+                    $lower = strtolower($this->search);
+                    foreach ($pages['all'] as $description => $link) {
+                        if (strpos(strtolower($description), $lower) !== false) {
+                            $ret[] = array('label' => $description, 'value'=>$link);
+                        }
+                    }
+                } else {
+                    foreach ($pages['numbers'] as $description => $link) {
+                        $ret[] = array('label' => $description, 'value' => $link . '=' . $this->search);
+                    }
+                }
+                return $ret;
+
+            case 'ewic':
+                $query = '
+                    SELECT p.upc, p.description
+                    FROM products AS p
+                        INNER JOIN EWicItems AS e ON p.upc=e.upc
+                    WHERE e.alias IS NULL
+                        AND p.description LIKE ?
+                    ORDER BY p.last_sold';
+                $param = array('%' . $args->search . '%');
+                $prep = $dbc->prepare($query);
+                $res = $dbc->execute($prep, $param);
+                while ($row = $dbc->fetchRow($res)) {
+                    $ret[] = array(
+                        'label' => $row['description'],
+                        'value' => $row['upc'],
+                    );
                 }
 
                 return $ret;

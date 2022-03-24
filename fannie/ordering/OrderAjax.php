@@ -27,10 +27,14 @@ if (!class_exists('FannieAPI')) {
 if (!class_exists('OrderNotifications')) {
     include(__DIR__ . '/OrderNotifications.php');
 }
+if (!class_exists('SoPoBridge')) {
+    include(__DIR__ . '/SoPoBridge.php');
+}
 
 class OrderAjax extends FannieRESTfulPage
 {
     protected $must_authenticate = true;
+    public $discoverable = false;
 
     public function preprocess()
     {
@@ -41,7 +45,8 @@ class OrderAjax extends FannieRESTfulPage
             'post<id><confirm>',
             'post<id><store>',
             'post<id><close>',
-            'post<id><testNotify>'
+            'post<id><testNotify>',
+            'post<id><nodupe>'
         );
 
         return parent::preprocess();
@@ -64,8 +69,19 @@ class OrderAjax extends FannieRESTfulPage
                 SELECT * FROM PendingSpecialOrder
                 WHERE order_id=?");
         $dbc->execute($moveP, array($this->id));
+
+        $itemP = $dbc->prepare("SELECT s.storeID, p.order_id, p.trans_id 
+                FROM " . FannieDB::fqn('PendingSpecialOrder', 'trans') . " AS p
+                    LEFT JOIN " . FannieDB::fqn('SpecialOrders', 'trans') . " AS s ON p.order_id=s.specialOrderID
+                WHERE p.order_id=?
+                    AND p.trans_id > 0");
+        $bridge = new SoPoBridge($dbc, $this->config);
+        $itemR = $dbc->execute($itemP, array($this->id));
+        while ($itemW = $dbc->fetchRow($itemR)) {
+            $bridge->removeItemFromPurchaseOrder($this->id, $itemW['trans_id'], $itemW['storeID']);
+        }
         
-        $cleanP = $dbc->prepare("DELETE FROM PendingSpecialOrder
+        $cleanP = $dbc->prepare("DELETE FROM " . FannieDB::fqn('PendingSpecialOrder', 'trans') . "
                 WHERE order_id=?");
         $dbc->execute($cleanP, array($this->id));
 
@@ -79,6 +95,10 @@ class OrderAjax extends FannieRESTfulPage
         $soModel->specialOrderID($this->id);
         $soModel->storeID($this->store);
         $soModel->save();
+
+        $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+            (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+        $dbc->execute($audit, array($this->id, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Changed Store', 'Store #' . $this->store));
     }
 
     protected function post_id_confirm_handler()
@@ -97,6 +117,10 @@ class OrderAjax extends FannieRESTfulPage
             $dbc->execute($del,array($this->id));
         }
 
+        $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+            (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+        $dbc->execute($audit, array($this->id, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Toggled Confirm', ($this->confirm ? 'On' : 'Off')));
+
         return false;
     }
 
@@ -109,6 +133,10 @@ class OrderAjax extends FannieRESTfulPage
         $prep = $dbc->prepare("UPDATE PendingSpecialOrder SET
             voided=? WHERE order_id=?");
         $dbc->execute($prep,array($this->pn,$this->id));
+
+        $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+            (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+        $dbc->execute($audit, array($this->id, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Changed Household Name', 'Person #' . $this->pn));
 
         return false;
     }
@@ -147,6 +175,10 @@ class OrderAjax extends FannieRESTfulPage
             $json['sentEmail'] = $email->orderArrivedEmail($this->id);
         }
 
+        $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+            (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+        $dbc->execute($audit, array($this->id, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Changed Status', 'Status #' . $this->status));
+
         echo json_encode($json);
 
         return false;
@@ -160,6 +192,21 @@ class OrderAjax extends FannieRESTfulPage
         $json['sentEmail'] = $email->orderTestEmail($this->id);
 
         echo json_encode($json);
+
+        return false;
+    }
+
+    protected function post_id_nodupe_handler()
+    {
+        $dbc = $this->tdb();
+        $prep = $dbc->prepare('UPDATE SpecialOrders SET noDuplicate=? WHERE specialOrderID=?');
+        $res = $dbc->execute($prep, array($this->nodupe ? 1 : 0, $this->id));
+
+        $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+            (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+        $dbc->execute($audit, array($this->id, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Changed Duplication', ($this->nodupe ? 'Off' : 'On')));
+
+        echo 'Done';
 
         return false;
     }

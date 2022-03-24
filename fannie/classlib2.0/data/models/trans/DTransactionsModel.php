@@ -30,7 +30,7 @@ class DTransactionsModel extends BasicModel
 
     protected $columns = array(
     'datetime'    => array('type'=>'DATETIME','index'=>True),
-    'store_id'    => array('type'=>'SMALLINT'),
+    'store_id'    => array('type'=>'SMALLINT', 'default'=>true),
     'register_no'    => array('type'=>'SMALLINT'),
     'emp_no'    => array('type'=>'SMALLINT'),
     'trans_no'    => array('type'=>'INT'),
@@ -147,8 +147,9 @@ class DTransactionsModel extends BasicModel
         $this->name = 'dlog_15';
         unset($this->columns['datetime']);
         $tdate = array('tdate'=>array('type'=>'datetime','index'=>True));
+        $date_id = array('date_id'=>array('type'=>'INT'));
         $trans_num = array('trans_num'=>array('type'=>'VARCHAR(25)'));
-        $this->columns = $tdate + $this->columns + $trans_num;
+        $this->columns = $tdate + $date_id + $this->columns + $trans_num;
         $chk = parent::normalize($db_name, $mode, $doCreate);
         if ($chk !== false) {
             $log_adds += $chk;
@@ -216,6 +217,7 @@ class DTransactionsModel extends BasicModel
         // EL: Need to restore $this-columns to original values.
         $this->connection = FannieDB::get($FANNIE_TRANS_DB);
         unset($this->columns['tdate']);
+        unset($this->columns['date_id']);
         unset($this->columns['trans_num']);
         $datetime = array('datetime'=>array('type'=>'datetime','index'=>true));
         $this->columns = $datetime + $this->columns;
@@ -267,15 +269,23 @@ class DTransactionsModel extends BasicModel
                 $this->connection->query($sql);
             }
         }
+        $source = $this->connection->tableDefinition($table_name);
+        $dbms = $this->connection->dbmsName();
 
-        $sql = 'CREATE VIEW '.$this->connection->identifierEscape($view_name).' AS '
+        $sql = 'CREATE VIEW '.$this->identifierEscape($dbms, $view_name).' AS '
             .'SELECT '
             .$this->connection->identifierEscape('datetime').' AS '
             .$this->connection->identifierEscape('tdate').',';
+        if (isset($source['date_id'])) {
+            $sql .= 'date_id,';
+        } else {
+            $sql .= $this->connection->dateymd('datetime') . ' AS date_id,';
+        }
         $c = $this->connection; // for more concise code below
         foreach($this->columns as $name => $definition) {
             if ($name == 'datetime') continue;
             elseif ($name == 'tdate') continue;
+            elseif ($name == 'date_id') continue;
             elseif ($name == 'trans_num'){
                 // create trans_num field
                 $sql .= $c->concat(
@@ -292,11 +302,11 @@ class DTransactionsModel extends BasicModel
                 $sql .= "CASE WHEN trans_subtype IN ('CP','IC') THEN 'T' 
                     WHEN upc = 'DISCOUNT' THEN 'S' ELSE trans_type END AS trans_type,\n";
             } else {
-                $sql .= $c->identifierEscape($name).",\n";
+                $sql .= $this->identifierEscape($dbms, $name).",\n";
             }
         }
         $sql = preg_replace("/,\n$/","\n",$sql);
-        $sql .= ' FROM '.$c->identifierEscape($table_name)
+        $sql .= ' FROM '.$this->identifierEscape($dbms, $table_name)
             .' WHERE '.$c->identifierEscape('trans_status')
             ." NOT IN ('D','X','Z') AND emp_no <> 9999
             AND register_no <> 99";
@@ -359,6 +369,18 @@ class DTransactionsModel extends BasicModel
         }
         $start_ts = strtotime($start);
         $end_ts = strtotime($end);
+
+        /**
+         * Possible revision: throw an exception
+         * If the calling code is providing invalid date(s) and
+         * this method returns bigArchive or dlogBig, the calling
+         * code might very well issue a query that scans the entire
+         * archive table. Returning dlog/dtransactions instead minimizes
+         * the performance impact of this kind of mistake.
+         */
+        if ($start_ts === false || $end_ts === false || $start_ts < 0 || $end_ts < 0) {
+            return ($dlog) ? $FANNIE_TRANS_DB.$sep.'dlog' : $FANNIE_TRANS_DB.$sep.'dtransactions';
+        }
     
         // today. return dlog/dtrans
         if (date('Y-m-d',$start_ts) == date('Y-m-d')) {

@@ -21,9 +21,14 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\data\pipes\OutgoingEmail;
+
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'/classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
+}
+if (!class_exists('SubAgreement')) {
+    include(__DIR__ . '/sub/SubAgreement.php');
 }
 
 class PISignaturePage extends FannieRESTfulPage 
@@ -68,7 +73,7 @@ class PISignaturePage extends FannieRESTfulPage
     {
         $primary = \COREPOS\Fannie\API\Member\MemberREST::getPrimary($mem);
         if (filter_var($primary[0]['email'], FILTER_VALIDATE_EMAIL)) {
-            $mail = new PHPMailer();
+            $mail = OutgoingEmail::get();
             $mail->From = 'info@wholefoods.coop';
             $mail->FromName = 'Whole Foods Co-op';
             $mail->AddAddress($primary[0]['email']);
@@ -81,7 +86,7 @@ class PISignaturePage extends FannieRESTfulPage
 
     private function outputFile()
     {
-        $dir = '/var/www/cgi-bin/docfile/docfile/' . $this->id . '/';
+        $dir = __DIR__ . '/noauto/docfile/' . $this->id . '/';
         if (!is_dir($dir)) {
             mkdir($dir);
         }

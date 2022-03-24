@@ -23,7 +23,7 @@
 
 require(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class CoolItemUploadPage extends \COREPOS\Fannie\API\FannieUploadPage 
@@ -57,16 +57,19 @@ class CoolItemUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
         $dbc->selectDB($this->config->get('OP_DB'));
 
         $itemP = $dbc->prepare('
-            SELECT itemdesc,
-                description,
-                weight
+            SELECT s.itemdesc,
+                p.description,
+                s.weight,
+                s.text,
+                s.mosaStatement,
+                s.originText
             FROM scaleItems AS s
                 LEFT JOIN products AS p ON s.plu=p.upc
             WHERE plu=?');
         $saveP = $dbc->prepare('
             UPDATE scaleItems
             SET price=?,
-                itemdesc=?,
+                originText=?,
                 modified=' . $dbc->now() . '
             WHERE plu=?');
         $product = new ProductsModel($dbc);
@@ -86,13 +89,7 @@ class CoolItemUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
                 continue;
             }
             $itemdesc = !empty($item['itemdesc']) ? $item['itemdesc'] : $item['description'];
-            if (strstr($itemdesc, "\n")) {
-                list($line1, $line2) = explode("\n", $itemdesc);
-                $itemdesc = $line1 . "\n" . $cool;
-            } else {
-                $itemdesc .= "\n" . $cool;
-            }
-            $dbc->execute($saveP, array($price, $itemdesc, $upc));
+            $dbc->execute($saveP, array($price, $cool, $upc));
             if ($prodPricing) {
                 $product->upc($upc);
                 foreach ($product->find() as $obj) {
@@ -103,18 +100,21 @@ class CoolItemUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
 
             $scale_info = array(
                 'RecordType' => 'ChangeOneItem',
-                'PLU' => substr($upc, 3, 4),
+                'PLU' => COREPOS\Fannie\API\item\ServiceScaleLib::upcToPLU($upc),
                 'Description' => $itemdesc,
                 'Price' => $price,
                 'Type' => $item['weight'] == 0 ? 'Random Weight' : 'Fixed Weight',
                 'ReportingClass' => 1,
+                'ExpandedText' => $item['text'],
+                'MOSA' => $item['mosaStatement'],
+                'OriginText' => $cool,
             );
             $scale_items[] = $scale_info;
         }
 
         $scales = $this->getScales(FormLib::get('scales', array()));
         \COREPOS\Fannie\API\item\HobartDgwLib::writeItemsToScales($scale_items, $scales);
-        \COREPOS\Fannie\API\item\EpScaleLib::writeItemsToScales($scale_items, $scales);
+        \COREPOS\Fannie\API\item\EpScaleLib::writeItemsToScales($scale_items, $scales, false);
 
         return true;
     }

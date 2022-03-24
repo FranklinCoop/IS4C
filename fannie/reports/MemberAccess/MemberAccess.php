@@ -23,14 +23,14 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class MemberAccess extends FannieReportPage 
 {
     public $description = '[Member Access Discount Report] Shows owners who have used EBT, WIC, and/or ACCESS';
-    public $report_set = 'Reports';
-    public $themed = true;
+    public $report_set = 'Membership';
+    public $discoverable = false;
 
     protected $report_headers = array('Owner #', 'Tender Used', 'Has Access');
     protected $sort_direction = 1;

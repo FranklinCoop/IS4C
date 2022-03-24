@@ -1,6 +1,7 @@
 <?php
+use COREPOS\Fannie\API\item\StandardAccounting;
 include('../../../../config.php');
-include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+include(__DIR__ . '/../../../../classlib2.0/FannieAPI.php');
 $dbc = FannieDB::get($FANNIE_OP_DB);
 if (!class_exists('WfcLib')) {
     require(dirname(__FILE__) . '/../WfcLib.php');
@@ -144,22 +145,26 @@ if ($store != 50) {
 }
 
 
-$pCodeQ = $dbc->prepare("SELECT s.salesCode,-1*sum(l.total) as total,min(l.department) 
+$pCodeQ = $dbc->prepare("SELECT s.salesCode,-1*sum(l.total) as total,min(l.department) , l.store_id
 FROM $dlog as l 
 INNER JOIN {$OP_DB}departments AS s ON l.department=s.dept_no
 WHERE l.tdate BETWEEN ? AND ?
 AND l.department < 600 AND l.department <> 0
 AND l.trans_type <>'T'
 AND " . DTrans::isStoreID($store, 'l') . "
-GROUP BY s.salesCode
+GROUP BY s.salesCode, l.store_id
 order by s.salesCode");
 $pCodeR = $dbc->execute($pCodeQ, $store_dates);
 $pCodes = WfcLib::getPCodes();
+$data = array();
 while($row = $dbc->fetch_row($pCodeR)){
-    if (isset($pCodes[$row[0]])) $pCodes[$row[0]][0] = $row[1];
+    if (isset($pCodes[$row[0]])) {
+        $code = StandardAccounting::extend($row[0], $row['store_id']);
+        $data[$code] = array($row[1]);
+    }
 }
 echo "<br /><b>Sales</b>";
-echo WfcLib::tablify($pCodes,array(0,1),array("pCode","Sales"),
+echo WfcLib::tablify($data,array(0,1),array("pCode","Sales"),
          array(WfcLib::ALIGN_LEFT,WfcLib::ALIGN_RIGHT|WfcLib::TYPE_MONEY),1);
 
 $saleSumQ = $dbc->prepare("SELECT -1*sum(l.total) as totalSales
@@ -258,7 +263,7 @@ echo WfcLib::tablify($ar_rows,array(1,2,3,4,5),array("Account","MemNum","Descrip
 $discQ = $dbc->prepare("SELECT     m.memDesc, -1*SUM(d.total) AS Discount,count(*) 
 FROM $dlog d INNER JOIN
        custdata c ON d.card_no = c.CardNo INNER JOIN
-      memTypeID m ON c.memType = m.memTypeID
+      memtype m ON c.memType = m.memtype
 WHERE d.tdate BETWEEN ? AND ?
     AND (d.upc = 'DISCOUNT') AND c.personnum= 1
 and total <> 0
@@ -363,7 +368,7 @@ $transQ = $dbc->prepare("select q.trans_num,sum(q.quantity) as items,transaction
         m.memdesc as transaction_type
     from $dlog as d
     left join custdata as c on d.card_no = c.cardno
-    left join memTypeID as m on c.memtype = m.memTypeID
+    left join memtype as m on c.memtype = m.memtype
     WHERE d.tdate BETWEEN ? AND ?
     AND trans_type in ('I','D')
     and upc <> 'RRR'

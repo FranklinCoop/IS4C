@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../../classlib2.0/FannieAPI.php');
 }
 
 class CWCouponReport extends FannieReportPage 
@@ -183,11 +183,13 @@ class CWCouponReport extends FannieReportPage
             $post += $row[18];
         }
 
-        return array('Uses', count($data), '', sprintf('%.2f', $ttl/count($data)), sprintf('%.2f', $ttl), '',
+        return array('Uses', count($data), '',
+            sprintf('%.2f', count($data)==0 ? 0 : $ttl/count($data)),
+            sprintf('%.2f', $ttl), '',
             '', '', '', '', '',
-            sprintf('%.2f', $pre / count($data)), '', 
+            sprintf('%.2f', count($data)==0 ? 0 : $pre / count($data)), '', 
             '', '', '', '', '',
-            sprintf('%.2f', $post / count($data))
+            sprintf('%.2f', count($data)==0 ? 0 : $post / count($data))
         );
     }
 

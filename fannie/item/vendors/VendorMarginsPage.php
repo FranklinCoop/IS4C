@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class VendorMarginsPage extends FannieRESTfulPage 
@@ -90,6 +90,14 @@ class VendorMarginsPage extends FannieRESTfulPage
     {
         $this->id = 1;
         $phpunit->assertNotEquals(0, strlen($this->get_id_view()));
+    }
+
+    public function helpContent()
+    {
+        return '<p>Set margin targets that are specific to both a vendor and a POS department. 
+A value of zero means there is no target for this vendor & POS department combination.</p>
+<p>These are the highest priority margin targets ahead of both general margin targets for
+POS departments and margin targets for vendor-specific subcategories.</p>';
     }
 }
 

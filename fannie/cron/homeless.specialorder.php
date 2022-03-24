@@ -32,10 +32,10 @@
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT . 'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 if (!function_exists('cron_msg')) {
-    include($FANNIE_ROOT.'src/cron_msg.php');
+    include(__DIR__ . '/../src/cron_msg.php');
 }
 
 set_time_limit(0);
@@ -61,6 +61,17 @@ having max(department)=0 and max(noteSuperID)=0
 and max(trans_id) > 0
 )
 and trans_id > 0
+
+UNION ALL
+
+select s.order_id,description,datetime,
+case when c.lastName ='' then b.LastName else c.lastName END as name
+from PendingSpecialOrder
+as s left join SpecialOrders as c on s.order_id=c.specialOrderID
+left join {$OP}custdata as b on s.card_no=b.CardNo and s.voided=b.personNum
+WHERE c.storeID NOT IN (1, 2)
+and trans_id > 0
+
 order by datetime
 ";
 
@@ -69,12 +80,12 @@ if ($sql->num_rows($r) > 0){
     $msg_body = "Homeless orders detected!\n\n";
     while($w = $sql->fetch_row($r)){
         $msg_body .= $w['datetime'].' - '.(empty($w['name'])?'(no name)':$w['name']).' - '.$w['description']."\n";
-        $msg_body .= "http://key".$FANNIE_URL."ordering/view.php?orderID=".$w['order_id']."\n\n";
+        $msg_body .= "http://key".$FANNIE_URL."ordering/OrderViewPage.php?orderID=".$w['order_id']."\n\n";
     }
     $msg_body .= "These messages will be sent daily until orders get departments\n";
     $msg_body .= "or orders are closed\n";
 
-    $to = "buyers, michael";
+    $to = "buyers, dbuyers, it";
     $subject = "Incomplete SO(s)";
     mail($to,$subject,$msg_body);
 }

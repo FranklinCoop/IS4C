@@ -25,8 +25,8 @@ namespace COREPOS\Fannie\API\item\signage {
 
 class Signage12UpL extends \COREPOS\Fannie\API\item\FannieSignage 
 {
-    protected $BIG_FONT = 40;
-    protected $MED_FONT = 14;
+    protected $BIG_FONT = 36;
+    protected $MED_FONT = 9;
     protected $SMALL_FONT = 10;
     protected $SMALLER_FONT = 8;
     protected $SMALLEST_FONT = 6;
@@ -39,7 +39,86 @@ class Signage12UpL extends \COREPOS\Fannie\API\item\FannieSignage
     protected $top = 17;
     protected $left = 8.5;
 
-    public function drawPDF()
+    protected function drawItem($pdf, $item, $row, $column)
+    {
+        $effective_width = $this->width - $this->left;
+
+        $price = $this->printablePrice($item);
+
+        $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($row*$this->height) + 6);
+        $pdf->SetFont($this->font, 'B', $this->SMALL_FONT);
+        $pdf = $this->fitText($pdf, $this->SMALL_FONT, 
+            strtoupper($item['brand']), array($column, 6, 1));
+
+        $pdf->SetFont($this->font, '', $this->MED_FONT);
+        $pdf = $this->fitText($pdf, $this->MED_FONT, 
+            $item['description'], array($column, 6, 2));
+
+        $pdf->SetX($this->left + ($this->width*$column));
+        $pdf->SetFont($this->alt_font, '', $this->SMALLER_FONT);
+        $item['size'] = $this->formatSize($item['size'], $item);
+        $pdf->Cell($effective_width, 6, $item['size'], 0, 1, 'C');
+
+        if (!isset($item['signMultiplier']) || $item['signMultiplier'] != -3) {
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 41));
+            $pdf->SetFont($this->font, '', $this->BIG_FONT);
+            $pdf->Cell($effective_width, 12, $price, 0, 1, 'C');
+        } else {
+            $pdf->SetXY(-5 + $this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 41));
+            $pdf->SetFont($this->font, '', $this->MED_FONT);
+            $pdf->MultiCell($effective_width/2, 6, "BUY ONE\nGET ONE", 0, 'R');
+            $pdf->SetXY(-5 + $this->left + ($this->width*$column) + ($effective_width/2), $this->top + ($this->height*$row) + ($this->height - 39));
+            $pdf->SetFont($this->font, '', $this->BIG_FONT);
+            $pdf->Cell($effective_width/2, 12, 'FREE', 0, 1, 'L');
+        }
+
+        if ($this->validDate($item['startDate']) && $this->validDate($item['endDate'])) {
+            // intl would be nice
+            $datestr = $this->getDateString($item['startDate'], $item['endDate']);
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 33));
+            $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
+            $pdf->Cell($effective_width, 20, strtoupper($datestr), 0, 1, 'R');
+        }
+
+        // suppress "regular" price on price change batches
+        if (isset($item['discountType']) && $item['discountType'] == 0) {
+            $item['nonSalePrice'] = $item['normal_price'];
+        }
+
+        if ($item['originShortName'] != '' || (isset($item['nonSalePrice']) && $item['nonSalePrice'] > $item['normal_price'])) {
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 35.5));
+            $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
+            $text = ($item['originShortName'] != '') ? $item['originShortName'] : sprintf('Regular Price: $%.2f', $item['nonSalePrice']);
+            $pdf->Cell($effective_width, 20, $text, 0, 1, 'L');
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 33));
+            $pdf->Cell($effective_width, 20, $item['upc'], 0, 1, 'L');
+        } else {
+            $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 33));
+            $pdf->Cell($effective_width, 20, $item['upc'], 0, 1, 'L');
+        } 
+
+        return $pdf;
+    }
+
+    protected function tickMarks($pdf, $width, $height)
+    {
+        $pdf->Line(2, $height+0.0, 6, $height+0.0);
+        $pdf->Line(2, (2*$height)+1.0, 6, (2*$height)+1.0);
+        $pdf->Line(4*$width-3, $height+0.0, 4*$width+1, $height+0.0);
+        $pdf->Line(4*$width-3, (2*$height)+1.0, 4*$width+1, (2*$height)+1.0);
+
+        $pdf->Line($width+1.5, 2, $width+1.5, 8);
+        $pdf->Line(2*$width+1.5, 2, 2*$width+1.5, 8);
+        $pdf->Line(3*$width+1.5, 2, 3*$width+1.5, 8);
+        $pdf->Line($width+1.5, (3*$height)-6, $width+1.5, 3*$height);
+        $pdf->Line(2*$width+1.5, (3*$height)-6, 2*$width+1.5, 3*$height);
+        $pdf->Line(3*$width+1.5, (3*$height)-6, 3*$width+1.5, 3*$height);
+
+        return $pdf;
+    }
+
+    protected function createPDF()
     {
         $pdf = new \FPDF('L', 'mm', 'Letter');
         $pdf->SetMargins(3.175, 3.175, 3.175);
@@ -47,11 +126,17 @@ class Signage12UpL extends \COREPOS\Fannie\API\item\FannieSignage
         $pdf = $this->loadPluginFonts($pdf);
         $pdf->SetFont($this->font, '', 16);
 
+        return $pdf;
+    }
+
+    public function drawPDF()
+    {
+        $pdf = $this->createPDF();
+
         $data = $this->loadItems();
         $count = 0;
         $sign = 0;
         $this->top = 17;
-        $effective_width = $this->width - $this->left;
         foreach ($data as $item) {
             $item = $this->decodeItem($item);
             if ($count % 12 == 0) {
@@ -61,50 +146,7 @@ class Signage12UpL extends \COREPOS\Fannie\API\item\FannieSignage
 
             $row = floor($sign / 4);
             $column = $sign % 4;
-
-            $price = $this->printablePrice($item);
-
-            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($row*$this->height) + 6);
-            $pdf->SetFont($this->font, 'B', $this->SMALL_FONT);
-            $pdf = $this->fitText($pdf, $this->SMALL_FONT, 
-                strtoupper($item['brand']), array($column, 6, 1));
-
-            $pdf->SetFont($this->font, '', $this->MED_FONT);
-            $pdf = $this->fitText($pdf, $this->MED_FONT, 
-                $item['description'], array($column, 6, 2));
-
-            $pdf->SetX($this->left + ($this->width*$column));
-            $pdf->SetFont($this->alt_font, '', $this->SMALLER_FONT);
-            $item['size'] = $this->formatSize($item['size'], $item);
-            $pdf->Cell($effective_width, 6, $item['size'], 0, 1, 'C');
-
-            if ($item['signMultiplier'] != -3) {
-                $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 39));
-                $pdf->SetFont($this->font, '', $this->BIG_FONT);
-                $pdf->Cell($effective_width, 12, $price, 0, 1, 'C');
-            } else {
-                $pdf->SetXY(-5 + $this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 39));
-                $pdf->SetFont($this->font, '', $this->MED_FONT);
-                $pdf->MultiCell($effective_width/2, 6, "BUY ONE\nGET ONE", 0, 'R');
-                $pdf->SetXY(-5 + $this->left + ($this->width*$column) + ($effective_width/2), $this->top + ($this->height*$row) + ($this->height - 39));
-                $pdf->SetFont($this->font, '', $this->BIG_FONT);
-                $pdf->Cell($effective_width/2, 12, 'FREE', 0, 1, 'L');
-            }
-
-            if ($item['startDate'] != '' && $item['endDate'] != '') {
-                // intl would be nice
-                $datestr = $this->getDateString($item['startDate'], $item['endDate']);
-                $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 33));
-                $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
-                $pdf->Cell($effective_width, 20, strtoupper($datestr), 0, 1, 'R');
-            }
-
-            if ($item['originShortName'] != '' || isset($item['nonSalePrice'])) {
-                $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 33));
-                $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
-                $text = ($item['originShortName'] != '') ? $item['originShortName'] : sprintf('Regular Price: $%.2f', $item['nonSalePrice']);
-                $pdf->Cell($effective_width, 20, $text, 0, 1, 'L');
-            }
+            $pdf = $this->drawItem($pdf, $item, $row, $column);
 
             $count++;
             $sign++;

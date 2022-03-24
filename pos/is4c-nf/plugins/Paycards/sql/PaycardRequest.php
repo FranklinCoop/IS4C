@@ -22,6 +22,7 @@
 *********************************************************************************/
 
 namespace COREPOS\pos\plugins\Paycards\sql;
+use \COREPOS\pos\plugins\Paycards\card\CardValidator;
 use \Exception;
 use \PaycardConf;
 
@@ -58,7 +59,8 @@ class PaycardRequest
     private function initAmounts()
     {
         $amount = $this->conf->get("paycard_amount");
-        if (($this->type == "Debit" || $this->type == "EBTCASH") && $amount > $this->conf->get("amtdue")) {
+        $valid = new CardValidator();
+        if ($valid->allowCashback($this->type) && $amount > $this->conf->get("amtdue")) {
             $cashback = $amount - $this->conf->get("amtdue");
             $amount = $this->conf->get("amtdue");
             return array($amount, $cashback);
@@ -108,6 +110,11 @@ class PaycardRequest
     public function setAmount($amt)
     {
         $this->amount = $amt;
+    }
+
+    public function setCashBack($amt)
+    {
+        $this->cashback = $amt;
     }
 
     public function setCardholder($name)
@@ -177,22 +184,39 @@ class PaycardRequest
         $this->dbTrans->query($upQ);
     }
 
-    public function updateCardInfo($pan, $name, $issuer)
+    private function entryMethodID($entryMethod)
+    {
+        switch (strtoupper($entryMethod)) {
+            case 'CHIP':
+                return -1;
+            case 'CONTACTLESS':
+                return -2;
+            case 'SWIPED':
+                return 0;
+            default:
+                return ($this->conf->get("paycard_keyed")===true ? 1 : 0);
+        }
+    }
+
+    public function updateCardInfo($pan, $name, $issuer, $entryMethod)
     {
         $this->setPAN($pan);
         $this->cardholder = $name;
         $this->issuer = $issuer;
+        $this->manual = $this->entryMethodID($entryMethod);
         $upP = $this->dbTrans->prepare('
             UPDATE PaycardTransactions
             SET PAN=?,
                 issuer=?,
-                name=?
+                name=?,
+                manual=?
             WHERE paycardTransactionID=?
         ');
         $this->dbTrans->execute($upP, array(
             $this->pan,
             $this->issuer,
             $this->cardholder,
+            $this->manual,
             $this->last_paycard_transaction_id,
         ));
     }

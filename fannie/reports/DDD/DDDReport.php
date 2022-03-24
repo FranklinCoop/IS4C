@@ -23,18 +23,19 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class DDDReport extends FannieReportPage 
 {
     public $description = '[Shrink Reports] lists items marked as DDD/shrink at the registers.';
+    public $report_set = 'Shrink';
     public $themed = true;
 
     protected $title = "Fannie : DDD Report";
     protected $header = "DDD Report";
-    protected $report_headers = array('Date','UPC','Item','Dept#','Dept Name','Account#', 'Super Dept', 'Qty','$','Reason', 'Loss');
-    protected $required_fields = array('submitted');
+    protected $report_headers = array('Date','UPC','LC','Brand','Item','Dept#','Dept Name','Account#', 'Super Dept', 'Qty','Cost $','Retail $','Reason', 'Loss');
+    protected $required_fields = array('date1', 'date2');
 
     protected $sort_direction = 1;
 
@@ -44,22 +45,45 @@ class DDDReport extends FannieReportPage
         $dbc->selectDB($this->config->get('OP_DB'));
         $FANNIE_TRANS_DB = $this->config->get('TRANS_DB');
 
-        $dtrans = $FANNIE_TRANS_DB . $dbc->sep() . 'transarchive';
-        $union = true;
         $args = array();
         try {
             $date1 = $this->form->date1;
             $date2 = $this->form->date2;
             $dtrans = DTransactionsModel::selectDTrans($date1, $date2);
-            $union = false;
             $args[] = $date1 . ' 00:00:00';
             $args[] = $date2 . ' 23:59:59';
         } catch (Exception $ex) {
-            $date1 = '';
-            $date2 = '';
+            return array();
         }
         $store = FormLib::get('store', 0);
         $args[] = $store;
+
+        $dept_where = '';
+        $super = FormLib::get('buyer', '');
+        $superTable = 'MasterSuperDepts';
+        $depts = FormLib::get('departments', array());
+        $dept1 = FormLib::get('deptStart', '');
+        $dept2 = FormLib::get('deptEnd', '');
+        $subs = FormLib::get('subdepts', array());
+        if ($super !== '' && $super == -2) {
+            $dept_where .= " AND m.superID<>0 ";
+        } elseif ($super !== '' && $super > -1) {
+            $superTable = 'superdepts';
+            $dept_where .= " AND m.superID=? ";
+            $args[] = $super;
+        }
+        if (!empty($depts)) {
+            list($dIN, $args) = $dbc->safeInClause($depts, $args);
+            $dept_where .= " AND d.department IN ({$dIN}) ";
+        } elseif ($dept1 && $dept2) {
+            $dept_where .= " AND d.department BETWEEN ? AND ? ";
+            $args[] = $dept1;
+            $args[] = $dept2;
+        }
+        if (!empty($subs)) {
+            list($sIN, $args) = $dbc->safeInClause($subs, $args);
+            $dept_where .= " AND p.subdept IN ({$sIN}) ";
+        }
 
         /**
           I'm using {{placeholders}}
@@ -71,26 +95,32 @@ class DDDReport extends FannieReportPage
                     MONTH(datetime) AS month,
                     DAY(datetime) AS day,
                     d.upc,
+                    MAX(COALESCE(p.brand, '')) AS brand,
                     d.description,
                     d.department,
                     e.dept_name,
+                    SUM(d.cost) AS cost,
                     SUM(d.quantity) AS quantity,
                     SUM(d.total) AS total,
                     s.description AS shrinkReason,
-                    m.super_name,
-                    e.salesCode,
-                    d.charflag
-                  FROM {{table}} AS d
+                    MAX(" . ($superTable == 'MasterSuperDepts' ? 'm.super_name' : "''") . ") AS super_name,
+                    MAX(e.salesCode) AS salesCode,
+                    MAX(d.charflag) AS charflag,
+                    MAX(u.likeCode) AS lc
+                  FROM {$dtrans} AS d
                     LEFT JOIN departments AS e ON d.department=e.dept_no
                     LEFT JOIN ShrinkReasons AS s ON d.numflag=s.shrinkReasonID
-                    LEFT JOIN MasterSuperDepts AS m ON d.department=m.dept_ID
+                    LEFT JOIN {$superTable} AS m ON d.department=m.dept_ID
+                    LEFT JOIN upcLike AS u ON d.upc=u.upc
+                    " . DTrans::joinProducts('d') . "
                   WHERE trans_status = 'Z'
                     AND trans_type IN ('D', 'I')
                     AND emp_no <> 9999
                     AND register_no <> 99
-                    AND upc <> '0'
-                    {{date_clause}}
+                    AND d.upc <> '0'
+                    AND datetime BETWEEN ? AND ?
                     AND " . DTrans::isStoreID($store, 'd') . "
+                    {$dept_where}
                   GROUP BY
                     YEAR(datetime),
                     MONTH(datetime),
@@ -99,30 +129,11 @@ class DDDReport extends FannieReportPage
                     d.description,
                     d.department,
                     e.dept_name,
-                    s.description";
+                    s.description
+                 HAVING SUM(d.quantity) > 0";
         
-        $fullQuery = '';
-        if (!$union) {
-            // user selected date range
-            $fullQuery = str_replace('{{table}}', $dtrans, $query);
-            $fullQuery = str_replace('{{date_clause}}', 'AND datetime BETWEEN ? AND ?', $fullQuery);
-        } else {
-            // union of today (dtransaction)
-            // plus last quarter (transarchive)
-            $today_table = $FANNIE_TRANS_DB . $dbc->sep() . 'dtransactions';
-            $today_clause = ' AND ' . $dbc->datediff($dbc->now(), 'datetime') . ' = 0';
-            $query1 = str_replace('{{table}}', $today_table, $query);
-            $query1 = str_replace('{{date_clause}}', $today_clause, $query1);
-            $query2 = str_replace('{{table}}', $dtrans, $query);
-            $query2 = str_replace('{{date_clause}}', '', $query2);
-            $fullQuery = $query1 . ' UNION ALL ' . $query2;
-            // prepend store argument as both queries will have a store
-            // clause requiring the parameter
-            array_unshift($args, $store);
-        }
-
         $data = array();
-        $prep = $dbc->prepare($fullQuery);
+        $prep = $dbc->prepare($query);
         $result = $dbc->execute($prep, $args);
         while ($row = $dbc->fetchRow($result)) {
             $data[] = $this->rowToRecord($row);
@@ -136,47 +147,43 @@ class DDDReport extends FannieReportPage
         return array(
             date('Y-m-d', mktime(0, 0, 0, $row['month'], $row['day'], $row['year'])),
             $row['upc'],
+            $row['lc'] ? $row['lc'] : '',
+            $row['brand'],
             $row['description'],
             $row['department'],
             $row['dept_name'],
             $row['salesCode'],
             $row['super_name'],
             sprintf('%.2f', $row['quantity']),
+            sprintf('%.2f', $row['cost']),
             sprintf('%.2f', $row['total']),
             empty($row['shrinkReason']) ? 'n/a' : $row['shrinkReason'],
             $row['charflag'] == 'C' ? 'No' : 'Yes',
         );
     }
     
+    public function calculate_footers($data)
+    {
+        $sumQty = 0.0;
+        $sumCost = 0.0;
+        $sumRetail = 0.0;
+        foreach($data as $row) {
+            $sumQty += $row[9];
+            $sumCost += $row[10];
+            $sumRetail += $row[11];
+        }
+
+        return array(_('Total'),
+            null,null,null,null,null,null,null,null,
+            sprintf('%s', number_format($sumQty,2)),
+            sprintf('$ %s', number_format($sumCost,2)),
+            sprintf('$ %s', number_format($sumRetail,2)),
+            '', null, null
+        );
+    }
     public function form_content()
     {
-        $store = FormLib::storePicker();
-        return '
-        <form action="' . $_SERVER['PHP_SELF'] . '" method="get">
-<div class="well">Dates are optional; omit for last quarter</div>
-<div class="col-sm-4">
-    <div class="form-group">
-    <label>Date Start</label>
-    <input type=text id=date1 name=date1 class="form-control date-field" />
-    </div>
-    <div class="form-group">
-    <label>Date End</label>
-    <input type=text id=date2 name=date2 class="form-control date-field" />
-    </div>
-    <div class="form-group">
-    <label>Store</label>
-    ' . $store['html'] . '
-    </div>
-    <p>
-    <button type=submit name=submitted value=1 class="btn btn-default btn-core">Submit</button>
-    <button type=reset name=reset class="btn btn-default btn-reset">Start Over</button>
-    </p>
-</div>
-<div class="col-sm-4">'
-    . FormLib::date_range_picker() . '
-</div>
-</form>
-        ';
+        return FormLib::dateAndDepartmentForm();
     }
 
     public function helpContent()
@@ -190,9 +197,9 @@ class DDDReport extends FannieReportPage
     public function unitTest($phpunit)
     {
         $data = array('month'=>1, 'day'=>1, 'year'=>2000, 'upc'=>'4011',
-            'description'=>'test', 'department'=>1, 'dept_name'=>'test',
+            'brand'=>'b','description'=>'test', 'department'=>1, 'dept_name'=>'test',
             'salesCode'=>100, 'super_name'=>'test', 'quantity'=>1,
-            'total'=>1, 'shrinkReason'=>'test', 'charflag'=>'C');
+            'cost'=>1, 'total'=>1, 'shrinkReason'=>'test', 'charflag'=>'C');
         $phpunit->assertInternalType('array', $this->rowToRecord($data));
     }
 }

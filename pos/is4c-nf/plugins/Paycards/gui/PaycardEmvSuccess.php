@@ -75,13 +75,9 @@ class PaycardEmvSuccess extends BasicCorePage
                     $this->conf->set('paycardTendered', true);
                 }
 
-                // only reset terminal if the terminal was used for the transaction
-                // activating a gift card should not reset terminal
-                if ($this->conf->get("paycard_type") == PaycardLib::PAYCARD_TYPE_ENCRYPTED) {
-                    UdpComm::udpSend('termReset');
-                    $this->conf->set('ccTermState','swipe');
-                    $this->conf->set("CacheCardType","");
-                }
+                UdpComm::udpSend('termReset');
+                $this->conf->set('ccTermState','swipe');
+                $this->conf->set("CacheCardType","");
                 $this->conf->reset();
 
                 $this->change_page($this->page_url."gui-modules/pos2.php" . $qstr);
@@ -89,6 +85,7 @@ class PaycardEmvSuccess extends BasicCorePage
                 return false;
             } elseif ($mode == PaycardLib::PAYCARD_MODE_AUTH && $input == "VD" 
                 && ($this->conf->get('CacheCardType') == 'CREDIT' || $this->conf->get('CacheCardType') == 'EMV' || $this->conf->get('CacheCardType') == 'GIFT' || $this->conf->get('CacheCardType') == '')) {
+                UdpComm::udpSend('termReset');
                 $pluginInfo = new Paycards();
                 $this->change_page($pluginInfo->pluginUrl()."/gui/PaycardEmvVoid.php");
 
@@ -117,7 +114,7 @@ class PaycardEmvSuccess extends BasicCorePage
         function submitWrapper(){
             var str = $('#reginput').val();
             if (str.toUpperCase() == 'RP'){
-                $.ajax({url: '<?php echo $this->page_url; ?>ajax-callbacks/AjaxEnd.php',
+                $.ajax({url: '<?php echo $this->page_url; ?>ajax/AjaxEnd.php',
                     cache: false,
                     type: 'post',
                     data: 'receiptType='+$('#rp_type').val()+'&ref=<?php echo ReceiptLib::receiptNumber(); ?>'
@@ -176,7 +173,7 @@ class PaycardEmvSuccess extends BasicCorePage
 
     function body_content()
     {
-        $this->input_header("onsubmit=\"return submitWrapper();\" action=\"".filter_input(INPUT_SERVER, 'PHP_SELF')."\"");
+        $this->input_header("onsubmit=\"return submitWrapper();\" action=\"".AutoLoader::ownURL()."\"");
         echo '<div class="baseHeight">';
         if ($this->capture->required()) {
             $reginput = FormLib::get('reginput', false);
@@ -228,7 +225,6 @@ class PaycardEmvSuccess extends BasicCorePage
             $this->addOnloadCommand("\$('#reginput').val('RP');\n");
             $this->addOnloadCommand("submitWrapper();\n");
         }
-        $rpType = $this->rpType($this->conf->get('paycard_type'));
         printf("<input type=\"hidden\" id=\"rp_type\" value=\"%s\" />",$rpType);
     }
 

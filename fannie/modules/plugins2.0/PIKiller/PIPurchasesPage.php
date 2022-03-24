@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'/classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 if (!class_exists('PIKillerPage')) {
     include('lib/PIKillerPage.php');
@@ -54,6 +54,12 @@ class PIPurchasesPage extends PIKillerPage {
         switch ($filter) {
             case 'R':
                 $sql = ' AND trans_status=\'R\' ';
+                break;
+            case '1':
+                $sql .= ' AND store_id=1 ';
+                break;
+            case '2':
+                $sql .= ' AND store_id=2 ';
                 break;
         }
 
@@ -128,6 +134,8 @@ class PIPurchasesPage extends PIKillerPage {
         $filters = array(
             'No filter' => '',
             'Returns' => 'R',
+            'Hillside' => 1,
+            'Denfeld' => 2,
         );
         foreach ($filters as $label => $val) {
             printf('<option %s value="%s">%s</option>',

@@ -50,10 +50,10 @@ class PaycardProcessPage extends BasicCorePage
     protected $action = '';
     protected $conf;
 
-    public function __construct()
+    public function __construct($session, $form)
     {
         $this->conf = new PaycardConf();
-        parent::__construct();
+        parent::__construct($session, $form);
     }
 
     public function getHeader()
@@ -70,9 +70,12 @@ class PaycardProcessPage extends BasicCorePage
         echo "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n";
         echo "<link rel=\"stylesheet\" type=\"text/css\"
             href=\"{$myUrl}css/pos.css\">";
+        echo "<link rel=\"stylesheet\" type=\"text/css\"
+            href=\"{$myUrl}css/spinner.css\">";
         $jquery = MiscLib::win32() ? 'jquery-1.8.3.min.js' : 'jquery.js';
         echo "<script type=\"text/javascript\"
             src=\"{$myUrl}js/{$jquery}\"></script>";
+        echo '<script type="text/javascript" src="' . $myUrl . '/js/errorLog.js"></script>';
         $this->paycardJscriptFunctions();
         $this->head_content();
         echo "</head>";
@@ -104,9 +107,13 @@ class PaycardProcessPage extends BasicCorePage
     protected function paycardJscriptFunctions()
     {
         $pluginInfo = new Paycards();
+        $recheck = $pluginInfo->pluginUrl() . '/ajax/AjaxPaycardReCheck.php'
+            . '?current=' . $_SERVER['PHP_SELF'];
         ?>
         <script type="text/javascript">
         function paycard_submitWrapper(){
+            setupDisplay();
+            paycard_processingDisplay();
             $.ajax({url: '<?php echo $pluginInfo->pluginUrl(); ?>/ajax/AjaxPaycardAuth.php',
                 cache: false,
                 type: 'post',
@@ -124,19 +131,25 @@ class PaycardProcessPage extends BasicCorePage
                 } else {
                     window.location = destination;
                 }
-            }).fail(function(){
+            }).fail(function(jqxhr, stat, error) {
+                errorLog.log(JSON.stringify({ jqstatus: stat, err: error, resp: jqxhr.responseText }));
                 window.location = '<?php echo $this->page_url; ?>gui-modules/pos2.php';
             });
-            paycard_processingDisplay();
             return false;
         }
+        function setupDisplay() {
+            var wrapper = '<div class="coloredArea centerOffset centeredDisplay rounded">';
+            var spinner = '<div class="lds-spinner"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>';
+            var testDiv = '<div id="waitingText">Waiting for response</div>';
+            $('div.baseHeight').html(wrapper + testDiv + spinner + '</div>');
+        }
         function paycard_processingDisplay(){
-            var content = $('div.baseHeight').html();
+            var content = $('div#waitingText').html();
             if (content.length >= 23)
                 content = 'Waiting for response.';
             else
                 content += '.';
-            $('div.baseHeight').html(content);
+            $('div#waitingText').html(content);
             setTimeout('paycard_processingDisplay()',1000);
         }
         </script>
@@ -161,6 +174,7 @@ class PaycardProcessPage extends BasicCorePage
                 $json['main_frame'] .= '?receipt=' . $json['receipt'];
             }
         } else {
+            $this->conf->reset();
             $json['main_frame'] = MiscLib::base_url().'gui-modules/boxMsg2.php';
         }
         $this->change_page($json['main_frame']);

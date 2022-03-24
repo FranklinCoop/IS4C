@@ -21,9 +21,13 @@
 
 *********************************************************************************/
 
+use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DisplayLib;
+use COREPOS\pos\lib\DiscountModule;
+use COREPOS\pos\lib\MiscLib;
 use COREPOS\pos\lib\TransRecord;
 use COREPOS\pos\parser\Parser;
+use COREPOS\pos\parser\parse\VoidCmd;
 
 class AccessProgramParser extends Parser {
 
@@ -31,12 +35,19 @@ class AccessProgramParser extends Parser {
     {
         if (substr($str, 0, 6) == 'ACCESS') {
             return true;
+        } elseif ($str == 'VD10730') {
+            return true;
         }
+
+        return false;
     }
 
     public function parse($str)
     {
         $ret = $this->default_json();
+        if ($str == 'VD10730') {
+            return $this->voidBags($str);
+        }
 
         if (CoreLocal::get('memberID') == '0') {
             $ret['output'] = DisplayLib::boxMsg(
@@ -51,7 +62,7 @@ class AccessProgramParser extends Parser {
 
         if ($str == 'ACCESS') {
             if (CoreLocal::get('AccessQuickMenu') != '' && class_exists('QuickMenuLauncher')) {
-                $qm = new QuickMenuLauncher();
+                $qm = new QuickMenuLauncher($this->session);
 
                 return $qm->parse('QM' . CoreLocal::get('AccessQuickMenu'));
             } else {
@@ -77,10 +88,25 @@ class AccessProgramParser extends Parser {
             'numflag' => $selection,
         ));
 
+        DiscountModule::updateDiscount(new DiscountModule(10, 'custdata'));
+        TransRecord::discountnotify(10);
+
         $ret['output'] = DisplayLib::lastpage();
         $ret['receipt'] = 'accessSignupSlip';
 
         return $ret;
+    }
+
+    private function voidBags($json)
+    {
+        $dbc = Database::tDataConnect();
+        $ttlP = $dbc->prepare("SELECT SUM(total) FROM localtemptrans WHERE upc='0000000010730'");
+        while ($dbc->getValue($ttlP) > 0.005) {
+            $void = new VoidCmd($this->session);
+            $json = $void->parse('VD0000000010730');
+        }
+
+        return $json;
     }
 
     public static $adminLoginMsg = 'Login to approve Access Application';

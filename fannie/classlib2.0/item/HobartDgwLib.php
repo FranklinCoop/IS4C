@@ -155,6 +155,15 @@ class HobartDgwLib
                     $has_et = true;
                     $mode = $new_item ? 'WriteOneExpandedText' : 'ChangeOneExpandedText';
                     fwrite($fp,"Record Type,Expanded Text Number,Expanded Text\r\n");
+                    if ($item['MOSA']) {
+                        $item['ExpandedText'] = str_replace('{mosa}', 'Certified Organic By MOSA', $item['ExpandedText']);
+                    } else {
+                        $item['ExpandedText'] = str_replace('{mosa}', '', $item['ExpandedText']);
+                    }
+                    if (!isset($item['OriginText'])) {
+                        $item['OriginText'] = '';
+                    }
+                    $item['ExpandedText'] = str_replace('{cool}', $item['OriginText'], $item['ExpandedText']);
                     $text = '';
                     foreach (explode("\n", $item['ExpandedText']) as $line) {
                         $text .= wordwrap($line, 50, "\n") . "\n";
@@ -222,7 +231,7 @@ class HobartDgwLib
                         // not a valid UPC either
                         continue;
                     }
-                    preg_match("/002(\d\d\d\d)0/",$upc,$matches);
+                    $plu = ServiceScaleLib::upcToPLU($upc);
                     $plu = $matches[1];
                 }
                 fwrite($fp,"DeleteOneItem,$plu\r\n");
@@ -287,7 +296,7 @@ class HobartDgwLib
             }
 
             $plu = $line[$column_index['PLU Number']];
-            $upc = self::scalePluToUpc($plu);
+            $upc = ServiceScaleLib::pluToUPC($plu);
 
             $product->reset();
             $product->upc($upc);
@@ -372,7 +381,7 @@ class HobartDgwLib
         while(!feof($fp)) {
             $line = fgetcsv($fp);
             $plu = $line[$number_index];
-            $upc = self::scalePluToUpc($plu);
+            $upc = ServiceScaleLib::pluToUPC($plu);
 
             $product->reset();
             $product->upc($upc);
@@ -392,18 +401,6 @@ class HobartDgwLib
         fclose($fp);
 
         return $item_count;
-    }
-
-    static private function scalePluToUpc($plu)
-    {
-        // convert PLU to UPC
-        // includes WFC oddities with zero alignment
-        // on short PLUs (less than 4 digits)
-        $upc = str_pad($plu, 3, '0', STR_PAD_LEFT);
-        $upc = str_pad($upc, 4, '0', STR_PAD_LEFT);
-        $upc = '002' . $upc . '000000';
-
-        return $upc;
     }
 }
 

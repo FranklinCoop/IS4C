@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class CoopDealsReviewPage extends FanniePage 
@@ -80,6 +80,8 @@ class CoopDealsReviewPage extends FanniePage
         list($upcIn, $args) = $dbc->safeInClause($upcs);
         $args[] = $set;
 
+        $cdDef = $dbc->tableDefinition('CoopDealsItems');
+
         $saleItemsP = $dbc->prepare("
             SELECT t.upc,
                 t.price,
@@ -90,13 +92,14 @@ class CoopDealsReviewPage extends FanniePage
                     "'Co-op Deals '",
                     "t.abtpr",
                     ''
-                ) . " AS batch
+                ) . " AS batch,
+                " . (isset($cdDef['cost']) ? 't.cost' : '0') . " AS cost
             FROM CoopDealsItems as t
                 " . DTrans::joinProducts('t', 'p', 'INNER') . "
                 LEFT JOIN MasterSuperDepts AS s ON p.department=s.dept_ID
             WHERE t.upc IN ({$upcIn})
                 AND t.dealSet=?
-            ORDER BY s.super_name, t.upc
+            ORDER BY batch, t.upc
         ");
         $saleItemsR = $dbc->execute($saleItemsP, $args);
 
@@ -107,19 +110,35 @@ class CoopDealsReviewPage extends FanniePage
                 discountType,
                 priority,
                 startDate,
-                endDate
+                endDate,
+                owner
             )
-            VALUES (?, ?, ?, 0, ?, ?)
+            VALUES (?, ?, ?, 0, ?, ?, ?)
         ');
 
-        $list = new BatchListModel($dbc);
-        $list->active(0);
-        $list->pricemethod(0);
-        $list->quantity(0);
+        $blDef = $dbc->tableDefinition('batchList');
+        $insQ = "INSERT INTO batchList (upc, batchID, salePrice, active";
+        if (isset($blDef['signMultiplier'])) {
+            $insQ .= ", signMultiplier";
+        }
+        if (isset($blDef['cost'])) {
+            $insQ .= ", cost";
+        }
+        $insQ .= ") VALUES (?, ?, ?, 0";
+        if (isset($blDef['signMultiplier'])) {
+            $insQ .= ", ?";
+        }
+        if (isset($blDef['cost'])) {
+            $insQ .= ", ?";
+        }
+        $insQ .= ")";
+        $insP = $dbc->prepare($insQ);
 
+        //$bu = new BatchUpdateModel($dbc);
+        $dbc->startTransaction();
         while ($row = $dbc->fetch_row($saleItemsR)) {
             if (!isset($batchIDs[$row['batch']])) {
-                $args = array($row['batch'] . ' ' . $naming, 1, 1);
+                $args = array($row['batch'] . ' ' . $naming, 2, 1);
                 if (substr($row['batch'],-2) == " A"){
                     $args[] = $start;
                     $args[] = $end;
@@ -130,10 +149,15 @@ class CoopDealsReviewPage extends FanniePage
                     $args[] = $start;
                     $args[] = $b_end;
                 }
+                list($firstWord) = explode(' ', $args[0]);
+                $args[] = $firstWord;
     
                 $dbc->execute($batchP,$args);
                 $bID = $dbc->insertID();
                 $batchIDs[$row['batch']] = $bID;
+                //$bu->reset();
+                //$bu->batchID($bID);
+                //$bu->logUpdate(//$bu::UPDATE_CREATE);
 
                 if ($this->config->get('STORE_MODE') === 'HQ') {
                     StoreBatchMapModel::initBatch($bID);
@@ -141,12 +165,20 @@ class CoopDealsReviewPage extends FanniePage
             }
             $id = $batchIDs[$row['batch']];
 
-            $list->upc($row['upc']);
-            $list->batchID($id);
-            $list->salePrice(sprintf("%.2f",$row['price']));
-            $list->signMultiplier($row['multiplier']);
-            $list->save();
+            $args = array($row['upc'], $id, sprintf('%.2f', $row['price']));
+            if (isset($blDef['signMultiplier'])) {
+                $args[] = $row['multiplier'];
+            }
+            if (isset($blDef['cost'])) {
+                $args[] = $row['cost'];
+            }
+            $dbc->execute($insP, $args);
+            //$bu->reset();
+            //$bu->upc($row['upc']);
+            //$bu->batchID($id);
+            //$bu->logUpdate(//$bu::UPDATE_ADDED);
         }
+        $dbc->commitTransaction();
 
         $ret = "<p>New sales batches have been created!</p>";
         $ret .= "<p><a href=\"../newbatch/\">View batches</a></p>";
@@ -185,16 +217,15 @@ class CoopDealsReviewPage extends FanniePage
                 MAX(CASE WHEN s.super_name IS NULL THEN 'sale' ELSE s.super_name END) as batch,
                 t.abtpr as subbatch
             FROM CoopDealsItems as t
-                LEFT JOIN products AS p ON t.upc=p.upc
+                " . DTrans::joinProducts('t', 'p', 'INNER') . "
                 LEFT JOIN MasterSuperDepts AS s ON p.department=s.dept_ID
             WHERE t.dealSet=?
-                AND p.inUse=1
             GROUP BY t.upc,
                 p.brand,
                 p.description,
                 t.price,
                 t.abtpr
-            ORDER BY s.super_name,t.upc
+            ORDER BY batch,t.upc
         ");
         $result = $dbc->execute($query, array($set));
 

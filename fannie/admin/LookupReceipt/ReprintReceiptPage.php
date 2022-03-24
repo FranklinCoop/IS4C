@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage 
@@ -80,6 +80,8 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
             emp_no,
             register_no,
             trans_no,
+            SUM(case when upc='DISCOUNT' then total
+                     when trans_type IN ('I','D','A') then total else 0 end)  AS subTotal,
             MAX(card_no) AS card_no,
             MAX(datetime) AS ts
         FROM $dlog WHERE 1=1 ";
@@ -172,11 +174,8 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
             $this->results = "<b>No receipts match the given criteria</b>";
         } elseif ($dbc->numRows($result) == 1){
             $row = $dbc->fetchRow($result);
-            $year = $row[0];
-            $month = $row[1];
-            $day = $row[2];
             $trans_num = $row[3].'-'.$row[4].'-'.$row[5];
-            header("Location: RenderReceiptPage.php?year=$year&month=$month&day=$day&receipt=$trans_num");
+            header("Location: RenderReceiptPage.php?year={$row['year']}&month={$row['month']}&day={$row['day']}&receipt=$trans_num");
             return false;
         } else {
             $this->results = $this->toTable($dbc, $result, $dlog);
@@ -203,7 +202,7 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
                 </thead>
                 <tbody>';
         $subTotalP = $dbc->prepare("
-            SELECT SUM(-total) AS subtotal
+            SELECT SUM(total) AS subtotal
             FROM {$dlog} AS d
             WHERE datetime BETWEEN ? AND ?
                 AND trans_type='T'
@@ -215,17 +214,14 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
         $num_results = $dbc->numRows($result);
         while ($row = $dbc->fetchRow($result)) {
             $ret .= '<tr>';
-            $year = $row[0];
-            $month = $row[1];
-            $day = $row[2];
             $ret .= '<td>' . $row['ts'] . '</td>';
             $trans_num = $row[3].'-'.$row[4].'-'.$row[5];
-            $ret .= "<td><a href=RenderReceiptPage.php?year=$year&month=$month&day=$day&receipt=$trans_num>";
+            $ret .= "<td><a href=\"RenderReceiptPage.php?year={$row['year']}&month={$row['month']}&day={$row['day']}&receipt=$trans_num\">";
             $ret .= "$trans_num</a></td>";
             $ret .= '<td>' . $row['emp_no'] . '</td>';
             $ret .= '<td>' . $row['register_no'] . '</td>';
             $ret .= '<td>' . $row['card_no'] . '</td>';
-            if ($num_results < 50) {
+            if ($num_results < 50000) {
                 $subTotalArgs = array(
                     date('Y-m-d 00:00:00', strtotime($row['ts'])),
                     date('Y-m-d 23:59:59', strtotime($row['ts'])),
@@ -233,8 +229,8 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
                     $row['register_no'],
                     $row['trans_no'],
                 );
-                $subTotal = $dbc->getValue($subTotalP, $subTotalArgs);
-                $ret .= sprintf('<td>%.2f</td>', $subTotal);
+                //$subTotal = $dbc->getValue($subTotalP, $subTotalArgs);
+                $ret .= sprintf('<td>%.2f</td>', $row['subTotal']);
             } else {
                 $ret .= '<td>n/a</td>';
             }
@@ -286,11 +282,11 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
     {
         $dbc = $this->connection;
         $depts = "<option value=\"\">Select one...</option>";
-        $res = $dbc->query("SELECT dept_no,dept_name from departments order by dept_name");
+        $res = $dbc->query("SELECT dept_no,dept_name from " . FannieDB::fqn('departments', 'op') . " order by dept_name");
         while ($row = $dbc->fetchRow($res)) {
             $depts .= sprintf("<option value=%d>%s</option>",$row[0],$row[1]);
         }
-        $numsR = $dbc->query("SELECT TenderCode,TenderName FROM tenders ORDER BY TenderName");
+        $numsR = $dbc->query("SELECT TenderCode,TenderName FROM " . FannieDB::fqn('tenders', 'op') . " ORDER BY TenderName");
         $tenders = '';
         while ($numsW = $dbc->fetchRow($numsR)) {
             $tenders .= sprintf("<option value=%s>%s</option>",$numsW[0],$numsW[1]); 
@@ -323,7 +319,7 @@ class ReprintReceiptPage extends \COREPOS\Fannie\API\FannieReadOnlyPage
         $phpunit->assertNotEquals(0, strlen($this->get_date_view()));
         $this->date = date('Y-m-d');
         $phpunit->assertEquals(true, $this->preprocess());
-        $phpunit->assertEquals(true, $this->get_date_handler());
+        $phpunit->assertInternalType('boolean', $this->get_date_handler());
         // other code path after handler runs
         $phpunit->assertNotEquals(0, strlen($this->get_date_view()));
     }

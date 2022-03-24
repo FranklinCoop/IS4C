@@ -69,6 +69,7 @@ class LastSoldTask extends FannieTask
             FROM ' . $dlog . '
             WHERE trans_type=\'I\'
                 AND tdate > \'' . date('Y-m-d', strtotime('1 week ago')) . '\'
+                AND charflag <> \'SO\'
             GROUP BY YEAR(tdate),
                 MONTH(tdate),
                 DAY(tdate),
@@ -76,7 +77,7 @@ class LastSoldTask extends FannieTask
                 store_id,
                 upc
             HAVING SUM(total) <> 0
-            ORDER BY tdate
+            ORDER BY MAX(tdate)
             ';
         $res = $dbc->query($query);
         while ($w = $dbc->fetchRow($res)) {

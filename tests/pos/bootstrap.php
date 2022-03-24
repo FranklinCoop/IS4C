@@ -8,10 +8,11 @@ $CORE_LOCAL = new COREPOS\pos\lib\LocalStorage\WrappedStorage();
 CoreLocal::refresh();
 define('CONF_LOADED', true);
 include(dirname(__FILE__).'/../../pos/is4c-nf/lib/AutoLoader.php');
+COREPOS\pos\lib\LocalStorage\LaneConfig::refresh();
 COREPOS\pos\lib\LocalStorage\LaneCache::clear();
 AutoLoader::loadMap();
 COREPOS\pos\lib\CoreState::loadParams();
-AutoLoader::blacklist('CoopCred');
-AutoLoader::blacklist('CCredMembershipsModel');
-AutoLoader::blacklist('CCredProgramsModel');
+AutoLoader::ignoreClass('CoopCred');
+AutoLoader::ignoreClass('CCredMembershipsModel');
+AutoLoader::ignoreClass('CCredProgramsModel');
 

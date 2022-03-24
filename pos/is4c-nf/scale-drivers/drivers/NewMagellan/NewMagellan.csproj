@@ -15,7 +15,10 @@
   <!-- Defined constants -->
   <ItemGroup>
     <MonoDefine Include="MONO" Condition=" '$(OS)' == 'Unix' " />
-    <RabbitDefine Include="CORE_RABBIT" Condition=" Exists('RabbitMQ.Client.dll') " />
+    <RabbitDefine Include="CORE_RABBIT"
+        Condition=" Exists('packages\RabbitMQ.Client.2.8.7\lib\net30\RabbitMQ.Client.dll') " />
+    <RabbitDefine Include="CORE_MYSQL"
+        Condition=" Exists('packages\MySql.Data.6.9.12\lib\net40\MySql.Data.dll') " />
     <JsonDefine Include="NEWTONSOFT_JSON" />
   </ItemGroup>
 
@@ -30,7 +33,12 @@
     <MagellanRef Include="UDPMsgBox.dll" />
     <MagellanRef Include="SPH.dll" />
     <MagellanRef Include="Newtonsoft.Json.dll" />
-    <MagellanRef Include="RabbitMQ.Client.dll" Condition=" Exists('RabbitMQ.Client.dll') " />
+    <MagellanRef Include="RabbitMQ.Client.dll"
+        Condition=" Exists('packages\RabbitMQ.Client.2.8.7\lib\net30\RabbitMQ.Client.dll') " />
+    <MagellanRef Include="MySql.Data.dll"
+        Condition=" Exists('packages\MySql.Data.6.9.12\lib\net40\MySql.Data.dll') " />
+    <MagellanRef Include="MySqlPipe.dll"
+        Condition=" Exists('packages\MySql.Data.6.9.12\lib\net40\MySql.Data.dll') " />
     <MagellanRef Include="Discover.dll" />
 
     <MagellanTarget Include="DelegateFormLibrary" />
@@ -38,10 +46,31 @@
     <MagellanTarget Include="SPHLibrary" />
     <MagellanTarget Include="JsonLibrary" />
     <MagellanTarget Include="Discover" />
+    <MagellanTarget Include="ComPortLibrary" Condition=" '$(OS)' != 'Unix' " />
+    <MagellanTarget Include="RabbitMqLibrary"
+        Condition=" Exists('packages\RabbitMQ.Client.2.8.7\lib\net30\RabbitMQ.Client.dll') " />
+    <MagellanTarget Include="MySqlPipe"
+        Condition=" Exists('packages\MySql.Data.6.9.12\lib\net40\MySql.Data.dll') " />
   </ItemGroup>
+
+  <ItemGroup>
+    <ServiceFiles Include="Watcher.cs" />
+    <ServiceFiles Include="WinService.cs" />
+  </ItemGroup>
+
   <Target Name="Build" DependsOnTargets="@(MagellanTarget)">
-    <Csc Sources="@(Magellan)" References="@(MagellanRef)" TargetType="exe" OutputAssembly="pos.exe" 
+    <Csc Sources="@(Magellan)" References="@(MagellanRef)" TargetType="exe"
+        Win32Icon="core-nm.ico" OutputAssembly="pos.exe"
         Platform="$(BuildPlatform)" DisabledWarnings="$(NoWarn)" DefineConstants="@(JsonDefine) @(RabbitDefine)" />
+    <Csc Sources="Watcher.cs" TargetType="exe" Condition=" '$(OS)' != 'Unix' "
+        Win32Icon="core-watcher.ico" OutputAssembly="pos-watcher.exe"
+        Platform="$(BuildPlatform)" DisabledWarnings="$(NoWarn)" />
+    <Csc Sources="@(ServiceFiles)" TargetType="exe" OutputAssembly="pos-service.exe"
+        Platform="$(BuildPlatform)" DisabledWarnings="$(NoWarn)" Condition=" '$(OS)' != 'Unix' " />
+    <Csc Sources="ComProbe.cs" References="ComPort.dll" TargetType="exe" OutputAssembly="com-probe.exe"
+        Platform="$(BuildPlatform)" DisabledWarnings="$(NoWarn)" Condition=" '$(OS)' != 'Unix' " />
+    <Csc Sources="RbaVolume.cs" References="SPH.dll" TargetType="exe" OutputAssembly="rbavolume.exe"
+        Platform="$(BuildPlatform)" DisabledWarnings="$(NoWarn)" Condition=" '$(OS)' != 'Unix' " />
   </Target>
 
   <!-- Build DelegateForm.dll -->
@@ -50,6 +79,24 @@
   </ItemGroup>
   <Target Name="DelegateFormLibrary" Inputs="@(DelegateForm)" Outputs="DelegateForm.dll">
     <Csc Sources="@(DelegateForm)" TargetType="library" OutputAssembly="DelegateForm.dll" 
+        Platform="$(BuildPlatform)" DisabledWarnings="$(NoWarn)" />
+  </Target>
+
+  <!-- Build ComPort.dll -->
+  <ItemGroup>
+    <ComPort Include="ComPort.cs" />
+  </ItemGroup>
+  <Target Name="ComPortLibrary" Inputs="@(ComPort)" Outputs="ComPort.dll">
+    <Csc Sources="@(ComPort)" TargetType="library" OutputAssembly="ComPort.dll" 
+        Platform="$(BuildPlatform)" DisabledWarnings="$(NoWarn)" />
+  </Target>
+
+  <!-- Build CHttp.dll -->
+  <ItemGroup>
+    <CHttp Include="CHttp.cs" />
+  </ItemGroup>
+  <Target Name="CHttpLibrary" Inputs="@(CHttp)" Outputs="CHttp.dll">
+    <Csc Sources="@(CHttp)" TargetType="library" OutputAssembly="CHttp.dll" 
         Platform="$(BuildPlatform)" DisabledWarnings="$(NoWarn)" />
   </Target>
 
@@ -85,8 +132,8 @@
     <USBLayer Include="USB-HidSharp.cs" />
     
     <USBLayerRef Include="HidSharp.dll" />
-
     <USBLayerTarget Include="HIDSharpLibrary" />
+
   </ItemGroup>
   <Target Name="USBLayerLibrary" Inputs="@(USBLayer)" Outputs="USBLayer.dll" DependsOnTargets="@(USBLayerTarget)">
     <Csc Sources="@(USBLayer)" TargetType="library" References="@(USBLayerRef)" OutputAssembly="USBLayer.dll" 
@@ -101,6 +148,16 @@
   </ItemGroup>
   <Target Name="UDPMsgBoxLibrary" Inputs="@(UDPMsgBox)" Outputs="UDPMsgBox.dll" DependsOnTargets="DelegateFormLibrary">
     <Csc Sources="@(UDPMsgBox)" References="@(UDPMsgBoxRef)" TargetType="library" OutputAssembly="UDPMsgBox.dll" 
+        Platform="$(BuildPlatform)" DisabledWarnings="$(NoWarn)" />
+  </Target>
+
+  <ItemGroup>
+    <MySqlInclude Include="MySqlPipe.cs" />
+
+    <MySqlRef Include="MySql.Data.dll" />
+  </ItemGroup>
+  <Target Name="MySqlPipe" Inputs="@(MySqlInclude)" Outputs="MySqlPipe.dll" DependsOnTargets="MySqlLibrary">
+    <Csc Sources="@(MySqlInclude)" References="@(MySqlRef)" TargetType="library" OutputAssembly="MySqlPipe.dll" 
         Platform="$(BuildPlatform)" DisabledWarnings="$(NoWarn)" />
   </Target>
 
@@ -120,37 +177,63 @@
     <SPH Include="SPH_IngenicoRBA_USB.cs" />
     <SPH Include="RBA_Stub.cs" />
     <SPH Include="SPH_Parallel_Writer.cs" />
+    <SPH Include="SPH_SMA_Scale.cs" />
     <SPH Include="SPH_Datacap_IPTran.cs" />
     <SPH Include="SPH_Datacap_PDCX.cs" Condition=" Exists('DSIPDCXLib.dll') And Exists('AxDSIPDCXLib.dll') " />
     <SPH Include="SPH_Datacap_EMVX.cs" 
         Condition=" Exists('DSIPDCXLib.dll') And Exists('AxDSIPDCXLib.dll') And Exists('DSIEMVXLib.dll') AND Exists('AxDSIEMVXLib.dll') " />
+    <SPH Include="SPH_Datacap_Gen2.cs" 
+        Condition=" Exists('DSIPDCXLib.dll') And Exists('AxDSIPDCXLib.dll') And Exists('DSIEMVXLib.dll') AND Exists('AxDSIEMVXLib.dll') " />
 
     <SPHRef Include="DelegateForm.dll" />
     <SPHRef Include="Bitmap.dll" />
+    <SPHRef Include="CHttp.dll" />
     <SPHRef Include="USBLayer.dll" />
     <SPHRef Include="ParallelLayer.dll" />
     <SPHRef Include="DSIPDCXLib.dll" Condition=" Exists('DSIPDCXLib.dll') And Exists('AxDSIPDCXLib.dll') " />
     <SPHRef Include="AxDSIPDCXLib.dll" Condition=" Exists('DSIPDCXLib.dll') And Exists('AxDSIPDCXLib.dll') " />
     <SPHRef Include="DSIEMVXLib.dll" Condition=" Exists('DSIEMVXLib.dll') And Exists('AxDSIEMVXLib.dll') " />
     <SPHRef Include="AxDSIEMVXLib.dll" Condition=" Exists('DSIEMVXLib.dll') And Exists('AxDSIEMVXLib.dll') " />
+    <SPHRef Include="ComPort.dll" Condition=" Exists('DSIEMVXLib.dll') And Exists('AxDSIEMVXLib.dll') " />
     <SPHRef Include="System.Drawing.dll" Condition=" '$(OS)' == 'Unix' " />
 
     <SPHTarget Include="DelegateFormLibrary" />
+    <SPHTarget Include="CHttpLibrary" />
     <SPHTarget Include="BitmapLibrary" />
     <SPHTarget Include="USBLayerLibrary" />
     <SPHTarget Include="ParallelLayerLibrary" />
+    <SPHTarget Include="ComPortLibrary" Condition=" Exists('DSIEMVXLib.dll') And Exists('AxDSIEMVXLib.dll') " />
   </ItemGroup>
   <Target Name="SPHLibrary" Inputs="@(SPH)" Outputs="SPH.dll" DependsOnTargets="@(SPHTarget)">
     <Csc Sources="@(SPH)" DefineConstants="@(MonoDefine)" References="@(SPHRef)" TargetType="library" OutputAssembly="SPH.dll" 
         Platform="$(BuildPlatform)" DisabledWarnings="$(NoWarn)" />
   </Target>
 
+  <!-- just grab nuget-provided package if it exists instead of building HidSharp -->
   <Target Name="HIDSharpLibrary" Returns="HidSharp.dll">
-    <MSBuild Projects="HidSharp\HidSharp.csproj" />
+    <MSBuild Projects="HidSharp\HidSharp.csproj"
+        Condition=" !Exists('packages\HidSharp.1.5\lib\net35\HidSharp.dll') " />
+    <Copy SourceFiles="packages\HidSharp.1.5\lib\net35\HidSharp.dll" DestinationFolder=".\"
+        Condition=" Exists('packages\HidSharp.1.5\lib\net35\HidSharp.dll') " />
   </Target>
 
+  <!-- just grab nuget-provided package if it exists instead of building Newtonsoft.Json -->
   <Target Name="JsonLibrary" Returns="Newtonsoft.Json.dll">
-    <MSBuild Projects="Newtonsoft.Json\Newtonsoft.Json.Net40.csproj" />
+    <MSBuild Projects="Newtonsoft.Json\Newtonsoft.Json.Net40.csproj" 
+        Condition=" !Exists('packages\Newtonsoft.Json.9.0.1\lib\net40\Newtonsoft.Json.dll') " />
+    <Copy SourceFiles="packages\Newtonsoft.Json.9.0.1\lib\net40\Newtonsoft.Json.dll" 
+        DestinationFolder=".\"
+        Condition=" Exists('packages\Newtonsoft.Json.9.0.1\lib\net40\Newtonsoft.Json.dll') " />
+  </Target>
+
+  <Target Name="RabbitMqLibrary" Returns="RabbitMQ.Client.dll">
+    <Copy SourceFiles="packages\RabbitMQ.Client.2.8.7\lib\net30\RabbitMQ.Client.dll" DestinationFolder=".\"
+        Condition=" Exists('packages\RabbitMQ.Client.2.8.7\lib\net30\RabbitMQ.Client.dll') " />
+  </Target>
+  
+  <Target Name="MySqlLibrary" Returns="MySql.Data.dll">
+    <Copy SourceFiles="packages\MySql.Data.6.9.12\lib\net40\MySql.Data.dll" DestinationFolder=".\"
+        Condition=" Exists('packages\MySql.Data.6.9.12\lib\net40\MySql.Data.dll') " />
   </Target>
 
   <ItemGroup>

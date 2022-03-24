@@ -20,6 +20,9 @@ class PluginsTest extends PHPUnit_Framework_TestCase
             if (substr($file, -4) != '.php') {
                 continue;
             }
+            if (strstr($file, 'noauto')) {
+                continue;
+            }
             $name = basename($file);
             $name = substr($name, 0, strlen($name)-4);
             if (isset($first[$name])) {
@@ -49,7 +52,6 @@ class PluginsTest extends PHPUnit_Framework_TestCase
                 // class already defined
                 continue;
             }
-            var_dump($name . '-' . $ns_class);
             ob_start();
             include($file);
             $output = ob_get_clean();

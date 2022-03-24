@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'/classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 if (!class_exists('PIKillerPage')) {
     include('lib/PIKillerPage.php');
@@ -57,6 +57,9 @@ class PIPatronagePage extends PIKillerPage {
             <th>Check Number</th><th>Cashed Date</th>
             <th>Cashed Here</th><th>Reprint</th></tr>';
         foreach($this->__models['patronage'] as $obj){
+            if ($obj->FY() < 0) {
+                continue;
+            }
             $reprint_link = 'n/a';
             if ($obj->check_number() != '') {
                 $reprint_link = sprintf('<a href="../../../mem/patronage/PatronageChecks.php?reprint=1&mem=%d&fy=%d">Reprint</a>',

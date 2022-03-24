@@ -37,6 +37,16 @@ use \AutoLoader;
 class Parser {
 
     /**
+      A LocalStorage instance representing session data
+    */
+    protected $session;
+    
+    public function __construct($session)
+    {
+        $this->session = $session;
+    }
+
+    /**
       Check whether the module handles this input
       @param $str The input string
       @return 
@@ -47,8 +57,9 @@ class Parser {
          processing will proceed to the next Parser module.
 
     */
-    function check($str){
-    
+    function check($str)
+    {
+        return false; 
     }
 
     /**
@@ -74,8 +85,9 @@ class Parser {
        The utility method default_json() provides an array
        with the proper keys and sane default values.
     */
-    function parse($str){
-
+    function parse($str)
+    {
+        return $this->default_json();
     }
 
     /**
@@ -86,17 +98,7 @@ class Parser {
     */
     function default_json()
     {
-        return array(
-            'main_frame'=>false,
-            'target'=>'.baseHeight',
-            'output'=>false,
-            'redraw_footer'=>false,
-            'receipt'=>false,
-            'trans_num'=>ReceiptLib::receiptNumber(),
-            'scale'=>false,
-            'udpmsg'=>false,
-            'retry'=>false
-            );
+        return new ParseResult();
     }
 
     /**
@@ -155,7 +157,7 @@ class Parser {
         $parse_chain = array();
         $first = "";
         foreach ($set as $classname) {
-            $instance = new $classname();
+            $instance = new $classname(null);
             if ($instance->isLast()){
                 array_push($parse_chain,$classname);
             } elseif ($instance->isFirst()) {

@@ -26,7 +26,7 @@
 */
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class PatronageCheckNumbersUploadPage extends \COREPOS\Fannie\API\FannieUploadPage {
@@ -104,7 +104,7 @@ class PatronageCheckNumbersUploadPage extends \COREPOS\Fannie\API\FannieUploadPa
                     }
                 }
 
-                if ($amt_index && $line[$amt_index] && trim($line[$amt_index]) != $obj->cash_pat()) {
+                if ($amt_index && $line[$amt_index] && $obj->cash_pat() > 0.05 && trim($line[$amt_index]) != $obj->cash_pat()) {
                     $this->stats['errors'][] = 'Check #' . $check_no
                         . ' member #' . $obj->cardno() 
                         . ' issued for ' . $obj->cash_pat()

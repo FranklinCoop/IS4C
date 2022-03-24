@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class VendorListReport extends FannieReportPage 
@@ -51,7 +51,7 @@ class VendorListReport extends FannieReportPage
                 v.phone,
                 v.fax,
                 v.email,
-                v.notes,
+                MAX(v.notes) AS notes,
                 COUNT(p.upc) AS skus
             FROM vendors AS v
                 LEFT JOIN products AS p ON p.default_vendor_id=v.vendorID

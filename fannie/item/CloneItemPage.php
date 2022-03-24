@@ -44,6 +44,11 @@ class CloneItemPage extends FannieRESTfulPage
 
             return true;
         }
+        if (!preg_match('/^\d+$/', trim($new))) {
+            $this->addOnloadCommand("showBootstrapAlert('#alert-area', 'danger', 'New UPC must be a number');\n");
+
+            return true;
+        }
 
         $new = BarcodeLib::padUPC($new);
         $model = new ProductsModel($dbc);
@@ -66,6 +71,8 @@ class CloneItemPage extends FannieRESTfulPage
         $description = substr('CLONE ' . $model->description(), 0, 30);
         $model->description($description);
         $model->store_id(1);
+        $model->created(date('Y-m-d H:i:s'));
+        $model->last_sold(null);
         $model->save();
 
         if ($dbc->tableExists('prodExtra')) {
@@ -111,7 +118,7 @@ class CloneItemPage extends FannieRESTfulPage
             </p>
             <div class="form-group">
                 <label>New Item UPC</label>
-                <input type="text" name="new-upc" class="form-control" id="new-upc" required />
+                <input type="number" name="new-upc" class="form-control" id="new-upc" required />
             </div>
             <p>
                 <button type="submit" class="btn btn-default">Clone Item</button>

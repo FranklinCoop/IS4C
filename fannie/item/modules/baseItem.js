@@ -41,6 +41,16 @@ var baseItem = (function() {
                             $('#discount-select'+store_id).val(3);
                         }
                     });
+                    if ($('#store-sync').prop('checked') === false) {
+                        return;
+                    }
+                    var opts = $('#subdept'+store_id).html();
+                    $('.chosen-subdept').each(function(i, e) {
+                        if (e.id != 'subdept'+store_id) {
+                            $(e).html(opts);
+                            $(e).trigger('chosen:updated');
+                        }
+                    });
                 }
             }
         );
@@ -56,10 +66,10 @@ var baseItem = (function() {
             if (!resp.error) {
                 $('#local-origin-id').val(resp.localID);
                 $('.tab-pane.active .product-case-size').prop('disabled', false);
-                $('#product-sku-field').prop('disabled', false);
+                $('.sku-field').prop('disabled', false);
             } else {
                 $('.tab-pane.active .product-case-size').prop('disabled', true);
-                $('#product-sku-field').prop('disabled', true);
+                $('.sku-field').prop('disabled', true);
             }
         });
     };

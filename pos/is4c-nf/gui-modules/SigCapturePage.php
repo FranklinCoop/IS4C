@@ -24,44 +24,25 @@
 use COREPOS\pos\lib\gui\BasicCorePage;
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DisplayLib;
-use COREPOS\pos\lib\FormLib;
+use COREPOS\pos\lib\ReceiptLib;
 use COREPOS\pos\lib\UdpComm;
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
 class SigCapturePage extends BasicCorePage 
 {
-
-    private $bmp_path;
+    private $bmpPath;
 
     function head_content()
     {
+        $receipt = ReceiptLib::receiptNumber();
+        $this->addOnloadCommand("sigCapture.init('{$this->page_url}', '{$receipt}', '{$this->bmpPath}');");
+        $this->addOnloadCommand("sigCapture.addOption('[Clear] to cancel');");
         ?>
         <script type="text/javascript" src="<?php echo $this->page_url; ?>js/ajax-parser.js"></script>
+        <script type="text/javascript" src="<?php echo $this->page_url; ?>js/sigCapture.js"></script>
         <script type="text/javascript">
         function parseWrapper(str) {
-            if (str.substring(0, 7) == 'TERMBMP') {
-                var fn = '<?php echo $this->bmp_path; ?>' + str.substring(7);
-                $('<input>').attr({
-                    type: 'hidden',
-                    name: 'bmpfile',
-                    value: fn
-                }).appendTo('#formlocal');
-
-                var img = $('<img>').attr({
-                    src: fn,
-                    width: 250 
-                });
-                $('#imgArea').append(img);
-                $('.boxMsgAlert').html('Approve Signature');
-                $('#sigInstructions').html('[enter] to approve, [clear] to cancel');
-            } 
-        }
-        function addToForm(n, v) {
-            $('<input>').attr({
-                name: n,
-                value: v,
-                type: 'hidden'
-            }).appendTo('#formlocal');
+            return sigCapture.parseWrapper(str);
         }
         </script>
         <style type="text/css">
@@ -72,59 +53,58 @@ class SigCapturePage extends BasicCorePage
 
     function preprocess()
     {
-        $this->bmp_path = $this->page_url . 'scale-drivers/drivers/NewMagellan/ss-output/tmp/';
+        $this->bmpPath = $this->page_url . 'scale-drivers/drivers/NewMagellan/ss-output/tmp/';
 
-        $terminal_msg = 'termSig';
-        $amt = FormLib::get('amt');
+        $terminalMsg = 'termSig';
+        $amt = $this->form->tryGet('amt');
         if ($amt !== '') {
-            if (FormLib::get('type') !== '') {
-               $terminal_msg .= sprintf('%s: $.%2f', FormLib::get('type'), $amt);
-            } else {
-                $terminal_msg .= sprintf('Amount: $.%2f', $amt);
-            }
+            $type = $this->form->tryGet('type');
+            $terminalMsg .= $type !== '' ? sprintf('%s: $.%2f', $type, $amt) : sprintf('Amount: $.%2f', $amt);
         }
 
-        if (FormLib::get('reginput', false) !== false) {
-            $bmpfile = FormLib::get('bmpfile');
-            if (strtoupper(FormLib::get('reginput')) === 'CL') {
-                if ($bmpfile !== '' && file_exists($bmpfile)) {
-                    unlink($bmpfile);
+        $input = $this->form->tryGet('reginput', false);
+        $bmpfile = $this->form->tryGet('bmpfile');
+        if (strtoupper($input) === 'CL') {
+            /**
+             * Cancel request. Delete signature if necessary, reset terminal, go home
+             */
+            if ($bmpfile !== '' && file_exists($bmpfile)) {
+                unlink($bmpfile);
+            }
+            $this->change_page($this->page_url.'gui-modules/pos2.php');
+            UdpComm::udpSend('termReset');
+
+            return false;
+        } elseif ($input === '') {
+            if ($bmpfile !== '' && file_exists($bmpfile)) {
+
+                // this should have been set already, but if we have sufficient info
+                // we can make sure it's correct.
+                $qstr = '';
+                if ($this->form->tryGet('code') !== '') {
+                    $qstr = '?reginput=' . urlencode((100*$amt) . $this->form->code)
+                        . '&repeat=1';
                 }
-                $this->change_page($this->page_url.'gui-modules/pos2.php');
-                UdpComm::udpSend('termReset');
+
+                $bmp = file_get_contents($bmpfile);
+                $this->saveImage('BMP', $bmp);
+                unlink($bmpfile);
+
+                $this->change_page($this->page_url.'gui-modules/pos2.php' . $qstr);
 
                 return false;
-            } elseif (FormLib::get('reginput', false) === '') {
-                if ($bmpfile !== '' && file_exists($bmpfile)) {
-
-                    // this should have been set already, but if we have sufficient info
-                    // we can make sure it's correct.
-                    $qstr = '';
-                    if (FormLib::get('code') !== '') {
-                        $qstr = '?reginput=' . urlencode((100*$amt) . FormLib::get('code'))
-                            . '&repeat=1';
-                    }
-
-                    $bmp = file_get_contents($bmpfile);
-                    $this->saveImage('BMP', $bmp);
-                    unlink($bmpfile);
-
-                    $this->change_page($this->page_url.'gui-modules/pos2.php' . $qstr);
-
-                    return false;
-
-                } else {
-                    UdpComm::udpSend($terminal_msg);
-                }
             }
-        } else {
-            UdpComm::udpSend($terminal_msg);
+        } elseif ($input === false || strtoupper($input) === 'TL') {
+            if ($bmpfile !== '' && file_exists($bmpfile)) {
+                unlink($bmpfile);
+            }
+            UdpComm::udpSend($terminalMsg);
         }
 
         return true;
     }
 
-    private function saveImage($format, $img_content)
+    private function saveImage($format, $imgContent)
     {
         $dbc = Database::tDataConnect();
         $capQ = 'INSERT INTO CapturedSignature
@@ -137,12 +117,12 @@ class SigCapturePage extends BasicCorePage
         Database::getsubtotals();
         $args = array(
             date('Y-m-d H:i:s'),
-            CoreLocal::get('CashierNo'),
-            CoreLocal::get('laneno'),
-            CoreLocal::get('transno'),
-            CoreLocal::get('LastID') + 1,
+            $this->session->get('CashierNo'),
+            $this->session->get('laneno'),
+            $this->session->get('transno'),
+            $this->session->get('LastID') + 1,
             $format,
-            $img_content,
+            $imgContent,
         );
         $capR = $dbc->execute($capP, $args);
 
@@ -151,7 +131,7 @@ class SigCapturePage extends BasicCorePage
 
     function body_content()
     {
-        $this->input_header();
+        $this->input_header("onsubmit=\"return sigCapture.submitWrapper();\" action=\"".AutoLoader::ownURL()."\"");
         echo DisplayLib::printheaderb();
         ?>
         <div class="baseHeight">
@@ -159,26 +139,20 @@ class SigCapturePage extends BasicCorePage
         echo "<div id=\"boxMsg\" class=\"centeredDisplay\">";
 
         echo "<div class=\"boxMsgAlert coloredArea\">";
-        echo "Waiting for signature";
+        echo _("Waiting for signature");
         echo "</div>";
 
         echo "<div class=\"\">";
 
         echo "<div id=\"imgArea\"></div>";
         echo '<div class="textArea">';
-        if (!isset($_REQUEST['amt'])) {
-            $_REQUEST['amt'] = 0.00;
-        }
-        if (!isset($_REQUEST['type'])) {
-            $_REQUEST['type'] = 'Unknown';
-        }
-        if (!isset($_REQUEST['code'])) {
-            $_REQUEST['code'] = '??';
-        }
-        echo '$' . sprintf('%.2f', $_REQUEST['amt']) . ' as ' . $_REQUEST['type'];
+        $amt = $this->form->tryGet('amt', 0.00);
+        $type = $this->form->tryGet('type', 'Unknown');
+        $code = $this->form->tryGet('code', '??');
+        echo '$' . sprintf('%.2f', $amt) . ' as ' . $type;
         echo '<br />';
         echo '<span id="sigInstructions" style="font-size:90%;">';
-        echo '[enter] to get re-request signature, [clear] to cancel';
+        echo _('[subtotal] to get re-request signature, [clear] to cancel');
         echo '</span>';
         echo "</div>";
 
@@ -189,12 +163,18 @@ class SigCapturePage extends BasicCorePage
         echo DisplayLib::printfooter();
         echo "</div>";
 
-        $this->add_onload_command("addToForm('amt', '{$_REQUEST['amt']}');\n");
-        $this->add_onload_command("addToForm('type', '{$_REQUEST['type']}');\n");
-        $this->add_onload_command("addToForm('code', '{$_REQUEST['code']}');\n");
+        $this->add_onload_command("sigCapture.addToForm('amt', '{$amt}');\n");
+        $this->add_onload_command("sigCapture.addToForm('type', '{$type}');\n");
+        $this->add_onload_command("sigCapture.addToForm('code', '{$code}');\n");
+        $this->add_onload_command("sigCapture.addToForm('doCapture', 1);\n");
         
-        CoreLocal::set("boxMsg",'');
+        $this->session->set("boxMsg",'');
     } // END body_content() FUNCTION
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertEquals(true, $this->saveImage('bmp', 'fakeContent'));
+    }
 }
 
 AutoLoader::dispatch();
@@ -216,10 +196,10 @@ if (function_exists('imagecreatefromstring')) {
     if ($image !== false) {
         ob_start();
         $success = imagepng($image);
-        $png_content = ob_get_clean();
+        $pngContent = ob_get_clean();
         if ($success) {
             $format = 'PNG';
-            $img_content = $png_content;
+            $imgContent = $pngContent;
         }
     }
 }

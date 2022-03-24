@@ -33,7 +33,7 @@ class EpScaleLib
       @param $scale_model [ServiceScaleModel]
       @return [string] CSV formatted line
     */
-    static public function getItemLine($item_info, $scale_model)
+    static public function getItemLine($item_info, $scale_model, $asNew)
     {
         $scale_fields = '';
         if ($scale_model->epStoreNo() != 0) {
@@ -42,14 +42,42 @@ class EpScaleLib
         $scale_fields .= 'DNO' . $scale_model->epDeptNo() . chr(253);
         $scale_fields .= 'SAD' . $scale_model->epScaleAddress() . chr(253);
 
+        $labelInfo = array('labelType'=>103, 'descriptionWidth'=>26, 'textWidth'=>0);
         if (isset($item_info['Label'])) {
-            $item_info['Label'] = ServiceScaleLib::labelTranslate($item_info['Label'], $scale_model->scaleType());
+            $labelInfo = ServiceScaleLib::labelTranslate($item_info['Label'], $scale_model->scaleType());
         }
 
-        if ($item_info['RecordType'] == 'WriteOneItem') {
-            return self::getAddItemLine($item_info) . $scale_fields;
+        // Always requested "add" might work better. Setting description
+        // isn't reliable when "updating" an item that doesn't actually
+        // exist on the other side of processing
+        /* ePlum nominally supports both an "add" and an "update"
+         * operation but the latter is not always reliable.
+         * Specifically, ePlum stores multiple descriptions where
+         * 'Description 1' is the first line of text, 'Description 2'
+         * is the second line, etc. Specifying two descriptions
+         * in an "add" command always works but specifying two
+         * descriptions in an "update" command sometimes ends
+         * up ignoring the second description.
+         *
+         * CORE doesn't only support ePlum; it also still supports
+         * Hobart's Data GateWeigh which also has separate
+         * "add and "update" operations. The goal of the current
+         * setup is to make it so you can feed the same '$items'
+         * data into both scale communication layers and generally
+         * have ePlum almost always use "add" operations but have
+         * Hobart switch appropriately between the two operations.
+         */
+        if ($asNew || $item_info['RecordType'] == 'WriteOneItem') {
+            $line = self::getAddItemLine($item_info, $labelInfo) . $scale_fields;
         } else {
-            return self::getUpdateItemLine($item_info) . $scale_fields;
+            $line = self::getUpdateItemLine($item_info, $labelInfo) . $scale_fields;
+        }
+
+        if ($scale_model->scaleType() == 'HOBART_HTI') {
+            preg_match('/UTA(\d\d\d)/', $line, $matches);    
+            $tare = $matches[1];
+            $fixed_tare = substr($tare . '0', -3);
+            $line = str_replace($matches[0], 'UTA' . $fixed_tare, $line);
         }
 
         return $line;
@@ -65,28 +93,34 @@ class EpScaleLib
         $et_line .= 'SAD' . $scale_model->epScaleAddress() . chr(253);
         $et_line .= 'PNO' . $item_info['PLU'] . chr(253);
         $et_line .= 'INO' . $item_info['PLU'] . chr(253);
-        $et_line .= 'ITE' . self::expandedText($item_info['ExpandedText']) . chr(253);
+        $et_line .= 'ITE' . self::expandedText($item_info['ExpandedText'], $item_info, $scale_model) . chr(253);
 
         return $et_line;
     }
 
-    static private function expandedText($text)
+    static private function expandedText($text, $item_info, $scale_model)
     {
-        $text = str_replace("\r", '', $text);
-        $ret = '';
-        foreach (explode("\n", $text) as $line) {
-            $ret .= wordwrap($line, 35, "\n") . "\n";
+        if ($item_info['MOSA']) {
+            $text = str_replace('{mosa}', 'Certified Organic By MOSA', $text);
+        } else {
+            $text = str_replace('{mosa}', '', $text);
+            $text = str_ireplace('CERTIFIED ', '', $text);
         }
-        return str_replace("\n", chr(0xE), $ret);
+        if (!isset($item_info['OriginText'])) {
+            $item_info['OriginText'] = '';
+        }
+        $text = str_replace('{cool}', $item_info['OriginText'], $text);
+        $text = str_replace("\r", '', $text);
+        return str_replace("\n", chr(0xE), $text);
     }
 
-    static private function getAddItemLine($item_info)
+    static private function getAddItemLine($item_info, $labelInfo)
     {
         $line = 'CCOSPIA' . chr(253);
         $line .= 'PNO' . $item_info['PLU'] . chr(253);
-        $line .= 'UPC' . '002' . str_pad($item_info['PLU'],4,'0',STR_PAD_LEFT) . '000000' . chr(253);
+        $line .= 'UPC' . ServiceScaleLib::pluToUPC($item_info['PLU']) . chr(253);
         $desc = (isset($item_info['Description'])) ? $item_info['Description'] : '';
-        $line .= self::wrapDescription($desc, 26);
+        $line .= self::wrapDescription($desc, $labelInfo['descriptionWidth']);
         $line .= 'DS1' . '0' . chr(253);
         if (!strstr($line, 'DN2')) {
             $line .= 'DN2' . chr(253);
@@ -98,11 +132,13 @@ class EpScaleLib
         $line .= 'DS4' . '0' . chr(253);
         $line .= 'UPR' . (isset($item_info['Price']) ? round(100*$item_info['Price']) : '0') . chr(253);
         $line .= 'EPR' . '0' . chr(253);
-        $line .= 'FWT' . (isset($item_info['NetWeight']) ? $item_info['NetWeight'] : '0') . chr(253);
+        $line .= 'FWT' . (isset($item_info['NetWeight']) ? sprintf('%d0', $item_info['NetWeight']) : '0') . chr(253);
         if ($item_info['Type'] == 'Random Weight') {
             $line .= 'UMELB' . chr(253);
-        } else {
+        } elseif (isset($item_info['NetWeight']) && $item_info['NetWeight']) {
             $line .= 'UMEFW' . chr(253);
+        } else {
+            $line .= 'UMEBC' . chr(253);
         }
         $line .= 'BCO' . '0' . chr(253);
         $line .= 'WTA' . '0' . chr(253);
@@ -121,7 +157,7 @@ class EpScaleLib
         $line .= 'NRA' . '95' . chr(253);
         $line .= 'ANO' . '0' . chr(253);
         $line .= 'FTA' . 'N' . chr(253);
-        $line .= 'LF1' . (isset($item_info['Label']) ? $item_info['Label'] : '0') . chr(253);
+        $line .= 'LF1' . (isset($item_info['Label']) ? $labelInfo['labelType'] : '0') . chr(253);
         $line .= 'LF2' . '0' . chr(253);
         $line .= 'FR1' . '0' . chr(253);
         $line .= 'FDT' . '0' . chr(253);
@@ -143,7 +179,7 @@ class EpScaleLib
         return $line;
     }
 
-    static private function getUpdateItemLine($item_info)
+    static private function getUpdateItemLine($item_info, $labelInfo)
     {
         $line = 'CCOSPIC' . chr(253); 
         foreach (ServiceScaleLib::$WRITE_ITEM_FIELDS as $key => $field_info) {
@@ -151,25 +187,28 @@ class EpScaleLib
                 switch ($key) {
                     case 'PLU':
                         $line .= 'PNO' . $item_info[$key] . chr(253);
-                        $line .= 'UPC' . '002' . str_pad($item_info[$key],4,'0',STR_PAD_LEFT) . '000000' . chr(253);
+                        $line .= 'UPC' . ServiceScaleLib::pluToUPC($item_info[$key]) . chr(253);
                         $line .= 'INO' . $item_info[$key] . chr(253);
                         break;
                     case 'Description':
                         if (strstr($item_info[$key], "\n")) {
                             list($line1, $line2) = explode("\n", $item_info[$key]);
                             $line .= 'DN1' . $line1 . chr(253);
+                            $line .= 'DS1' . '0' . chr(253);
                             $line .= 'DN2' . $line2 . chr(253);
-                        } elseif (strlen($item_info[$key]) > 22) {
-                            $line .= self::wrapDescription($item_info[$key], 26);
+                            $line .= 'DS2' . '0' . chr(253);
+                        } elseif (strlen($item_info[$key]) > $labelInfo['descriptionWidth'] && $labelInfo['descriptionWidth'] != 0) {
+                            $line .= self::wrapDescription($item_info[$key], $labelInfo['descriptionWidth']);
                         } else {
                             $line .= 'DN1' . $item_info[$key] . chr(253);
+                            $line .= 'DS1' . '0' . chr(253);
                         }
                         break;
                     case 'ReportingClass':
                         $line .= 'CCL' . $item_info[$key] . chr(253);
                     case 'Label':
                         /** disabled 11Nov2015 - doesn't syncing seems broken **/
-                        $line .= 'LF1' . $item_info[$key] . chr(253);
+                        $line .= 'LF1' . $labelInfo['labelType'] . chr(253);
                         break;
                     case 'Tare':
                         $line .= 'UTA' . str_pad(floor(100*$item_info['Tare']).'0', 3, '0', STR_PAD_LEFT). chr(253);
@@ -178,20 +217,27 @@ class EpScaleLib
                         $line .= 'SLI' . $item_info[$key] . chr(253) . 'SLT0' . chr(253);
                         break;
                     case 'Price':
-                        $line .= 'UPR' . round(100*$item_info[$key]) . chr(253);
+                        if ($item_info['Price'] != 0 && $item_info['Price'] < 9999) {
+                            $line .= 'UPR' . round(100*$item_info[$key]) . chr(253);
+                        }
                         break;
                     case 'Type':
                         if ($item_info[$key] == 'Random Weight') {
                             $line .= 'UMELB' . chr(253);
+                            $line .= 'BCO' . '0' . chr(253);
                         } else {
-                            $line .= 'UMEFW' . chr(253);
+                            $line .= 'UMEBC' . chr(253);
+                            $line .= 'BCO' . '1' . chr(253);
                         }
                         break;
                     case 'NetWeight':
-                        $line .= 'FWT' . $item_info[$key] . chr(253);
+                        $line .= 'FWT' . sprintf('%d', $item_info[$key]) . chr(253);
                         break;
                     case 'Graphics':
                         $line .= 'GNO' . str_pad($item_info[$key],6,'0',STR_PAD_LEFT) . chr(253);
+                        break;
+                    case 'inUse':
+                        $line .= 'UF8' . ($item_info[$key] ? 1 : 0) . chr(253);
                         break;
                 }
             }
@@ -202,11 +248,14 @@ class EpScaleLib
 
     static private function wrapDescription($desc, $length, $limit=2)
     {
-        $desc = wordwrap($desc, $length, "\n", true); 
-        $lines = explode("\n", $desc);
-        $keys = array_filter(array_keys($lines), function($i) use ($limit) { return strlen($i)<$limit; });
+        $lines = array($desc);
+        if ($length > 0) {
+            $wrapped = wordwrap($desc, $length, "\n", true);
+            $lines = explode("\n", $wrapped);
+        }
+        $keys = array_filter(array_keys($lines), function($i) use ($limit) { return $i<$limit; });
         return array_reduce($keys, function($carry, $key) use ($lines) {
-            return $carry . 'DN' . ($key+1) . $lines[$key] . chr(253)
+            return $carry . 'DN' . ($key+1) . trim($lines[$key]) . chr(253)
                 . 'DS' . ($key+1) . '0' . chr(253);
         });
     }
@@ -222,15 +271,11 @@ class EpScaleLib
         Must have keys "host", "type", and "dept". 
         May have boolean value with key "new".
     */
-    static public function writeItemsToScales($items, $scales=array())
+    static public function writeItemsToScales($items, $scales=array(), $asNew=true)
     {
         $config = \FannieConfig::factory(); 
         if (!isset($items[0])) {
             $items = array($items);
-        }
-        $new_item = false;
-        if (isset($items[0]['RecordType']) && $items[0]['RecordType'] == 'WriteOneItem') {
-            $new_item = true;
         }
         $header_line = '';
         $file_prefix = ServiceScaleLib::sessionKey();
@@ -261,7 +306,7 @@ class EpScaleLib
             $fptr = fopen($file_name, 'w');
             fwrite($fptr, 'BNA' . $file_prefix . '_' . $counter . chr(253) . self::$NEWLINE);
             foreach ($items as $item) {
-                $item_line = self::getItemLine($item, $scale_model);
+                $item_line = self::getItemLine($item, $scale_model, $asNew);
                 fwrite($fptr, $item_line . self::$NEWLINE);
 
                 if (isset($item['ExpandedText'])) {
@@ -288,6 +333,7 @@ class EpScaleLib
     static public function deleteItemsFromScales($items, $scales=array())
     {
         $config = \FannieConfig::factory(); 
+        $dbc = \FannieDB::get($config->get('OP_DB'));
 
         if (!is_array($items)) {
             $items = array($items);
@@ -300,14 +346,19 @@ class EpScaleLib
         }
         $selected_scales = $scales;
         if (!is_array($scales) || count($selected_scales) == 0) {
-            $selected_scales = $config->get('SCALES');
+            $prep = $dbc->prepare("SELECT * FROM ServiceScales");
+            $selected_scales = $dbc->getAllRows($prep);
         }
         $scale_model = new \ServiceScalesModel(\FannieDB::get($config->get('OP_DB')));
         $counter = 0;
+        $epScales = array();
         foreach ($selected_scales as $scale) {
             $file_name = sys_get_temp_dir() . '/' . $file_prefix . '_deleteItem_' . $counter . '.dat';
             $fptr = fopen($file_name, 'w');
             foreach ($items as $plu) {
+                if (isset($epScales[$scale['epDeptNo']])) {
+                    continue;
+                }
                 if (strlen($plu) !== 4) {
                     // might be a UPC
                     $upc = str_pad($plu, 13, '0', STR_PAD_LEFT);
@@ -315,9 +366,20 @@ class EpScaleLib
                         // not a valid UPC either
                         continue;
                     }
-                    preg_match("/002(\d\d\d\d)0/",$upc,$matches);
-                    $plu = $matches[1];
+                    $plu = ServiceScaleLib::upcToPLU($upc);
                 }
+                fwrite($fptr, 'BNA' . $file_prefix . '_' . $counter . chr(253) . self::$NEWLINE);
+                $line = 'CCOSPID' . chr(253); 
+                $line .= 'SNO' . $scale['epStoreNo'] . chr(253);
+                $line .= 'DNO' . $scale['epDeptNo'] . chr(253);
+                $line .= 'PNO' . $plu . chr(253);
+                fwrite($fptr, $line . self::$NEWLINE);
+                $line = 'CCOSIID' . chr(253); 
+                $line .= 'SNO' . $scale['epStoreNo'] . chr(253);
+                $line .= 'DNO' . $scale['epDeptNo'] . chr(253);
+                $line .= 'INO' . $plu . chr(253);
+                fwrite($fptr, $line . self::$NEWLINE);
+                $epScales[$scale['epDeptNo']] = true;
             }
             fclose($fptr);
 

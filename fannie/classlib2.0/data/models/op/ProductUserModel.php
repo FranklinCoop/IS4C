@@ -41,6 +41,7 @@ class ProductUserModel extends BasicModel
     'enableOnline' => array('type'=>'TINYINT'),
     'soldOut' => array('type'=>'TINYINT', 'default'=>0),
     'signCount' => array('type'=>'TINYINT', 'default'=>1),
+    'narrow' => array('type'=>'TINYINT', 'default'=>0),
     );
 
     public function doc()
@@ -51,8 +52,22 @@ Depends on:
 
 Use:
 Longer product descriptions for use in
-online webstore
+sale signage. In some edge case it\'s also
+for an online webstore
         ';
+    }
+
+    public function hookAddColumnnarrow()
+    {
+        if ($this->connection->tableExists('NarrowTags')) {
+            $this->connection->startTransaction();
+            $prep = $this->connection->prepare('UPDATE productUser SET narrow=1 WHERE upc=?');
+            $res = $this->connection->query('SELECT upc FROM NarrowTags');
+            while ($row = $this->connection->fetchRow($res)) {
+                $this->connection->execute($prep, array($row['upc']));
+            }
+            $this->connection->commitTransaction();
+        }
     }
 }
 

@@ -24,6 +24,8 @@
 class Unfi7DigitCsvExport 
 {
     public $nice_name = 'UNFI (7 Digit Code CSV)';
+    public $extension = 'csv';
+    public $mime_type = 'text/csv';
 
     public function send_headers()
     {
@@ -31,6 +33,13 @@ class Unfi7DigitCsvExport
         header("Content-Disposition: attachment; filename=order_export.csv");
         header("Pragma: no-cache");
         header("Expires: 0");
+    }
+
+    public function exportString($id)
+    {
+        ob_start();
+        $this->export_order($id);
+        return ob_get_clean();
     }
 
     public function export_order($id)
@@ -43,7 +52,7 @@ class Unfi7DigitCsvExport
 
         echo 'productCode,quantity' . $NL;
         foreach ($items->find() as $item) {
-            echo str_pad($item->sku(), 7, '0', STR_PAD_LEFT);
+            echo str_pad(str_replace('.', '', $item->sku()), 7, '0', STR_PAD_LEFT);
             echo ',';
             echo $item->quantity();
             echo $NL;

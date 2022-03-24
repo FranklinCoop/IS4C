@@ -23,19 +23,23 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class UnfiExportForMas extends FannieReportPage 
 {
 
-    protected $report_headers = array('Vendor', 'Inv#', 'Date', 'Inv Ttl', 'Code Ttl', 'Code');
+    protected $report_headers = array('Vendor', 'Inv#', 'PO#', 'Date', 'Inv Ttl', 'Code Ttl', 'Code');
     protected $sortable = false;
     protected $no_sort_but_style = true;
 
-    public $page_set = 'Purchasing';
+    public $report_set = 'Finance';
     public $description = '[MAS Invoice Export] exports vendor invoices for MAS90.';
     protected $required_fields = array('date1', 'date2');
+    public $discoverable = true;
+
+    protected $header = 'Invoice Export for MAS';
+    protected $title = 'Invoice Export for MAS';
 
     /**
       Lots of options on this report.
@@ -71,25 +75,33 @@ class UnfiExportForMas extends FannieReportPage
             $accounting = '\COREPOS\Fannie\API\item\Accounting';
         }
 
+        $vendorID = FormLib::get('vendorID');
+        $args = array($vendorID, $date1.' 00:00:00', $date2.' 23:59:59');
         $codingQ = 'SELECT o.orderID, 
                         o.salesCode, 
+                        i.vendorOrderID,
                         i.vendorInvoiceID, 
                         SUM(o.receivedTotalCost) as rtc,
                         MAX(o.receivedDate) AS rdate,
-                        MAX(i.storeID) AS storeID
+                        MAX(i.storeID) AS storeID,
+                        MAX(n.vendorName) AS vendor
                     FROM PurchaseOrderItems AS o
                         LEFT JOIN PurchaseOrder as i ON o.orderID=i.orderID 
+                        LEFT JOIN vendors AS n ON n.vendorID=i.vendorID
                     WHERE i.vendorID=? 
-                        AND i.userID=0
                         AND o.receivedDate BETWEEN ? AND ?
-                    GROUP BY o.orderID, o.salesCode, i.vendorInvoiceID
+                        AND o.orderID <> -99 ';
+        if (FormLib::get('store')) {
+            $codingQ .= ' AND i.storeID=? ';
+            $args[] = FormLib::get('store');
+        }
+        $codingQ .= ' GROUP BY o.orderID, o.salesCode, i.vendorInvoiceID, i.vendorOrderID
                     ORDER BY rdate, i.vendorInvoiceID, o.salesCode';
         $codingP = $dbc->prepare($codingQ);
 
         $report = array();
         $invoice_sums = array();
-        $vendorID = FormLib::get('vendorID');
-        $codingR = $dbc->execute($codingP, array($vendorID, $date1.' 00:00:00', $date2.' 23:59:59'));
+        $codingR = $dbc->execute($codingP, $args);
         $orders = array();
         while ($codingW = $dbc->fetch_row($codingR)) {
             if ($codingW['rtc'] == 0) {
@@ -102,8 +114,9 @@ class UnfiExportForMas extends FannieReportPage
                 $code = 'n/a';
             }
             $record = array(
-                'UNFI',
+                $codingW['vendor'],
                 '<a href="../ViewPurchaseOrders.php?id=' . $codingW['orderID'] . '">' . $codingW['vendorInvoiceID'] . '</a>',
+                $codingW['vendorOrderID'] ? $codingW['vendorOrderID'] : $codingW['orderID'],
                 $codingW['rdate'],
                 0.00,
                 sprintf('%.2f', $codingW['rtc']),
@@ -124,11 +137,11 @@ class UnfiExportForMas extends FannieReportPage
             $invTTL = 0;
             for ($i=0; $i<count($data); $i++) {
                 $row = $data[$i];
-                $invTTL += $row[4];
+                $invTTL += $row[5];
             }
 
             foreach ($orders[$id] as $row) {
-                $row[3] = $invTTL;
+                $row[4] = $invTTL;
                 $report[] = $row;
             }
         }
@@ -138,7 +151,7 @@ class UnfiExportForMas extends FannieReportPage
 
     private function wfcCoding($code,$storeID)
     {
-        if (substr($code, 0, 3) === '512' || $code === '51600') {
+        if (substr($code, 0, 3) === '512') {
             return $code . '0' . $storeID . '20';
         } elseif ($code === '51300' || $code === '51310' || $code === '51315') {
             return $code . '0' . $storeID . '30';
@@ -150,6 +163,7 @@ class UnfiExportForMas extends FannieReportPage
     function form_content()
     {
         $dbc = FannieDB::get($this->config->get('OP_DB'));
+        $stores = FormLib::storePicker();
         ob_start();
         ?>
 <form method = "get" action="UnfiExportForMas.php">
@@ -176,6 +190,10 @@ class UnfiExportForMas extends FannieReportPage
         }
         ?>
         </select>
+    </div>
+    <div class="form-group">
+        <label>Store</label>
+        <?php echo $stores['html']; ?>
     </div>
     <p>
         <button type="submit" class="btn btn-default btn-core">Submit</button>

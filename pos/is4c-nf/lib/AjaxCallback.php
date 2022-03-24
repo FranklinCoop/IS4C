@@ -23,8 +23,11 @@
 
 namespace COREPOS\pos\lib;
 use COREPOS\pos\lib\LaneLogger;
+use COREPOS\pos\lib\LocalStorage\WrappedStorage;
 use \AutoLoader;
 use \ReflectionClass;
+
+use COREPOS\common\mvc\FormValueContainer;
 
 /**
   @class AjaxCallback
@@ -33,16 +36,22 @@ class AjaxCallback
 {
     protected $encoding = 'json';
     protected static $logger;
+    protected $session;    
+    protected $form;    
+
+    public function __construct($session, $form)
+    {
+        $this->session = $session;
+        $this->form = $form;
+    }
 
     public function getEncoding()
     {
         return $this->encoding;
     }
 
-    // @hintable
-    public function ajax($input=array())
+    public function ajax()
     {
-
     }
 
     // @hintable
@@ -64,16 +73,16 @@ class AjaxCallback
               timing calls is off by default. uncomment start
               and end calls to collect data
             */
-            //self::perfStart();
+            self::perfStart();
             self::executeCallback($callback_class);
-            //self::perfEnd();
+            self::perfEnd($callback_class);
         }
     }
 
     // @hintable
     private static function executeCallback($callback_class)
     {
-        $obj = new $callback_class();
+        $obj = new $callback_class(new WrappedStorage(), new FormValueContainer());
         ob_start();
         $output = $obj->ajax();
         $extra_output = ob_get_clean();
@@ -98,16 +107,29 @@ class AjaxCallback
         self::$elapsed = microtime(true); 
     }
 
-    protected static function perfEnd()
+    protected static function perfEnd($callback_class)
     {
-        $timer = microtime(true) - self::$elapsed;
-        $log = dirname(__FILE__) . '/../log/perf.log';
-        $refl = new ReflectionClass(get_called_class());
-        $file = basename($refl->getFileName());
-        if (self::$elapsed !== null && is_writable($log)) {
-            $fptr = fopen($log, 'a');
-            fwrite($fptr, $file . "," . $timer . "\n");
-            fclose($fptr);
+        /**
+         * Some AJAX handlers might close the current session in
+         * which case we can't record a performance figure
+         */
+        if (substr($callback_class, -13) != 'AjaxPollScale' && session_status() == PHP_SESSION_ACTIVE) {
+            $timer = sprintf('%.4f', microtime(true) - self::$elapsed);
+            $session = new WrappedStorage();
+            $perf = $session->get('perfLog');
+            if (!is_array($perf)) {
+                $perf = array();
+            }
+            if (count($perf) > 10) {
+                array_shift($perf);
+            }
+            $form = new FormValueContainer();
+            $input = $form->tryGet('input', false);
+            if ($input === false) {
+                $input = $form->tryGet('reginput');
+            }
+            array_push($perf, array('action'=>$callback_class, 'time'=>$timer, 'input'=>$input));
+            $session->set('perfLog', $perf);
         }
     }
 

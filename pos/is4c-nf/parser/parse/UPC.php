@@ -32,9 +32,9 @@ use COREPOS\pos\lib\Scanning\DiscountType;
 use COREPOS\pos\lib\Scanning\PriceMethod;
 use COREPOS\pos\lib\Scanning\SpecialDept;
 use COREPOS\pos\lib\Scanning\SpecialUPC;
-use \CoreLocal;
 use COREPOS\pos\parser\Parser;
 use COREPOS\pos\plugins\Plugin;
+use \CoreLocal;
 
 class UPC extends Parser 
 {
@@ -59,7 +59,7 @@ class UPC extends Parser
     const HID_PREFIX = '0XC';
     const HID_STATUS = 'HI';
 
-    const GS1_PREFIX = 'GS1~';
+    const GS1_PREFIX = 'GS1~RX';
     const GS1_STATUS = 'GS';
 
     /**
@@ -129,17 +129,21 @@ class UPC extends Parser
         if ($this->source == self::GS1_PREFIX) {
             $str = $this->fixGS1($str);
         }
+        $this->status = self::GENERIC_STATUS;
         if ($this->source !== false) {
             $this->status = $this->getStatus($this->source);
-        } else {
-            $this->status = self::GENERIC_STATUS;
+        }
+        if ($this->source !== false) {
+            //strip the prefix from the upc here so that parsing continues
+            $str = substr($str,strlen($this->source));
+            $this->status = $this->getStatus($this->source);
         }
 
         /**
           Do not apply scanned items if
           tare has been entered
         */
-        if (CoreLocal::get('tare') > 0 && $this->source === self::SCANNED_PREFIX) {
+        if ($this->session->get('tare') > 0 && $this->source === self::SCANNED_PREFIX) {
             return $this->default_json();
         }
 
@@ -164,19 +168,19 @@ class UPC extends Parser
         /* check for special upcs that aren't really products */
         if (!$row) {
             return $this->nonProductUPCs($upc, $ret);
-        } else {
-            return $this->handleItem($upc, $row, $scaleStickerItem, $scalepriceUPC, $scalepriceEAN);
         }
+
+        return $this->handleItem($upc, $row, $scaleStickerItem, $scalepriceUPC, $scalepriceEAN);
     }
 
     private function handleItem($upc, $row, $scaleStickerItem, $scalepriceUPC, $scalepriceEAN)
     {
         $ret = $this->default_json();
-        $my_url = MiscLib::base_url();
+        $myUrl = MiscLib::baseURL();
         $dbc = Database::pDataConnect();
 
-        $quantity = CoreLocal::get("quantity");
-        if (CoreLocal::get("quantity") == 0 && CoreLocal::get("multiple") == 0) {
+        $quantity = $this->session->get("quantity");
+        if ($this->session->get("quantity") == 0 && $this->session->get("multiple") == 0) {
             $quantity = 1;
         }
 
@@ -194,21 +198,24 @@ class UPC extends Parser
             $row['description'] = $row['formatted_name'];
         }
 
-        $this->checkInUse($row);
+        $ret = $this->checkInUse($row, $ret);
+        if ($ret['main_frame']) {
+            return $ret;
+        }
 
         /**
           Apply special department handlers
           based on item's department
         */
-        $deptmods = CoreLocal::get('SpecialDeptMap');
-        if (!is_array($deptmods) && (CoreLocal::get('NoCompat') == 1 || $dbc->table_exists('SpecialDeptMap'))) {
+        $deptmods = $this->session->get('SpecialDeptMap');
+        if (!is_array($deptmods) && ($this->session->get('NoCompat') == 1 || $dbc->table_exists('SpecialDeptMap'))) {
             $model = new \COREPOS\pos\lib\models\op\SpecialDeptMapModel($dbc);
             $deptmods = $model->buildMap();
-            CoreLocal::set('SpecialDeptMap', $deptmods);
+            $this->session->set('SpecialDeptMap', $deptmods);
         }
         if (is_array($deptmods) && isset($deptmods[$row['department']])){
             foreach($deptmods[$row['department']] as $mod){
-                $obj = SpecialDept::factory($mod);
+                $obj = SpecialDept::factory($mod, $this->session);
                 $ret = $obj->handle($row['department'],$row['normal_price'],$ret);
                 if ($ret['main_frame'])
                     return $ret;
@@ -226,13 +233,13 @@ class UPC extends Parser
           case; they're normally entered by keying a quantity multiplier
         */
         if ($this->duplicateWeight($row, $scaleStickerItem)) {
-            CoreLocal::set("strEntered",$row["upc"]);
-            CoreLocal::set("boxMsg","<b>Same weight as last item</b>");
-            CoreLocal::set('boxMsgButtons', array(
-                'Confirm Weight [enter]' => '$(\'#reginput\').val(\'\');submitWrapper();',
-                'Cancel [clear]' => '$(\'#reginput\').val(\'CL\');submitWrapper();',
+            $this->session->set("strEntered",$row["upc"]);
+            $this->session->set("boxMsg",_("<b>Same weight as last item</b>"));
+            $this->session->set('boxMsgButtons', array(
+                _('Confirm Weight [enter]') => '$(\'#reginput\').val(\'\');submitWrapper();',
+                _('Cancel [clear]') => '$(\'#reginput\').val(\'CL\');submitWrapper();',
             ));
-            $ret['main_frame'] = $my_url."gui-modules/boxMsg2.php?quiet=1";
+            $ret['main_frame'] = $myUrl."gui-modules/boxMsg2.php?quiet=1";
             return $ret;
         }
 
@@ -248,8 +255,8 @@ class UPC extends Parser
                 return $ret;
             }
 
-            list($bad_age, $ret) = PrehLib::ageCheck($row['idEnforced'], $ret);
-            if ($bad_age === true) {
+            list($badAge, $ret) = PrehLib::ageCheck($row['idEnforced'], $ret);
+            if ($badAge === true) {
                 return $ret;
             }
         }
@@ -261,11 +268,11 @@ class UPC extends Parser
             $peek = PrehLib::peekItem();
             if (strstr($peek,"** Tare Weight") === False)
                 TransRecord::addTare($row['tareweight']*100);
-        } elseif ($row['scale'] != 0 && !CoreLocal::get("tare") && Plugin::isEnabled('PromptForTare') && !CoreLocal::get("tarezero")) {
-            $ret['main_frame'] = $my_url.'plugins/PromptForTare/TarePromptInputPage.php?item='.$entered;
+        } elseif ($row['scale'] != 0 && !$this->session->get("tare") && Plugin::isEnabled('PromptForTare') && !$this->session->get("tarezero")) {
+            $ret['main_frame'] = $myUrl.'plugins/PromptForTare/TarePromptInputPage.php?item='.$upc;
             return $ret;
         } else {
-            CoreLocal::set('tarezero', False);
+            $this->session->set('tarezero', False);
         }
 
         /* sanity check - ridiculous price 
@@ -291,13 +298,13 @@ class UPC extends Parser
         /* need a weight with this item
            retry the UPC in a few milliseconds and see
         */
-        if ($scale != 0 && CoreLocal::get("weight") == 0 && $qttyEnforced == 0
-            && CoreLocal::get("quantity") == 0 && !$scaleStickerItem) {
+        if ($scale != 0 && $this->session->get("weight") == 0 && $qttyEnforced == 0
+            && $this->session->get("quantity") == 0 && !$scaleStickerItem) {
 
-            CoreLocal::set("SNR",CoreLocal::get('strEntered'));
+            $this->session->set("SNR",$this->session->get('strEntered'));
             $ret['output'] = DisplayLib::boxMsg(
                 _("please put item on scale"),
-                'Weighed Item',
+                _('Weighed Item'),
                 true,
                 DisplayLib::standardClearButton()
             );
@@ -307,10 +314,10 @@ class UPC extends Parser
 
         /* quantity required for this item. Send to
            entry page if one wasn't provided */
-        if (($qttyEnforced == 1) && (CoreLocal::get("multiple") == 0) && (CoreLocal::get("msgrepeat" == 0) || CoreLocal::get('qttyvalid') == 0)) {
+        if (($qttyEnforced == 1) && ($this->session->get("multiple") == 0) && ($this->session->get("msgrepeat" == 0) || $this->session->get('qttyvalid') == 0)) {
             $ret['main_frame'] = 
-                    $my_url . 'gui-modules/QuantityEntryPage.php'
-                    . '?entered-item=' . CoreLocal::get('strEntered')
+                    $myUrl . 'gui-modules/QuantityEntryPage.php'
+                    . '?entered-item=' . $this->session->get('strEntered')
                     . '&qty-mode=' . $scale;
             return $ret;
         } 
@@ -318,9 +325,9 @@ class UPC extends Parser
         /* got a scale weight, make sure the tare
            is valid */
         if ($scale != 0 && !$scaleStickerItem) {
-            $quantity = CoreLocal::get("weight") - CoreLocal::get("tare");
-            if (CoreLocal::get("quantity") != 0) 
-                $quantity = CoreLocal::get("quantity") - CoreLocal::get("tare");
+            $quantity = $this->session->get("weight") - $this->session->get("tare");
+            if ($this->session->get("quantity") != 0) 
+                $quantity = $this->session->get("quantity") - $this->session->get("tare");
 
             if ($quantity <= 0) {
                 $ret['output'] = DisplayLib::boxMsg(
@@ -331,11 +338,11 @@ class UPC extends Parser
                 );
                 return $ret;
             }
-            CoreLocal::set("tare",0);
+            $this->session->set("tare",0);
         }
 
         /* non-scale items need integer quantities */    
-        if ($row["scale"] == 0 && (int) CoreLocal::get("quantity") != CoreLocal::get("quantity") ) {
+        if ($row["scale"] == 0 && (int) $this->session->get("quantity") != $this->session->get("quantity") ) {
             $ret['output'] = DisplayLib::boxMsg(
                 _("fractional quantity cannot be accepted for this item"),
                 _('Invalid Quantity'),
@@ -364,13 +371,22 @@ class UPC extends Parser
         $row['foodstamp'] = $foodstamp;
         $row['discount'] = $discountable;
 
-        $this->enforceSaleLimit($dbc, $row);
+        if ($row['special_limit'] && $row['discounttype'] == 0 && $this->hardLimit($dbc, $row, $quantity)) {
+            $ret['output'] = DisplayLib::boxMsg(
+                _("Already purchase maximum amount"),
+                _('Quantity Limited Item'),
+                false,
+                DisplayLib::standardClearButton()
+            );
+            return $ret;
+        }
+        $row = $this->enforceSaleLimit($dbc, $row, $quantity);
 
         /*
             BEGIN: figure out discounts by type
         */
 
-        $DiscountObject = DiscountType::getObject($row['discounttype']);
+        $discountObject = DiscountType::getObject($row['discounttype'], $this->session);
 
         /* add in sticker price and calculate a quantity
            if the item is stickered, scaled, and on sale. 
@@ -389,14 +405,17 @@ class UPC extends Parser
            quantity and items that do not have a normal_price
            assigned cannot calculate a proper quantity.
         */
+        $rawQty = false;
         if ($scaleStickerItem) {
-            if ($DiscountObject->isSale() && $scale == 1 && $row['normal_price'] != 0) {
+            if ($discountObject->isSale() && $scale == 1 && $row['normal_price'] != 0 && $this->session->get('VariableNoSalePrice') != 1) {
                 $quantity = MiscLib::truncate2($scaleprice / $row["normal_price"]);
-            } else if ($scale == 1 && $row['normal_price'] != 0) {
+            } elseif ($scale == 1 && $row['normal_price'] != 0) {
                 $quantity = MiscLib::truncate2($scaleprice / $row["normal_price"]);
                 if (round($scaleprice, 2) != round($quantity * $row['normal_price'], 2)) {
                     $quantity = 1.0;
                     $row['normal_price'] = $scaleprice;
+                    $rawQty = $scaleprice / $row['normal_price'];
+                    $row['cost'] = MiscLib::truncate2($row['cost'] * $rawQty);
                 } 
             } else {
                 $row['normal_price'] = $scaleprice;
@@ -408,42 +427,50 @@ class UPC extends Parser
         */
 
         $row['trans_subtype'] = $this->status;
-        $pricemethod = MiscLib::nullwrap($DiscountObject->isSale() ? $row['specialpricemethod'] : $row["pricemethod"]);
-        $PriceMethodObject = PriceMethod::getObject($pricemethod);
+        $pricemethod = MiscLib::nullwrap($discountObject->isSale() ? $row['specialpricemethod'] : $row["pricemethod"]);
+        $priceMethodObject = PriceMethod::getObject($pricemethod, $this->session);
 
         // prefetch: otherwise object members 
         // pass out of scope in addItem()
-        $prefetch = $DiscountObject->priceInfo($row,$quantity);
-        $added = $PriceMethodObject->addItem($row, $quantity, $DiscountObject);
+        $prefetch = $discountObject->priceInfo($row,$quantity);
+        $added = $priceMethodObject->addItem($row, $quantity, $discountObject);
 
         if (!$added) {
             $ret['output'] = DisplayLib::boxMsg(
-                $PriceMethodObject->errorInfo(),
+                $priceMethodObject->errorInfo(),
                 '',
                 false,
                 DisplayLib::standardClearButton()
             );
             return $ret;
+        } elseif (false && $rawQty) { // rewrite edge-case quantities idea
+            $dbc = Database::tDataConnect();
+            $prep = $dbc->prepare('SELECT MAX(trans_id) FROM localtemptrans WHERE upc=?');
+            $tID = $dbc->getValue($prep, array($row['upc']));
+            if ($tID) {
+                $prep = $dbc->prepare('UPDATE localtemptrans SET quantity=?, ItemQtty=? WHERE trans_id=?');
+                $res = $dbc->execute($prep, array($rawQty, $rawQty, $tID));
+            }
         }
 
         /* add discount notifications lines, if applicable */
-        $DiscountObject->addDiscountLine();
+        $discountObject->addDiscountLine();
 
         // cleanup, reset flags and beep
         if ($quantity != 0) {
 
-            CoreLocal::set("msgrepeat",0);
-            CoreLocal::set("qttyvalid",0);
+            $this->session->set("msgrepeat",0);
+            $this->session->set("qttyvalid",0);
 
             $ret['udpmsg'] = 'goodBeep';
         }
 
         /* reset various flags and variables */
-        if (CoreLocal::get("tare") != 0) CoreLocal::set("tare",0);
-        CoreLocal::set("ttlflag",0);
-        CoreLocal::set("fntlflag",0);
-        CoreLocal::set("quantity",0);
-        CoreLocal::set("itemPD",0);
+        if ($this->session->get("tare") != 0) $this->session->set("tare",0);
+        $this->session->set("ttlflag",0);
+        $this->session->set("fntlflag",0);
+        $this->session->set("quantity",0);
+        $this->session->set("itemPD",0);
         Database::setglobalflags(0);
 
         /* output item list, update totals footer */
@@ -451,7 +478,7 @@ class UPC extends Parser
         $ret['output'] = DisplayLib::lastpage();
 
         if ($prefetch['unitPrice']==0 && $row['discounttype'] == 0){
-            $ret['main_frame'] = $my_url.'gui-modules/priceOverride.php';
+            $ret['main_frame'] = $myUrl.'gui-modules/priceOverride.php';
         }
 
         return $ret;
@@ -483,11 +510,11 @@ class UPC extends Parser
         $discounttype = MiscLib::nullwrap($row["discounttype"]);
 
         $quantity = 1;
-        if (CoreLocal::get("quantity") != 0) {
-            $quantity = CoreLocal::get("quantity");
+        if ($this->session->get("quantity") != 0) {
+            $quantity = $this->session->get("quantity");
         }
 
-        $save_refund = CoreLocal::get("refund");
+        $saveRefund = $this->session->get("refund");
 
         TransRecord::addRecord(array(
             'upc' => $upc,
@@ -507,12 +534,12 @@ class UPC extends Parser
             'discounttype' => $discounttype,
         ));
 
-        CoreLocal::set("refund",$save_refund);
+        $this->session->set("refund",$saveRefund);
     }
 
     function fixGS1($str){
-        // remove GS1~ prefix + two additional characters
-        $str = substr($str,6);
+        // remove GS1~ prefix
+        $str = substr($str, 6);
 
         // check application identifier
 
@@ -548,6 +575,11 @@ class UPC extends Parser
         // leading/trailing whitespace creates issues
         $entered = trim($entered);
 
+        // leave GS1 barcodes alone otherwise
+        if ($this->source == self::GS1_PREFIX) {
+            return $entered;
+        }
+
         /* exapnd UPC-E */
         if (substr($entered, 0, 1) == 0 && strlen($entered) == 7) {
             $entered = $this->expandUPCE($entered);
@@ -555,7 +587,7 @@ class UPC extends Parser
 
         /* make sure upc length is 13 */
         $upc = "";
-        if (CoreLocal::get('EanIncludeCheckDigits') != 1) {
+        if ($this->session->get('EanIncludeCheckDigits') != 1) {
             /** 
               If EANs do not include check digits, the value is 13 digits long,
               and the value does not begin with a zero, it most likely
@@ -589,7 +621,7 @@ class UPC extends Parser
         $scalePrefix = '002';
         $scaleStickerItem = false;
         $scaleCheckDigits = false;
-        if (CoreLocal::get('UpcIncludeCheckDigits') == 1) {
+        if ($this->session->get('UpcIncludeCheckDigits') == 1) {
             $scalePrefix = '02';
             $scaleCheckDigits = true;
         }
@@ -601,20 +633,19 @@ class UPC extends Parser
             // extract price portion of the barcode
             // position varies depending whether a check
             // digit is present in the upc
+            $scalepriceUPC = MiscLib::truncate2(substr($upc, -4)/100);
+            $scalepriceEAN = MiscLib::truncate2(substr($upc, -5)/100);
             if ($scaleCheckDigits) {
                 $scalepriceUPC = MiscLib::truncate2(substr($upc, 8, 4)/100);
                 $scalepriceEAN = MiscLib::truncate2(substr($upc, 7, 5)/100);
-            } else {
-                $scalepriceUPC = MiscLib::truncate2(substr($upc, -4)/100);
-                $scalepriceEAN = MiscLib::truncate2(substr($upc, -5)/100);
             }
-            $rewrite_class = CoreLocal::get('VariableWeightReWriter');
-            if ($rewrite_class != '' && class_exists('COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\' . $rewrite_class)) {
-                $rewrite_class = 'COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\' . $rewrite_class;
-            } elseif ($rewrite_class === '' || !class_exists($rewrite_class)) {
-                $rewrite_class = 'COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\ZeroedPriceReWrite';
+            $rewriteClass = $this->session->get('VariableWeightReWriter');
+            if ($rewriteClass != '' && substr($rewriteClass, 0, 7) !== 'COREPOS' && class_exists('COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\' . $rewriteClass)) {
+                $rewriteClass = 'COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\' . $rewriteClass;
+            } elseif ($rewriteClass === '' || !class_exists($rewriteClass)) {
+                $rewriteClass = 'COREPOS\\pos\\lib\\Scanning\\VariableWeightReWrites\\ZeroedPriceReWrite';
             }
-            $rewriter = new $rewrite_class();
+            $rewriter = new $rewriteClass();
             $upc = $rewriter->translate($upc, $scaleCheckDigits);
             // I think this is WFC special casing; needs revising.
             if ($upc == "0020006000000" || $upc == "0020010000000") $scalepriceUPC *= -1;
@@ -637,20 +668,19 @@ class UPC extends Parser
 
     private function genericSecurity($ret)
     {
-        $my_url = MiscLib::baseURL();
+        $myUrl = MiscLib::baseURL();
         /* force cashiers to enter a comment on refunds */
-        if (CoreLocal::get("refund")==1 && CoreLocal::get("refundComment") == ""){
+        if ($this->session->get("refund")==1 && $this->session->get("refundComment") == ""){
             $ret['udpmsg'] = 'twoPairs';
-            if (CoreLocal::get("SecurityRefund") > 20){
-                $ret['main_frame'] = $my_url."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-RefundAdminLogin";
-            } else {
-                $ret['main_frame'] = $my_url.'gui-modules/refundComment.php';
+            $ret['main_frame'] = $myUrl.'gui-modules/refundComment.php';
+            if ($this->session->get("SecurityRefund") > 20){
+                $ret['main_frame'] = $myUrl."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-RefundAdminLogin";
             }
-            CoreLocal::set("refundComment",CoreLocal::get("strEntered"));
+            $this->session->set("refundComment",$this->session->get("strEntered"));
             return $ret;
         }
-        if (CoreLocal::get('itemPD') > 0 && CoreLocal::get('SecurityLineItemDiscount') == 30 && CoreLocal::get('msgrepeat')==0){
-            $ret['main_frame'] = $my_url."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-LineItemDiscountAdminLogin";
+        if ($this->session->get('itemPD') > 0 && $this->session->get('SecurityLineItemDiscount') == 30 && $this->session->get('msgrepeat')==0){
+            $ret['main_frame'] = $myUrl."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-LineItemDiscountAdminLogin";
             return $ret;
         }
 
@@ -660,14 +690,14 @@ class UPC extends Parser
     private function duplicateWeight($row, $scaleStickerItem)
     {
         if ($row['scale'] == 1 
-            && CoreLocal::get("lastWeight") > 0 && CoreLocal::get("weight") > 0
-            && abs(CoreLocal::get("weight") - CoreLocal::get("lastWeight")) < 0.0005
+            && $this->session->get("lastWeight") > 0 && $this->session->get("weight") > 0
+            && abs($this->session->get("weight") - $this->session->get("lastWeight")) < 0.0005
             && !$scaleStickerItem && abs($row['normal_price']) > 0.01
-            && CoreLocal::get('msgrepeat') == 0) {
+            && $this->session->get('msgrepeat') == 0) {
             return true;
-        } else  {
-            return false;
         }
+
+        return false;
     }
 
     private function isDateRestricted($row)
@@ -697,16 +727,16 @@ class UPC extends Parser
     private function nonProductUPCs($upc, $ret)
     {
         $dbc = Database::pDataConnect();
-        $objs = is_array(CoreLocal::get("SpecialUpcClasses")) ? CoreLocal::get('SpecialUpcClasses') : array();
-        foreach($objs as $class_name){
-            $instance = SpecialUPC::factory($class_name);
+        $objs = is_array($this->session->get("SpecialUpcClasses")) ? $this->session->get('SpecialUpcClasses') : array();
+        foreach($objs as $className){
+            $instance = SpecialUPC::factory($className, $this->session);
             if ($instance->isSpecial($upc)){
                 return $instance->handle($upc,$ret);
             }
         }
 
         // no match; not a product, not special
-        if (CoreLocal::get('NoCompat') == 1 || $dbc->table_exists('IgnoredBarcodes')) {
+        if ($this->session->get('NoCompat') == 1 || $dbc->table_exists('IgnoredBarcodes')) {
             // lookup UPC in tabe of ignored barcodes
             // this just suppresses any error message from
             // coming back
@@ -717,7 +747,7 @@ class UPC extends Parser
             }
         }
         
-        $obj = ItemNotFound::factory(CoreLocal::get('ItemNotFound'));
+        $obj = ItemNotFound::factory($this->session->get('ItemNotFound'));
         $ret = $obj->handle($upc, $ret);
 
         return $ret;
@@ -727,12 +757,21 @@ class UPC extends Parser
     {
         $dbc = Database::pDataConnect();
         $query = "SELECT inUse,upc,description,normal_price,scale,deposit,
-            qttyEnforced,department,local,cost,tax,foodstamp,discount,
+            qttyEnforced,department,local,tax,foodstamp,discount,
             discounttype,specialpricemethod,special_price,groupprice,
             pricemethod,quantity,specialgroupprice,specialquantity,
             mixmatchcode,idEnforced,tareweight,scaleprice";
-        if (CoreLocal::get('NoCompat') == 1) {
-            $query .= ', line_item_discountable, formatted_name, special_limit ';
+        if ($this->session->get('NoCompat') == 1) {
+            $query .= ', 
+                line_item_discountable, 
+                formatted_name, 
+                special_limit,
+                CASE 
+                    WHEN received_cost <> 0 AND received_cost IS NOT NULL
+                        THEN received_cost
+                    WHEN discounttype > 0 AND special_cost <> 0 AND special_cost IS NOT NULL 
+                        THEN special_cost 
+                    ELSE cost END AS cost';
         } else {
             $table = $dbc->tableDefinition('products');
             // New column 16Apr14
@@ -753,6 +792,14 @@ class UPC extends Parser
             } else {
                 $query .= ', 0 AS special_limit';
             }
+            // New column 20Oct16
+            if (isset($table['special_cost']) && isset($table['received_cost'])) {
+                $query .= ', CASE WHEN received_cost <> 0 AND received_cost IS NOT NULL THEN received_cost
+                    WHEN discounttype > 0 AND special_cost <> 0 AND special_cost IS NOT NULL 
+                    THEN special_cost ELSE cost END AS cost';
+            } else {
+                $query .= ', cost';
+            }
         }
         $query .= " FROM products WHERE upc = '".$upc."'";
         $result = $dbc->query($query);
@@ -761,10 +808,11 @@ class UPC extends Parser
         return $row;
     }
 
-    private function checkInUse($row)
+    private function checkInUse($row, $ret)
     {
         /* Implementation of inUse flag
-         *   if the flag is not set, display a warning dialog noting this
+         *   if the flag is not set and it's likely a keyed item
+         *   display a warning dialog noting this
          *   and allowing the sale to be confirmed or canceled
          */
         if ($row["inUse"] == 0) {
@@ -774,10 +822,43 @@ class UPC extends Parser
                 'department' => $row['department'],
                 'charflag' => 'IU',
             ));
+            if (substr($row['upc'], 0, 6) == '000000' && $this->session->get('msgrepeat') == 0) {
+                $this->session->set("strEntered",$row["upc"]);
+                $this->session->set("boxMsg", _("Inactive PLU. Is this the correct item: ") . $row['description']);
+                $this->session->set('boxMsgButtons', array(
+                    _('Confirm Sale [enter]') => '$(\'#reginput\').val(\'\');submitWrapper();',
+                    _('Cancel [clear]') => '$(\'#reginput\').val(\'CL\');submitWrapper();',
+                ));
+                $ret['main_frame'] = MiscLib::baseURL() . "gui-modules/boxMsg2.php?quiet=1";
+            }
         }
+
+        return $ret;
     }
 
-    private function enforceSaleLimit($dbc, $row)
+    private function hardLimit($dbc, $row, $quantity)
+    {
+            $appliedQ = "
+                SELECT SUM(quantity) AS saleQty
+                FROM " . $this->session->get('tDatabase') . $dbc->sep() . "localtemptrans
+                WHERE discounttype = 0
+                    AND (
+                        upc='{$row['upc']}'
+                        OR (mixMatch='{$row['mixmatchcode']}' AND mixMatch<>''
+                            AND mixMatch<>'0' AND mixMatch IS NOT NULL)
+                    )";
+            $appliedR = $dbc->query($appliedQ);
+            if ($appliedR && $dbc->num_rows($appliedR)) {
+                $appliedW = $dbc->fetch_row($appliedR);
+                if (($appliedW['saleQty']+$quantity) > $row['special_limit']) {
+                    return true;
+                }
+            }
+
+            return false;
+    }
+
+    private function enforceSaleLimit($dbc, $row, $quantity)
     {
         /**
           Enforce per-transaction sale limits
@@ -785,7 +866,7 @@ class UPC extends Parser
         if ($row['special_limit'] > 0) {
             $appliedQ = "
                 SELECT SUM(quantity) AS saleQty
-                FROM " . CoreLocal::get('tDatabase') . $dbc->sep() . "localtemptrans
+                FROM " . $this->session->get('tDatabase') . $dbc->sep() . "localtemptrans
                 WHERE discounttype <> 0
                     AND (
                         upc='{$row['upc']}'

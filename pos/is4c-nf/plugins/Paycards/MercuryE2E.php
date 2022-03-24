@@ -24,12 +24,14 @@
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DisplayLib;
 use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\PrehLib;
 use COREPOS\pos\lib\TransRecord;
 use COREPOS\pos\lib\UdpComm;
 use COREPOS\pos\plugins\Paycards\sql\PaycardRequest;
 use COREPOS\pos\plugins\Paycards\sql\PaycardVoidRequest;
 use COREPOS\pos\plugins\Paycards\sql\PaycardGiftRequest;
 use COREPOS\pos\plugins\Paycards\sql\PaycardResponse;
+use COREPOS\pos\plugins\Paycards\card\CardValidator;
 use COREPOS\pos\plugins\Paycards\card\EncBlock;
 use COREPOS\pos\plugins\Paycards\xml\XmlData;
 
@@ -329,7 +331,8 @@ class MercuryE2E extends BasicCCModule
                 $ttl = $this->conf->get("paycard_amount");
                 $dept = $this->conf->get('PaycardDepartmentGift');
                 $dept = $dept == '' ? 902 : $dept;
-                COREPOS\pos\lib\DeptLib::deptkey($ttl*100, $dept . '0');
+                $deptObj = new COREPOS\pos\lib\DeptLib($this->conf);
+                $deptObj->deptkey($ttl*100, $dept . '0');
                 $bal = $this->conf->get('GiftBalance');
                 $this->conf->set("boxMsg","<b>Success</b><font size=-1>
                                            <p>New card balance: $" . $bal . "
@@ -344,6 +347,14 @@ class MercuryE2E extends BasicCCModule
                                            <p>\"rp\" to print
                                            <br>[enter] to continue</font>"
                 );
+                if ($bal == 'WIC') {
+                    $this->conf->set("boxMsg","<b>Success</b><font size=-1>
+                                               <p>" . nl2br($this->conf->get('EWicBalanceReceipt')) . "</p>
+                                               <p>\"rp\" to print
+                                               <br>[enter] to continue</font>"
+                    );
+                    $json['receipt'] = 'wicSlip';
+                }
                 break;
             case PaycardLib::PAYCARD_MODE_AUTH:
                 // cast to string. tender function expects string input
@@ -363,7 +374,11 @@ class MercuryE2E extends BasicCCModule
                 // include it in the tender line
                 $recordID = $this->last_paycard_transaction_id;
                 $charflag = ($recordID != 0) ? 'PT' : '';
+                $this->conf->set('refund', 0); // refund flag should not invert tender amount
                 TransRecord::addFlaggedTender($tenderDescription, $tenderCode, $amt, $recordID, $charflag);
+                if ($tenderCode == 'EF' || $tenderCode == 'EC') {
+                    PrehLib::ttl();
+                }
 
                 $apprType = 'Approved';
                 if ($this->conf->get('paycard_partial')){
@@ -374,11 +389,27 @@ class MercuryE2E extends BasicCCModule
                 }
                 $this->conf->set('paycard_partial', false);
 
+                $cbMsg = '';
+                if ($this->conf->get('LastEmvCashBack')) {
+                    $cbMsg = sprintf('<p><b>Cashback: %.2f</b></p>', $this->conf->get('LastEmvCashBack'));
+                }
+
                 $isCredit = ($this->conf->get('CacheCardType') == 'CREDIT' || $this->conf->get('CacheCardType') == '') ? true : false;
                 $needSig = ($this->conf->get('paycard_amount') > $this->conf->get('CCSigLimit') || $this->conf->get('paycard_amount') < 0) ? true : false;
-                if (($isCredit || $this->conf->get('EmvSignature') === true) && $needSig) {
+                if ($this->conf->get('paycard_recurring')) {
                     $this->conf->set("boxMsg",
                             "<b>$apprType</b>
+                            <font size=-1>
+                            <p>Please verify cardholder signature
+                            <p>[enter] to continue
+                            <br>\"rp\" to reprint slip
+                            <br>[void] " . _('to reverse the charge') . "
+                            </font>");
+                    $json['receipt'] = 'ccSlip';
+                } elseif (($isCredit || $this->conf->get('EmvSignature') === true) && $needSig) {
+                    $this->conf->set("boxMsg",
+                            "<b>$apprType</b>
+                            {$cbMsg}
                             <font size=-1>
                             <p>Please verify cardholder signature
                             <p>[enter] to continue
@@ -391,6 +422,7 @@ class MercuryE2E extends BasicCCModule
                 } else {
                     $this->conf->set("boxMsg",
                             "<b>$apprType</b>
+                            {$cbMsg}
                             <font size=-1>
                             <p>No signature required
                             <p>[enter] to continue
@@ -399,7 +431,7 @@ class MercuryE2E extends BasicCCModule
                 } 
                 break;
             case PaycardLib::PAYCARD_MODE_VOID:
-                $void = new COREPOS\pos\parser\parse\Void();
+                $void = new COREPOS\pos\parser\parse\VoidCmd($this->conf);
                 $void->voidid($this->conf->get("paycard_id"), array());
                 // advanced ID to the void line
                 $this->conf->set('paycard_id', $this->conf->get('paycard_id')+1);
@@ -867,9 +899,14 @@ class MercuryE2E extends BasicCCModule
         return $normalized;
     }
 
-    protected function beginXmlRequest($request, $refNo=false, $recordNo=false)
+    protected function beginXmlRequest($request, $refNo=false, $recordNo=false, $tipped=false)
     {
         $termID = $this->getTermID();
+        $separateID = false;
+        if (substr($termID, -2) == '::') {
+            $separateID = true;
+            $termID = substr($termID, 0, strlen($termID)-2);
+        }
         $mcTerminalID = $this->conf->get('PaycardsTerminalID');
         if ($mcTerminalID === '') {
             $mcTerminalID = $this->conf->get('laneno');
@@ -879,6 +916,7 @@ class MercuryE2E extends BasicCCModule
             <TStream>
             <Transaction>
             <MerchantID>'.$termID.'</MerchantID>
+            ' . ($separateID ? "<TerminalID>{{TerminalID}}</TerminalID>" : '') . '
             <OperatorID>'.$request->cashierNo.'</OperatorID>
             <LaneID>'.$mcTerminalID.'</LaneID>
             <InvoiceNo>'.$request->refNum.'</InvoiceNo>
@@ -888,8 +926,23 @@ class MercuryE2E extends BasicCCModule
             <Frequency>OneTime</Frequency>
             <Amount>
                 <Purchase>'.$request->formattedAmount().'</Purchase>';
-        if ($request->cashback > 0 && ($request->type == "Debit" || $request->type == "EBTCASH")) {
+        $cval =new CardValidator();
+        $cbMax = $this->conf->get('PaycardsTermCashBackLimit');
+        if ($request->cashback > 0 && $cval->allowCashback($request->type)) {
                 $msgXml .= "<CashBack>" . $request->formattedCashBack() . "</CashBack>";
+        } elseif ($this->conf->get('PaycardsOfferCashBack') == 3 && strtoupper($request->type) == 'DEBIT') {
+            $msgXml .= "<CashBack>Prompt</CashBack>";
+            if (is_numeric($cbMax) && $cbMax > 0) {
+                $msgXml .= sprintf('<MaximumCashBack>%.2f</MaximumCashBack>', $cbMax);
+            }
+        } elseif ($this->conf->get('PaycardsOfferCashBack') == 4 && in_array(strtoupper($request->type), array('DEBIT','EMV'))) {
+            $msgXml .= "<CashBack>Prompt</CashBack>";
+            if (is_numeric($cbMax) && $cbMax > 0) {
+                $msgXml .= sprintf('<MaximumCashBack>%.2f</MaximumCashBack>', $cbMax);
+            }
+        }
+        if ($tipped) {
+            $msgXml .= '<Gratuity>Prompt</Gratuity>';
         }
         $msgXml .= "</Amount>";
         if ($request->type == 'Credit' && $request->mode == 'Sale') {
@@ -941,19 +994,31 @@ class MercuryE2E extends BasicCCModule
     private function getWsUrl($domain)
     {
         if ($this->conf->get("training") == 1) {
-            return "https://w1.mercurydev.net/ws/ws.asmx";
+            return "https://w1.mercurycert.net/ws/ws.asmx?WSDL";
         }
         return "https://$domain/ws/ws.asmx";
     }
 
+    /**
+     * Check for mismatched auth amounts
+     * @param $amt authorized amount
+     * @param $request PaycardRequest
+     *
+     * If the authorized amount is less than expected
+     * it's normally a partial authorization.
+     * If the amount is more than expected cashback
+     * was probably added to the transaction
+     */
     protected function handlePartial($amt, $request)
     {
         if ($amt != abs($this->conf->get("paycard_amount"))) {
             $request->changeAmount($amt);
 
+            if ($amt < abs($this->conf->get('paycard_amount'))) {
+                $this->conf->set("paycard_partial",True);
+                UdpComm::udpSend('goodBeep');
+            }
             $this->conf->set("paycard_amount",$amt);
-            $this->conf->set("paycard_partial",True);
-            UdpComm::udpSend('goodBeep');
         }
     }
 

@@ -33,9 +33,12 @@ class ProductWeeklyLastQuarterModel extends BasicModel
     protected $columns = array(
     'productWeeklyLastQuarterID' => array('type'=>'INT', 'increment'=>true, 'index'=>true),
     'upc' => array('type'=>'VARCHAR(13)', 'primary_key'=>true),
+    'storeID' => array('type'=>'INT', 'primary_key'=>true),
     'weekLastQuarterID' => array('type'=>'INT', 'primary_key'=>true),
     'quantity' => array('type'=>'DECIMAL(10,2)'),
     'total' => array('type'=>'MONEY'),
+    'saleQuantity' => array('type'=>'DECIMAL(10,2)'),
+    'saleTotal' => array('type'=>'MONEY'),
     'percentageStoreSales' => array('type'=>'DECIMAL(10,5)'),
     'percentageSuperDeptSales' => array('type'=>'DECIMAL(10,5)'),
     'percentageDeptSales' => array('type'=>'DECIMAL(10,5)'),

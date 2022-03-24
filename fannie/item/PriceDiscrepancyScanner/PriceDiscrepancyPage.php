@@ -23,7 +23,7 @@
 
 require(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class PriceDiscrepancyPage extends FannieRESTfulPage {
@@ -100,7 +100,7 @@ class PriceDiscrepancyPage extends FannieRESTfulPage {
             $ret .= '<td><button class="btn btn-active" type="button" onclick="editPrice(this,\''. $key .'\',\''. $thisPrice . '\',\'1\'); return false; window.location.reload();">' . $row['dprice'] . '</button></td>';
             
             $ret .= '<td><a href="../ItemEditorPage.php?searchupc=' . $key . '" target="_blank">' . $key . '</a></td>';
-            $ret .= '<td><a href="http://key/scancoord/TrackChangeNew.php?upc=' . $key . '" target="_blank">See Changes</a></td>';
+            $ret .= '<td><a href="http://key/scancoord/item/TrackChangeNew.php?upc=' . $key . '" target="_blank">See Changes</a></td>';
         }
         $ret .= '</table>';
         

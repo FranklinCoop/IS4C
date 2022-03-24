@@ -21,13 +21,18 @@
 
 *********************************************************************************/
 
+include(__DIR__ . '/../../../../config.php');
+if (!class_exists('FannieAPI')) {
+    include(__DIR__ . '/../../../../classlib2.0/FannieAPI.php');
+}
+
 /**
   @class MemberSummaryModel
 */
 class MemberSummaryModel extends CoreWarehouseModel
 {
-
     protected $name = "MemberSummary";
+    protected $preferred_db = 'plugin:WarehouseDatabase';
 
     protected $columns = array(
     'card_no' => array('type'=>'INT', 'primary_key'=>true),
@@ -68,6 +73,9 @@ class MemberSummaryModel extends CoreWarehouseModel
     'longlightTotalItems' => array('type'=>'DOUBLE'),
     'longlightAverageItems' => array('type'=>'DOUBLE'),
     'longlightTotalVisits' => array('type'=>'INT'),
+    'homeStoreID' => array('type'=>'INT'),
+    'homeStorePercent' => array('type'=>'DOUBLE'),
+    'storeCouponPercent' => array('type'=>'DOUBLE'),
     );
 
     public function refresh_data($trans_db, $month, $year, $day=False)
@@ -88,10 +96,10 @@ class MemberSummaryModel extends CoreWarehouseModel
             SELECT card_no,
                 MIN(date_id) AS firstVisit,
                 MAX(date_id) AS lastVisit,
-                SUM(total) AS totalSpending,
-                AVG(total) AS averageSpending,
-                SUM(quantity) AS totalItems,
-                AVG(quantity) AS averageItems,
+                SUM(retailTotal) AS totalSpending,
+                AVG(retailTotal/(CASE WHEN transCount=0 THEN 1 ELSE transCount END)) AS averageSpending,
+                SUM(retailQuantity) AS totalItems,
+                AVG(retailQuantity/(CASE WHEN transCount=0 THEN 1 ELSE transCount END)) AS averageItems,
                 SUM(transCount) AS totalVisits
             FROM sumMemSalesByDay
             WHERE date_id BETWEEN ? AND ?
@@ -132,6 +140,7 @@ class MemberSummaryModel extends CoreWarehouseModel
                 spotlightAverageItems=?,
                 spotlightTotalVisits=?
             WHERE card_no=?');
+        $dbc->startTransaction();
         while ($spotlight = $dbc->fetchRow($basicR)) {
             $dbc->execute($upP, array(
                 $spotlight_start,
@@ -144,37 +153,9 @@ class MemberSummaryModel extends CoreWarehouseModel
                 $spotlight['card_no'],
             ));
         }
+        $dbc->commitTransaction();
 
-        $year_args = array(
-            date('Ym01', $lastyear),
-            date('Ymt', $lastmonth),
-        );
-        $basicR = $dbc->execute($basicP, $year_args);
-        $year_start = date('Y-m-01', $lastyear);
-        $year_end = date('Y-m-t', $lastmonth);
-        $upP = $dbc->prepare('
-            UPDATE MemberSummary
-            SET yearStart=?,
-                yearEnd=?,
-                yearTotalSpending=?,
-                yearAverageSpending=?,
-                yearTotalItems=?,
-                yearAverageItems=?,
-                yearTotalVisits=?
-            WHERE card_no=?');
-        while ($year = $dbc->fetchRow($basicR)) {
-            $dbc->execute($upP, array(
-                $year_start,
-                $year_end,
-                $year['totalSpending'],
-                $year['averageSpending'],
-                $year['totalItems'],
-                $year['averageItems'],
-                $year['totalVisits'],
-                $year['card_no'],
-            ));
-        }
-
+        $this->lastYearStats($dbc);
 
         $oldlight = array(strtotime($spotlight_args[0]), strtotime($spotlight_args[1]));
         $oldlight_args = array(
@@ -190,6 +171,7 @@ class MemberSummaryModel extends CoreWarehouseModel
                 oldlightTotalVisits=?
             WHERE card_no=?');
         $basicR = $dbc->execute($basicP, $oldlight_args);
+        $dbc->startTransaction();
         while ($old = $dbc->fetchRow($basicR)) {
             $dbc->execute($upP, array(
                 $old['totalSpending'],
@@ -200,6 +182,7 @@ class MemberSummaryModel extends CoreWarehouseModel
                 $old['card_no'],
             ));
         }
+        $dbc->commitTransaction();
 
         $longSQL = '';
         $long_args = array($spotlight_args[0]);
@@ -213,10 +196,10 @@ class MemberSummaryModel extends CoreWarehouseModel
             SELECT card_no,
                 MIN(date_id) AS firstVisit,
                 MAX(date_id) AS lastVisit,
-                SUM(total) AS totalSpending,
-                AVG(total) AS averageSpending,
-                SUM(quantity) AS totalItems,
-                AVG(quantity) AS averageItems,
+                SUM(retailTotal) AS totalSpending,
+                AVG(retailTotal/(CASE WHEN transCount=0 THEN 1 ELSE transCount END)) AS averageSpending,
+                SUM(retailQuantity) AS totalItems,
+                AVG(retailQuantity/(CASE WHEN transCount=0 THEN 1 ELSE transCount END)) AS averageItems,
                 SUM(transCount) AS totalVisits
             FROM sumMemSalesByDay
             WHERE date_id < ?
@@ -233,6 +216,7 @@ class MemberSummaryModel extends CoreWarehouseModel
                 longlightTotalVisits=?
             WHERE card_no=?');
         $basicR = $dbc->execute($basicP, $long_args);
+        $dbc->startTransaction();
         while ($long = $dbc->fetchRow($basicR)) {
             $dbc->execute($upP, array(
                 $long['totalSpending'],
@@ -243,6 +227,7 @@ class MemberSummaryModel extends CoreWarehouseModel
                 $long['card_no'],
             ));
         }
+        $dbc->commitTransaction();
 
         // do ranks
 
@@ -256,6 +241,7 @@ class MemberSummaryModel extends CoreWarehouseModel
             SET totalSpendingRank=?
             WHERE card_no=?');
         $result = $dbc->query($query);
+        $dbc->startTransaction();
         while ($row = $dbc->fetchRow($result)) {
             $dbc->execute($rankP, array($rank, $row['card_no']));
             $rank++;
@@ -335,6 +321,184 @@ class MemberSummaryModel extends CoreWarehouseModel
             $dbc->execute($rankP, array($rank, $row['card_no']));
             $rank++;
         }
+        $dbc->commitTransaction();
+
+        $this->storePreference($dbc);
     }
+
+    /**
+     * Add new accounts from the current month that
+     * aren't in the existing stats table
+     */
+    private function initMissing($dbc)
+    {
+        $dateArgs = array(
+            date('Ym01'),
+            date('Ymd'),
+        );
+
+        $initP = $dbc->prepare('
+            INSERT INTO MemberSummary
+            (card_no, firstVisit, lastVisit, totalSpending,
+            averageSpending, totalItems, averageItems,
+            totalVisits)
+            SELECT card_no,
+                MIN(date_id) AS firstVisit,
+                MAX(date_id) AS lastVisit,
+                SUM(retailTotal) AS totalSpending,
+                AVG(retailTotal/(CASE WHEN transCount=0 THEN 1 ELSE transCount END)) AS averageSpending,
+                SUM(retailQuantity) AS totalItems,
+                AVG(retailQuantity/(CASE WHEN transCount=0 THEN 1 ELSE transCount END)) AS averageItems,
+                SUM(transCount) AS totalVisits
+            FROM sumMemSalesByDay
+            WHERE date_id BETWEEN ? AND ?
+                AND card_no NOT IN (SELECT card_no FROM MemberSummary)
+            GROUP BY card_no');
+        $dbc->execute($initP, $dateArgs);
+    }
+
+    /**
+     * Update the last-year fields in the
+     * stats table
+     */
+    private function lastYearStats($dbc)
+    {
+        $year_ago = mktime(0, 0, 0, date('n'), date('j'), date('Y')-1);
+        $yesterday = strtotime('yesterday');
+        $year_args = array(
+            date('Ymd', $year_ago),
+            date('Ymd', $yesterday),
+        );
+        $basicQ = '
+            SELECT card_no,
+                MIN(date_id) AS firstVisit,
+                MAX(date_id) AS lastVisit,
+                SUM(retailTotal) AS totalSpending,
+                AVG(retailTotal/(CASE WHEN transCount=0 THEN 1 ELSE transCount END)) AS averageSpending,
+                SUM(retailQuantity) AS totalItems,
+                AVG(retailQuantity/(CASE WHEN transCount=0 THEN 1 ELSE transCount END)) AS averageItems,
+                SUM(transCount) AS totalVisits
+            FROM sumMemSalesByDay
+            WHERE date_id BETWEEN ? AND ?
+            GROUP BY card_no';
+        $basicP = $dbc->prepare($basicQ);
+        $basicR = $dbc->execute($basicP, $year_args);
+        $year_start = $year_args[0];
+        $year_end = $year_args[1];
+        $upP = $dbc->prepare('
+            UPDATE MemberSummary
+            SET yearStart=?,
+                yearEnd=?,
+                yearTotalSpending=?,
+                yearAverageSpending=?,
+                yearTotalItems=?,
+                yearAverageItems=?,
+                yearTotalVisits=?
+            WHERE card_no=?');
+        $dbc->startTransaction();
+        while ($year = $dbc->fetchRow($basicR)) {
+            $dbc->execute($upP, array(
+                $year_start,
+                $year_end,
+                $year['totalSpending'],
+                $year['averageSpending'],
+                $year['totalItems'],
+                $year['averageItems'],
+                $year['totalVisits'],
+                $year['card_no'],
+            ));
+        }
+        $dbc->commitTransaction();
+    }
+
+    /**
+     * Update just the store preference fields
+     */
+    private function storePreference($dbc)
+    {
+        $year_ago = mktime(0, 0, 0, date('n'), date('j'), date('Y')-1);
+        $yesterday = strtotime('yesterday');
+        $year_args = array(
+            date('Ymd', $year_ago),
+            date('Ymd', $yesterday),
+        );
+        $storeP = $dbc->prepare("SELECT
+            SUM(transCount) AS ttl,
+            SUM(CASE WHEN store_id=1 THEN transCount ELSE 0 END) AS hs,
+            SUM(CASE WHEN store_id=2 THEN transCount ELSE 0 END) AS den,
+            card_no
+            FROM sumMemSalesByDay
+            WHERE date_id BETWEEN ? AND ?
+            GROUP BY card_no");
+        $res = $dbc->execute($storeP, $year_args);
+        $homeP = $dbc->prepare("UPDATE MemberSummary
+            SET homeStoreID=?, homeStorePercent=?
+            WHERE card_no=?");
+        $dbc->startTransaction();
+        while ($counts = $dbc->fetchRow($res)) {
+            if ($counts['hs'] > $counts['den']) {
+                $homeID = 1;
+                $homePercent = $counts['hs'] / $counts['ttl'];
+            } else {
+                $homeID = 2;
+                $homePercent = $counts['den'] / $counts['ttl'];
+            }
+            $dbc->execute($homeP, array($homeID, $homePercent, $counts['card_no']));
+        }
+        $dbc->commitTransaction();
+    }
+
+    private function couponUsage($dbc)
+    {
+        $year_ago = mktime(0, 0, 0, date('n'), date('j'), date('Y')-1);
+        $yesterday = strtotime('yesterday');
+        $year_args = array(
+            date('Ymd', $year_ago),
+            date('Ymd', $yesterday),
+        );
+        $coupP = $dbc->prepare("
+            SELECT card_no,
+                SUM(CASE WHEN usedCoupon=1 THEN 1 ELSE 0 END) as coupons,
+                COUNT(*) AS transactions
+            FROM transactionSummary
+            WHERE date_id BETWEEN ? AND ?
+            GROUP BY card_no");
+        $res = $dbc->execute($coupP, $year_args);
+        $setP = $dbc->prepare("UPDATE MemberSummary
+            SET storeCouponPercent=?
+            WHERE card_no=?");
+        $dbc->startTransaction();
+        while ($row = $dbc->fetchRow($res)) {
+            $dbc->execute($setP, array($row['coupons'] / $row['transactions'], $row['card_no']));
+        }
+        $dbc->commitTransaction();
+    }
+
+    /**
+     * Refresh just a subset of stats instead of
+     * doing the full reload. This makes some data fresher
+     * but takes a lot less time. Updates:
+     *  - last year spending, items, etc
+     *  - store preferences
+     */
+    public function refreshStats()
+    {
+        echo "Add missing accounts\n";
+        $this->initMissing($this->connection);
+        echo "Re-calculate stats\n";
+        $this->lastYearStats($this->connection);
+        echo "Update store preferences\n";
+        $this->storePreference($this->connection);
+        echo "Update coupon usage\n";
+        $this->couponUsage($this->connection);
+    }
+}
+
+if (php_sapi_name() == 'cli' && basename($_SERVER['PHP_SELF']) == basename(__FILE__)) {
+    $config = FannieConfig::factory();
+    $settings = $config->get('PLUGIN_SETTINGS');
+    $dbc = FannieDB::get($settings['WarehouseDatabase']);
+    $obj = new MemberSummaryModel($dbc);
+    $obj->refreshStats();
 }
 

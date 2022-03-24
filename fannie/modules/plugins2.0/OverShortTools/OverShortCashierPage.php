@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class OverShortCashierPage extends FanniePage {
@@ -352,7 +352,7 @@ class OverShortCashierPage extends FanniePage {
     function body_content()
     {
         ob_start();
-        $this->add_script('js/cashier.js'); 
+        $this->addScript('js/cashier.js'); 
         if (!$this->window_dressing) {
             echo "<html>";
             echo "<head><title>{$this->title}</title>";

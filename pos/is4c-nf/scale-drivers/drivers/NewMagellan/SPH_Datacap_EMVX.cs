@@ -36,20 +36,31 @@ using DSIEMVXLib;
 using AxDSIEMVXLib;
 using DSIPDCXLib;
 using AxDSIPDCXLib;
+using ComPort;
 
 namespace SPH {
 
 public class SPH_Datacap_EMVX : SerialPortHandler 
 {
     private DsiEMVX emv_ax_control = null;
-    private DsiPDCX pdc_ax_control = null; // can I include both?
+    private DsiPDCX pdc_ax_control = null;
     private string device_identifier = null;
     private string com_port = "0";
     protected string server_list = "x1.mercurypay.com;x2.backuppay.com";
     protected int LISTEN_PORT = 8999; // acting as a Datacap stand-in
+    protected short CONNECT_TIMEOUT = 60;
     protected string sequence_no = null;
-    private bool log_xml = true;
     private RBA_Stub rba = null;
+    private string xml_log = null;
+    private bool enable_xml_log = true;
+    private bool pdc_active;
+    private Object pdcLock = new Object();
+    private bool emv_reset;
+    private bool always_reset = false;
+    private bool emv_active;
+    private bool reverse_servers = false;
+    private Object emvLock = new Object();
+    private string terminalID = "";
 
     public SPH_Datacap_EMVX(string p) : base(p)
     { 
@@ -59,8 +70,17 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             device_identifier = parts[0];
             com_port = parts[1];
         }
-        if (device_identifier == "INGENICOISC250_MERCURY_E2E") {
+
+        string my_location = AppDomain.CurrentDomain.BaseDirectory;
+        char sep = Path.DirectorySeparatorChar;
+        xml_log = my_location + sep + "log.xml";
+        pdc_active = false;
+        emv_active = false;
+        emv_reset = true;
+
+        if (device_identifier.Substring(0, 8) == "INGENICO") {
             rba = new RBA_Stub("COM"+com_port);
+            rba.SetEMV(RbaButtons.EMV);
         }
     }
 
@@ -68,27 +88,67 @@ public class SPH_Datacap_EMVX : SerialPortHandler
       Initialize EMVX control with servers
       and response timeout
     */
-    protected bool initDevice()
+    protected bool ReInitDevice()
     {
         if (pdc_ax_control == null) {
             pdc_ax_control = new DsiPDCX();
             pdc_ax_control.ServerIPConfig(server_list, 0);
+            pdc_ax_control.SetResponseTimeout(CONNECT_TIMEOUT);
             InitPDCX();
         }
-        pdc_ax_control.CancelRequest();
+        lock (pdcLock) {
+            if (pdc_active) {
+                Console.WriteLine("Reset PDC");
+                pdc_ax_control.CancelRequest();
+                pdc_active = false;
+            }
+        }
+        lock (emvLock) {
+            if (emv_active) {
+                Console.WriteLine("Reset EMV");
+                var type = emv_ax_control.GetType();
+                if (type.GetMethod("CancelRequest") != null) {
+                    emv_ax_control.CancelRequest();
+                    emv_active = false;
+                }
+            }
+        }
 
         if (emv_ax_control == null) {
             emv_ax_control = new DsiEMVX();
         }
-        PadReset();
+        FlaggedReset();
 
         if (rba != null) {
             rba.SetParent(this.parent);
             rba.SetVerbose(this.verbose_mode);
-            rba.stubStart();
+            try {
+                rba.stubStart();
+            } catch (Exception) {}
         }
 
         return true;
+    }
+
+    private TcpListener GetHTTP()
+    {
+        TcpListener http = null;
+        while (true) {
+            try {
+                http = new TcpListener(IPAddress.Any, LISTEN_PORT);
+                http.Start();
+                break;
+            } catch (System.Net.Sockets.SocketException ex) {
+                //this.LISTEN_PORT += 2;
+                throw ex;
+            }
+        }
+
+        if (http != null && this.LISTEN_PORT > 8999) {
+            parent.MsgSend("SETTCP" + this.LISTEN_PORT);
+        }
+
+        return http;
     }
 
     /**
@@ -102,11 +162,19 @@ public class SPH_Datacap_EMVX : SerialPortHandler
     */
     public override void Read()
     { 
-        initDevice();
-        TcpListener http = new TcpListener(IPAddress.Loopback, LISTEN_PORT);
-        http.Start();
+        ReInitDevice();
+        RBA_Stub emailRBA = null;
+        if (device_identifier.Contains("INGENICO")) {
+            emailRBA = new RBA_Stub("COM"+com_port);
+            emailRBA.SetParent(this.parent);
+            emailRBA.SetVerbose(this.verbose_mode);
+        }
+        TcpListener http = this.GetHTTP();
         byte[] buffer = new byte[10];
         while (SPH_Running) {
+            string result = "";
+            string keyVal = "key";
+            bool saveResult = false;
             try {
                 using (TcpClient client = http.AcceptTcpClient()) {
                     client.ReceiveTimeout = 100;
@@ -123,33 +191,47 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                         }
 
                         message = GetHttpBody(message);
-
+                        message = message.Trim(new char[]{'"'});
+                        try {
+                            XmlDocument request = new XmlDocument();
+                            request.LoadXml(message);
+                            keyVal = request.SelectSingleNode("TStream/Transaction/InvoiceNo").InnerXml;
+                        } catch (Exception) {
+                            Console.WriteLine("Error parsing from\n" + message);
+                        }
                         // Send EMV messages to EMVX, others
                         // to PDCX
-                        string result = "";
                         if (message.Contains("EMV")) {
-                            result = ProcessEMV(message);
-                        } else {
+                            result = ProcessEMV(message, true);
+                            saveResult = true;
+                        } else if (message.Contains("termSig")) {
+                            FlaggedReset();
+                            result = GetSignature(true);
+                        } else if (device_identifier.Contains("INGENICO") && message.Contains("termEmail")) {
+                            result = emailRBA.getEmailSync();
+                        } else if (message.Length > 0) {
                             result = ProcessPDC(message);
+                            saveResult = true;
                         }
                         result = WrapHttpResponse(result);
-                        if (this.verbose_mode > 0) {
-                            Console.WriteLine(result);
-                        }
 
                         byte[] response = System.Text.Encoding.ASCII.GetBytes(result);
                         stream.Write(response, 0, response.Length);
-                        if (log_xml) {
-                            using (StreamWriter file = new StreamWriter("log.xml", true)) {
-                                file.WriteLine(result);
-                            }
+                        stream.Close();
+                        if (message.Contains("EMV")) {
+                            FlaggedReset();
                         }
                     }
                     client.Close();
                 }
             } catch (Exception ex) {
-                if (verbose_mode > 0) {
-                    Console.WriteLine(ex);
+                this.LogMessage(ex.ToString());
+                try {
+                    if (saveResult && result.Length > 0) {
+                        parent.SqlLog(keyVal, result);
+                    }
+                } catch (Exception) {
+                    this.LogMessage(keyVal + ": " + result);
                 }
             }
         }
@@ -199,22 +281,47 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             //sig_message = msg.Substring(7);
             msg = "termSig";
         }
+        if (msg.Length > 10 && msg.Substring(0, 10) == "screenLine") {
+            string line = msg.Substring(10);
+            msg = "IGNORE";
+            if (rba != null) {
+                rba.addScreenMessage(line);
+            }
+        }
         switch(msg) {
             case "termReset":
             case "termReboot":
                 if (rba != null) {
                     rba.stubStop();
                 }
-                initDevice();
+                lock(emvLock) {
+                    emv_reset = true;
+                }
+                ReInitDevice();
                 break;
             case "termManual":
                 break;
             case "termApproved":
+                FlaggedReset();
+                if (rba != null) {
+                    rba.showMessage("Approved");
+                }
+                break;
+            case "termDeclined":
+                if (rba != null) {
+                    rba.showMessage("Declined");
+                }
+                break;
+            case "termError":
+                if (rba != null) {
+                    rba.showMessage("Error");
+                }
                 break;
             case "termSig":
                 if (rba != null) {
                     rba.stubStop();
                 }
+                FlaggedReset();
                 GetSignature();
                 break;
             case "termGetType":
@@ -225,13 +332,135 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                 break;
             case "termWait":
                 break;
+            case "termFindPort":
+                var new_port = this.PortSearch(this.device_identifier);
+                if (new_port != "" && new_port != this.com_port && new_port.All(char.IsNumber)) {
+                    this.com_port = new_port;
+                }
+                break;
+        }
+    }
+
+    public override void SetConfig(string k, string v)
+    {
+        if (k == "disableRBA" && v == "true") {
+            try {
+                if (this.rba != null) {
+                    rba.stubStop();
+                }
+            } catch (Exception) {}
+            this.rba = null;
+        } else if (k == "disableButtons" && v == "true") {
+            this.rba.SetEMV(RbaButtons.None);
+        } else if (k == "logXML" && v == "true") {
+            this.enable_xml_log = true;
+        }
+    }
+
+    /**
+      Supported options:
+        -- Global Options --
+        * alwaysReset [boolean] default false
+            Issue a PadReset command following a transaction. This will make
+            the terminal beep until the customer removes their card. Control
+            will not be returned to the cashier until the card is removed or
+            the reset command times out.
+        * logErrors [boolean] default false
+            Write error information to the same debug_lane.log file as PHP.
+            Errors are logged regardless of whether the verbose switch (-v) 
+            is used but not all verbose output is treated as an error & logged
+        * logXML [boolean] default false
+            Log XML requests & responses to "xml.log" in the current directory.
+        * servers [string] default "x1.mercurypay.com;x2.backuppay.com"
+            Set PDCX server list
+        * terminalID [string] default ""
+            Whether this is required varies by processor
+
+        -- Ingencio Specific Options --
+        * disableRBA [boolean] default false
+            Stops all direct communication with Ingenico terminal.
+            Driver will solely utilize Datacap functionality
+        * disableButtons [boolean] default false
+            Does not display payment type or cashback selection buttons.
+            RBA commands can still be used to display static text
+            Irrelevant if disableRBA is true
+        * disableMessages [boolean] default false
+            Does not display approved/declined on screen via RBA
+            Irrelevant if disableRBA is true
+        * buttons [string] default EMV
+            Change labeling of the buttons. Valid options are "credit"
+            and "cashback" currently.
+            Irrelevant if disableRBA or disableButtons is true
+        * defaultMessage [string] default "Welcome"
+            Message displayed onscreen at the start of a transaction
+            Irrelevant if disableRBA is true
+        * cashback [boolean] default true
+            Show cashback selections if payment type debit or ebt cash
+            is selected.
+            Irrelevant if disableRBA or disableButtons is true
+    */
+    public override void SetConfig(Dictionary<string,string> d)
+    {
+        if (d.ContainsKey("disableRBA") && d["disableRBA"].ToLower() == "true") {
+            try {
+                if (this.rba != null) {
+                    rba.stubStop();
+                }
+            } catch (Exception) {}
+            this.rba = null;
+        }
+
+        if (this.rba != null && d.ContainsKey("disableButtons") && d["disableButtons"].ToLower() == "true") {
+            this.rba.SetEMV(RbaButtons.None);
+        }
+
+        if (this.rba != null && d.ContainsKey("disableMessages") && d["disableMessages"].ToLower() == "true") {
+            this.rba.DisableMessages();
+        }
+
+        if (this.rba != null && d.ContainsKey("buttons")) {
+            if (d["buttons"].ToLower() == "credit") {
+                this.rba.SetEMV(RbaButtons.Credit);
+            } else if (d["buttons"].ToLower() == "cashback") {
+                this.rba.SetEMV(RbaButtons.Cashback);
+            }
+        }
+
+        if (this.rba != null && d.ContainsKey("defaultMessage")) {
+            this.rba.SetDefaultMessage(d["defaultMessage"]);
+        }
+
+        if (d.ContainsKey("alwaysReset") && d["alwaysReset"].ToLower() == "true") {
+            this.always_reset = true;
+        }
+
+        if (d.ContainsKey("logXML") && d["logXML"].ToLower() == "true") {
+            this.enable_xml_log = true;
+        }
+
+        if (d.ContainsKey("logErrors") && d["logErrors"].ToLower() == "true") {
+            this.enableUnifiedLog();
+        }
+
+        if (this.rba != null && d.ContainsKey("cashback") && (d["cashback"].ToLower() == "true" || d["cashback"].ToLower() == "false")) {
+            this.rba.SetCashBack(d["cashback"].ToLower() == "true" ? true : false);
+        }
+
+        if (d.ContainsKey("servers")) {
+            this.server_list = d["servers"];
+        }
+
+        if (d.ContainsKey("terminalID")) {
+            this.terminalID = d["terminalID"];
         }
     }
 
     /**
       Process XML transaction using dsiPDCX
+      @param xml the request body
+      @param autoReset true if the request requires a reset, false if the request IS a reset
     */
-    protected string ProcessEMV(string xml)
+    protected string ProcessEMV(string xml, bool autoReset)
     {
         /* 
            Substitute values into the XML request
@@ -240,7 +469,6 @@ public class SPH_Datacap_EMVX : SerialPortHandler
            as so tracking SequenceNo values is not POS'
            problem.
         */
-        xml = xml.Trim(new char[]{'"'});
         xml = xml.Replace("{{SequenceNo}}", SequenceNo());
         if (IsCanadianDeviceType(this.device_identifier)) {
             // tag name is different in this case;
@@ -251,13 +479,8 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             xml = xml.Replace("{{SecureDevice}}", SecureDeviceToEmvType(this.device_identifier));
         }
         xml = xml.Replace("{{ComPort}}", com_port);
-        if (this.verbose_mode > 0) {
-            Console.WriteLine(xml);
-        }
-        if (log_xml) {
-            using (StreamWriter file = new StreamWriter("log.xml", true)) {
-                file.WriteLine(xml);
-            }
+        if (this.terminalID.Length > 0) {
+            xml = xml.Replace("{{TerminalID}}", this.terminalID);
         }
 
         try {
@@ -268,11 +491,41 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             XmlDocument request = new XmlDocument();
             request.LoadXml(xml);
             var IPs = request.SelectSingleNode("TStream/Transaction/HostOrIP").InnerXml.Split(new Char[]{','}, StringSplitOptions.RemoveEmptyEntries);
+            if (this.reverse_servers) {
+                Array.Reverse(IPs);
+            }
             string result = "";
             foreach (string IP in IPs) {
                 // try request with an IP
+
+                // If this is NOT a pad reset request, check the emv_reset
+                // flag to see if a reset is needed. If so, execute one
+                // and update the flag
+                if (autoReset) {
+                    FlaggedReset();
+                }
+
+                lock(emvLock) {
+                    emv_active = true;
+                }
+
                 request.SelectSingleNode("TStream/Transaction/HostOrIP").InnerXml = IP;
                 result = emv_ax_control.ProcessTransaction(request.OuterXml);
+
+                lock(emvLock) {
+                    emv_active = false;
+                    // if this is not a reset command, set the reset needed flag
+                    if (autoReset) {
+                        emv_reset = true;
+                    }
+                }
+
+                if (enable_xml_log) {
+                    using (StreamWriter sw = new StreamWriter(xml_log, true)) {
+                        sw.WriteLine(DateTime.Now.ToString() + " (send emv): " + request.OuterXml);
+                        sw.WriteLine(DateTime.Now.ToString() + " (recv emv): " + result);
+                    }
+                }
                 XmlDocument doc = new XmlDocument();
                 try {
                     doc.LoadXml(result);
@@ -282,30 +535,44 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                     XmlNode return_code = doc.SelectSingleNode("RStream/CmdResponse/DSIXReturnCode");
                     XmlNode origin = doc.SelectSingleNode("RStream/CmdResponse/ResponseOrigin");
                     /**
-                      On anything that is not a local connectivity failure, exit the
-                      loop and return the result without trying any further IPs.
+                      On a client/3006 error or server/4003 error keep trying IPs.
+                      Both indicate a network connectivity error that may just be
+                      transient.
+                      003327 is a Com Port access error. May be transient in some cases.
                     */
-                    if (origin.InnerXml != "Client" || return_code.InnerXml != "003006") {
+                    if (origin.InnerXml == "Client" && return_code.InnerXml == "003006") {
+                        this.LogMessage("Retry on client 3006 (epay: " + IP + ")");
+                        this.reverse_servers = !this.reverse_servers;
+                    } else if (origin.InnerXml == "Client" && return_code.InnerXml == "003327") { 
+                        this.LogMessage("Retry on client 3006 (COM error)");
+                        Thread.Sleep(500);
+                        var new_port = this.PortSearch(this.device_identifier);
+                        if (new_port != "" && new_port != this.com_port && new_port.All(char.IsNumber)) {
+                            this.com_port = new_port;
+                        }
+                    } else if (origin.InnerXml == "Server" && return_code.InnerXml == "004003") {
+                        this.LogMessage("Retry on server 4003 (epay: " + IP + ")");
+                    } else {
                         break;
                     }
                 } catch (Exception ex) {
                     // response was invalid xml
-                    if (this.verbose_mode > 0) {
-                        Console.WriteLine(ex);
-                    }
+                    this.LogMessage(ex.ToString());
                     // status is unclear so do not attempt 
                     // another transaction
                     break;
                 }
             }
 
+            if (autoReset && this.always_reset) {
+                FlaggedReset();
+            }
+
             return result;
 
         } catch (Exception ex) {
             // request was invalid xml
-            if (this.verbose_mode > 0) {
-                Console.WriteLine(ex);
-            }
+            this.LogMessage(ex.ToString());
         }
 
         return "";
@@ -316,20 +583,33 @@ public class SPH_Datacap_EMVX : SerialPortHandler
     */
     protected string ProcessPDC(string xml)
     {
-        xml = xml.Trim(new char[]{'"'});
-        xml = xml.Replace("{{SequenceNo}}", SequenceNo());
-        xml = xml.Replace("{{SecureDevice}}", this.device_identifier);
-        xml = xml.Replace("{{ComPort}}", com_port);
-        if (this.verbose_mode > 0) {
-            Console.WriteLine(xml);
+        lock (pdcLock) {
+            pdc_active = true;
         }
-        if (log_xml) {
-            using (StreamWriter file = new StreamWriter("log.xml", true)) {
-                file.WriteLine(xml);
+        string ret = "";
+        try {
+            xml = xml.Replace("{{SequenceNo}}", SequenceNo());
+            xml = xml.Replace("{{SecureDevice}}", this.device_identifier);
+            xml = xml.Replace("{{ComPort}}", com_port);
+            if (this.terminalID.Length > 0) {
+                xml = xml.Replace("{{TerminalID}}", this.terminalID);
             }
+
+            ret = pdc_ax_control.ProcessTransaction(xml, 1, null, null);
+            if (enable_xml_log) {
+                using (StreamWriter sw = new StreamWriter(xml_log, true)) {
+                    sw.WriteLine(DateTime.Now.ToString() + " (send pdc): " + xml);
+                    sw.WriteLine(DateTime.Now.ToString() + " (recv pdc): " + ret);
+                }
+            }
+        } catch (Exception ex) {
+            this.LogMessage(ex.ToString());
+        }
+        lock (pdcLock) {
+            pdc_active = false;
         }
 
-        return pdc_ax_control.ProcessTransaction(xml, 1, null, null);
+        return ret;
     }
 
     /**
@@ -361,6 +641,24 @@ public class SPH_Datacap_EMVX : SerialPortHandler
     }
 
     /**
+      Set a lock, check if the reset flag is active.
+      If so, issue a reset and clear the flag then
+      release the lock
+    */
+    protected string FlaggedReset()
+    {
+        string ret = "";
+        lock(emvLock) {
+            if (emv_reset) {
+                ret  = PadReset();
+                emv_reset = false;
+            }
+        }
+
+        return ret;
+    }
+
+    /**
       EMVX reset device for next transaction
     */
     protected string PadReset()
@@ -370,6 +668,7 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             + "<Transaction>"
             + "<HostOrIP>127.0.0.1</HostOrIP>"
             + "<MerchantID>MerchantID</MerchantID>"
+            + (this.terminalID.Length > 0 ? "<TerminalID>" + this.terminalID + "</TerminalID>" : "")
             + "<TranCode>EMVPadReset</TranCode>"
             + "<SecureDevice>" + SecureDeviceToEmvType(this.device_identifier) + "</SecureDevice>"
             + "<ComPort>" + this.com_port + "</ComPort>"
@@ -377,13 +676,13 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             + "</Transaction>"
             + "</TStream>";
     
-        return ProcessEMV(xml);
+        return ProcessEMV(xml, false);
     }
 
     /**
       PDCX method to get signature from device
     */
-    protected string GetSignature()
+    protected string GetSignature(bool udp=true)
     {
         string xml="<?xml version=\"1.0\"?>"
             + "<TStream>"
@@ -408,20 +707,36 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             string sigdata = doc.SelectSingleNode("RStream/Signature").InnerText;
             List<Point> points = SigDataToPoints(sigdata);
 
-            int ticks = Environment.TickCount;
             string my_location = AppDomain.CurrentDomain.BaseDirectory;
             char sep = Path.DirectorySeparatorChar;
-            while (File.Exists(my_location + sep + "ss-output/"  + sep + ticks)) {
-                ticks++;
-            }
+            string ticks = System.Guid.NewGuid().ToString();
             string filename = my_location + sep + "ss-output"+ sep + "tmp" + sep + ticks + ".bmp";
             BitmapBPP.Signature sig = new BitmapBPP.Signature(filename, points);
-            parent.MsgSend("TERMBMP" + ticks + ".bmp");
-        } catch (Exception) {
-            return null;
+            if (udp) {
+                parent.MsgSend("TERMBMP" + ticks + ".bmp");
+            } else {
+                return "<img>" + ticks + ".bmp</img>";
+            }
+        } catch (Exception ex) {
+            this.LogMessage(ex.ToString());
         }
-        
-        return null;
+
+        return "<err>Error collecting signature</err>";
+    }
+
+    protected string PortSearch(string device)
+    {
+        switch (device) {
+            case "VX805XPI":
+            case "VX805XPI_MERCURY_E2E":
+                return ComPortUtility.FindComPort("Verifone");
+            case "INGENICOISC250":
+            case "INGENICOISC250_MERCURY_E2E":
+            case "INGENICOISC250_RAPIDCONNECT_E2E":
+                return ComPortUtility.FindComPort("Ingenico");
+            default:
+                return "";
+        }
     }
 
     /**
@@ -435,7 +750,11 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                 return "VX805";
             case "INGENICOISC250":
             case "INGENICOISC250_MERCURY_E2E":
+            case "INGENICOISC250_RAPIDCONNECT_E2E":
                 return "ISC250";
+            case "INGENICOISC480":
+            case "INGENICOISC480_RAPIDCONNECT_E2E":
+                return "ISC480";
             default:
                 return device;
         }
@@ -448,10 +767,15 @@ public class SPH_Datacap_EMVX : SerialPortHandler
     {
         switch (device) {
             case "VX805XPI":
+                return "EMV_VX805_RAPIDCONNECT";
             case "VX805XPI_MERCURY_E2E":
                 return "EMV_VX805_MERCURY";
             case "INGENICOISC250_MERCURY_E2E":
                 return "EMV_ISC250_MERCURY";
+            case "INGENICOISC250_RAPIDCONNECT_E2E":
+                return "EMV_ISC250_RAPIDCONNECT_E2E";
+            case "INGENICOISC480_RAPIDCONNECT_E2E":
+                return "EMV_ISC480_RAPIDCONNECT_E2E";
             default:
                 return "EMV_" + device;
         }

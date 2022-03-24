@@ -110,7 +110,8 @@ class MysqlAdapter implements DialectAdapter
 
     public function dateymd($date1)
     {
-        return "DATE_FORMAT($date1,'%Y%m%d')";
+        $str = "DATE_FORMAT($date1,'%Y%m%d')";
+        return $this->convert($str, 'INT');
     }
 
     public function dayofweek($field)
@@ -142,6 +143,35 @@ class MysqlAdapter implements DialectAdapter
     public function setLockTimeout($seconds)
     {
         return sprintf('SET SESSION innodb_lock_wait_timeout = %d', $seconds);
+    }
+
+    public function setCharSet($charset)
+    {
+        return "SET NAMES '$charset'";
+    }
+
+    public function getProcessList()
+    {
+        return 'SELECT * FROM information_schema.PROCESSLIST';
+    }
+
+    public function kill($intID)
+    {
+        if ($intID != (int)$intID || ((int)$intID) == 0) {
+            throw new \Exception('Invalid query ID');
+        }
+
+        return sprintf('KILL %d', $intID);
+    }
+
+    public function space($num)
+    {
+        return "SPACE({$num})";
+    }
+
+    public function numberFormat($num)
+    {
+        return "FORMAT({$num}, 2)";
     }
 }
 

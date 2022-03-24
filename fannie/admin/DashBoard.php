@@ -21,12 +21,14 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\data\pipes\OutgoingEmail;
+
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT . 'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 if (!function_exists('installSelectField')) {
-    include_once($FANNIE_ROOT . 'install/util.php');
+    include_once(__DIR__ . '/../install/util.php');
 }
 
 class DashBoard extends FannieRESTfulPage
@@ -51,43 +53,43 @@ class DashBoard extends FannieRESTfulPage
     private function emailConfiguration()
     {
         include(dirname(__FILE__) . '/../config.php');
-        $warn = !class_exists('PHPMailer') ? '<div class="alert alert-warning">PHPMailer is missing. Use composer to install it or notifications will not be sent.</div>' : '';
+        $warn = !OutgoingEmail::available() ? '<div class="alert alert-warning">' . _('PHPMailer is missing. Use composer to install it or notifications will not be sent.') . '</div>' : '';
         $ret = '<div class="panel panel-default">
             <div class="panel-heading">
                 <a href="" onclick="$(\'#email-config\').toggle(); return false;">
-                Notification Configuration</a>
+                ' . _('Notification Configuration') . '</a>
             </div>
             <div class="panel-body collapse" id="email-config">
                 <form method="post">
                 ' . $warn . '
                 <div class="form-group">
-                <label>Notification Email Address(es)</label>
+                <label>' . _('Notification Email Address(es)') . '</label>
                 ' . installTextField('MON_SMTP_ADDR', $MON_SMTP_ADDR, '') . '
                 </div>
                 <div class="form-group">
-                <label>SMTP Host</label>
+                <label>' . _('SMTP Host') . '</label>
                 ' . installTextField('MON_SMTP_HOST', $MON_SMTP_HOST, '127.0.0.1') . '
                 </div>
                 <div class="form-group">
-                <label>SMTP Port</label>
+                <label>' . _('SMTP Port') . '</label>
                 ' . installTextField('MON_SMTP_PORT', $MON_SMTP_PORT, '25') . '
                 </div>
                 <div class="form-group">
                 <label>SMTP SSL/TLS</label>
                 ' . installSelectField('MON_SMTP_ENC', $MON_SMTP_ENC, array('None','SSL','TLS'), 'None') . '
-                <label>SMTP Auth</label>
+                <label>' . _('SMTP Auth') . '</label>
                 ' . installSelectField('MON_SMTP_AUTH', $MON_SMTP_AUTH, array('No', 'Yes'), 'No') . '
                 </div>
                 <div class="form-group">
-                <label>SMTP Auth Username</label>
+                <label>' . _('SMTP Auth Username') . '</label>
                 ' . installTextField('MON_SMTP_USER', $MON_SMTP_USER, '') . '
                 </div>
                 <div class="form-group">
-                <label>SMTP Auth Password</label>
+                <label>' . _('SMTP Auth Password') . '</label>
                 ' . installTextField('MON_SMTP_PW', $MON_SMTP_PW, '') . '
                 </div>
                 <p>
-                    <button type="submit" class="btn btn-default btn-core">Save Settings</button>
+                    <button type="submit" class="btn btn-default btn-core">' . _('Save Settings') . '</button>
                 </p>
             </div>
             </div>';
@@ -104,7 +106,7 @@ class DashBoard extends FannieRESTfulPage
         $ret = '<div class="panel panel-default">
             <div class="panel-heading">
                 <a href="" onclick="$(\'#mon-config\').toggle(); return false;">
-                Monitors Configuration</a>
+                ' . _('Monitors Configuration') . '</a>
             </div>
             <div class="panel-body collapse" id="mon-config">
                 <form method="post">
@@ -120,7 +122,7 @@ class DashBoard extends FannieRESTfulPage
         }
         $ret .= '</table>
                 <p>
-                    <button type="submit" class="btn btn-default btn-core">Save Settings</button>
+                    <button type="submit" class="btn btn-default btn-core">' . _('Save Settings') . '</button>
                 </p>
             </div>
             </div>';
@@ -133,7 +135,7 @@ class DashBoard extends FannieRESTfulPage
         $mods = FannieAPI::listModules('\COREPOS\Fannie\API\monitor\Monitor');
         $cache = unserialize(COREPOS\Fannie\API\data\DataCache::getFile('forever', 'monitoring'));
         if (!$cache) {
-            return '<div class="alert alert-danger">No Dashboard data available. Is the Monitoring Task enabled?</div>';
+            return '<div class="alert alert-danger">' . _('No Dashboard data available. Is the Monitoring Task enabled?') . '</div>';
         }
         ob_start();
         echo $this->emailConfiguration();
@@ -144,7 +146,7 @@ class DashBoard extends FannieRESTfulPage
                 continue;
             }
             if (!isset($cache[$class])) {
-                echo "No data for $class<br />";
+                printf(_("No data for %s<br />"), $class);
             } else {
                 $obj = new $class($this->config);
                 $out = $obj->display($cache[$class]);
@@ -158,7 +160,7 @@ class DashBoard extends FannieRESTfulPage
 
     public function helpContent()
     {
-        return '<p>The Dashboard configures monitoring modules and displays
+        return _('<p>The Dashboard configures monitoring modules and displays
             their most recent output.</p>
             <p>Click <em>Notification Configuration</em> to access email notification
             settings. An SMTP connection is required to send emails.</p>
@@ -167,7 +169,7 @@ class DashBoard extends FannieRESTfulPage
             <p>The main section of the page displays each active monitor\'s
             most recent assessment of system status. If this page is blank
             make sure at least one monitor is active and the Monitoring Task
-            is enabled in scheduled tasks.</p>';
+            is enabled in scheduled tasks.</p>');
     }
 
     public function unitTest($phpunit)

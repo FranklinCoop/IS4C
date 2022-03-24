@@ -22,7 +22,7 @@
 *********************************************************************************/
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 class SoReceivingReport extends FanniePage 
 {
@@ -37,7 +37,7 @@ class SoReceivingReport extends FanniePage
 function refilter(f){
     var o = $('#orderSetting').val();
     var s = $('#sS').val();
-    location = "receivingReport.php?f="+f+"&s="+s+"&order="+o;
+    location = "SoReceivingReport.php?f="+f+"&s="+s+"&order="+o;
 }
 function resort(o){
     var f= $('#sF').val();

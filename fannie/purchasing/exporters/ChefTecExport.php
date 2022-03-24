@@ -25,6 +25,8 @@ class ChefTecExport
 {
 
     public $nice_name = 'ChefTec (CSV)';
+    public $extension = 'csv';
+    public $mime_type = 'test/csv';
 
     public function send_headers()
     {
@@ -32,6 +34,13 @@ class ChefTecExport
         header("Content-Disposition: attachment; filename=order_export.csv");
         header("Pragma: no-cache");
         header("Expires: 0");
+    }
+
+    public function exportString($id)
+    {
+        ob_start();
+        $this->export_order($id);
+        return ob_get_clean();
     }
 
     public function export_order($id)
@@ -60,14 +69,15 @@ class ChefTecExport
         );
 
         foreach ($items->find() as $obj) {
+            $obj->description(str_replace('"', '', $obj->description()));
             list($units, $unit_of_measure) = $this->getUnits($obj);
             echo $obj->sku().',';
-            echo '"'.$obj->description().'",';
+            echo '"'.$obj->brand() . ' ' . $obj->description().'",';
             echo $order->vendorInvoiceID() . ',';
             echo date('Ymd', strtotime($obj->receivedDate())) . ',';
             printf('%f,', $units * $obj->caseSize() * $obj->quantity());
             echo $unit_of_measure . ',';
-            printf('%.2f,', $obj->unitCost() * $obj->caseSize() * $obj->quantity());
+            printf('%.2f,', $obj->receivedTotalCost());
             echo '"'.$obj->description().'",';
             echo '"",'; // alt. indicator
             echo '"",'; // alt. unit
@@ -92,9 +102,10 @@ class ChefTecExport
             $units = $a * $b;
         }
         if (strstr($unit_of_measure, '/')) { // space probably omitted
-            preg_match('/([0-9.]+)\/([0-9.]+)(.+)/', $unit_of_measure, $matches);
-            $units = $matches[1] * $matches[2];
-            $unit_of_measure = $matches[3];
+            if (preg_match('/([0-9.]+)\/([0-9.]+)(.+)/', $unit_of_measure, $matches)) {
+                $units = $matches[1] * $matches[2];
+                $unit_of_measure = $matches[3];
+            }
         }
 
         return array($units, $unit_of_measure);

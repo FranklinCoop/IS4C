@@ -39,6 +39,14 @@ class SpecialDept
     */
     public $help_summary = 'Documentation Needed!';
 
+    protected $session;
+    protected $slip_type ='';
+
+    public function __construct($session)
+    {
+        $this->session = $session;
+    }
+
     /**
       More extensive help text, if needed
     */
@@ -54,8 +62,7 @@ class SpecialDept
       @param $arr a handler map (array)
       @return handler map (array)
     */
-    // @hintable
-    public function register($deptID,$arr)
+    public function register($deptID, array $arr)
     {
         if (!is_array($arr)) {
             $arr = array();
@@ -83,10 +90,13 @@ class SpecialDept
       will be invoked within a Parser object and
       hence uses the same return format.
     */
-    // @hintable
     public function handle($deptID,$amount,$json)
     {
         return $json;
+    }
+
+    public function getSlip() {
+        return $this->slip_type;
     }
 
     private static $builtin = array(
@@ -98,17 +108,16 @@ class SpecialDept
         'PaidOutDept',
     );
 
-    // @hintable
-    public static function factory($class)
+    public static function factory($class, $session)
     {
         if ($class != '' && in_array($class, self::$builtin)) {
             $class = 'COREPOS\\pos\\lib\\Scanning\\SpecialDepts\\' . $class;
-            return new $class();
+            return new $class($session);
         } elseif ($class != '' && class_exists($class)) {
-            return new $class();
+            return new $class($session);
         }
 
-        return new self();
+        return new self($session);
     }
 }
 

@@ -38,22 +38,29 @@ class SpecialUPC
 {
     private static $builtin = array(
         'CouponCode',
-        'DatabaseCoupon',
+        'DatabarCoupon',
         'HouseCoupon',
         'SpecialOrder',
+        'ReducedVariableItem',
     );
 
-    // @hintable
-    public static function factory($class)
+    protected $session;
+
+    public static function factory($class, $session)
     {
         if ($class != '' && in_array($class, self::$builtin)) {
             $class = 'COREPOS\\pos\\lib\\Scanning\\SpecialUPCs\\' . $class;
-            return new $class();
+            return new $class($session);
         } elseif ($class != '' && class_exists($class)) {
-            return new $class();
+            return new $class($session);
         }
 
-        return new self();
+        return new self($session);
+    }
+
+    public function __construct($session)
+    {
+        $this->session = $session;
     }
 
     /**
@@ -66,11 +73,6 @@ class SpecialUPC
     public function isSpecial($upc)
     {
         return false;
-    }
-
-    public function is_special($upc)
-    {
-        return $this->isSpecial($upc);
     }
 
     /**
@@ -86,7 +88,6 @@ class SpecialUPC
       will be invoked within a Paser object and
       hence uses the same return format.
     */
-    // @hintable
     public function handle($upc,$json)
     {
 

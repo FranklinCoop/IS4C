@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class EditOnePurchaseOrder extends FannieRESTfulPage 
@@ -35,6 +35,7 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
     for a specific vendor. When scanning, only items available from that vendor are shown.';
 
     protected $must_authenticate = true;
+    protected $enable_linea = true;
     
     public function preprocess()
     {
@@ -46,16 +47,23 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
         return parent::preprocess();
     }
 
+    private function asciiFilter($str)
+    {
+        return preg_replace('/[^\x20-\x7E]/','', $str);
+    }
+
     /**
       AJAX call: ?id=<vendor ID>&search=<search string>
       Find vendor items based on search string
+      Called by: editone.js: itemSearch()
     */
     protected function get_id_search_handler()
     {
         global $FANNIE_OP_DB;
         $dbc = FannieDB::get($FANNIE_OP_DB);
         $ret = array(); 
-
+        $orderID = FormLib::get('orderID');
+        
         // search by vendor SKU
         $skuQ = 'SELECT v.brand, v.description, v.size, v.units, v.cost, v.sku
                  FROM vendorItems AS v
@@ -65,7 +73,7 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
         while($w = $dbc->fetch_row($skuR)){
             $result = array(
             'sku' => $w['sku'],
-            'title' => $w['brand'].' - '.$w['description'],
+            'title' => $this->asciiFilter($w['brand']).' - '. $this->asciiFilter($w['description']),
             'unitSize' => $w['size'],   
             'caseSize' => $w['units'],
             'unitCost' => sprintf('%.2f',$w['cost']),
@@ -75,7 +83,7 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
             $ret[] = $result;
         }
         if (count($ret) > 0){
-            $this->mergeSearchResult($ret);
+            $this->mergeSearchResult($ret, $orderID, $dbc);
             return false;
         }
 
@@ -87,7 +95,7 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
         while($w = $dbc->fetch_row($upcR)){
             $result = array(
             'sku' => $w['sku'],
-            'title' => $w['brand'].' - '.$w['description'],
+            'title' => $this->asciiFilter($w['brand']).' - '. $this->asciiFilter($w['description']),
             'unitSize' => $w['size'],   
             'caseSize' => $w['units'],
             'unitCost' => sprintf('%.2f',$w['cost']),
@@ -97,74 +105,123 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
             $ret[] = $result;
         }
         if (count($ret) > 0){
-            $this->mergeSearchResult($ret);
+            $this->mergeSearchResult($ret, $orderID, $dbc);
             return False;
         }
+
 
         echo '[]';
         return False;
     }
 
-    private function mergeSearchResult($ret)
+    /**
+      Finalize a search result
+
+      This adds an item's order history and quantity present in the
+      current order. If the item is not in the current order and
+      there's exactly one search result then it gets
+      automatically added with quantity one. Otherwise it's incremented
+      by one. The logic here is oriented around using a handheld scanner
+      where scanning something three times results in quantity three.
+
+      When the search returns multiple results the quantities returned
+      are simply current values without any automatic incrementing
+    */
+    private function mergeSearchResult($ret, $orderID, $dbc)
     {
-        echo json_encode($ret);
+        $storeP = $dbc->prepare('SELECT storeID FROM PurchaseOrder WHERE orderID=?');
+        $storeID = $dbc->getValue($storeP, array($orderID));
+
+        $historyQ = 'SELECT placedDate, quantity
+            FROM PurchaseOrder AS o
+                INNER JOIN PurchaseOrderItems AS i ON o.orderID=i.orderID
+            WHERE o.storeID=?
+                AND i.sku=?
+                AND placed=1
+                AND (receivedQty > 0 OR receivedQty IS NULL)
+            ORDER BY placedDate DESC';
+        $historyQ = $dbc->addSelectLimit($historyQ, 3);
+        $historyP = $dbc->prepare($historyQ);
+
+        $currentP = $dbc->prepare('SELECT quantity FROM PurchaseOrderItems WHERE orderID=? AND sku=?');
+        for ($i=0; $i<count($ret); $i++) {
+            $sku = $ret[$i]['sku'];
+            $cases = $dbc->getValue($currentP, array($orderID, $sku));
+            $ret[$i]['cases'] = ($cases) ? $cases : 0;
+            $this->sku = $ret[$i]['sku'];
+            $this->qty = $ret[$i]['cases']; 
+            $this->id = $orderID;
+            if (count($ret) === 1) {
+                $ret[$i]['cases'] += 1;
+                $this->qty = $ret[$i]['cases'];
+                ob_start();
+                $this->get_id_sku_qty_handler();
+                $result = ob_get_clean();
+            }
+            $ret[$i]['history'] = array();
+            $historyR = $dbc->execute($historyP, array($storeID, $sku));
+            while ($historyW = $dbc->fetchRow($historyR)) {
+                $ret[$i]['history'][] = array(
+                    'date' => date('m/d/y', strtotime($historyW['placedDate'])),
+                    'cases' => $historyW['quantity'],
+                );
+            }
+        }
+        $json = array('items' => $ret, 'table' => $this->itemListTab($orderID));
+        echo json_encode($json);
     }
 
     /**
       AJAX call: ?id=<order ID>&sku=<vendor SKU>&qty=<# of cases>
       Add the given SKU & qty to the order
+
+      Called by: editone.js: saveItem()
     */
     protected function get_id_sku_qty_handler()
     {
         global $FANNIE_OP_DB;
         $dbc = FannieDB::get($FANNIE_OP_DB);
         $orderID = $this->id;
-        $order = new PurchaseOrderModel($dbc);
-        $order->orderID($orderID);
-        $order->load();
+        $vendorP = $dbc->prepare('SELECT vendorID FROM PurchaseOrder WHERE orderID=?');
+        $vendorID = $dbc->getValue($vendorP, array($orderID));
 
         $vitem = new VendorItemsModel($dbc);
-        $vitem->vendorID($order->vendorID());
+        $vitem->vendorID($vendorID);
         $vitem->sku($this->sku);
         $vitem->load();
 
         $pitem = new PurchaseOrderItemsModel($dbc);
         $pitem->orderID($orderID);
         $pitem->sku($this->sku);
+        $saved = false;
         if ($this->qty == 0) {
-            $pitem->delete();
+            $saved = $pitem->delete();
         } else {
             $pitem->quantity($this->qty);
             $pitem->unitCost($vitem->cost());
             $pitem->caseSize($vitem->units());
             $pitem->unitSize($vitem->size());
-            $pitem->brand($vitem->brand());
-            $pitem->description($vitem->description());
+            $pitem->brand($this->asciiFilter($vitem->brand()));
+            $pitem->description($this->asciiFilter($vitem->description()));
             $pitem->internalUPC($vitem->upc());
     
-            $pitem->save();
+            $saved = $pitem->save();
         }
 
         $ret = array();
-        $pitem->reset();
-        $pitem->orderID($orderID);
-        $pitem->sku($this->sku);
-        if (count($pitem->find()) == 0 && $this->qty != 0) {
+        if ($saved === false) {
             $ret['error'] = 'Error saving entry';
         } else {
-            $q = 'SELECT count(*) as rows,
-                SUM(unitCost*caseSize*quantity) as estimatedCost
-                FROM PurchaseOrderItems WHERE orderID=?';
-            $p = $dbc->prepare($q);
-            $r = $dbc->execute($p, array($orderID));
-            $w = $dbc->fetch_row($r);
-            $ret['count'] = $w['rows'];
-            $ret['cost'] = sprintf('%.2f',$w['estimatedCost']);
+            $ret['table'] = $this->itemListTab($orderID);
         }
         echo json_encode($ret);
-        return False;
+
+        return false;
     }
 
+    /**
+      Called by: editone.js: markInCurrentOrder()
+    */
     protected function get_id_sku_index_handler()
     {
         global $FANNIE_OP_DB;
@@ -186,10 +243,19 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
         return false;
     }
 
+    /**
+      Called by: editone.js: updateList()
+    */
     protected function post_id_sku_case_qty_handler()
     {
         $poi = new PurchaseOrderItemsModel($this->connection);
         $poi->orderID($this->id);
+        $offset = FormLib::get('listOffset', 0);
+        $upcs = FormLib::get('upc', array());
+        $brands = FormLib::get('brand', array());
+        $descriptions = FormLib::get('description', array());
+        $sizes = FormLib::get('unitSize', array());
+        $costs = FormLib::get('totalCost', array());
         for ($i=0; $i<count($this->sku); $i++) {
             $poi->sku($this->sku[$i]);
             if (isset($this->case[$i])) {
@@ -198,7 +264,21 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
             if (isset($this->qty[$i])) {
                 $poi->quantity($this->qty[$i]);
             }
-            $poi->save();
+            if ($i >= $offset) {
+                // this is a manual entry
+                $index = $i - $offset;
+                if (trim($this->sku[$i]) === '') {
+                    // cannot save w/o a SKU
+                    continue;
+                }
+                $poi->internalUPC(BarcodeLib::padUPC($upcs[$index]));
+                $poi->brand(trim($brands[$index]));
+                $poi->description(trim($descriptions[$index]));
+                $poi->unitSize(trim($sizes[$index]));
+                $poi->unitSize(trim($sizes[$index]));
+                $poi->unitCost($costs[$index]);
+            }
+            $saved = $poi->quantity() == 0 ? $poi->delete() : $poi->save();
         }
 
         $ret = array();
@@ -216,7 +296,6 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
     {
         global $FANNIE_OP_DB;
         $dbc = FannieDB::get($FANNIE_OP_DB);
-        $vendorID = $this->id;
         $userID = FannieAuth::getUID($this->current_user);
         $orderID = $this->id;
         $order = new PurchaseOrderModel($dbc);
@@ -225,68 +304,76 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
         $vendorID = $order->vendorID();
 
         $q = 'SELECT vendorName, 
-            sum(case when i.orderID is null then 0 else 1 END) as rows, 
+            sum(case when i.orderID is null then 0 else 1 END) as \'rows\', 
             MAX(creationDate) as date,
             sum(unitCost*caseSize*quantity) as estimatedCost
             FROM PurchaseOrder as p 
-            INNER JOIN vendors as v ON p.vendorID=v.vendorID
-            LEFT JOIN PurchaseOrderItems as i
-            ON p.orderID=i.orderID
-            WHERE p.orderID=?';
+                INNER JOIN vendors as v ON p.vendorID=v.vendorID
+                LEFT JOIN PurchaseOrderItems as i ON p.orderID=i.orderID
+            WHERE p.orderID=?
+            GROUP BY vendorName';
         $p = $dbc->prepare($q);
-        $r = $dbc->execute($p, array($orderID)); 
-        $w = $dbc->fetch_row($r);
+        $row = $dbc->getRow($p, array($orderID)); 
+        $cost = sprintf('%.2f', $row['estimatedCost']);
 
-        $ret = '<div id="orderInfo">
-            <span id="orderInfoVendor">'.$w['vendorName'].'</span>';
-        $ret .= ' '.$w['date'];
-        $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;';
-        $ret .= ' # of Items: <span id="orderInfoCount">'.$w['rows'].'</span>';
-        $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;';
-        $ret .= ' Est. cost: $<span id="orderInfoCost">'.sprintf('%.2f',$w['estimatedCost']).'</span>';
-        $ret .= '</div><hr />';
+        $search = $this->itemSearchTab($orderID);
+        $list = $this->itemListTab($orderID);
 
-        $ret .= '<ul class="nav nav-tabs" role="tablist">
-            <li role="presentation" class="active">
-                <a href="#item-wrapper" aria-controls="item-wrapper" role="tab" data-toggle="tab">
-                    Item Search
-                </a>
-            </li> 
-            <li role="presentation">
-                <a href="#list-wrapper" aria-controls="list-wrapper" role="tab" data-toggle="tab">
-                    Item List
-                </a>
-            </li> 
-            <li>
-                <a href="PurchasingIndexPage.php">Home</a>
-            </li>
-            <li>
-                <a href="ViewPurchaseOrders.php?id=' . $orderID . '">View Order</a>
-            </li>
-        </ul>
-        <p>
-        <div class="tab-content">';
+        $ret = <<<HTML
+<div id="orderInfo">
+    <span id="orderInfoVendor">{$row['vendorName']}</span>
+    {$row['date']}
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    # of Items: <span id="orderInfoCount">{$row['rows']}</span>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    Est. cost: $<span id="orderInfoCost">{$cost}</span>
+</div>
+<hr />
+<ul class="nav nav-tabs" role="tablist">
+    <li role="presentation" class="active">
+        <a href="#item-wrapper" aria-controls="item-wrapper" role="tab" data-toggle="tab">
+            Item Search
+        </a>
+    </li> 
+    <li role="presentation">
+        <a href="#list-wrapper" aria-controls="list-wrapper" role="tab" data-toggle="tab">
+            Item List
+        </a>
+    </li> 
+    <li>
+        <a href="PurchasingIndexPage.php">Home</a>
+    </li>
+    <li>
+        <a href="ViewPurchaseOrders.php?id={$orderID}">View Order</a>
+    </li>
+</ul>
+<p>
+    <div class="tab-content">
+        <div id="item-wrapper" role="tabpanel" class="tab-pane active">
+            {$search}
+        </div>
+        <div id="list-wrapper" role="tabpanel" class="tab-pane">
+            {$list}
+        </div>
+    </div>
+</p>
+<input type="hidden" id="vendor-id" value="{$vendorID}" />
+<input type="hidden" id="order-id" value="{$orderID}" />
+HTML;
 
-        $ret .= '<div id="item-wrapper" role="tabpanel" class="tab-pane active">';
-        $ret .= $this->itemSearchTab($orderID);
-        $ret .= '</div>';
-        $ret .= '<div id="list-wrapper" role="tabpanel" class="tab-pane">';
-        $ret .= $this->itemListTab($orderID);
-        $ret .= '</div>';
-        $ret .= '</div></p>';
-
-        $ret .= sprintf('<input type="hidden" id="vendor-id" value="%d" />',$vendorID);
-        $ret .= sprintf('<input type="hidden" id="order-id" value="%d" />',$orderID);
-
-        $this->add_onload_command("\$('#searchField').focus();\n");
-        $this->add_script('js/editone.js');
+        $this->addOnloadCommand("\$('#searchField').focus();\n");
+        $this->addOnloadCommand("enableLinea('#searchField', function(){ itemSearch(); });\n");
+        $this->addScript('js/editone.js?id=1');
 
         return $ret;
     }
 
+    /**
+      Search for & display single item
+    */
     private function itemSearchTab($orderID)
     {
-        return '
+        return <<<HTML
             <div id="ItemSearch">
                 <form class="form-inline" action="" onsubmit="itemSearch();return false;">
                     <div class="form-group">
@@ -301,52 +388,81 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
             </div>
             <p>
                 <div id="SearchResults"></div>
-            </p>';
+            </p>
+HTML;
     }
 
+    /**
+      Display all items in the order
+      as an editable table
+    */
     private function itemListTab($orderID)
     {
         $poi = new PurchaseOrderItemsModel($this->connection);
         $poi->orderID($orderID);
         $poi->load();
 
+        $order = new PurchaseOrderModel($this->connection);
+        $order->orderID($orderID);
+        $order->load();
+
+        $batchP = $this->connection->prepare("
+            SELECT b.batchName
+            FROM batchList AS l
+                INNER JOIN batches AS b ON l.batchID=b.batchID
+                INNER JOIN StoreBatchMap AS m ON l.batchID=m.batchID
+            WHERE l.upc=?
+                AND m.storeID=?
+                AND b.startDate <= " . $this->connection->curdate() . "
+                AND b.endDate >= " . $this->connection->curdate() . "
+                AND b.discounttype > 0
+        ");
+
         $ret = '
             <table class="table table-bordered table-striped">
             <tr>
                 <th>SKU</th>
-                <th>UPC</th>
-                <th>Brand</th>
+                <th class="hidden-xs">UPC</th>
+                <th class="hidden-xs">Brand</th>
                 <th>Description</th>
-                <th>Size</th>
+                <th class="hidden-xs">Size</th>
                 <th>Units/Case</th>
                 <th>Cases</th>
-                <th>Est. Cost</th>
+                <th class="hidden-xs">Est. Cost</th>
             </tr>';
+        $offset = 0;
         foreach ($poi->find() as $item) {
-            $ret .= sprintf('<tr>
+            $batch = $this->connection->getValue($batchP, array($item->internalUPC(), $order->storeID()));
+            $ret .= sprintf('<tr %s>
                 <td>%s<input type="hidden" name="sku[]" value="%s" /></td>
+                <td class="hidden-xs">%s</td>
+                <td class="hidden-xs">%s</td>
                 <td>%s</td>
-                <td>%s</td>
-                <td>%s</td>
-                <td>%s</td>
+                <td class="hidden-xs">%s</td>
                 <td><input type="text" class="form-control" name="case[]" value="%s" /></td>
                 <td><input type="text" class="form-control" name="qty[]" value="%s" /></td>
-                <td>%.2f</td>
+                <td class="hidden-xs">%.2f</td>
                 </tr>',
+                $batch ? 'class="info" title="' . $batch . '"' : '',
                 $item->sku(), $item->sku(),
                 \COREPOS\Fannie\API\lib\FannieUI::itemEditorLink($item->internalUPC()),
-                $item->brand(),
-                $item->description(),
+                $this->asciiFilter($item->brand()),
+                $this->asciiFilter($item->description()),
                 $item->unitSize(),
                 $item->caseSize(),
                 $item->quantity(),
                 $item->unitCost() * $item->caseSize() * $item->quantity()
             );
+            $offset++;
         }
         $ret .= '</table>
             <p>
+                <input type="hidden" name="listOffset" value="' . $offset . '" />
                 <a href="" onclick="updateList(); return false;"
                     class="btn btn-default">Save</a>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="" onclick="addManualRow(); return false;"
+                    class="btn btn-default">Add Manual Entry</a>
             </p>';
 
         return $ret;
@@ -365,24 +481,26 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
     */
     private function getOrderID($vendorID, $userID)
     {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dbc = FannieDB::get($this->config->get('OP_DB'));
+        $store = COREPOS\Fannie\API\lib\Store::getIdByIp();
+        if (FormLib::get('store', false)) {
+            $store = FormLib::get('store');
+        }
+        $cutoff = date('Y-m-d', strtotime('30 days ago'));
         $orderQ = 'SELECT orderID FROM PurchaseOrder WHERE
-            vendorID=? AND userID=? and placed=0
+            vendorID=? AND userID=? AND storeID=? AND creationDate > ? and placed=0
             ORDER BY creationDate DESC';
         $orderP = $dbc->prepare($orderQ);
-        $orderR = $dbc->execute($orderP, array($vendorID, $userID));
-        if ($dbc->num_rows($orderR) > 0){
-            $row = $dbc->fetch_row($orderR);
-            return $row['orderID'];
-        } else {
+        $orderID = $dbc->getValue($orderP, array($vendorID, $userID, $store, $cutoff));
+        if (!$orderID) {
             $insQ = 'INSERT INTO PurchaseOrder (vendorID, creationDate,
                 placed, userID, storeID) VALUES (?, '.$dbc->now().', 0, ?, ?)';
             $insP = $dbc->prepare($insQ);
-            $store = COREPOS\Fannie\API\lib\Store::getIdByIp();
             $insR = $dbc->execute($insP, array($vendorID, $userID, $store));
-            return $dbc->insertID();
+            $orderID = $dbc->insertID();
         }
+
+        return $orderID;
     }
 
     /**
@@ -393,14 +511,22 @@ class EditOnePurchaseOrder extends FannieRESTfulPage
         global $FANNIE_OP_DB;
         $model = new VendorsModel(FannieDB::get($FANNIE_OP_DB));
         $vOpts = $model->toOptions();
+        $stores = FormLib::storePicker();
+        $this->addScript('../src/javascript/chosen/chosen.jquery.min.js');
+        $this->addCssFile('../src/javascript/chosen/bootstrap-chosen.css');
+        $this->addOnloadCommand("\$('select.chosen').chosen();\n");
 
         return <<<HTML
 <form class="form" action="EditOnePurchaseOrder.php" method="get">
     <div class="form-group">
         <label>Select a vendor</label>
-        <select name="vendorID" class="form-control">
+        <select name="vendorID" class="form-control chosen">
             {$vOpts}
         </select>
+    </div>
+    <div class="form-group">
+        <label>Select a store</label>
+        {$stores['html']}
     </div>
     <p>
         <button type="submit" class="btn btn-default">Go</button>

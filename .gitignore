@@ -13,6 +13,8 @@ fannie/logs/*.txt
 pos/is4c-nf/scale-drivers/drivers/rs232/ssd
 */tmp/*
 fannie/item/images/new/*
+fannie/item/images/ic/
+fannie/item/images/ic.wfc/
 fannie/legacy/FE/overshort/acct
 fannie/cache/cachefiles
 fannie/inventory/archive/*
@@ -36,6 +38,7 @@ vendor
 !pos/is4c-nf/scale-drivers/drivers/NewMagellan/.paket/paket.bootstrapper.exe
 TestPage
 saveTestInfo.php
+node_modules
 README
 pos/is4c-nf/scale-drivers/drivers/NewMagellan/ports.conf
 pos/is4c-nf/log/*.log

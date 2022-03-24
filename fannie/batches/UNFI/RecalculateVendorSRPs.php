@@ -27,7 +27,7 @@
 /* configuration for your module - Important */
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class RecalculateVendorSRPs extends FannieRESTfulPage
@@ -55,8 +55,9 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
         $query = '
             SELECT v.upc,
                 v.sku,
-                v.cost,
+                COALESCE(p.cost, v.cost) AS cost,
                 CASE
+                    WHEN c.margin IS NOT NULL AND c.margin <> 0 THEN c.margin 
                     WHEN a.margin IS NOT NULL THEN a.margin
                     WHEN b.margin IS NOT NULL THEN b.margin
                     ELSE 0 
@@ -68,6 +69,7 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
                 INNER JOIN vendors AS n ON v.vendorID=n.vendorID
                 LEFT JOIN products as p ON v.upc=p.upc AND v.vendorID=p.default_vendor_id
                 LEFT JOIN departments AS b ON p.department=b.dept_no
+                LEFT JOIN VendorSpecificMargins AS c ON c.vendorID=n.vendorID AND p.department=c.deptID
             WHERE v.vendorID=?
                 AND (a.margin IS NOT NULL OR b.margin IS NOT NULL)';
         $fetchP = $dbc->prepare($query);
@@ -83,7 +85,13 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
             $insP = $dbc->prepare('INSERT INTO vendorSRPs VALUES (?,?,?)');
         }
         $rounder = new \COREPOS\Fannie\API\item\PriceRounder();
+        $upcs = array();
+        $dbc->startTransaction();
         while ($fetchW = $dbc->fetchRow($fetchR)) {
+            if (isset($upcs[$fetchW['upc']])) {
+                continue;
+            }
+            $upcs[$fetchW['upc']] = true;
             // calculate a SRP from unit cost and desired margin
             $adj = \COREPOS\Fannie\API\item\Margin::adjustedCost($fetchW['cost'], $fetchW['discount'], $fetchW['shipping']);
             $srp = \COREPOS\Fannie\API\item\Margin::toPrice($adj, $fetchW['margin']);
@@ -95,6 +103,7 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
                 $insR = $dbc->execute($insP,array($id,$fetchW['upc'],$srp));
             }
         }
+        $dbc->commitTransaction();
 
         $ret = "<b>SRPs have been updated</b><br />";
         $ret .= sprintf('<p>
@@ -138,7 +147,7 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
             <?php echo $opts; ?></select>
         <button type=submit class="btn btn-default">Recalculate</button>
         <button type="button" onclick="location='VendorPricingIndex.php';return false;"
-            class="btn btn-default">Back</button>
+            class="btn btn-default">Back to Vendor Pricing</button>
         </p>
         </form>
         <?php

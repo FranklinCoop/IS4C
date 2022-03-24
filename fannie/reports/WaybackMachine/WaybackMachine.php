@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class WaybackMachine extends FannieRESTfulPage 
@@ -94,6 +94,12 @@ class WaybackMachine extends FannieRESTfulPage
                 </div>
             </div>
             ';
+    }
+
+    public function helpContent()
+    {
+        return '<p>Search sales transaction for a given term going back to the requested <em>Stop At</em> date.
+This will do a series of smaller searches and is intended for queries that need to cover years or decades of data</p>';
     }
 }
 

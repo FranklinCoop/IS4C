@@ -24,6 +24,7 @@
 namespace COREPOS\pos\lib\Tenders;
 use COREPOS\pos\lib\DisplayLib;
 use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\adminlogin\AdminLoginInterface;
 use \CoreLocal;
 
 /**
@@ -31,7 +32,7 @@ use \CoreLocal;
   Tender module for inter-departmental transfers
   Requires Mgr. password
 */
-class ManagerApproveTender extends TenderModule 
+class ManagerApproveTender extends TenderModule implements AdminLoginInterface
 {
 
     /**
@@ -56,33 +57,34 @@ class ManagerApproveTender extends TenderModule
     */
     public function preReqCheck()
     {
-        $my_url = MiscLib::base_url();
+        $myUrl = MiscLib::baseURL();
 
         if (CoreLocal::get("approvetender") != 1) {
             CoreLocal::set("approvetender",1);
-            return $my_url."gui-modules/adminlogin.php?class=COREPOS-pos-lib-Tenders-ManagerApproveTender";
-        } else {
-            CoreLocal::set("approvetender",0);
-            return true;
+            return $myUrl."gui-modules/adminlogin.php?class=COREPOS-pos-lib-Tenders-ManagerApproveTender";
         }
+        CoreLocal::set("approvetender",0);
+
+        return true;
     }
 
     /**
       adminlogin callback to approve store transfers
     */
-    public static $adminLoginMsg = 'Login to approve tender';
-
-    public static $adminLoginLevel = 30;
+    public static function messageAndLevel()
+    {
+        return array(_('Login to approve tender'), 30);
+    }
 
     static public function adminLoginCallback($success)
     {
         if ($success) {
             $inp = urlencode(CoreLocal::get('strEntered'));
             return MiscLib::baseURL() . 'gui-modules/pos2.php?reginput=' . $inp . '&repeat=1';
-        } else {
-            CoreLocal::set('approvetender', 0);
-            return false;
         }
+        CoreLocal::set('approvetender', 0);
+
+        return false;
     }
 }
 

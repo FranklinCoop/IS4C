@@ -23,7 +23,7 @@
 
 require(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class DeleteItemPage extends FannieRESTfulPage
@@ -58,7 +58,7 @@ class DeleteItemPage extends FannieRESTfulPage
         if (substr($upc, 0, 3) == '002') {
             $scaleQ = $dbc->prepare("DELETE FROM scaleItems WHERE plu=?");
             $dbc->execute($scaleQ,array($upc));
-            $plu = substr($upc, 3, 4);
+            $plu = COREPOS\Fannie\API\item\ServiceScaleLib::upcToPLU($upc);
             \COREPOS\Fannie\API\item\HobartDgwLib::deleteItemsFromScales($plu);
             \COREPOS\Fannie\API\item\EpScaleLib::deleteItemsFromScales($plu);
         }
@@ -138,6 +138,14 @@ HTML;
 
         $res = $this->connection->query('SELECT * FROM products WHERE upc=\'' . $this->id . '\'');
         $phpunit->assertEquals(0, $this->connection->numRows($res));
+    }
+
+    public function helpContent()
+    {
+        return '<p>Enter a UPC to permanently delete an item. There is a confirmation screen
+before it\'s really deleted. This generally is not recommended unless the entry was a mistake
+and has no associated sales. Deleting an item won\'t delete those sales but some context of
+the item\'s various attributes is lost.</p>';
     }
 }
 

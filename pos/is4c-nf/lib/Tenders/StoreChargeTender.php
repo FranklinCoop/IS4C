@@ -23,6 +23,7 @@
 
 namespace COREPOS\pos\lib\Tenders;
 use COREPOS\pos\lib\CoreState;
+use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DisplayLib;
 use COREPOS\pos\lib\MiscLib;
 use \CoreLocal;
@@ -34,16 +35,17 @@ use \CoreLocal;
 class StoreChargeTender extends TenderModule 
 {
 
+    protected $slip_type = 'miSlip';
     /**
       Check for errors
       @return True or an error message string
     */
     public function errorCheck()
     {
-        $charge_ok = \COREPOS\pos\lib\MemberLib::chargeOk();
+        $chargeOk = \COREPOS\pos\lib\MemberLib::chargeOk();
     
         $buttons = array('[clear]' => 'parseWrapper(\'CL\');');
-        if ($charge_ok == 0) {
+        if ($chargeOk == 0) {
             return DisplayLib::boxMsg(
                 _("member") . ' ' . CoreLocal::get("memberID") . '<br />' .
                 _("is not authorized") . '<br />' ._("to make charges"),
@@ -67,7 +69,7 @@ class StoreChargeTender extends TenderModule
                 _("is only \$") . $memChargeCommitted,
                 $buttons
             );
-        } elseif(MiscLib::truncate2(CoreLocal::get("amtdue")) < MiscLib::truncate2($this->amount)) {
+        } elseif (abs(MiscLib::truncate2(CoreLocal::get("amtdue"))) < abs(MiscLib::truncate2($this->amount))) {
             return DisplayLib::xboxMsg(
                 _("charge tender exceeds purchase amount"),
                 $buttons
@@ -94,7 +96,7 @@ class StoreChargeTender extends TenderModule
         $pref = CoreState::getCustomerPref('store_charge_see_id');
         if ($pref == 'yes') {
             if (CoreLocal::get('msgrepeat') == 0) {
-                CoreLocal::set("boxMsg","<BR>please verify member ID</B><BR>press [enter] to continue<P><FONT size='-1'>[clear] to cancel</FONT>");
+                CoreLocal::set("boxMsg",_("<BR>please verify member ID</B><BR>press [enter] to continue<P><FONT size='-1'>[clear] to cancel</FONT>"));
                 CoreLocal::set('lastRepeat', 'storeChargeSeeID');
 
                 return MiscLib::base_url().'gui-modules/boxMsg2.php?quiet=1';
@@ -105,6 +107,15 @@ class StoreChargeTender extends TenderModule
         }
 
         return true;
+    }
+
+    public function add()
+    {
+        Database::queueJob(array(
+            'class' => 'COREPOS\\Fannie\\API\\jobs\\ArUpdate',
+            'data' => array('id' => CoreLocal::get('memberID')),
+        ));
+        parent::add();
     }
 }
 

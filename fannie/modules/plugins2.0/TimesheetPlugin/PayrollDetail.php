@@ -1,7 +1,7 @@
 <?php
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class PayrollDetail extends FanniePage {
@@ -10,7 +10,7 @@ class PayrollDetail extends FanniePage {
     protected $header = 'Payroll Detail';
 
     function preprocess(){
-        $this->add_css_file('includes/style.css');
+        $this->addCssFile('includes/style.css');
         return True;
     }   
 

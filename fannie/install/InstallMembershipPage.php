@@ -156,6 +156,31 @@ $modes = array(
 );
 echo installSelectField('FANNIE_CUST_SCHEMA', $FANNIE_CUST_SCHEMA, $modes, 0);
 ?>
+</div>
+<hr />
+<h4 class="install">Default Editor</h4>
+<div>
+Choose a tool for managing member data. Relative URLs are assumed to be internal
+to POS but absolute URLs will be followed, too.
+<br />
+Editor URL:
+<?php echo installTextField('FANNIE_MEMBER_URL', $FANNIE_MEMBER_URL, 'mem/MemberEditor.php'); ?>
+<br />
+URL Parameter name:
+<?php echo installTextField('FANNIE_MEMBER_PARAM', $FANNIE_MEMBER_PARAM, 'memNum'); ?>
+</div>
+<hr />
+<h4 class="install">Max Normal Account Number</h4>
+<div>
+The maximum number of normal customer accounts. This should be a high value and defaults
+to one billion. The purpose of the limit is to create a space for <em>non-normal</em>
+accounts that are automatically generated and not used directly by people. Cordoning
+these off keeps the length of the account numbers real people are using from growing
+too quickly.
+<br />
+Maximum:
+<?php echo installTextField('FANNIE_CARDNO_MAX', $FANNIE_CARDNO_MAX, '1000000000'); ?>
+</div>
 <hr />
 <p>
     <button type="submit" class="btn btn-default">Save Configuration</button>
@@ -168,47 +193,72 @@ $sql = db_test_connect($FANNIE_SERVER,$FANNIE_SERVER_DBMS,
 if (!$sql) {
     echo "<div class='alert alert-danger'>Cannot connect to database to refresh views.</div>";
 } else {
-    echo "Refreshing database views ... ";
-    $this->recreate_views($sql);
-    echo "done.";
+    $info = $this->recreate_views($sql);
+    $errors = trim($this->dbErrors($info));
+    if ($errors == '') {
+        echo '<div class="alert alert-success">Refreshed views successfully</div>';
+    } else {
+        echo '<div class="alert alert-danger">Problems encountered refreshing views:<br />' . $errors . '</div>';
+    }
 }
 
         return ob_get_clean();
     // body_content
     }
 
+    private function dbErrors($arr)
+    {
+        return array_reduce(
+            array_filter($arr, function($i) { return $i['error'] != 0; }),
+            function ($carry, $item) { return $carry . $item['error_msg'] . '<br />'; }
+        );
+    }
+
     // rebuild views that depend on ar & equity
     // department definitions
     function recreate_views($con)
     {
+        $ret = array();
         $db_name = $this->config->get('TRANS_DB');
 
         $con->query("DROP VIEW ar_history_today",$db_name);
         $model = new ArHistoryTodayModel($con);
-        $model->createIfNeeded($db_name);
+        $ret[] = $model->createIfNeeded($db_name);
 
         $con->query("DROP VIEW ar_history_today_sum",$db_name);
         $model = new ArHistoryTodaySumModel($con);
-        $model->createIfNeeded($db_name);
+        $ret[] = $model->createIfNeeded($db_name);
 
         $con->query("DROP VIEW ar_live_balance",$db_name);
         $model = new ArLiveBalanceModel($con);
         $model->addExtraDB($this->config->get('OP_DB'));
-        $model->createIfNeeded($db_name);
+        $ret[] = $model->createIfNeeded($db_name);
 
         $con->query("DROP VIEW stockSumToday",$db_name);
         $model = new StockSumTodayModel($con);
-        $model->createIfNeeded($db_name);
+        $ret[] = $model->createIfNeeded($db_name);
 
         $con->query("DROP VIEW equity_live_balance",$db_name);
         $model = new EquityLiveBalanceModel($con);
         $model->addExtraDB($this->config->get('OP_DB'));
-        $model->createIfNeeded($db_name);
+        $ret[] = $model->createIfNeeded($db_name);
+
+        return $ret;
     }
 
     public function unitTest($phpunit)
     {
         $phpunit->assertNotEquals(0, strlen($this->body_content()));
+
+        include(dirname(__FILE__) . '/../config.php');
+        $sql = db_test_connect($FANNIE_SERVER,$FANNIE_SERVER_DBMS,
+                $FANNIE_TRANS_DB,$FANNIE_SERVER_USER,
+                $FANNIE_SERVER_PW);
+        $refresh = $this->recreate_views($sql);
+        foreach ($refresh as $result) {
+            $phpunit->assertEquals(0,$result['error'],
+                'Error creating '.$result['db'].'.'.$result['struct'].': '.$result['error_msg']);
+        }
     }
 
 // InstallMembershipPage

@@ -22,31 +22,31 @@
 *********************************************************************************/
 
 namespace COREPOS\pos\parser\preparse;
-use \CoreLocal;
 use COREPOS\pos\parser\PreParser;
 
 class Refund extends PreParser 
 {
-    
     function check($str)
     {
-        // ignore comments; they may have all sorts of
-        // random character cominations
-        if (substr($str, 0, 2) == "CM") {
+        /* Ignore product searches and comments; they may have all sorts of
+         * random character combinations.
+         */
+        if (
+            substr($str, -2, 2) == "PV" ||
+            substr($str, 0, 2) == "PV" ||
+            substr($str, 0, 2) == "CM"
+        ) {
             return false;
         }
-
 
         if (strstr($str, 'RF')) {
             // void and refund cannot combine
             if (strstr($str, 'VD')) {
                 return false;
-            } else {
-                return true;
             }
-        } else {
-            return false;
+            return true;
         }
+        return false;
     }
 
     function parse($str)
@@ -56,7 +56,7 @@ class Refund extends PreParser
         foreach ($parts as $p) {
             $remainder .= $p;
         }
-        CoreLocal::set("refund",1);
+        $this->session->set("refund",1);
 
         return $remainder;
     }

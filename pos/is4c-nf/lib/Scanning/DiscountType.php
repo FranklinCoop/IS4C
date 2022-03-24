@@ -32,7 +32,6 @@ use \CoreLocal;
 */
 class DiscountType 
 {
-
     static public $MAP = array(
         0   => 'COREPOS\\pos\\lib\\Scanning\\DiscountTypes\\NormalPricing',
         1   => 'COREPOS\\pos\\lib\\Scanning\\DiscountTypes\\EveryoneSale',
@@ -53,6 +52,13 @@ class DiscountType
     */
     protected $savedInfo;
 
+    protected $session;
+
+    public function __construct($session)
+    {
+        $this->session = $session;
+    }
+
     /**
       Calculate pricing
       @param $row A record from the products table
@@ -65,8 +71,7 @@ class DiscountType
        - discount The discount amount for everyone
        - memDiscount The discount amount for members
     */
-    // @hintable
-    public function priceInfo($row,$quantity=1)
+    public function priceInfo(array $row,$quantity=1)
     {
         return array(
             "regPrice"=>0,
@@ -145,25 +150,22 @@ class DiscountType
        the DiscountTypeClasses array is zero-indexed,
        subtract 64 as an offset  
     */
-    public static function getObject($discounttype)
+    public static function getObject($discounttype, $session)
     {
         $discounttype = MiscLib::nullwrap($discounttype);
-        $DiscountObject = null;
-        $DTClasses = CoreLocal::get("DiscountTypeClasses");
+        $dtClasses = CoreLocal::get("DiscountTypeClasses");
         if ($discounttype < 64 && isset(DiscountType::$MAP[$discounttype])) {
             $class = DiscountType::$MAP[$discounttype];
-            $DiscountObject = new $class();
-        } else if ($discounttype >= 64 && isset($DTClasses[($discounttype-64)])) {
-            $class = $DTClasses[($discounttype)-64];
-            $DiscountObject = new $class();
-        } else {
-            // If the requested discounttype isn't available,
-            // fallback to normal pricing. Debatable whether
-            // this should be a hard error.
-            $DiscountObject = new NormalPricing();
+            return new $class($session);
+        } elseif ($discounttype >= 64 && isset($dtClasses[($discounttype-64)])) {
+            $class = $dtClasses[($discounttype)-64];
+            return new $class($session);
         }
 
-        return $DiscountObject;
+        // If the requested discounttype isn't available,
+        // fallback to normal pricing. Debatable whether
+        // this should be a hard error.
+        return new NormalPricing($session);
     }
 
 }

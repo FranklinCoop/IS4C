@@ -20,11 +20,13 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
-global $FANNIE_ROOT;
-if (!class_exists('FannieAPI'))
-  include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+include(dirname(__FILE__).'/../../../config.php');
+if (!class_exists('FannieAPI')) {
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
+}
 
-class ScanKioskSync extends FanniePlugin 
+
+class ScanKioskSync extends \COREPOS\Fannie\API\FanniePlugin
 {
 
     /**

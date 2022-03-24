@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'/classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 if (!class_exists('PIKillerPage')) {
     include('lib/PIKillerPage.php');
@@ -94,6 +94,14 @@ class PIMemberPage extends PIKillerPage {
             $this->__models['note'] = $tmp['note'];
         }
 
+        $comP = $dbc->prepare("SELECT empNo FROM Commissions WHERE cardNo=? AND type='OWNERSHIP'");
+        $this->commissioned = $dbc->getValue($comP, array($this->id));
+        $empR = $dbc->query('SELECT emp_no, FirstName FROM employees WHERE EmpActive=1 AND emp_no > 0 ORDER BY FirstName');
+        $this->emps = array();
+        while ($empW = $dbc->fetchRow($empR)) {
+            $this->emps[] = $empW;
+        }
+
         $dbc = FannieDB::get($FANNIE_TRANS_DB);
 
         $this->__models['equity'] = $this->get_model($dbc, 'EquityLiveBalanceModel',
@@ -155,7 +163,9 @@ class PIMemberPage extends PIKillerPage {
             $default = new MemtypeModel($dbc);
             $default->memtype($json['customerTypeID']);
             $default->load();
-            $json['memberStatus'] = $default->custdataType();
+            if (FormLib::get('suspended') == 0) {
+                $json['memberStatus'] = $default->custdataType();
+            }
             $account_holder['discount'] = $default->discount();
             $account_holder['staff'] = $default->staff();
             $account_holder['chargeAllowed'] = $json['chargeLimit'] == 0 ? 0 : 1;
@@ -209,6 +219,25 @@ class PIMemberPage extends PIKillerPage {
         }
         $resp = \COREPOS\Fannie\API\member\MemberREST::post($this->card_no, $json);
 
+        $limitDiscountP = $dbc->prepare("
+            UPDATE custdata
+            SET discount=0
+            WHERE CardNo=?
+                AND memType IN (3,9)
+                AND personNum > 2
+        ");
+        //$dbc->execute($limitDiscountP, array($this->card_no));
+
+        $comm = new CommissionsModel($dbc);
+        $comm->cardNo($this->id);
+        $comm->type('OWNERSHIP');
+        $exists = $comm->find();
+        if (count($exists) > 0) {
+            $comm = $exists[0];
+        }
+        $comm->empNo(FormLib::get('commissioned'));
+        $comm->save();
+
         $custdata = new CustdataModel($dbc);
         $custdata->CardNo($this->card_no);
         foreach ($custdata->find() as $c) {
@@ -220,11 +249,11 @@ class PIMemberPage extends PIKillerPage {
         $cards->load();
         $cards->pushToLanes();
 
+
         $prep = $dbc->prepare('
             SELECT webServiceUrl FROM Stores WHERE hasOwnItems=1 AND storeID<>?
             ');
         $res = $dbc->execute($prep, array(\FannieConfig::config('STORE_ID')));
-        $client = new \Datto\JsonRpc\Http\Client($row['webServiceUrl']);
         while ($row = $dbc->fetchRow($res)) {
             $client = new \Datto\JsonRpc\Http\Client($row['webServiceUrl']);
             $client->query(time(), 'COREPOS\\Fannie\\API\\webservices\\FannieMemberLaneSync', array('id'=>$this->card_no));
@@ -282,24 +311,35 @@ class PIMemberPage extends PIKillerPage {
                     }
                 }
             }
+            echo '<input type="hidden" name="suspended" value="1" />';
             echo '</td>';
         }
         else {
+            echo '<input type="hidden" name="suspended" value="0" />';
             echo "<td>$status</td>";
         }
         echo "<td colspan=2><a href=PISuspensionPage.php?id=".$this->card_no.">History</a>";
-        if ($this->auth_mode == 'Full')
+        if ($this->auth_mode == 'Full') {
             echo '&nbsp;&nbsp;&nbsp;<a href="PISuspensionPage.php?edit=1&id='.$this->card_no.'">Change Status</a>';
+            if (substr($status, 0, 4) === 'TERM' && $this->__models['equity']->payments() > 0) {
+                echo '&nbsp;&nbsp;&nbsp;<a onclick="return confirm(\'Remove equity and term?\');" 
+                    href="PITermCheck.php?id='.$this->card_no.'">Term Account</a>';
+            }
+        }
         else if ($this->auth_mode == 'Limited' && isset($this->__models['suspended']) && $this->__models['suspended']->reasoncode() == 16){
             echo '&nbsp;&nbsp;&nbsp;<a href="PISuspensionPage.php?fixaddress=1&id='.$this->card_no.'"
                 onclick="return confirm(\'Address is correct?\');">Address Corrected</a>';
         }
         echo '</td>';
-        echo "<td><a href=\"{$FANNIE_URL}ordering/clearinghouse.php?card_no=".$this->card_no."\">Special Orders</a></td>";
+        echo "<td><a href=\"{$FANNIE_URL}ordering/clearinghouse.php?card_no="
+            . ($this->card_no == 11 ? 0 : $this->card_no) ."\">Special Orders</a></td>";
         if (FannieAuth::validateUserQuiet('GiveUsMoney')) {
             echo "<td><a href=\"{$FANNIE_URL}modules/plugins2.0/GiveUsMoneyPlugin/GumMainPage.php?id=".$this->card_no."\">Owner Loans</a></td>";
         }
         echo "</tr>";
+
+        $whP = $this->connection->prepare('SELECT * FROM ' . FannieDB::fqn('MemberSummary','plugin:WarehouseDatabase') . ' WHERE card_no=?');
+        $whData = $this->connection->getRow($whP, array($this->id));
 
         echo "<tr>";
         echo '<input type="hidden" name="customerID" value="' . $this->primary_customer['customerID'] . '" />';
@@ -307,6 +347,10 @@ class PIMemberPage extends PIKillerPage {
         echo '<td>'.$this->text_or_field('FirstName',$this->primary_customer['firstName']).'</td>';
         echo "<td class=\"yellowbg\">Last Name: </td>";
         echo '<td>'.$this->text_or_field('LastName',$this->primary_customer['lastName']).'</td>';
+        echo "<td class=\"yellowbg\">Home Store: </td>";
+        printf('<td>%s (%.2f%%)</td>',
+            ($whData['homeStoreID'] == 1 ? 'Hillside' : 'Denfeld'),
+            $whData['homeStorePercent']*100);
         echo '</tr>';
 
         echo "<tr>";
@@ -315,6 +359,8 @@ class PIMemberPage extends PIKillerPage {
         echo "<td class=\"yellowbg\">Gets mailings: </td>";
         echo '<td>'.$this->text_or_select('mailflag',$this->account['contactAllowed'],
                     array(1,0), array('Yes','No')).'</td>';
+        echo "<td class=\"yellowbg\">Avg Basket: </td>";
+        printf('<td>$%.2f</td>', $whData['yearAverageSpending']);
         echo "</tr>";
 
         echo "<tr>";
@@ -322,6 +368,13 @@ class PIMemberPage extends PIKillerPage {
         echo '<td>'.$this->text_or_field('address2',$this->account['addressSecondLine']).'</td>';
         echo "<td class=\"yellowbg\">UPC: </td>";
         echo '<td colspan=\"2\">'.$this->text_or_field('upc',$this->account['idCardUPC']).'</td>';
+        echo "<td class=\"yellowbg\">Shop Rate: </td>";
+        printf('<td>%.2f</td>', $whData['yearTotalVisits'] / 12);
+        /*
+        echo "<td class=\"yellowbg\">Election Password: </td>";
+        $vP = $dbc->prepare("SELECT password FROM Voters WHERE cardNo=?");
+        printf('<td>%s</td>', $dbc->getValue($vP, array($this->id)));
+         */
         echo "</tr>";
 
         echo "<tr>";
@@ -356,6 +409,12 @@ class PIMemberPage extends PIKillerPage {
         echo '<td>'.$this->text_or_field('phone2',$this->primary_customer['altPhone']).'</td>';
         echo "<td class=\"yellowbg\">E-mail: </td>";
         echo '<td>'.$this->text_or_field('email',$this->primary_customer['email']).'</td>';
+        echo "<td class=\"yellowbg\">Payment Plan: </td>";
+        $prep = $dbc->prepare('SELECT name FROM EquityPaymentPlanAccounts AS a
+            INNER JOIN EquityPaymentPlans AS e ON a.equityPaymentPlanID=e.equityPaymentPlanID
+            WHERE a.cardNo=?');
+        $plan = $dbc->getValue($prep, array($this->card_no));
+        echo '<td>' . ($plan ? $plan : 'n/a') . '</td>';
         echo "</tr>";
 
                 echo "<tr>";
@@ -381,6 +440,14 @@ class PIMemberPage extends PIKillerPage {
                 array(),$limitedEdit).'</td>';
         echo "<td class=\"yellowbg\">Current Balance: </td>";
         echo '<td>'.sprintf('%.2f',$this->__models['ar']->balance()).'</td>';
+        echo "<td class=\"yellowbg\">Referral:</td>";
+        $opts = array(0);
+        $labels = array('n/a');
+        foreach ($this->emps as $e) {
+            $opts[] = $e['emp_no'];
+            $labels[] = $e['emp_no'] . ' ' . $e['FirstName'];
+        }
+        echo '<td>' . $this->text_or_select('commissioned', $this->commissioned, $opts, $labels) . '</td>';
         echo "</tr>";
 
         echo "<tr class=\"yellowbg\"><td colspan=6></td></tr>";
@@ -439,12 +506,22 @@ class PIMemberPage extends PIKillerPage {
             echo '<a href="PIMemberPage.php?id=' . ($this->card_no - 1) . '">Prev Mem</a>';
             echo '&nbsp;&nbsp;';
             echo '<a href="PIMemberPage.php?id=' . ($this->card_no + 1) . '">Next Mem</a>';
+            echo '&nbsp;&nbsp;';
+            echo '<a href="../../../reports/CustomerHistory/AccountHistoryReport.php?id=' . $this->card_no . '">Changes History</a>';
         }
         else
             echo '<input type="submit" value="Save Member" />';
         echo '</td>';
 
         echo '</tr>';
+        if ($this->auth_mode == 'Full') {
+            echo '<tr>';
+            echo '<td class="yellowbg">Web Page</td>';
+            $prep = $dbc->prepare('SELECT guid FROM MyWebDB.Identifiers WHERE cardNo=?');
+            $guid = $dbc->getValue($prep, $this->card_no);
+            $url = 'http://wholefoods.coop/my/' . $guid;
+            echo '<td colspan="7">' . $url . '</td></tr>';
+        }
 
         echo "</table>";
         if (FormLib::get('edit', false) !== false) {

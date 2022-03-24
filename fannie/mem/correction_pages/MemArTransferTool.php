@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class MemArTransferTool extends FannieRESTfulPage 
@@ -124,9 +124,9 @@ class MemArTransferTool extends FannieRESTfulPage
     
     protected function post_dept_amount_memFrom_memTo_view()
     {
+        if (!empty($this->errors)) return $this->errors;
         $name1 = $this->getName($this->memFrom);
         $name2 = $this->getName($this->memTo);
-        if (!empty($this->errors)) return $this->errors;
 
         $ret = "<form action=\"MemArTransferTool.php\" method=\"post\">";
         $ret .= "<b>Confirm transfer</b>";

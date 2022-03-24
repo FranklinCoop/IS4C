@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class TaxForgivenessReport extends FannieReportPage 
@@ -33,6 +33,7 @@ class TaxForgivenessReport extends FannieReportPage
     protected $required_fields = array('date1', 'date2');
     public $themed = true;
     public $description = '[Tax Forgiveness] reports transactions where tax was fully or partially forgiven';
+    public $report_set = 'Tax';
     protected $report_headers = array('Date', 'Receipt', '%Discount', 'FS Tender');
 
     public function fetch_report_data()

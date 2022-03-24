@@ -44,5 +44,10 @@ interface DialectAdapter
     public function locate($substr, $str);
     public function concat($expressions);
     public function setLockTimeout($seconds);
+    public function setCharSet($charset);
+    public function getProcessList();
+    public function kill($intID);
+    public function space($num);
+    public function numberFormat($num);
 }
 

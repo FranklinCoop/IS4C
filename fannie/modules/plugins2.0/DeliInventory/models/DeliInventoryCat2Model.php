@@ -27,6 +27,7 @@
 class DeliInventoryCat2Model extends BasicModel {
 
     protected $name = "deliInventoryCat2";
+    protected $preferred_db = 'op';
 
     protected $columns = array(
     'id' => array('type'=>'INT', 'primary_key' => True, 'increment'=>True),
@@ -39,7 +40,11 @@ class DeliInventoryCat2Model extends BasicModel {
     'price' => array('type'=>'MONEY'),
     'total' => array('type'=>'MONEY'),
     'size' => array('type'=>'VARCHAR(20)'),
-    'category' => array('type'=>'VARCHAR(50)', 'index'=>True)
+    'category' => array('type'=>'VARCHAR(50)', 'index'=>True),
+    'upc' => array('type'=>'VARCHAR(13)'),
+    'vendorID' => array('type'=>'INT'),
+    'storeID' => array('type'=>'INT'),
+    'categoryID' => array('type'=>'INT'),
     );
 }
 

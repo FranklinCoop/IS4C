@@ -22,7 +22,7 @@
 *********************************************************************************/
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class LogViewer extends FanniePage 
@@ -125,7 +125,7 @@ class LogViewer extends FanniePage
         } else {
 
             if ($FANNIE_PRETTY_LOGS != 0) {
-                $this->add_script($FANNIE_URL.'src/javascript/syntax-highlighter/scripts/jquery.syntaxhighlighter.min.js');
+                $this->addScript($FANNIE_URL.'src/javascript/syntax-highlighter/scripts/jquery.syntaxhighlighter.min.js');
                 $highlite_cmd = sprintf('
                         $.SyntaxHighlighter.init({
                         \'baseUrl\' : \'%s\',
@@ -133,7 +133,7 @@ class LogViewer extends FanniePage
                         });',
                     $FANNIE_URL.'src/javascript/syntax-highlighter',
                     $FANNIE_URL.'src/javascript/syntax-highlighter/prettify');
-                $this->add_onload_command($highlite_cmd);
+                $this->addOnloadCommand($highlite_cmd);
             }
         
             $ret .= '<code>';

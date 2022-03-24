@@ -1,7 +1,7 @@
 <?php
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class TimesheetExport extends FannieReportPage {
@@ -20,7 +20,7 @@ class TimesheetExport extends FannieReportPage {
               set up headers
             */
             $this->content_function = "report_content";
-            $this->has_menus(False);
+            $this->hasMenus(False);
 
             /**
               Check if a non-html format has been requested
@@ -74,7 +74,7 @@ class TimesheetExport extends FannieReportPage {
         global $FANNIE_PLUGIN_SETTINGS, $FANNIE_OP_DB;
         $ts_db = FannieDB::get($FANNIE_PLUGIN_SETTINGS['TimesheetDatabase']);
         $periodID = FormLib::get_form_value('period',0);
-        $_SESSION['periodID'] = $periodID;
+        $this->session->periodID = $periodID;
         $perDatesQ = $ts_db->prepare("SELECT * FROM ".
             $FANNIE_PLUGIN_SETTINGS['TimesheetDatabase'].".payperiods WHERE periodID = ?");
         $perDatesR = $ts_db->execute($perDatesQ,array($periodID));

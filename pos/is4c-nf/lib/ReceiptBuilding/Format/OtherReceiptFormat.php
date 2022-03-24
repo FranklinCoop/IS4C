@@ -36,8 +36,7 @@ class OtherReceiptFormat extends DefaultReceiptFormat
       @param $row a single receipt record
       @return a formatted string
     */
-    // @hintable
-    public function format($row)
+    public function format(array $row)
     {
         if ($row['trans_type'] == '0') {
             // tare
@@ -45,7 +44,7 @@ class OtherReceiptFormat extends DefaultReceiptFormat
             $description = str_replace('**',' =', $description);
             return $description;
         } else if ($row['trans_type'] == 'H' && $row['description'] != '') {
-            $this->is_bold = True;
+            $this->bold = true;
             return $row['description'];
         }
         return "";

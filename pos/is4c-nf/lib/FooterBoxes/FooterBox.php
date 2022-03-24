@@ -22,6 +22,7 @@
 *********************************************************************************/
 
 namespace COREPOS\pos\lib\FooterBoxes;
+use COREPOS\pos\lib\LocalStorage\WrappedStorage;
 
 /**
   @class FooterBox
@@ -33,7 +34,6 @@ namespace COREPOS\pos\lib\FooterBoxes;
 */
 class FooterBox 
 {
-
     /**
       CSS here will be applied (in-line) to the
       header content. If you define a different
@@ -48,6 +48,13 @@ class FooterBox
     */
     public $display_css = '';
     public $display_css_class = '';
+
+    protected $session;
+
+    public function __construct($session)
+    {
+        $this->session = $session;
+    }
 
     /**
       Define the header for this box
@@ -78,19 +85,17 @@ class FooterBox
         'TransPercentDiscount',
     );
 
-    // @hintable
     public static function factory($class)
     {
         if ($class != '' && in_array($class, self::$builtin)) {
             $class = 'COREPOS\\pos\\lib\FooterBoxes\\' . $class;
-            return new $class();
+            return new $class(new WrappedStorage());
         } elseif ($class != '' && class_exists($class)) {
-            return new $class();
+            return new $class(new WrappedStorage());
         }
 
-        return new COREPOS\pos\lib\FooterBoxes\FooterBox();
+        return new FooterBox(new WrappedStorage());
     }
- 
 }
 
 /**

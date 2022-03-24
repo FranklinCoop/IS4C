@@ -34,17 +34,24 @@ class FloorSectionsListViewModel extends ViewModel
 
     protected $columns = array(
     'upc' => array('type'=>'VARCHAR(13)', 'primary_key'=>true),
+    'storeID' => array('type'=>'INT', 'primary_key'=>true),
     'sections'=> array('type'=>'VARCHAR(255)'),
     );
 
     public function definition()
     {
+        $concat = 'GROUP_CONCAT(f.name SEPARATOR \',\')';
+        if ($this->connection->dbmsName() == 'postgres9') {
+            $concat = 'string_agg(f.name, \',\')';
+        }
         return '
             SELECT m.upc,
-                GROUP_CONCAT(f.name SEPARATOR \', \') AS sections
+                f.storeID,
+                ' . $concat . ' AS sections
             FROM FloorSectionProductMap AS m
                 INNER JOIN FloorSections AS f ON m.floorSectionID=f.floorSectionID
-            GROUP BY m.upc
+            GROUP BY m.upc,
+                f.storeID
         ';
     }
 

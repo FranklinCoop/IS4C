@@ -64,9 +64,9 @@ var orderView = (function($) {
         $('#orderStatus').change(function() {
             mod.updateStatus($('#orderID').val(), $(this).val());
             if ($(this).val() == 0) { // New No Call
-                $('#ctcselect').val(0); // No
+                $('#ctcselect').val(0).trigger('change'); // No
             } else if ($(this).val() == 3) { // New Call
-                $('#ctcselect').val(1); // Yes
+                $('#ctcselect').val(1).trigger('change'); // Yes
             }
         });
         $('#orderStore').change(function() {
@@ -83,7 +83,7 @@ var orderView = (function($) {
                 data: 'id='+$('#orderID').val()+'&testNotify=1'
             }).done(function(resp){
                 if (resp.sentEmail) {
-                    alert('Emailed Test Notification');
+                    alert('Sent Test Notification');
                 } else {
                     alert('Notification Test Failed');
                 }
@@ -92,8 +92,6 @@ var orderView = (function($) {
     };
 
     mod.saveCtC = function (val,oid){
-        console.log(val);
-        console.log(oid);
         $.ajax({
             url: 'OrderAjax.php',
             type: 'post',
@@ -109,10 +107,6 @@ var orderView = (function($) {
             data: 'customer=1&orderID='+oid+'&memNum='+cardno,
             dataType: 'json'
         }).done(function(resp){
-            if (resp.customer) {
-                $('#customerDiv').html(resp.customer);
-                mod.afterLoadCustomer();
-            }
             if (resp.footer) {
                 $('#footerDiv').html(resp.footer);
                 $('#confirm-date').change(function(e) {
@@ -120,6 +114,46 @@ var orderView = (function($) {
                 });
                 $('#ctcselect').change(function() {
                     mod.saveCtC($(this).val(), $('#orderID').val());
+                });
+            }
+            if (resp.customer) {
+                $('#customerDiv').html(resp.customer);
+                mod.afterLoadCustomer();
+            }
+            if (resp.memType) {
+                var memType = parseInt(resp.memType, 10);
+                var discMemTypes = [1,3,5,6];
+                console.log($.inArray(memType, discMemTypes));
+                var i = 0;
+                $('.upc').each(function(){
+                    i++;
+                });
+                $('.upc').each(function(){
+                    var upc = $(this).text();
+                    var srp = $('#srp'+i).val();
+                    var actual = $('#act'+i).val();
+                    if ($.inArray(memType, discMemTypes) != -1) {
+                        // add member discounts 
+                        if (actual == srp) {
+                            var discText = $('#discPercent'+upc).text();
+                            if (discText != 'Never' && discText != 'Sale') {
+                                var newsrp = actual - (actual * 0.15);
+                                newsrp = newsrp.toFixed(2);
+                                $('#act'+i).val(newsrp);
+                                $('#act'+i).trigger('change');
+                            }
+                        }
+                    } else {
+                        // remove member discounts 
+                        if (actual < srp) {
+                            var discText = $('#discPercent'+upc).text();
+                            if (discText != 'Sale') {
+                                $('#act'+i).val(srp);
+                                $('#act'+i).trigger('change');
+                            }
+                        }
+                    }
+                    i--;
                 });
             }
         });
@@ -212,6 +246,7 @@ var orderView = (function($) {
         });
         $('.btn-search').click(mod.searchWindow);
         bindAutoComplete('input.input-vendor', '../ws/', 'vendor');
+        $('select.chosen').chosen();
     };
 
     mod.addUPC = function()
@@ -305,7 +340,7 @@ var orderView = (function($) {
             data: 'toggleStaff=1&orderID='+oid+'&transID='+tid
         }).done(function(resp) {
             if (resp.sentEmail) {
-                alert('Emailed Arrival Notification');
+                alert('Sent Arrival Notification');
             }
         });
     };
@@ -354,6 +389,11 @@ var orderView = (function($) {
         var nT = $('#nText').val();
         if (nT !== '' && nD === '0') {
             window.alert("Assign your notes to a department");
+            return false;
+        }
+
+        if ($('#orderStore').val() == 0) {
+            window.alert('Choose a store');
         } else {
             window.location = $('#redirectURL').val();
         }
@@ -369,7 +409,7 @@ var orderView = (function($) {
         }).done(function(resp){
             $('#statusdate'+oid).html(resp.tdate);
             if (resp.sentEmail) {
-                alert('Emailed Arrival Notification');
+                alert('Sent Arrival Notification');
             }
         });
     };
@@ -388,38 +428,19 @@ var orderView = (function($) {
 
 $(document).ready(function(){
 	var initoid = $('#init_oid').val();
-	$.ajax({
-        type: 'get',
-        data: 'customer=1&orderID='+initoid,
-        dataType: 'json'
-	}).done(function(resp){
-        if (resp.customer) {
-            $('#customerDiv').html(resp.customer);
-            orderView.afterLoadCustomer();
-        }
-        if (resp.footer) {
-            $('#footerDiv').html(resp.footer);
-            $('#confirm-date').change(function(e) {
-                orderView.saveConfirmDate(e.target.checked, $('#orderID').val());
-            });
-            $('#ctcselect').change(function() {
-                orderView.saveCtC($(this).val(), $('#orderID').val());
-            });
-            $('.done-btn').click(function(e) {
-                orderView.validateAndHome();
-                e.preventDefault();
-                return false;
-            });
-        }
-		var oid = $('#orderID').val();
-		$.ajax({
-            type: 'get',
-            data: 'items=1&orderID='+oid
-		}).done(function(resp){
-			$('#itemDiv').html(resp);
-            orderView.afterLoadItems();
-		});
-	});
+    orderView.afterLoadCustomer();
+    $('#ctcselect').change(function() {
+        orderView.saveCtC($(this).val(), $('#orderID').val());
+    });
+    $('.done-btn').click(function(e) {
+        orderView.validateAndHome();
+        e.preventDefault();
+        return false;
+    });
+    $('#confirm-date').change(function(e) {
+        orderView.saveConfirmDate(e.target.checked, $('#orderID').val());
+    });
+    orderView.afterLoadItems();
 });
 
 $(window).unload(function() {

@@ -40,7 +40,7 @@ use COREPOS\pos\lib\TransRecord;
  * page or True to go to pos2.php.
  */
 
-include_once(dirname(__FILE__).'/../../lib/AutoLoader.php');
+if (!class_exists("AutoLoader")) include_once(realpath(dirname(__FILE__).'/../../lib/AutoLoader.php'));
 
 class TarePromptInputPage extends NoInputCorePage 
 {
@@ -69,13 +69,13 @@ class TarePromptInputPage extends NoInputCorePage
                         $reginput = CoreLocal::get('DefaultTare')*100;
                     } else {
                         CoreLocal::set('tarezero', true);
-                        $this->change_page($pos_home.'?reginput='.$item);
+                        $this->change_page($pos_home.'?reginput='.$item.'&repeat=1');
                         return false;
                     }
                 } 
                 if (is_numeric($reginput)) {
                     TransRecord::addTare($reginput);
-                    $this->change_page($pos_home.'?reginput='.$item);
+                    $this->change_page($pos_home.'?reginput='.$item.'&repeat=1');
                     return false;
                 }
             }
@@ -90,7 +90,7 @@ class TarePromptInputPage extends NoInputCorePage
         <span class="larger">
         Enter Tare
         </span>
-        <form name="form" method="post" autocomplete="off" action="<?php echo $_SERVER['PHP_SELF']; ?>">
+        <form name="form" method="post" autocomplete="off" action="<?php AutoLoader::ownURL(); ?>">
         <input type="text" id="reginput" name='input' tabindex="0" onblur="$('#input').focus()" />
         <input type="hidden" name="item" value="<?php echo FormLib::get('item'); ?>" />
         </form>

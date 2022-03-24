@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class OverShortDayPage extends FanniePage 
@@ -197,8 +197,8 @@ class OverShortDayPage extends FanniePage
                 $tender_info[$w['trans_subtype']]['perEmp'][$w[1]] = $w['total'];
             }
 
-            $noteP = $dbc->prepare('SELECT note FROM dailyNotes WHERE emp_no=? AND date=? AND storeID=?');
-            $scaP = $dbc->prepare('SELECT amt FROM dailyCounts WHERE date=? AND emp_no=? AND storeID=?
+            $noteP = $dbc->prepare('SELECT note FROM dailyNotes WHERE emp_no=? AND `date`=? AND storeID=?');
+            $scaP = $dbc->prepare('SELECT amt FROM dailyCounts WHERE `date`=? AND emp_no=? AND storeID=?
                             AND tender_type=\'SCA\'');
             $countP = $dbc->prepare("select amt from dailyCounts where date=? and emp_no=? and tender_type=? AND storeID=?");
 
@@ -234,7 +234,7 @@ class OverShortDayPage extends FanniePage
                 foreach ($tender_info as $code => $info) {
                     $posAmt = 0;    
                     if (isset($info['perEmp'][$emp_no]))
-                        $posAmt = $info['perEmp'][$emp_no];
+                        $posAmt = sprintf('%.2f', $info['perEmp'][$emp_no]);
                     $output .= "<tr><td>&nbsp;</td><td>".$info['name']."</td>
                         <td id=dlog$code$row[1]>$posAmt</td>";
                     $output .= "<input type=\"hidden\" class=\"tcode$emp_no\" value=\"$code\" />";
@@ -318,7 +318,7 @@ class OverShortDayPage extends FanniePage
             $output .= "<td id=overallCountTotal>$overallCountTotal</td>";
             $output .= "<td id=overallOSTotal>$overallOSTotal</td></tr>";
 
-            $noteR = $dbc->execute($noteP, array(-1, $date));
+            $noteR = $dbc->execute($noteP, array(-1, $date, $store));
             $noteW = $dbc->fetchRow($noteR);
             $note = $noteW[0];
             $output .= "<tr><td>&nbsp;</td><td>Notes</td><td colspan=3</td>";

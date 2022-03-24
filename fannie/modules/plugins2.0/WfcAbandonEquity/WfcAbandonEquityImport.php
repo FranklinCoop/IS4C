@@ -1,7 +1,7 @@
 <?php
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class WfcAbandonEquityImport extends \COREPOS\Fannie\API\FannieUploadPage 
@@ -110,6 +110,7 @@ class WfcAbandonEquityImport extends \COREPOS\Fannie\API\FannieUploadPage
         $dbc = FannieDB::get($FANNIE_OP_DB);
         $dtrans_table = $FANNIE_TRANS_DB.$dbc->sep().'dtransactions';
         $trans = DTrans::getTransNo($dbc, $EMP_NO, $LANE_NO);
+        $dbc->startTransaction();
         foreach ($linedata as $data) {
 
             if (!isset($data[$indexes['card_no']])) {
@@ -160,7 +161,7 @@ class WfcAbandonEquityImport extends \COREPOS\Fannie\API\FannieUploadPage
                 $record['register_no'] = $LANE_NO;
                 $record['emp_no'] = $EMP_NO;
                 $record['trans_no'] = $trans;
-                $record['upc'] = $a_amt.'DP991';
+                $record['upc'] = $b_amt.'DP991';
                 $record['description'] = 'Class B Equity';
                 $record['trans_type'] = 'D';
                 $record['department'] = 991;
@@ -212,6 +213,7 @@ class WfcAbandonEquityImport extends \COREPOS\Fannie\API\FannieUploadPage
 
             $trans++;
         }
+        $dbc->commitTransaction();
 
         return true;
     }

@@ -145,5 +145,30 @@ class SqliteAdapter implements DialectAdapter
     {
         return sprintf('PRAGMA busy_timeout = %d', 1000*$seconds);
     }
+
+    public function setCharSet($charset)
+    {
+        return 'SELECT 1';
+    }
+
+    public function getProcessList()
+    {
+        return "SELECT 0 AS ID, '' AS STATE, '' AS INFO, '' AS USER, '' AS HOST, 0 AS TIME";
+    }
+
+    public function kill($intID)
+    {
+        return 'SELECT 1';
+    }
+
+    public function space($num)
+    {
+        return "SPACE({$num})";
+    }
+
+    public function numberFormat($num)
+    {
+        return "printf('%2f', {$num})";
+    }
 }
 

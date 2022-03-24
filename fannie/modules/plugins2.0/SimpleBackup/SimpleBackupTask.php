@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 /**
@@ -52,7 +52,7 @@ class SimpleBackupTask extends FannieTask
             $path = realpath($FANNIE_PLUGIN_SETTINGS['SimpleBackupDir']);
             $dir = $path . "/" . $db;
             if (!is_dir($dir) && !mkdir($dir)) {
-                $this->cronMsg('Could not create backup directory: ' . $dir, FannieLogger::ERROR);
+                $this->cronMsg('Could not create backup directory: ' . $dir, FannieLogger::ALERT);
                 continue;
             }
 
@@ -71,15 +71,15 @@ class SimpleBackupTask extends FannieTask
 
             $cmd = realpath($FANNIE_PLUGIN_SETTINGS['SimpleBackupBinPath']."/mysqldump");
             if ($cmd === false) {
-                $this->cronMsg('Could not locate mysqldump program', FannieLogger::ERROR);
+                $this->cronMsg('Could not locate mysqldump program', FannieLogger::ALERT);
                 break; // no point in trying other databases
             }
             $cmd = escapeshellcmd($cmd);
-            $cmd .= ' -q --databases 
-                -h ' . escapeshellarg($FANNIE_SERVER) . '
-                -u ' . escapeshellarg($FANNIE_SERVER_USER) . '
-                -p' . escapeshellarg($FANNIE_SERVER_PW) . ' 
-                ' . escapeshellarg($db);
+            $cmd .= ' -q ' .
+                ' -h ' . escapeshellarg($FANNIE_SERVER) .
+                ' -u ' . escapeshellarg($FANNIE_SERVER_USER) .
+                ' -p' . escapeshellarg($FANNIE_SERVER_PW) .
+                ' ' .  escapeshellarg($db);
             $outfile = $dir . '/' . $db . date('Ymd') . '.sql';
 
             $gzip = $this->gzip();
@@ -89,12 +89,17 @@ class SimpleBackupTask extends FannieTask
             }
 
             $cmd .= ' > ' . escapeshellarg($outfile);
-            system($cmd);
+            
+            $this->cronMsg("cmd: $cmd", FannieLogger::INFO);
+            $retVal = 0;
+            $lastLine = system($cmd, $retVal);
+            $this->cronMsg("retVal: $retVal", FannieLogger::INFO);
+            $this->cronMsg("lastLine: $lastLine", FannieLogger::INFO);
 
-            if (file_exists($outfile)) {
+            if (file_exists($outfile) && $retVal == 0) {
                 $this->cronMsg('Backup successful: ' . $outfile, FannieLogger::INFO);
             } else {
-                $this->cronMsg('Error creating backup: ' . $outfile, FannieLogger::ERROR);
+                $this->cronMsg('Error creating backup: ' . $outfile, FannieLogger::ALERT);
             }
         }
     }

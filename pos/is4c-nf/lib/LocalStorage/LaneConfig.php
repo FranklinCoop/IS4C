@@ -23,6 +23,8 @@
 
 namespace COREPOS\pos\lib\LocalStorage;
 
+// autoloading hasn't kicked in yet
+// this could be improved
 if (!class_exists('COREPOS\common\cache\file\CacheItemPool', false)) {
     include(dirname(__FILE__) . '/../../../../common/cache/file/CacheItemPool.php');
 }
@@ -55,6 +57,21 @@ class LaneConfig
                 self::$instance = new \COREPOS\common\cache\php\CacheItemPool('lane.config.cache');
             } else {
                 self::$instance = new \COREPOS\common\cache\file\CacheItemPool('lane.config.cache');
+            }
+        }
+    }
+
+    public static function refresh()
+    {
+        self::clear();
+        $json = __DIR__ . '/../../ini.json';
+        if (file_exists($json)) {
+            $json = json_decode(file_get_contents($json), true);
+            if (is_array($json)) {
+                foreach ($json as $key => $val) {
+                    self::set($key, $val);
+                }
+                self::flush();
             }
         }
     }
@@ -101,6 +118,7 @@ class LaneConfig
     {
         self::init();
         self::$instance->commit();
+        self::$changed = false;
     }
 }
 

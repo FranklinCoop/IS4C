@@ -23,13 +23,14 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class VoidedTransactionsReport extends FannieReportPage 
 {
     public $description = '[Voided Transactions] lists all transactions that were created using
     the lane UNDO command';
+    public $report_set = 'Cashiering';
     protected $header = 'Voided Transactions';
     protected $title = 'Voided Transactions';
 

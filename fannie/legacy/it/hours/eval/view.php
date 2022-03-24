@@ -1,7 +1,7 @@
 <?php
 include('../../../../config.php');
 
-require($FANNIE_ROOT.'auth/login.php');
+require(__DIR__ . '/../../../../auth/login.php');
 include('../db.php');
 
 $name = checkLogin();
@@ -29,7 +29,7 @@ elseif (isset($_REQUEST['addEntry'])){
     $month = $_REQUEST['month'];
     $year = $_REQUEST['year'];
     $type = $_REQUEST['type'];
-    $pos = mysql_real_escape_string($_REQUEST['pos']);
+    $pos = $_REQUEST['pos'];
     $score = $_REQUEST['score'];    
     $score = sprintf("%.2f",$score);
     $score = str_replace(".","",$score);    

@@ -40,6 +40,11 @@ class ShelfAudit extends \COREPOS\Fannie\API\FanniePlugin {
             'default'=>'core_shelfaudit',
             'description'=>'Database to store plugin-specific inventory tables.
                 Can be one of the default CORE databases or a separate one.'
+        ),
+    'ShelfAuditEmail' => array(
+            'label'=>'Export Email',
+            'default'=>'',
+            'description'=>'Email address for exporting recorded scans',
         )
     );
 
@@ -48,7 +53,7 @@ class ShelfAudit extends \COREPOS\Fannie\API\FanniePlugin {
 
     public function settingChange()
     {
-        global $FANNIE_ROOT, $FANNIE_PLUGIN_SETTINGS;
+        global $FANNIE_PLUGIN_SETTINGS;
 
         $db_name = $FANNIE_PLUGIN_SETTINGS['ShelfAuditDB'];
         if (empty($db_name)) return;

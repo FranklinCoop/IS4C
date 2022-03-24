@@ -23,6 +23,7 @@
 
 use \COREPOS\Fannie\API\item\Margin;
 use \COREPOS\Fannie\API\item\PriceRounder;
+use \COREPOS\Fannie\API\lib\Store;
 
 if (!class_exists('FannieAPI')) {
     include_once(dirname(__FILE__).'/../../classlib2.0/FannieAPI.php');
@@ -103,13 +104,15 @@ class ItemMarginModule extends \COREPOS\Fannie\API\item\ItemModule
     {
         $config = FannieConfig::factory();
         $dbc = FannieDB::get($config->get('OP_DB'));
-        $prodP = $dbc->prepare('SELECT auto_par FROM products WHERE upc=?');
-        $avg = $dbc->getValue($prodP, array($upc));
+        $store = Store::getIdByIp();
+        $prodP = $dbc->prepare('SELECT auto_par FROM products WHERE upc=? AND store_id=?');
+        $avg = $dbc->getValue($prodP, array($upc, $store));
         if ($avg) {
             return $avg;
         }
         $dbc = FannieDB::get($config->get('ARCHIVE_DB'));
         $avg = 0.0;
+        $store = Store::getIdByIp();
         if ($dbc->tableExists('productWeeklyLastQuarter')) {
             $maxP = $dbc->prepare('SELECT MAX(weekLastQuarterID) FROM productWeeklyLastQuarter WHERE upc=?'); 
             $maxR = $dbc->execute($maxP, $upc);
@@ -118,8 +121,9 @@ class ItemMarginModule extends \COREPOS\Fannie\API\item\ItemModule
                 $avgP = $dbc->prepare('
                     SELECT SUM((?-weekLastQuarterID)*quantity) / SUM(weekLastQuarterID)
                     FROM productWeeklyLastQuarter
-                    WHERE upc=?');
-                $avgR = $dbc->execute($avgP, array($maxW[0], $upc));
+                    WHERE upc=?
+                        AND storeID=?');
+                $avgR = $dbc->execute($avgP, array($maxW[0], $upc, $store));
                 $avgW = $dbc->fetchRow($avgR);
                 $avg = $avgW[0] / 7.0;
             }
@@ -130,8 +134,9 @@ class ItemMarginModule extends \COREPOS\Fannie\API\item\ItemModule
                     MAX(tdate) AS max,
                     ' . DTrans::sumQuantity() . ' AS qty
                 FROM dlog_90_view
-                WHERE upc=?');
-            $avgR = $dbc->execute($avgP, array($upc));
+                WHERE upc=?
+                    AND store_id=?');
+            $avgR = $dbc->execute($avgP, array($upc, $store));
             if ($avgR && $dbc->numRows($avgR)) {
                 $avgW = $dbc->fetchRow($avgR);
                 $d1 = new DateTime($avgW['max']);
@@ -185,6 +190,7 @@ class ItemMarginModule extends \COREPOS\Fannie\API\item\ItemModule
                         $rule->reviewDate($this->form->rule_review_date);
                         $rule->details($this->form->rule_details);
                         $rule->priceRuleTypeID($this->form->price_rule_type);
+                        $rule->maxPrice(preg_replace("/[^0-9.]/", "", $this->form->rule_details));
                     } catch (Exception $ex) {}
                     if ($old_rule > 1) {
                         $rule->priceRuleID($old_rule);
@@ -249,14 +255,16 @@ class ItemMarginModule extends \COREPOS\Fannie\API\item\ItemModule
         $vendorR = $dbc->execute($vendorP, array($upc));
         if ($vendorR && $dbc->num_rows($vendorR) > 0) {
             $w = $dbc->fetch_row($vendorR);
-            $desired_margin = $w['margin'] * 100;
-            if ($w['specialMargin']) {
-                $desired_margin = 100* $w['specialMargin'];
-                $w['name'] = 'Custom';
+            if ($w['margin'] > 0) {
+                $desired_margin = $w['margin'] * 100;
+                if ($w['specialMargin'] > 0) {
+                    $desired_margin = 100* $w['specialMargin'];
+                    $w['name'] = 'Custom';
+                }
+                $ret .= sprintf('Desired margin for this vendor category (%s) is %.2f%%<br />',
+                        $w['vendorName'] . ':' . $w['name'],
+                        $desired_margin);
             }
-            $ret .= sprintf('Desired margin for this vendor category (%s) is %.2f%%<br />',
-                    $w['vendorName'] . ':' . $w['name'],
-                    $desired_margin);
         }
 
         $shippingP = $dbc->prepare('
@@ -281,7 +289,7 @@ class ItemMarginModule extends \COREPOS\Fannie\API\item\ItemModule
                 $ret .= sprintf('Shipping markup for this vendor (%s) is %.2f%%<br />',
                         $w['vendorName'],
                         ($w['shippingMarkup']*100));
-                $shipping_markup = $w['discountRate'];
+                $shipping_markup = $w['shippingMarkup'];
             }
         }
         $cost = Margin::adjustedCost($cost, $vendor_discount, $shipping_markup);

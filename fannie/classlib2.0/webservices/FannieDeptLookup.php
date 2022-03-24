@@ -22,8 +22,10 @@
 *********************************************************************************/
 
 namespace COREPOS\Fannie\API\webservices;
+use \FannieDB;
+use \FannieConfig;
 
-class FannieDeptLookup extends \COREPOS\Fannie\API\webservices\FannieWebService
+class FannieDeptLookup extends FannieWebService
 {
     
     public $type = 'json'; // json/plain by default
@@ -94,7 +96,7 @@ class FannieDeptLookup extends \COREPOS\Fannie\API\webservices\FannieWebService
         }
 
         // lookup results
-        $dbc = \FannieDB::getReadOnly(\FannieConfig::factory()->get('OP_DB'));
+        $dbc = FannieDB::getReadOnly(FannieConfig::factory()->get('OP_DB'));
         switch (strtolower($args->type)) {
             case 'settings':
                 $model = new \DepartmentsModel($dbc);
@@ -134,17 +136,19 @@ class FannieDeptLookup extends \COREPOS\Fannie\API\webservices\FannieWebService
                         }
                         $query .= ' ORDER BY s.subdept_no';
                 } else {
+                    $dDef = $dbc->tableDefinition('departments');
+                    $active = isset($dDef['active']) ? ' active=1 ' : ' 1=1 ';
                     $query = '
                         SELECT d.dept_no AS id,
                             d.dept_name AS name
                         FROM superdepts AS s
                             INNER JOIN departments AS d ON d.dept_no=s.dept_ID ';
                     if (is_array($args->superID)) {
-                        $query .= ' WHERE s.superID BETWEEN ? AND ? ';
+                        $query .= ' WHERE s.superID BETWEEN ? AND ? AND ' . $active;
                         $params[] = $args->superID[0];
                         $params[] = $args->superID[1];
                     } else {
-                        $query .= ' WHERE s.superID = ? ';
+                        $query .= ' WHERE s.superID = ? AND ' . $active;
                         $params[] = $args->superID;
                     }
                     $query .= ' ORDER BY d.dept_no';
@@ -155,6 +159,7 @@ class FannieDeptLookup extends \COREPOS\Fannie\API\webservices\FannieWebService
                                 SELECT d.dept_no AS id,
                                     d.dept_name AS name 
                                 FROM departments AS d
+                                WHERE ' . $active . '
                                 ORDER BY d.dept_no';
                             $params = array();
                         } elseif ($args->superID == -2) {
@@ -163,7 +168,7 @@ class FannieDeptLookup extends \COREPOS\Fannie\API\webservices\FannieWebService
                                     d.dept_name AS name 
                                 FROM departments AS d
                                     INNER JOIN MasterSuperDepts AS m ON d.dept_no=m.dept_ID
-                                WHERE m.superID <> 0
+                                WHERE m.superID <> 0 AND ' . $active . '
                                 ORDER BY d.dept_no';
                             $params = array();
                         }

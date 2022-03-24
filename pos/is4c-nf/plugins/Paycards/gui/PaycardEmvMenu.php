@@ -41,7 +41,7 @@ class PaycardEmvMenu extends NoInputCorePage
         $this->conf = new PaycardConf();
         $choice = FormLib::get('selectlist', false);
         if ($choice !== false) {
-            $parser = new PaycardDatacapParser();
+            $parser = new PaycardDatacapParser($this->session);
             switch ($choice) {
                 case 'CAADMIN':
                     $this->change_page('PaycardEmvCaAdmin.php');
@@ -52,14 +52,27 @@ class PaycardEmvMenu extends NoInputCorePage
                 case 'EF':
                 case 'EC':
                 case 'GD':
+                case 'EMVTIP':
+                case 'EMVDC':
+                case 'EMVCC':
                     $json = $parser->parse('DATACAP' . $choice);
                     $this->change_page($json['main_frame']);
+                    return false;
+                case 'WI':
+                    $json = $parser->parse('DATACAPWI');
+                    $this->change_page($json['main_frame']);
+                    return false;
+                case 'WIM':
+                    $json = $parser->parse('DATACAPWI');
+                    $this->change_page($json['main_frame'] . '?manual=1');
                     return false;
                 case 'PVEF':
                 case 'PVEC':
                 case 'PVGD':
+                case 'PVWI':
                     $json = $parser->parse('PVDATACAP' . substr($choice, -2));
                     $this->change_page($json['main_frame']);
+                    return false;
                 case 'ACGD':
                 case 'AVGD':
                     $json = $parser->parse(substr($choice,0,2) . 'DATACAPGD');
@@ -69,8 +82,11 @@ class PaycardEmvMenu extends NoInputCorePage
                     $this->menu = array(
                         'EF' => 'Food Sale',
                         'EC' => 'Cash Sale',
+                        'WI' => 'eWIC Sale',
                         'PVEF' => 'Food Balance',
                         'PVEC' => 'Cash Balance',
+                        'PVWI' => 'eWIC Balance',
+                        'WIM' => 'eWIC Sale (Manual)',
                     );
                     $this->clearToHome = 0;
                     break;
@@ -83,6 +99,15 @@ class PaycardEmvMenu extends NoInputCorePage
                     );
                     $this->clearToHome = 0;
                     break;
+                case 'PV':
+                    $this->menu = array(
+                        'PVEF' => 'Food Balance',
+                        'PVEC' => 'Cash Balance',
+                        'PVWI' => 'eWIC Balance',
+                        'PVGD' => 'Gift Balance',
+                    );
+                    $this->clearToHome = 1;
+                    break;
                 case 'CL':
                 default:
                     if (FormLib::get('clear-to-home')) {
@@ -94,12 +119,42 @@ class PaycardEmvMenu extends NoInputCorePage
         }
         if ($choice === false || $choice === 'CL' || $choice === '') {
             if ($this->conf->get('PaycardsDatacapMode') == 1) {
-                $this->menu = array(
-                    'EMV' => 'EMV Credit/Debit',
-                    'CC' => 'Credit only',
-                    'EBT' => 'EBT',
-                    'GIFT' => 'Gift',
-                );
+                if ($this->conf->get('PaycardsTipping')) {
+                    $this->menu = array(
+                        'EMV' => 'EMV Credit/Debit',
+                        'EMVTIP' => 'EMV w/ Tipping',
+                        'CC' => 'Credit only',
+                        'DC' => 'Debit only',
+                        'EBT' => 'EBT',
+                        'GIFT' => 'Gift',
+                    );
+                } elseif ($this->conf->get('PaycardEmvCreditDebit') == 2) {
+                    $this->menu = array(
+                        'EMV' => 'EMV Credit/Debit',
+                        'EMVCC' => 'Credit (chip)',
+                        'CC' => 'Credit (swipe)',
+                        'EMVDC' => 'Debit (chip)',
+                        'DC' => 'Debit (swipe)',
+                        'EBT' => 'EBT',
+                        'GIFT' => 'Gift',
+                    );
+                } elseif ($this->conf->get('PaycardEmvCreditDebit') == 1) {
+                    $this->menu = array(
+                        'EMV' => 'EMV Credit/Debit',
+                        'EMVCC' => 'Credit (chip)',
+                        'EMVDC' => 'Debit (chip)',
+                        'EBT' => 'EBT',
+                        'GIFT' => 'Gift',
+                    );
+                } else {
+                    $this->menu = array(
+                        'EMV' => 'EMV Credit/Debit',
+                        'CC' => 'Credit only',
+                        'DC' => 'Debit only',
+                        'EBT' => 'EBT',
+                        'GIFT' => 'Gift',
+                    );
+                }
             } elseif ($this->conf->get('PaycardsDatacapMode') == 2 || $this->conf->get('PaycardsDatacapMode') == 3) {
                 $this->menu = array(
                     'EMV' => 'EMV Credit/Debit',
@@ -128,7 +183,7 @@ class PaycardEmvMenu extends NoInputCorePage
         <div class="centeredDisplay colored rounded">
         <span class="larger">process card transaction</span>
         <form name="selectform" method="post" id="selectform"
-            action="<?php echo filter_input(INPUT_SERVER, 'PHP_SELF'); ?>">
+            action="<?php echo AutoLoader::ownURL(); ?>">
         <input type="hidden" name="clear-to-home" value="<?php echo $this->clearToHome; ?>" />
         <?php if ($this->conf->get('touchscreen')) { ?>
         <button type="button" class="pos-button coloredArea"

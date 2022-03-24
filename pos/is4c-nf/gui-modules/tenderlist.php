@@ -24,12 +24,10 @@
 use COREPOS\pos\lib\gui\NoInputCorePage;
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DisplayLib;
-use COREPOS\pos\lib\FormLib;
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
 class tenderlist extends NoInputCorePage 
 {
-
     private function handleInput($entered)
     {
         $entered = strtoupper($entered);
@@ -47,7 +45,7 @@ class tenderlist extends NoInputCorePage
             // built department input string and set it
             // to be the next POS entry
             // Redirect to main screen
-            $input = FormLib::get('amt') . $entered;
+            $input = $this->form->amt . $entered;
             $this->change_page(
                 $this->page_url
                 . "gui-modules/pos2.php"
@@ -65,9 +63,10 @@ class tenderlist extends NoInputCorePage
     function preprocess()
     {
         // a selection was made
-        if (isset($_REQUEST['search'])){
-            return $this->handleInput($_REQUEST['search']);
-        }
+        try {
+            return $this->handleInput($this->form->search);
+        } catch (Exception $ex) {}
+
         return true;
     } // END preprocess() FUNCTION
 
@@ -87,7 +86,7 @@ class tenderlist extends NoInputCorePage
     */
     function body_content()
     {
-        $amount = FormLib::get('amt', 0);
+        $amount = $this->form->tryGet('amt', 0);
         $dbc = Database::pDataConnect();
         $res = $dbc->query("
             SELECT TenderCode,TenderName 
@@ -98,7 +97,7 @@ class tenderlist extends NoInputCorePage
 
         echo "<div class=\"baseHeight\">"
             ."<div class=\"listbox\">"
-            ."<form name=\"selectform\" method=\"post\" action=\"{$_SERVER['PHP_SELF']}\""
+            ."<form name=\"selectform\" method=\"post\" action=\"" . AutoLoader::ownURL() . '"'
             ." id=\"selectform\">"
             ."<select name=\"search\" id=\"search\" "
             ."size=\"15\" onblur=\"\$('#search').focus();\">";
@@ -112,26 +111,22 @@ class tenderlist extends NoInputCorePage
         }
         echo "</select>"
             ."</div>";
-        if (CoreLocal::get('touchscreen')) {
+        if ($this->session->get('touchscreen')) {
             echo '<div class="listbox listboxText">'
                 . DisplayLib::touchScreenScrollButtons()
                 . '</div>';
         }
         echo "<div class=\"listboxText coloredText centerOffset\">";
-        if ($amount >= 0) {
-            echo _("tendering").' $';
-        } else {
-            echo _("refunding").' $';
-        }
+        echo $amount >= 0 ? _("tendering").' $' : _("refunding").' $';
         printf('%.2f',abs($amount)/100);
         echo '<br />';
         echo _("use arrow keys to navigate")
-            . '<p><button type="submit" class="pos-button wide-button coloredArea">
-                OK <span class="smaller">[enter]</span>
+            . '<p><button type="submit" class="pos-button wide-button coloredArea">'
+            . _('OK') . ' <span class="smaller">' . _('[enter]') . '</span>
                 </button></p>'
             . '<p><button type="submit" class="pos-button wide-button errorColoredArea"
-                onclick="$(\'#search\').append($(\'<option>\').val(\'\'));$(\'#search\').val(\'\');">
-                Cancel <span class="smaller">[clear]</span>
+                onclick="$(\'#search\').append($(\'<option>\').val(\'\'));$(\'#search\').val(\'\');">'
+            . _('Cancel') . ' <span class="smaller">' . _('[clear]') . '</span>
                 </button></p>'
             ."</div><!-- /.listboxText coloredText .centerOffset -->"
             .'<input type="hidden" name="amt" value="' . $amount . '" />'
@@ -148,6 +143,7 @@ class tenderlist extends NoInputCorePage
         ob_start();
         $phpunit->assertEquals(false, $this->handleInput(''));
         $phpunit->assertEquals(false, $this->handleInput('CL'));
+        $this->form->amt = 1;
         $phpunit->assertEquals(false, $this->handleInput('CA'));
         ob_get_clean();
     }

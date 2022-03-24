@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class ItemOrderHistoryReport extends FannieReportPage 
@@ -47,18 +47,24 @@ class ItemOrderHistoryReport extends FannieReportPage
         $prod = new ProductsModel($dbc);
         $prod->upc(BarcodeLib::padUPC($this->form->upc));
         $prod->load();
+        $stores = FormLib::storePicker();
         $ret = array('Order History For ' . $prod->upc() . ' ' . $prod->description());
         if (FormLib::get('all')) {
             $ret[] = 'All [known] orders';
             if ($this->report_format = 'html') {
-                $ret[] = sprintf('<a href="ItemOrderHistoryReport.php?upc=%s">Show Recent</a>', $prod->upc());
+                $ret[] = sprintf(' <a href="ItemOrderHistoryReport.php?upc=%s">Show Recent</a>', $prod->upc())
+                    . ' | ' . $stores['html'];
             }
         } else {
             $ret[] = 'Since ' . date('F d, Y', strtotime('92 days ago'));
             if ($this->report_format = 'html') {
-                $ret[] = sprintf('<a href="ItemOrderHistoryReport.php?upc=%s&all=1">Show All</a>', $prod->upc());
+                $ret[] = sprintf(' <a href="ItemOrderHistoryReport.php?upc=%s&all=1">Show All</a>', $prod->upc())
+                    . ' | ' . $stores['html'];
             }
         }
+        $this->addScript('../../src/javascript/jquery.js');
+        $this->addScript('../RecentSales/recentSales.js');
+        $this->addOnloadCommand("recentSales.bindSelect('upc', '" . $prod->upc() . "');\n");
 
         return $ret;
     }
@@ -70,23 +76,45 @@ class ItemOrderHistoryReport extends FannieReportPage
 
         $upc = $this->form->upc;
         $upc = BarcodeLib::padUPC($upc);
+        $store = FormLib::get('store', false);
+        if ($store === false) {
+            $store = COREPOS\Fannie\API\lib\Store::getIdByIp();
+            if ($store === false) {
+                $store = 0;
+            }
+        }
 
+        $mapR = $dbc->prepare('SELECT DISTINCT sku FROM VendorAliases WHERE upc=?');
+        $mapped = $dbc->getValue($mapR, array($upc));
+
+        $args = array($upc);
         $query = 'SELECT i.sku, i.quantity, i.unitCost, i.caseSize,
-                        i.quantity * i.unitCost * i.caseSize AS ttl,
-                        o.vendorInvoiceID, v.vendorName, o.placedDate
+                        i.receivedTotalCost AS ttl,
+                        o.vendorInvoiceID, v.vendorName, o.placedDate,
+                        o.orderID,
+                        i.receivedQty
                         FROM PurchaseOrderItems AS i
                             LEFT JOIN PurchaseOrder AS o ON i.orderID=o.orderID
                             LEFT JOIN vendors AS v ON o.vendorID=v.vendorID
-                        WHERE i.internalUPC = ?
-                            AND o.placedDate >= ?
+                        WHERE ';
+        if ($mapped) {
+            $query .= ' (i.internalUPC=? OR i.sku=?) ';
+            $args[] = $mapped;
+        } else {
+            $query .= ' i.internalUPC=? ';
+        }
+        $query .= ' AND o.placedDate >= ?
+                            ' . ($store ? ' AND o.storeID=? ' : '') . '
                         ORDER BY o.placedDate';
-        $prep = $dbc->prepare($query);
-        $args = array($upc);
         if (FormLib::get('all')) {
             $args[] = '1900-01-01 00:00:00';
         } else {
             $args[] = date('Y-m-d', strtotime('92 days ago'));
         }
+        if ($store) {
+            $args[] = $store;
+        }
+        $prep = $dbc->prepare($query);
         $result = $dbc->execute($prep, $args);
         $data = array();
         while ($row = $dbc->fetchRow($result)) {
@@ -98,14 +126,17 @@ class ItemOrderHistoryReport extends FannieReportPage
 
     private function rowToRecord($row)
     {
+        if (empty($row['vendorInvoiceID'])) {
+            $row['vendorInvoiceID'] = '(invoice)';
+        }
         return array(
             $row['placedDate'],
             $row['vendorName'],
-            $row['vendorInvoiceID'],
+            sprintf('<a href="../../purchasing/ViewPurchaseOrders.php?id=%d">%s</a>', $row['orderID'], $row['vendorInvoiceID']),
             $row['sku'],
             $row['quantity'],
             $row['caseSize'],
-            $row['unitCost'],
+            sprintf('%.2f', $row['receivedQty'] == 0 ? $row['unitCost'] : $row['ttl'] / $row['receivedQty']),
             $row['ttl'],
         );
     }
@@ -154,7 +185,7 @@ class ItemOrderHistoryReport extends FannieReportPage
     {
         $data = array('placedDate'=>'2000-01-01', 'vendorName'=>'test',
             'vendorInvoiceID'=>'1234', 'sku'=>'111', 'quantity'=>1,
-            'caseSize'=>5, 'unitCost'=>1, 'ttl'=>5);
+            'caseSize'=>5, 'unitCost'=>1, 'ttl'=>5, 'orderID'=>1, 'receivedQty'=>1);
         $phpunit->assertInternalType('array', $this->rowToRecord($data));
     }
 }

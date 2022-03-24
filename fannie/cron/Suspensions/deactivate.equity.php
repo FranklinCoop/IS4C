@@ -28,7 +28,7 @@ if (!chdir(dirname(__FILE__))){
 
 include('../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT . 'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 /* HELP
@@ -66,8 +66,10 @@ $susQ = "INSERT INTO suspensions
     )
     and c.Type='PC' and n.payments < 100
     and c.memType in (1,3,5)
+    AND c.CardNo <> 18506
     and NOT EXISTS(SELECT NULL FROM suspensions as s
-    WHERE s.cardno=m.card_no)";
+    WHERE s.cardno=m.card_no)
+    AND DATE_ADD((select max(tdate) from is4c_trans.stockpurchases WHERE card_no=m.card_no), INTERVAL 1 YEAR) < '$dStr'";
 if (!isset($custdata['ChargeLimit'])) {
     $susQ = str_replace('c.ChargeLimit', 'c.MemDiscountLimit', $susQ);
 }
@@ -90,6 +92,7 @@ $histQ = "INSERT INTO suspension_history
         )
         and c.Type='PC' and n.payments < 100
         and c.memType in (1,3)
+        AND c.CardNo <> 18506
         and NOT EXISTS(SELECT NULL FROM suspensions as s
         WHERE s.cardno=m.card_no)";
 $sql->query($histQ);

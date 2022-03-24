@@ -32,13 +32,8 @@ Note it does not truncate the unified table first.';
 
     public $schedulable = false;
 
-    public function run()
+    private function findMonthlyTables($dbc)
     {
-        $dbc = FannieDB::get($this->config->get('ARCHIVE_DB'));
-
-        /**
-          Find monthly tables
-        */
         $tablesR = $dbc->query('SHOW TABLES');
         $monthly_tables = array();
         while ($w = $dbc->fetchRow($tablesR)) {
@@ -46,18 +41,13 @@ Note it does not truncate the unified table first.';
                 $monthly_tables[] = $w[0];
             }
         }
-        if (count($monthly_tables) == 0) {
-            echo "No monthly tables found!\n";
-            echo "No data has been copied\n";
-            return false;
-        } else {
-            sort($monthly_tables);
-        }
+        sort($monthly_tables);
 
-        /**
-          Check for basic errors before attempting
-          to copy any data
-        */
+        return $monthly_tables;
+    }
+
+    private function validateTables($monthly_tables)
+    {
         foreach ($monthly_tables as $table) {
             $valid = preg_match('/transArchive([0-9]{4})([0-9]{2})/', $table, $matches);
             if (!$valid) {
@@ -67,10 +57,11 @@ Note it does not truncate the unified table first.';
             }
         }
 
-        /**
-          Get partition info from
-          CREATE TABLE statement
-        */
+        return true;
+    }
+
+    private function getArchive($dbc)
+    {
         $bigArchive = $dbc->query('SHOW CREATE TABLE bigArchive'); 
         if ($bigArchive === false) {
             echo "Table bigArchive does not exist\n";
@@ -79,15 +70,27 @@ Note it does not truncate the unified table first.';
             return false;
         }
         $bigArchive = $dbc->fetchRow($bigArchive);
-        $bigArchive = $bigArchive[0];
+        $bigArchive = $bigArchive[1];
+        if (!strstr($bigArchive, 'PARTITION')) {
+            echo "Table bigArchive is not partitioned\n";
+            echo "No data has been copied\n";
+            return false;
+        }
 
-        /**
-          Create all necessary partitions
-        */
+        return $bigArchive;
+    }
+
+    private function createPartitions($dbc, $monthly_tables, $bigArchive)
+    {
         foreach ($monthly_tables as $table) {
             $valid = preg_match('/transArchive([0-9]{4})([0-9]{2})/', $table, $matches);
             $year = $matches[1];
             $month = $matches[2];
+            if ($year == "1901" && $month == "01") {
+                // this gets created in the CI environment
+                // haven't debugged how/why
+                continue;
+            }
 
             $partition_name = 'p' . $year . $month;
             if (strstr($bigArchive, 'PARTITION ' . $partition_name . ' VALUES')) {
@@ -110,6 +113,11 @@ Note it does not truncate the unified table first.';
             }
         }
 
+        return true;
+    }
+
+    private function copyData($dbc, $monthly_tables)
+    {
         /**
           All the partitioning code is MySQL specific
           anyway so using "LIMIT" doesn't really matter
@@ -155,7 +163,33 @@ Note it does not truncate the unified table first.';
                 echo "\tDetails: " . $dbc->error() . "\n";
             }
         }
+    }
 
+    public function run()
+    {
+        $dbc = FannieDB::get($this->config->get('ARCHIVE_DB'));
+
+        $monthly_tables = $this->findMonthlyTables($dbc);
+        if (count($monthly_tables) == 0) {
+            echo "No monthly tables found!\n";
+            echo "No data has been copied\n";
+            return false;
+        }
+
+        if (!$this->validateTables($monthly_tables)) {
+            return false;
+        }
+
+        $bigArchive = $this->getArchive($dbc);
+        if (!$bigArchive) {
+            return false;
+        }
+
+        if (!$this->createPartitions($dbc, $monthly_tables, $bigArchive)) {
+            return false;
+        }
+
+        $this->copyData($dbc, $monthly_tables);
         echo "Process complete\n";
     }
 }

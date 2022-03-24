@@ -21,9 +21,11 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\lib\Store;
+
 require(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class MarginToolFromSearch extends FannieRESTfulPage
@@ -109,6 +111,7 @@ class MarginToolFromSearch extends FannieRESTfulPage
             echo '0';
             return false;
         }
+        $store = Store::getIdByIp();
 
         $priceCalc = "SUM(CASE";
         $args = array();
@@ -141,10 +144,12 @@ class MarginToolFromSearch extends FannieRESTfulPage
         $query = "SELECT SUM(q.percentageDeptSales * ($marginSQL)) 
                     / SUM(q.percentageDeptSales) as weightedMargin
                   FROM products AS p
-                  LEFT JOIN $summary AS q ON p.upc=q.upc
+                      LEFT JOIN $summary AS q ON p.upc=q.upc AND p.store_id=q.storeID
                   WHERE department=?
+                    AND " . DTrans::isStoreID($store, 'p') . "
                     AND cost <> 0";
         $m_args[] = $this->deptID;
+        $m_args[] = $store;
         $prep = $dbc->prepare($query);
         $result = $dbc->execute($prep, $m_args);
         if ($dbc->num_rows($result) == 0) {
@@ -164,6 +169,7 @@ class MarginToolFromSearch extends FannieRESTfulPage
     {
         global $FANNIE_OP_DB, $FANNIE_ARCHIVE_DB;
         $dbc = FannieDB::get($FANNIE_OP_DB);
+        $store = Store::getIdByIp();
         $summary = $FANNIE_ARCHIVE_DB . $dbc->sep() . 'productSummaryLastQuarter';
         // calculate margin using newprice for the specific upc,
         // normal_price for the other upcs, and avoid divided by
@@ -180,11 +186,12 @@ class MarginToolFromSearch extends FannieRESTfulPage
                        / SUM(q.percentageSuperDeptSales) as weightedMargin
                   FROM products AS p
                   INNER JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
-                  LEFT JOIN $summary AS q ON p.upc=q.upc
+                      LEFT JOIN $summary AS q ON p.upc=q.upc AND p.store_id=q.storeID
                   WHERE m.superID=?
+                    AND " . DTrans::isStoreID($store, 'p') . "
                     AND cost <> 0";
         $prep = $dbc->prepare($query);
-        $result = $dbc->execute($prep, array($this->upc, $this->newprice, $this->upc, $this->newprice, $this->newprice, $this->newprice, $this->superID));
+        $result = $dbc->execute($prep, array($this->upc, $this->newprice, $this->upc, $this->newprice, $this->newprice, $this->newprice, $this->superID, $store));
         if ($dbc->num_rows($result) == 0) {
             echo "0";
         } else {
@@ -226,6 +233,7 @@ class MarginToolFromSearch extends FannieRESTfulPage
             $m_args[] = $this->newprices[$i]; 
             $m_args[] = $this->newprices[$i]; 
         }
+        $store = Store::getIdByIp();
         $marginSQL .= ' ELSE 
                             CASE WHEN normal_price=0 THEN 0 ELSE (normal_price-cost)/normal_price END
                         END';
@@ -233,10 +241,12 @@ class MarginToolFromSearch extends FannieRESTfulPage
                    / SUM(q.percentageSuperDeptSales) as weightedMargin
                   FROM products AS p
                   LEFT JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
-                  LEFT JOIN $summary AS q ON p.upc=q.upc
+                      LEFT JOIN $summary AS q ON p.upc=q.upc AND p.store_id=q.storeID
                   WHERE m.superID=?
+                    AND " . DTrans::isStoreID($store, 'p') . "
                     AND cost <> 0";
         $m_args[] = $this->superID;
+        $m_args[] = $store;
         $prep = $dbc->prepare($query);
         $result = $dbc->execute($prep, $m_args);
         if ($dbc->num_rows($result) == 0) {
@@ -331,7 +341,15 @@ class MarginToolFromSearch extends FannieRESTfulPage
                 if ($dbc->num_rows($lookupR) > 0) {
                     $info = $dbc->fetch_row($lookupR);
                 }
-                $ppo = ($info['size'] !== '') ? \COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($price, $info['size']) : '';
+                
+                $pricePerUnit = 0;
+                if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
+                    $pricePerUnit =  COREPOS\Fannie\API\lib\PriceLib::FCC_PricePerUnit($dbc, $row['upc'],$row['normal_price'], $row['size']);
+                } else {
+                    $pricePerUnit = COREPOS\Fannie\API\lib\PriceLib::pricePerUnit($row['normal_price'], $row['size']);
+                }
+
+                $ppo = ($info['size'] !== '') ? $pricePerUnit : '';
 
                 $tag->id($this->tags);
                 $tag->upc($upc);
@@ -389,9 +407,10 @@ class MarginToolFromSearch extends FannieRESTfulPage
     {
         global $FANNIE_OP_DB, $FANNIE_URL, $FANNIE_ARCHIVE_DB;
         $dbc = FannieDB::get($FANNIE_OP_DB);
-        $this->add_script($FANNIE_URL.'src/javascript/tablesorter/jquery.tablesorter.js');
-        $this->add_css_file($FANNIE_URL.'src/javascript/tablesorter/themes/blue/style.css');
+        $this->addScript($FANNIE_URL.'src/javascript/tablesorter/jquery.tablesorter.js');
+        $this->addCssFile($FANNIE_URL.'src/javascript/tablesorter/themes/blue/style.css');
         $ret = '';
+        $store = Store::getIdByIp();
 
         // list super depts & starting margins
         list($in_sql, $args) = $dbc->safeInClause($this->depts);
@@ -401,7 +420,9 @@ class MarginToolFromSearch extends FannieRESTfulPage
                    FROM MasterSuperDepts AS m
                    LEFT JOIN products AS p ON m.dept_ID=p.department
                    WHERE m.dept_ID IN ({$in_sql})
+                    AND " . DTrans::isStoreID($store, 'p') . "
                    GROUP BY m.superID, super_name";
+        $args[] = $store;
         $superP = $dbc->prepare($superQ);
         $superR = $dbc->execute($superP, $args);
         $ret .= '<div class="col-sm-2 pull-right">';
@@ -434,9 +455,10 @@ class MarginToolFromSearch extends FannieRESTfulPage
                        / SUM(q.percentageDeptSales) as weightedMargin
                     FROM products AS p
                     LEFT JOIN departments AS d ON p.department=d.dept_no
-                    LEFT JOIN $summary AS q ON p.upc=q.upc
+                        LEFT JOIN $summary AS q ON p.upc=q.upc AND p.store_id=q.storeID
                     WHERE department IN ({$in_sql})
                         AND cost <> 0
+                        AND " . DTrans::isStoreID($store, 'p') . "
                     GROUP BY department, dept_name";
         $marginP = $dbc->prepare($marginQ);
         $marginR = $dbc->execute($marginP, $args);
@@ -488,11 +510,13 @@ class MarginToolFromSearch extends FannieRESTfulPage
                     p.normal_price, m.superID, q.percentageStoreSales,
                     q.percentageSuperDeptSales, q.percentageDeptSales
                   FROM products AS p
-                  LEFT JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
-                  LEFT JOIN ' . $FANNIE_ARCHIVE_DB . $dbc->sep() . 'productSummaryLastQuarter AS q
-                    ON p.upc=q.upc
+                      LEFT JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
+                      LEFT JOIN ' . $FANNIE_ARCHIVE_DB . $dbc->sep() . 'productSummaryLastQuarter AS q
+                        ON p.upc=q.upc AND p.store_id=q.storeID
                   WHERE p.upc IN (' . $in_sql . ')
+                    AND ' . DTrans::isStoreID($store, 'p') . '
                   ORDER BY p.upc';
+        $args[] = $store;
         $prep = $dbc->prepare($query);
         $result = $dbc->execute($prep, $args);
         while($row = $dbc->fetch_row($result)) {

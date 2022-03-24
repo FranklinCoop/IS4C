@@ -20,6 +20,8 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
+use COREPOS\Fannie\API\lib\Store;
+
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
     include(dirname(__FILE__) . '/../classlib2.0/FannieAPI.php');
@@ -35,14 +37,12 @@ class SpecialOrdersMenu extends FanniePage
 
     public function body_content()
     {
-        $view = $this->config->get('SO_UI') === 'bootstrap' ? 'OrderViewPage.php' : 'view.php';
-        $list = $this->config->get('SO_UI') === 'bootstrap' ? 'NewSpecialOrdersPage.php' : 'clearinghouse.php';
         return <<<HTML
 <ul>
-<li><a href="{$view}">Create Order</a></li>
+<li><a href="OrderViewPage.php">Create Order</a> Note: WFC isn't taking new orders at this time.</li>
 <li>Review Orders
     <ul>
-    <li><a href="{$list}">Active Orders</a></li>
+    <li><a href="NewSpecialOrdersPage.php">Active Orders</a></li>
     <li><a href="OldSpecialOrdersPage.php">Old Orders</a></li>
     </ul>
 </li>

@@ -23,8 +23,8 @@
 
 namespace COREPOS\pos\ajax;
 use COREPOS\pos\lib\ReceiptLib;
-use \CoreLocal;
 use COREPOS\pos\lib\AjaxCallback;
+use \Exception;
 
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
@@ -35,16 +35,16 @@ class AjaxCabReceipt extends AjaxCallback
 {
     protected $encoding = 'plain';
 
-    // @hintable
-    public function ajax($input=array())
+    public function ajax()
     {
-        if (isset($_REQUEST['input'])) {
-            CoreLocal::set("cabReference",$_REQUEST['input']);
-        } elseif (isset($input['cab-reference'])) {
-            CoreLocal::set('cabReference', $input['cab-reference']);
-        }
-        $receipt = ReceiptLib::printReceipt('cab', CoreLocal::get('cabReference'));
-        ReceiptLib::writeLine($receipt);
+        try {
+            $this->session->set("cabReference",$this->form->input);
+            $cur = $this->session->get('receiptToggle');
+            $this->session->set('receiptToggle', 1);
+            $receipt = ReceiptLib::printReceipt('cab', $this->session->get('cabReference'));
+            ReceiptLib::writeLine($receipt);
+            $this->session->set('receiptToggle', $cur);
+        } catch (Exception $ex) {}
 
         return 'Done';
     }

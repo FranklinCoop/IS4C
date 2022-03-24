@@ -47,6 +47,8 @@ class VendorsModel extends BasicModel
     'notes' => array('type'=>'TEXT'),
     'localOriginID' => array('type'=>'INT', 'default'=>0),
     'inactive' => array('type'=>'TINYINT', 'default'=>0),
+    'orderMinimum' => array('type'=>'MONEY', 'default'=>0),
+    'halfCases' => array('type'=>'TINYINT', 'default'=>0),
     );
 
     public function hookAddColumnvendorAbbreviation()
@@ -61,6 +63,22 @@ class VendorsModel extends BasicModel
     {
         $this->inactive(0);
         return parent::toOptions($selected, $id_as_label);
+    }
+
+    public function save()
+    {
+        $result = parent::save();
+
+        $contact = new VendorContactModel($this->connection);
+        $contact->vendorID($this->vendorID());
+        $contact->phone($this->phone());
+        $contact->fax($this->fax());
+        $contact->email($this->email());
+        $contact->website($this->website());
+        $contact->notes($this->notes());
+        $contact->save();
+
+        return $result;
     }
 
     public function doc()

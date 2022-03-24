@@ -27,7 +27,7 @@
     * 21Mar2013 EL Hacked FANNIE_POUNDS_AS_POUNDS until established.
     *              Use input description width 30, not 27, OK per AT.
     * 16Mar2013 Eric Lee Need to get the vendor name either from the form
-    *            or from, ideally, vendors, or prodExtra.
+    *            or from vendors
     *            Currently the vendor name input is just text, not controlled.
     *           It would be better if it used size and unitofmeasure from the form.
     *            In update, would need a post-update shelftag create as in insertItem.php
@@ -36,7 +36,7 @@
 
 require(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class addShelfTag extends FannieRESTfulPage
@@ -60,7 +60,9 @@ class addShelfTag extends FannieRESTfulPage
         <link rel="stylesheet" type="text/css" href="../src/javascript/bootstrap/css/bootstrap.min.css">
         <link rel="stylesheet" type="text/css" href="../src/javascript/bootstrap-default/css/bootstrap.min.css">
         <link rel="stylesheet" type="text/css" href="../src/javascript/bootstrap-default/css/bootstrap-theme.min.css">
+        <link rel="stylesheet" type="text/css" href="../src/javascript/jquery-ui.css">
         <script type="text/javascript" src="../src/javascript/jquery.js"></script>
+        <script type="text/javascript" src="../src/javascript/jquery-ui.js"></script>
         <script type="text/javascript" src="../src/javascript/bootstrap/js/bootstrap.min.js"></script>
         <script type="text/javascript">
         $(document).ready(function(){
@@ -151,11 +153,33 @@ HTML;
           $shelftag->count(FormLib::get('count', 1));
           $insR = $shelftag->save();
 
+          $ret = '<div class="alert alert-success">Created Tag</div>
+             <p>
+              <a href="../admin/labels/ManualSignsPage.php?queueID=' . FormLib::get('subID') . '"
+                class="btn btn-default" target="_parent">Print Now</a>
+              </p>
+              <div class="col-sm-5">
+                <form action="ItemEditorPage.php" target="_parent" method="get">
+                <div class="input-group">
+                    <span class="input-group-addon">Search</span>
+                    <input type="text" class="form-control" name="searchupc" id="upc" />
+                    <span class="input-group-btn">
+                        <button type="submit" class="btn btn-default">Go</button>
+                    </span>
+              </div>
+              </form>';
           if ($insR === false) {
-            return '<div class="alert alert-danger">Error creating tag</div>';
-          } else {
-            return '<div class="alert alert-success">Created Tag</div>';
+            $ret = '<div class="alert alert-danger">Error creating tag</div>';
           }
+          $this->addScript('autocomplete.js');
+          if ($this->session->__superFilter !== '') {
+            $this->addOnloadCommand("EXTRA_AUTO_COMPLETE_PARAMS = { superID: " . $this->session->__superFilter . " };");
+          }
+          $wsUrl = '../ws/';
+          $this->addOnloadCommand("bindAutoComplete('#upc', '$wsUrl', 'item');\n");
+          $this->addOnloadCommand('$(\'#upc\').focus();');
+
+          return $ret;
         }
     }
 

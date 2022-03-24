@@ -36,6 +36,19 @@ class UsersModel extends BasicModel
     'uid' => array('type'=>'VARCHAR(4)'),
     'session_id' => array('type'=>'VARCHAR(50)'),
     'real_name' => array('type'=>'VARCHAR(75)'),
+    'email' => array('type'=>'VARCHAR(75)'),
+    'totpURL' => array('type'=>'VARCHAR(255)'),
     );
+
+    public function doc()
+    {
+        return '
+Use:
+Authentication system. Stores user accounts. Session here is no
+longer used; UserSessions stores that instead. The password and
+salt fields are only relevant when authenticating against the
+table rather than an external source.
+            ';
+    }
 }
 

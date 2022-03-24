@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class PurchasingIndexPage extends FannieRESTfulPage 
@@ -39,6 +39,8 @@ class PurchasingIndexPage extends FannieRESTfulPage
     {
         try {
             $vendors = $this->form->vendors;
+            $vendors = array_filter($vendors, function ($i) { return $i != ''; });
+            $vendors = array_unique($vendors);
             if (count($vendors) == 0) {
                 throw new Exception('At least one vendor required');
             }
@@ -48,8 +50,10 @@ class PurchasingIndexPage extends FannieRESTfulPage
             $task = new OrderGenTask();
             $task->setConfig($this->config);
             $task->setLogger($this->logger);
+            $task->setMultiplier($this->form->multiplier);
             $task->setSilent(true);
             $task->setVendors($vendors);
+            $task->setUser(FannieAuth::getUID($this->current_user));
             $task->setStore($this->form->store);
             $task->run();
 
@@ -69,28 +73,57 @@ class PurchasingIndexPage extends FannieRESTfulPage
                 INNER JOIN InventoryCache AS c ON i.upc=c.upc
                 INNER JOIN products AS p ON c.upc=p.upc AND c.storeID=p.store_id
             WHERE i.vendorID=p.default_vendor_id
+                AND v.inactive=0
             GROUP BY v.vendorID, v.vendorName
             ORDER BY v.vendorName');
+        $vendorSelect = '<select class="form-control chosen" name="vendors[]">';
+        $vendorSelect .= '<option value="">Select vendor...</option>';
+        while ($row = $this->connection->fetchRow($res)) {
+            $vendorSelect .= sprintf('<option value="%d">%s</option>', $row['vendorID'], $row['vendorName']);
+        }
+        $vendorSelect .= '</select>';
         $ret = '<form>
             <input type="hidden" name="_method" value="put" />
-            <table class="table table-bordered table-striped">
-            <tr><th>Vendor</th><th>Include</th>';
-        while ($row = $this->connection->fetchRow($res)) {
-            $ret .= sprintf('<tr>
-                <td>%s</td>
-                <td><input type="checkbox" name="vendors[]" value="%d" />
-                </tr>',
-                $row['vendorName'], $row['vendorID']);
+            <div class="small panel panel-default">
+                <div class="panel panel-heading">Vendors & Stores</div>
+                <div class="panel panel-body">
+            <label>Vendor(s)</label>';
+        for ($i=0; $i<5; $i++) {
+            $ret .= '<div class="form-group">' . $vendorSelect . '</div>'; 
         }
-        $ret .= '</table>
+        $ret .= '
             <p>
                 <label>Store</label>
                 ' . $stores['html'] . '
             </p>
+            </div></div>
+            <div class="small panel panel-default">
+                <div class="panel panel-heading">Automated Pars</div>
+                <div class="panel panel-body">
+                    <div class="form-group">
+                        <label title="For use with produce plants">Multiplier (optional)</label>
+                        <input class="form-control" type="number" value="1" min="1" max="30" name="multiplier" />
+                    </div>
+                    <div class="form-group">
+                        <label title="For use with produce plants">Forecast (optional)</label>
+                        <div class="input-group">
+                            <span class="input-group input-group-addon">$</span>
+                            <input class="form-control" type="forecast" value="0" min="0" max="1000000" name="forecast" />
+                        </div>
+                    </div>
+                </div>
+            </div>
             <p>
-                <button type="submit" class="btn btn-default">Generate Orders</button>
+                <button type="submit" class="btn btn-default btn-core">Generate Orders</button>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <button type="reset" class="btn btn-default" 
+                    onclick="$(\'select.chosen\').val(\'\').trigger(\'chosen:updated\');">Reset</button>
             </p>
         </form>';
+
+        $this->addScript('../src/javascript/chosen/chosen.jquery.min.js');
+        $this->addCssFile('../src/javascript/chosen/bootstrap-chosen.css');
+        $this->addOnloadCommand("\$('select.chosen').chosen();\n");
 
         return $ret;
     }
@@ -101,28 +134,23 @@ class PurchasingIndexPage extends FannieRESTfulPage
         return '<ul>
             <li><a href="ViewPurchaseOrders.php">View Orders</a>
             <li><a href="PurchasingSearchPage.php">Search Orders</a>
-            <li>Import Order
-                <ul>
-                    <li><a href="ManualPurchaseOrderPage.php">Manually</a></li>
-                    <li><a href="ImportPurchaseOrder.php">From Spreadsheet</a></li>
-                    <li><a href="importers/CpwInvoiceImport.php">Custom CPW XLS Import</a></li>
-                    <li><a href="importers/SpartanNashInvoiceImport.php">Custom Spartan Nash CSV Import</a></li>
-                </ul>
-            </li>
             <li>Create Order
                 <ul>
                 <li><a href="EditOnePurchaseOrder.php">By Vendor</a></li>
                 <li><a href="EditManyPurchaseOrders.php">By Item</a></li>
                 <li><a href="?_method=put">Generate Orders</a></li>
+                <li><a href="OrderGuidePage.php">Order Guides</a></li>
+                <li><a href="ScanTransferPage.php">Store Transfer</a></li>
                 </ul>
             </li>
-            <li>Reports
+            <li>Import Order
                 <ul>
-                <li><a href="reports/UnfiExportForMas.php">UNFI Export for MAS90</a></li>
-                <li><a href="reports/LocalInvoicesReport.php">Local Item Purchases Report</a></li>
-                <li><a href="reports/OutOfStockReport.php">Out of Stocks Report</a></li>
+                    <li><a href="ManualPurchaseOrderPage.php">Manually</a></li>
+                    <li><a href="ImportPurchaseOrder.php">From Spreadsheet</a></li>
                 </ul>
             </li>
+            <li><a href="../admin/labels/PickTagsPage.php">Pick Tags</a>
+            <li><a href="SalesByInvoicePage.php">Check Movement by Invoice</a>
             </ul>';
         
     }

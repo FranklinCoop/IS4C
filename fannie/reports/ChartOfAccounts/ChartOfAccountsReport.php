@@ -23,14 +23,14 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class ChartOfAccountsReport extends FannieReportPage 
 {
     public $description = '[Chart of Accounts report] lists tenders, sales, discounts, and taxes for a given 
                     range of dates with their chart of account numbers.';
-    public $report_set = 'Sales Reports';
+    public $report_set = 'Finance';
     public $themed = true;
 
     protected $title = "Fannie : Chart of Accounts Report";
@@ -140,7 +140,7 @@ class ChartOfAccountsReport extends FannieReportPage
             WHERE datetime BETWEEN ? AND ?
                 AND d.upc='TAXLINEITEM'
                 AND " . DTrans::isNotTesting('d') . "
-            GROUP BY d.description
+            GROUP BY d.description, t.salesCode
         ");
         $lineItemR = $dbc->execute($lineItemQ, $dates);
         while ($lineItemW = $dbc->fetch_row($lineItemR)) {

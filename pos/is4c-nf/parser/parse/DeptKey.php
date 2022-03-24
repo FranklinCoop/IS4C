@@ -23,17 +23,21 @@
 
 namespace COREPOS\pos\parser\parse;
 use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\DeptLib;
 use COREPOS\pos\lib\MiscLib;
 use COREPOS\pos\lib\Scanning\SpecialDept;
-use \CoreLocal;
 use COREPOS\pos\parser\Parser;
 
 class DeptKey extends Parser 
 {
     public function check($str)
     {
-        if (strstr($str,"DP") && strlen($str) > 3 &&
-            substr($str,0,2) != "VD") {
+        /**
+           Ex:
+           199DP10
+           199DP
+        */
+        if (preg_match('/^[\d-]+DP\d*$/', $str)) {
             return true;
         }
 
@@ -54,7 +58,7 @@ class DeptKey extends Parser
 
     public function parse($str)
     {
-        $my_url = MiscLib::baseURL();
+        $myUrl = MiscLib::baseURL();
         $ret = $this->default_json();
         list($amt, $dept) = $this->strToPieces($str);
 
@@ -66,19 +70,19 @@ class DeptKey extends Parser
             // no department specified, just amount followed by DP
             
             // maintain refund if needed
-            if (CoreLocal::get("refund")) {
+            if ($this->session->get("refund")) {
                 $amt = "RF" . $amt;
             }
 
             // go to the department select screen
-            $ret['main_frame'] = $my_url.'gui-modules/deptlist.php?in=' . $amt;
-        } elseif (CoreLocal::get("refund")==1 && CoreLocal::get("refundComment") == "") {
-            if (CoreLocal::get("SecurityRefund") > 20) {
-                $ret['main_frame'] = $my_url."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-RefundAdminLogin";
+            $ret['main_frame'] = $myUrl.'gui-modules/deptlist.php?in=' . $amt;
+        } elseif ($this->session->get("refund")==1 && $this->session->get("refundComment") == "") {
+            if ($this->session->get("SecurityRefund") > 20) {
+                $ret['main_frame'] = $myUrl."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-RefundAdminLogin";
             } else {
-                $ret['main_frame'] = $my_url.'gui-modules/refundComment.php';
+                $ret['main_frame'] = $myUrl.'gui-modules/refundComment.php';
             }
-            CoreLocal::set("refundComment",CoreLocal::get("strEntered"));
+            $this->session->set("refundComment",$this->session->get("strEntered"));
         }
 
         /* apply any appropriate special dept modules */
@@ -86,31 +90,47 @@ class DeptKey extends Parser
         $ret = $this->applyMods($deptmods, $dept, $amt, $ret);
         
         if (!$ret['main_frame']) {
-            $ret = \COREPOS\pos\lib\DeptLib::deptkey($amt, $dept, $ret);
+            $lib = new DeptLib($this->session);
+            $ret = $lib->deptkey($amt, $dept, $ret);
         }
 
         return $ret;
     }
 
+    /**
+     * Get the SpecialDept mapping
+     * This is normally cached within the session but if not present
+     * will be loaded from the SpecialDeptMap table
+     * The format is array( department# => array('list', 'of', 'mods') )
+     */
     private function getMods()
     {
-        $deptmods = CoreLocal::get('SpecialDeptMap');
+        $deptmods = $this->session->get('SpecialDeptMap');
         $dbc = Database::pDataConnect();
-        if (!is_array($deptmods) && (CoreLocal::get('NoCompat') == 1 || $dbc->table_exists('SpecialDeptMap'))) {
+        if (!is_array($deptmods) && ($this->session->get('NoCompat') == 1 || $dbc->table_exists('SpecialDeptMap'))) {
             $model = new \COREPOS\pos\lib\models\op\SpecialDeptMapModel($dbc);
             $deptmods = $model->buildMap();
-            CoreLocal::set('SpecialDeptMap', $deptmods);
+            $this->session->set('SpecialDeptMap', $deptmods);
         }
 
         return $deptmods;
     }
 
+    /**
+     * Apply any relevant SpecialDept modules
+     * @param $deptmods [keyed array] department number => array of module names
+     * @param $dept [int] current department number (times 10 for historical reasons)
+     * @param $amt [int] sale amount (in cents)
+     * @param $ret [ParseResult] parser return object
+     * @return [ParseResult] parser return object as modified by any applicable
+     *                       SpecialDept modules
+     */
     private function applyMods($deptmods, $dept, $amt, $ret)
     {
         $index = (int)($dept/10);
         if (is_array($deptmods) && isset($deptmods[$index])) {
             foreach($deptmods[$index] as $mod) {
-                $obj = SpecialDept::factory($mod);
+                $obj = SpecialDept::factory($mod, $this->session);
                 $ret = $obj->handle($dept,$amt/100,$ret);
             }
         }

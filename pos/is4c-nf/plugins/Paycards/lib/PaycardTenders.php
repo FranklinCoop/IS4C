@@ -19,7 +19,12 @@ class PaycardTenders
             return array($this->conf->get('PaycardsTenderCodeDiscover'));
         } elseif ($this->conf->get('PaycardsTenderCodeAmex') && $issuer == 'American Express') {
             return array($this->conf->get('PaycardsTenderCodeAmex'));
+        } elseif ($this->conf->get('PaycardsTenderCodeAmex') && $issuer == 'AMEX') {
+            return array($this->conf->get('PaycardsTenderCodeAmex')); //mercury datacap card type
+        } elseif ($this->conf->get('PaycardsTenderCodeAmex') && $issuer == 'DEBIT') {
+            return array($this->conf->get('PaycardsTenderCodeDebit')); //mercury datacap card type
         }
+        //data cap issuer fields AMEX,DCVR, DEBIT, EBT, M/C, NCG,VISA
         return false;
     }
 
@@ -27,6 +32,7 @@ class PaycardTenders
     { 
         switch ($type) {
             case 'DEBIT':
+            case 'EMVDC':
                 return array(
                     array($this->conf->get('PaycardsTenderCodeDebit')),
                     'DC',
@@ -45,6 +51,7 @@ class PaycardTenders
                     'EBT Food',
                 );
             case 'EMV':
+            case 'EMVCC':
                 return array(
                     array($this->conf->get('PaycardsTenderCodeEmv')),
                     'CC',

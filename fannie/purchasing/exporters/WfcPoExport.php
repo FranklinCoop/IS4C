@@ -28,18 +28,38 @@ if (!class_exists('DefaultCsvPoExport')) {
 class WfcPoExport extends DefaultCsvPoExport 
 {
     public $nice_name = 'WFC';
+    public $extension = 'csv';
+    public $mime_type = 'text/csv';
+
+    public function exportString($id)
+    {
+        ob_start();
+        $this->export_order($id);
+        return ob_get_clean();
+    }
 
     public function export_order($id)
     {
-        parent::export_order($id);
-
         $dbc = FannieDB::get(FannieConfig::config('OP_DB'));
         $order = new PurchaseOrderModel($dbc);
         $order->orderID($id);
         $order->load();
 
+        $auto = new AutoOrderMapModel($dbc);
+        $auto->vendorID($order->vendorID());
+        $auto->storeID($order->storeID());
+        $auto->load();
+
+        $notes = new PurchaseOrderNotesModel($dbc);
+        $notes->orderID($id);
+        $notes->load();
+        $noteContent = trim($notes->notes());
 
         echo "\r\n";
+        if ($auto->accountID() != '') {
+            echo "Account# " . $auto->accountID() . "\r\n";
+        }
+        echo "PO# " . $id . "\r\n";
         if ($order->storeID() == 1) {
             echo "Whole Foods Co-op\r\n";
             echo "610 E 4th St\r\n";
@@ -49,8 +69,15 @@ class WfcPoExport extends DefaultCsvPoExport
             echo "Whole Foods Co-op\r\n";
             echo "4426 Grand Ave\r\n";
             echo "\"Duluth, MN 55807\"\r\n";
-            echo "(218) 728-0884\r\n";
+            echo "(218) 336-0279\r\n";
         }
+
+        if ($noteContent != '') {
+            echo "Notes:\r\n";
+            echo "\"{$noteContent}\"\r\n";
+        }
+
+        parent::export_order($id);
     }
 }
 

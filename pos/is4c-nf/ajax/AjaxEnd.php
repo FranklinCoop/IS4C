@@ -22,7 +22,6 @@
 *********************************************************************************/
 
 namespace COREPOS\pos\ajax;
-use COREPOS\pos\lib\FormLib;
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\Drawers;
 use COREPOS\pos\lib\Kickers\Kicker;
@@ -31,7 +30,7 @@ use COREPOS\pos\lib\AjaxCallback;
 use COREPOS\pos\lib\CoreState;
 use COREPOS\pos\lib\ReceiptLib;
 use COREPOS\pos\lib\UdpComm;
-use \CoreLocal;
+use COREPOS\pos\lib\DriverWrappers\ScaleDriverWrapper;
 
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
@@ -42,14 +41,13 @@ class AjaxEnd extends AjaxCallback
 {
     protected $encoding = 'json';
 
-    // @hintable
-    public function ajax($input=array())
+    public function ajax()
     {
-        $receiptType = isset($input['receiptType']) ? $input['receiptType'] : FormLib::get('receiptType');
+        $receiptType = $this->form->tryGet('receiptType');
         if ($receiptType === '') {
             return array();
         }
-        $receiptNum = isset($input['ref']) ? $input['ref'] : FormLib::get('ref');
+        $receiptNum = $this->form->tryGet('ref');
 
         $transFinished = $this->transFinished($receiptType);
         if (!preg_match('/^\d+-\d+-\d+$/', $receiptNum)) {
@@ -60,23 +58,24 @@ class AjaxEnd extends AjaxCallback
         list($doEmail, $customerEmail) = $this->sendEmail();
 
         $receiptContent = array();
-        if ($this->isDisabled($receiptType) || $receiptType === 'none') {
-            $receiptContent = array();
-        } else {
-            if ($receiptType != "none") {
-                $receiptContent[] = ReceiptLib::printReceipt($receiptType, $receiptNum, false, $doEmail);
-            }
-            if (CoreLocal::get('autoReprint') == 1 && $receiptType !== "ccSlip" && $receiptType !== 'gcSlip') {
-                CoreLocal::set("autoReprint",0);
+        if (!$this->isDisabled($receiptType) && $receiptType !== 'none') {
+            $receiptContent[] = ReceiptLib::printReceipt($receiptType, $receiptNum, false, $doEmail);
+            if ($this->session->get('autoReprint') == 1 && $receiptType !== "ccSlip" && $receiptType !== 'gcSlip') {
+                $this->session->set("autoReprint",0);
                 $receiptContent[] = ReceiptLib::printReceipt($receiptType, $receiptNum, true);
             }
         }
 
         if ($transFinished) {
-            UdpComm::udpSend("termReset");
-            CoreLocal::set('ccTermState','swipe');
-            $this->uploadAndReset($receiptType);
-            CoreLocal::set("End",0);
+            $sdObj = ScaleDriverWrapper::factory($this->session->get('scaleDriver'));
+            if (is_object($sdObj)) {
+                $sdObj->readReset();
+            }
+            $this->session->set('ccTermState','swipe');
+            $this->session->set('lotterySpin',false);
+            $this->uploadAndReset();
+            $this->session->set("End",0);
+            Database::flushJobs();
         }
 
         // close session so if printer hangs
@@ -86,25 +85,42 @@ class AjaxEnd extends AjaxCallback
         }
 
         if ($receiptType == "full" && $dokick) {
-            Drawers::kick();
+            $drawer = new Drawers($this->session, null);
+            $drawer->kick();
         }
 
-        $PRINT_OBJ = PrintHandler::factory(CoreLocal::get('ReceiptDriver'));
-        $EMAIL_OBJ = $this->emailObj();
-        foreach ($receiptContent as $receipt) {
-            if (is_array($receipt)) {
-                if (!empty($receipt['print'])) {
-                    $PRINT_OBJ->writeLine($receipt['print']);
-                }
-                if (!empty($receipt['any'])) {
-                    $EMAIL_OBJ->writeLine($receipt['any'],$customerEmail);
-                }
-            } elseif(!empty($receipt)) {
-                $PRINT_OBJ->writeLine($receipt);
-            }
+        $this->outputReceipt($receiptContent, $customerEmail);
+
+        if ($transFinished) {
+            UdpComm::udpSend("termReset");
         }
 
         return array();
+    }
+
+    /**
+      Output the receipt to printer and/or email
+      @param $receiptContent [mixed string OR array]
+        A string will always be printed
+        An array will print the 'print' part and email the 'any' part
+      @param $customerEmail [string] customer email address
+    */
+    private function outputReceipt($receiptContent, $customerEmail)
+    {
+        $printObj = PrintHandler::factory($this->session->get('ReceiptDriver'));
+        $emailObj = $this->emailObj();
+        foreach ($receiptContent as $receipt) {
+            if (is_array($receipt)) {
+                if (!empty($receipt['print'])) {
+                    $printObj->writeLine($receipt['print']);
+                }
+                if (!empty($receipt['any'])) {
+                    $emailObj->writeLine($receipt['any'],$customerEmail);
+                }
+            } elseif(!empty($receipt)) {
+                $printObj->writeLine($receipt);
+            }
+        }
     }
 
     /**
@@ -113,23 +129,23 @@ class AjaxEnd extends AjaxCallback
     */
     private function isDisabled($receiptType)
     {
-        if ($receiptType == 'cancelled' && CoreLocal::get('CancelReceipt') == 0 && CoreLocal::get('CancelReceipt') !== '') {
+        if ($receiptType == 'cancelled' && $this->session->get('CancelReceipt') == 0 && $this->session->get('CancelReceipt') !== '') {
             return true;
-        } elseif ($receiptType == 'suspended' && CoreLocal::get('SuspendReceipt') == 0 && CoreLocal::get('SuspendReceipt') !== '') {
+        } elseif ($receiptType == 'suspended' && $this->session->get('SuspendReceipt') == 0 && $this->session->get('SuspendReceipt') !== '') {
             return true;
-        } elseif ($receiptType == 'ddd' && CoreLocal::get('ShrinkReceipt') == 0 && CoreLocal::get('ShrinkReceipt') !== '') {
+        } elseif ($receiptType == 'ddd' && $this->session->get('ShrinkReceipt') == 0 && $this->session->get('ShrinkReceipt') !== '') {
             return true;
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     private function emailObj()
     {
         // use same email class for sending the receipt
         // as was used to generate the receipt
-        $email_class = ReceiptLib::emailReceiptMod();
-        return new $email_class();
+        $emailClass = ReceiptLib::emailReceiptMod();
+        return new $emailClass();
     }
 
     private function sendEmail()
@@ -145,8 +161,8 @@ class AjaxEnd extends AjaxCallback
     {
         $dokick = false;
         if ($transFinished) {
-            $kicker_object = Kicker::factory(CoreLocal::get('kickerModule'));
-            $dokick = $kicker_object->doKick($receiptNum);
+            $kickerObject = Kicker::factory($this->session->get('kickerModule'));
+            $dokick = $kickerObject->doKick($receiptNum);
         }
 
         return $dokick;
@@ -172,19 +188,19 @@ class AjaxEnd extends AjaxCallback
             $receiptType == 'suspended' || $receiptType == 'none' ||
             $receiptType == 'ddd') {
             return true;
-        } else {
-            return false;
         }
+
+        return false;
     }
 
-    private function uploadAndReset($type) 
+    private function uploadAndReset() 
     {
-        if (CoreLocal::get("testremote")==0) {
+        if ($this->session->get("testremote")==0) {
             Database::testremote(); 
         }
 
-        if (CoreLocal::get("TaxExempt") != 0) {
-            CoreLocal::set("TaxExempt",0);
+        if ($this->session->get("TaxExempt") != 0) {
+            $this->session->set("TaxExempt",0);
             Database::setglobalvalue("TaxExempt", 0);
         }
 

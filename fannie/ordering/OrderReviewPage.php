@@ -20,9 +20,12 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
+
+use COREPOS\Fannie\API\lib\Operators as Op;
+
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class OrderReviewPage extends FannieRESTfulPage
@@ -194,6 +197,12 @@ class OrderReviewPage extends FannieRESTfulPage
             $orderModel->state(),
             $orderModel->zip()
         );
+
+        $noteP = $dbc->prepare('SELECT note FROM ' . FannieDB::fqn('memberNotes', 'op') . ' WHERE cardno=? ORDER BY stamp DESC');
+        $acctNote = $dbc->getValue($noteP, array($memNum));
+        if (trim($acctNote)) {
+            $ret .= '<tr><th>Acct Notes</th><td colspan="4">' . $acctNote . '</td></tr>';
+        }
             
         $ret .= '</table>';
 
@@ -219,7 +228,8 @@ class OrderReviewPage extends FannieRESTfulPage
         $ret .= '<tr><th>UPC</th><th>SKU</th><th>Description</th><th>Cases</th><th>SRP</th><th>Actual</th><th>Qty</th><th>Dept</th></tr>';
         $q = $dbc->prepare("SELECT o.upc,o.description,total,quantity,department,
             sku,ItemQtty,regPrice,o.discounttype,o.charflag,o.mixMatch FROM {$TRANS}CompleteSpecialOrder as o
-            left join vendorItems as v on o.upc=v.upc AND o.upc <> '0000000000000'
+            left join vendors as n on o.mixMatch=n.vendorName
+            left join vendorItems as v on o.upc=v.upc AND o.upc <> '0000000000000' AND v.vendorID=n.vendorID
             WHERE order_id=? AND trans_type='I'
             ORDER BY trans_id DESC");
         $r = $dbc->execute($q, array($this->orderID));
@@ -255,14 +265,15 @@ class OrderReviewPage extends FannieRESTfulPage
         $ret .= '</tr>';
         $ret .= '<tr>';
         $ret .= sprintf('<td colspan="2" align="right">Unit Price: $%.2f</td>',
-            ($row['regPrice']/$row['ItemQtty']/$row['quantity']));
+            Op::div( Op::div($row['regPrice'],$row['ItemQtty']), $row['quantity'] ));
         $ret .= sprintf('<td>From: %s</td>',$row['mixMatch']);
         $ret .= '<td>Discount</td>';
         if ($row['discounttype'] == 1 || $row['discounttype'] == 2) {
             $ret .= '<td id="discPercent'.$row['upc'].'">Sale</td>';
         } else if ($row['regPrice'] != $row['total']) {
             $ret .= sprintf('<td id="discPercent%s">%d%%</td>',$row['upc'],
-                round(100*(($row['regPrice']-$row['total'])/$row['regPrice'])));
+                round(100*Op::div($row['regPrice']-$row['total'], $row['regPrice']))
+            );
         } else {
             $ret .= '<td id="discPercent'.$row['upc'].'">0%</td>';
         }
@@ -279,6 +290,24 @@ class OrderReviewPage extends FannieRESTfulPage
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('TRANS_DB'));
 
+        $statP = $dbc->prepare("SELECT statusFlag, subStatus FROM SpecialOrders WHERE specialOrderID=?");
+        $stat = $dbc->getRow($statP, array($this->orderID));
+
+        $status = array(
+            0 => "New",
+            3 => "New, Call",
+            1 => "Called/waiting",
+            2 => "Pending",
+            4 => "Placed",
+            5 => "Arrived",
+            7 => "Completed",
+            8 => "Canceled",
+            9 => "Inquiry"
+        );
+
+        $ret = '<div class="alert alert-info">Closed ' . date('Y-m-d h:i:sa', $stat['subStatus'])
+            . ' with status ' . $status[$stat['statusFlag']] . '</div>';
+
         $prep = $dbc->prepare("SELECT entry_date, entry_type, entry_value
                            FROM SpecialOrderHistory
                            WHERE order_id = ?
@@ -286,7 +315,7 @@ class OrderReviewPage extends FannieRESTfulPage
                            ORDER BY entry_date");
         $result = $dbc->execute($prep, array($this->orderID));
 
-        $ret = '<table class="table table-bordered table-striped small">';
+        $ret .= '<table class="table table-bordered table-striped small">';
         $ret .= '<tr>
                     <th>Date</th>
                     <th>Action</th>
@@ -330,12 +359,27 @@ class OrderReviewPage extends FannieRESTfulPage
 
     public function get_orderID_view()
     {
-        $body = <<<HTML
+        $orderP = $this->connection->prepare('SELECT * FROM ' . FannieDB::fqn('SpecialOrders', 'trans') . ' WHERE specialOrderID=?');
+        $order = $this->connection->getRow($orderP, array($this->orderID));
+        $nodupe = '';
+        $checked = '';
+        if ($order['noDuplicate']) {
+            $nodupe = 'disabled title="This order cannot be duplicated"';
+            $checked = 'checked';
+        }
+        $noToggle = FannieAuth::validateUserQuiet('ordering_edit') ? '' : 'disabled';
+        return <<<HTML
 <p>
-    <button type="button" class="btn btn-default"
-        onclick="copyOrder({{orderID}}); return false;">
+    <button type="button" class="btn btn-default btn-dupe" {$nodupe}
+        onclick="copyOrder({$this->orderID}); return false;">
     Duplicate Order
     </button>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <label>
+        <input type="checkbox" id="dupeCB" {$checked} {$noToggle} 
+            onchange="toggleDisable({$this->orderID});" />
+        Disable duplication for this order
+    </label>
 </p>
 <div class="panel panel-default">
     <div class="panel-heading">Customer Information</div>
@@ -350,7 +394,6 @@ class OrderReviewPage extends FannieRESTfulPage
     <div class="panel-body" id="historyDiv"></div>
 </div>
 HTML;
-        return str_replace('{{orderID}}', $this->orderID, $body);
     }
 
     public function javascriptContent()
@@ -369,6 +412,23 @@ function copyOrder(oid){
             location='OrderViewPage.php?orderID='+resp;
         });
     }
+}
+function toggleDisable(oid) {
+    var nodupe = 0;
+    if ($('#dupeCB').prop('checked')) {
+        nodupe = 1;
+    }
+    $.ajax({
+        url: 'OrderAjax.php',
+        data: 'id='+oid+'&nodupe='+nodupe,
+        method: 'post',
+    }).done(function (resp) {
+        if (nodupe) {
+            $('.btn-dupe').prop('disabled', true);
+        } else {
+            $('.btn-dupe').prop('disabled', false);
+        }
+    });
 }
 $(document).ready(function(){
     $.ajax({

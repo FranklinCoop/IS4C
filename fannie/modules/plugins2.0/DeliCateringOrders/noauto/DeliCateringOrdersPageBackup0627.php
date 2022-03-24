@@ -25,7 +25,7 @@ COPY OF DELICATERINGORDERSPAGE.PHP
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class DeliCateringOrdersPage extends FannieRESTfulPage 
@@ -338,15 +338,14 @@ class DeliCateringOrdersPage extends FannieRESTfulPage
         $bnum = $row['num'];
         
         if ($anum > $bnum) {
-            $_SESSION['order_num'] = $anum + 1;
+            $this->session->order_num = $anum + 1;
         } else {
-            $_SESSION['order_num'] = $bnum + 1;
+            $this->session->order_num = $bnum + 1;
         }
         
-        //$_SESSION['order_num'] = ($row['num'] + 1);
-        if ($row['num'] == NULL) $_SESSION['order_num'] = 1;
-        $order_num = $_SESSION['order_num'];
-        $ret .= 'Order number: ' . $_SESSION['order_num'] . '<br>';
+        if ($row['num'] == NULL) $this->session->order_num = 1;
+        $order_num = $this->session->order_num;
+        $ret .= 'Order number: ' . $this->session->order_num . '<br>';
         
         $args = array();
         $args2 = array();

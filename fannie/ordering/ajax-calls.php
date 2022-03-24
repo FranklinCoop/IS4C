@@ -23,10 +23,10 @@
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 if (!function_exists('checkLogin')) {
-    include($FANNIE_ROOT.'auth/login.php');
+    include(__DIR__ . '/../auth/login.php');
 }
 
 $dbc = FannieDB::get($FANNIE_OP_DB);
@@ -215,6 +215,57 @@ function addUPC($orderID,$memNum,$upc,$num_cases=1)
     global $FANNIE_OP_DB,$TRANS;
     $dbc = FannieDB::get($FANNIE_OP_DB);
 
+    $ins_array = genericRow($orderID);
+    $ins_array['upc'] = "$upc";
+    $ins_array['card_no'] = "$memNum";
+    $ins_array['trans_type'] = "I";
+    $ins_array['ItemQtty'] = $num_cases;
+
+    if (!class_exists('OrderItemLib')) {
+        include(dirname(__FILE__) . '/OrderItemLib.php');
+    }
+
+    $mempricing = OrderItemLib::memPricing($memNum);
+
+    $item = OrderItemLib::getItem($upc);
+    $qtyReq = OrderItemLib::manualQuantityRequired($item);
+    $item['department'] = OrderItemLib::mapDepartment($item['department']);
+    if ($qtyReq !== false) {
+        $item['caseSize'] = $qtyReq;
+    }
+    $unitPrice = OrderItemLib::getUnitPrice($item, $mempricing);
+    $casePrice = OrderItemLib::getCasePrice($item, $mempricing);
+    if ($unitPrice == $item['normal_price'] && !OrderItemLib::useSalePrice($item, $mempricing)) {
+        $item['discounttype'] = 0;
+    }
+
+    $ins_array['upc'] = $item['upc'];
+    $ins_array['quantity'] = $item['caseSize'];
+    $ins_array['mixMatch'] = $item['vendorName'];
+    $ins_array['description'] = substr($item['description'], 0, 32) . ' SO';
+    $ins_array['department'] = $item['department'];
+    $ins_array['discountable'] = $item['discountable'];
+    $ins_array['discounttype'] = $item['discounttype'];
+    $ins_array['cost'] = $item['cost'];
+    $ins_array['unitPrice'] = $unitPrice;
+    $ins_array['total'] = $casePrice * $num_cases;
+    $ins_array['regPrice'] = $item['normal_price'] * $item['caseSize'] * $num_cases;
+
+    $tidP = $dbc->prepare("SELECT MAX(trans_id),MAX(voided),MAX(numflag) 
+            FROM {$TRANS}PendingSpecialOrder WHERE order_id=?");
+    $tidR = $dbc->execute($tidP,array($orderID));
+    $tidW = $dbc->fetch_row($tidR);
+    $ins_array['trans_id'] = $tidW[0]+1;
+    $ins_array['voided'] = $tidW[1];
+    $ins_array['numflag'] = $tidW[2];
+
+    $dbc->smartInsert("{$TRANS}PendingSpecialOrder",$ins_array);
+
+    return array($qtyReq,$ins_array['trans_id'],$ins_array['description']);
+    /*
+    global $FANNIE_OP_DB,$TRANS;
+    $dbc = FannieDB::get($FANNIE_OP_DB);
+
     $sku = str_pad($upc,6,'0',STR_PAD_LEFT);
     if (is_numeric($upc)) {
         $upc = BarcodeLib::padUPC($upc);
@@ -298,6 +349,7 @@ function addUPC($orderID,$memNum,$upc,$num_cases=1)
         FROM products AS p
             LEFT JOIN PriceRules AS r ON p.price_rule_id=r.priceRuleID
         WHERE upc=?
+            AND inUse=1
         ");
     $pdR = $dbc->execute($pdP, array($upc));
     $qtyReq = False;
@@ -334,12 +386,11 @@ function addUPC($orderID,$memNum,$upc,$num_cases=1)
             $ins_array['unitPrice'] = $pdW['normal_price'];
             if ($pdW['priceRuleTypeID'] == 6 || $pdW['priceRuleTypeID'] == 7 || $pdW['priceRuleTypeID'] == 8) {
                 $pdW['discount'] = 0;
+                $ins_array['discountable'] = 0;
             }
-            if ($pdW['discount'] != 0 && $pdW['discounttype'] == 1) {
-                /**
-                  Only apply sale pricing from non-closeout batches
-                  At WFC closeout happens to be batch type #11
-                */
+            if ($pdW['discounttype'] == 1) {
+                // Only apply sale pricing from non-closeout batches
+                // At WFC closeout happens to be batch type #11
                 $closeoutP = $dbc->prepare('
                     SELECT l.upc
                     FROM batchList AS l
@@ -347,7 +398,7 @@ function addUPC($orderID,$memNum,$upc,$num_cases=1)
                     WHERE l.upc=?
                         AND ' . $dbc->curdate() . ' >= b.startDate
                         AND ' . $dbc->curdate() . ' <= b.endDate
-                        AND b.batchType=11
+                        AND b.batchType IN (11, 12)
                 ');
                 $closeoutR = $dbc->execute($closeoutP, array($upc));
                 if ($closeoutR && $dbc->num_rows($closeoutR) == 0) {
@@ -374,30 +425,13 @@ function addUPC($orderID,$memNum,$upc,$num_cases=1)
             }
         }
         $ins_array['description'] = substr($pdW['description'],0,32);
-        /**
-          If product has a default vendor, lookup
-          vendor name and add it
-        */
+        // If product has a default vendor, lookup
+        // vendor name and add it
         if ($pdW['default_vendor_id'] != 0) {
             $v = new VendorsModel($dbc);
             $v->vendorID($pdW['default_vendor_id']);
             if ($v->load()) {
-                $ins_array['mixMatch'] = substr($v->vendorName(),0,26);
-            }
-        }
-        /**
-          If no vendor name was found, try looking in prodExtra
-        */
-        if (empty($ins_array['mixMatch']) && $dbc->tableExists('prodExtra')) {
-            $distP = $dbc->prepare('
-                SELECT x.distributor
-                FROM prodExtra AS x
-                WHERE x.upc=?
-            ');
-            $distR = $dbc->execute($distP, array($upc));
-            if ($distR && $dbc->num_rows($distR) > 0) {
-                $distW = $dbc->fetch_row($distR);
-                $ins_array['mixMatch'] = substr($distW['distributor'],0,26);
+                $ins_array['mixMatch'] = $v->vendorName();
             }
         }
     } elseif ($srp != 0) {
@@ -421,6 +455,7 @@ function addUPC($orderID,$memNum,$upc,$num_cases=1)
     $dbc->smartInsert("{$TRANS}PendingSpecialOrder",$ins_array);
     
     return array($qtyReq,$ins_array['trans_id'],$ins_array['description']);
+     */
 }
 
 function createContactRow($orderID)
@@ -496,8 +531,8 @@ function duplicateOrder($old_id,$from='CompleteSpecialOrder')
       Otherwise if the item is completely unknown, just copy it
       from the old order to the new one.
     */
-    $prodP = $dbc->prepare('SELECT upc FROM products WHERE upc=?');
-    $vendP = $dbc->prepare('SELECT upc FROM vendorItems WHERE upc=?');
+    $prodP = $dbc->prepare('SELECT upc FROM products WHERE upc=? AND upc <> \'0000000000000\'');
+    $vendP = $dbc->prepare('SELECT upc FROM vendorItems WHERE upc=? AND upc <> \'0000000000000\'');
     $itemP = $dbc->prepare('
         SELECT upc,
             ItemQtty,
@@ -505,7 +540,8 @@ function duplicateOrder($old_id,$from='CompleteSpecialOrder')
             trans_id
         FROM ' . $TRANS . $from . '
         WHERE order_id=?
-            AND trans_id > 0');
+            AND trans_id > 0
+        ORDER BY trans_id');
     $itemR = $dbc->execute($itemP, array($old_id));
     while ($itemW = $dbc->fetchRow($itemR)) {
         $prod = $dbc->execute($prodP, array($itemW['upc']));
@@ -534,6 +570,12 @@ function duplicateOrder($old_id,$from='CompleteSpecialOrder')
     $st = $statusW['numflag'];
     $timestamp = time();
 
+    $memP = $dbc->prepare("SELECT m.*
+        FROM {$TRANS}{$from} AS o
+            INNER JOIN " . FannieDB::fqn('meminfo', 'op') . " AS m ON o.card_no=m.card_no
+        WHERE o.order_id=?");
+    $mem = $dbc->getRow($memP, array($old_id));
+
     $dbc = FannieDB::get($FANNIE_TRANS_DB);
     // load values from old order
     $soModel = new SpecialOrdersModel($dbc);
@@ -543,6 +585,16 @@ function duplicateOrder($old_id,$from='CompleteSpecialOrder')
     $soModel->specialOrderID($new_id);
     $soModel->statusFlag( ($st == 1) ? 3 : 0 );
     $soModel->subStatus($timestamp);
+    // use latest contact info if available
+    if ($mem && strlen($mem['street']) > 0) {
+        $soModel->street($mem['street']);
+        $soModel->city($mem['city']);
+        $soModel->state($mem['state']);
+        $soModel->zip($mem['zip']);
+        $soModel->phone($mem['phone']);
+        $soModel->altPhone($mem['email_2']);
+        $soModel->email($mem['email_1']);
+    }
     // save with the new ID
     $soModel->save();
     $dbc = FannieDB::get($FANNIE_OP_DB);
@@ -727,7 +779,7 @@ function getCustomerForm($orderID,$memNum="0")
         $current_street = $orderModel->street();
         $current_phone = $orderModel->phone();
         if (empty($current_street) && empty($current_phone)) {
-            $contactQ = $dbc->prepare("SELECT street,city,state,zip,phone,email_1,email_2
+            $contactQ = $dbc->prepare("SELECT street,city,state,zip,phone,email_1,email_2 AS altPhone
                     FROM meminfo WHERE card_no=?");
             $contactR = $dbc->execute($contactQ, array($memNum));
             if ($dbc->num_rows($contactR) > 0) {
@@ -739,7 +791,7 @@ function getCustomerForm($orderID,$memNum="0")
                 $orderModel->state($contact_row['state']);
                 $orderModel->zip($contact_row['zip']);
                 $orderModel->phone($contact_row['phone']);
-                $orderModel->altPhone($contact_row['email_2']);
+                $orderModel->altPhone($contact_row['altPhone']);
                 $orderModel->email($contact_row['email_1']);
                 $orderModel->save();
                 $orderModel->specialOrderID($orderID);
@@ -752,11 +804,11 @@ function getCustomerForm($orderID,$memNum="0")
         $statusR = $dbc->execute($statusQ,array($memNum));
         $status_row  = $dbc->fetch_row($statusR);
         if ($status_row['Type'] == 'INACT') {
-            $status_row['status'] = 'Inactive';
+            $status_row['status'] = '<span style="color: #a94442; font-size: 140%; font-weight: bold;">Inactive</span>';
         } elseif ($status_row['Type'] == 'INACT2') {
-            $status_row['status'] = 'Inactive';
+            $status_row['status'] = '<span style="color: #a94442; font-size: 140%; font-weight: bold;">Inactive</span>';
         } elseif ($status_row['Type'] == 'TERM') {
-            $status_row['status'] = 'Terminated';
+            $status_row['status'] = '<span style="color: #a94442; font-size: 140%; font-weight: bold;">Terminated</span>';
         }
     } 
 
@@ -956,6 +1008,14 @@ function getCustomerForm($orderID,$memNum="0")
         $orderModel->state(), $orderID,
         $orderModel->zip(), $orderID
     );
+
+    $noteP = $dbc->prepare('SELECT note FROM ' . FannieDB::fqn('memberNotes', 'op') . ' WHERE cardno=? ORDER BY stamp DESC');
+    $acctNote = $dbc->getValue($noteP, array($memNum));
+    $acctNote = str_replace("\r", "", $acctNote);
+    $acctNote = str_replace('<br /><br />', '<br />', $acctNote);
+    if (trim($acctNote)) {
+        $ret .= '<tr><th>Acct Notes</th><td colspan="8" style="font-size: 85%;">' . $acctNote . '</td></tr>';
+    }
 
     $ret .= '</table>';
 
@@ -1319,7 +1379,7 @@ function itemList($orderID,$table="PendingSpecialOrder")
     $ret .= '<tr><th>UPC</th><th>Description</th><th>Cases</th><th>Pricing</th><th>&nbsp;</th></tr>';
         //<th>Est. Price</th>
         //<th>Qty</th><th>Est. Savings</th><th>&nbsp;</th></tr>';
-    $prep = $dbc->prepare("SELECT o.upc,o.description,total,quantity,
+    $prep = $dbc->prepare("SELECT o.upc,o.description,total,quantity,discountable,
         department,regPrice,ItemQtty,discounttype,trans_id FROM {$TRANS}$table as o
         WHERE order_id=? AND trans_type='I'");
     $res = $dbc->execute($prep, array($orderID));
@@ -1333,6 +1393,8 @@ function itemList($orderID,$table="PendingSpecialOrder")
             } else {
                 $pricing = "% Discount";
             }
+        } elseif ($w['discountable'] == 0) {
+            $pricing = 'Basics';
         }
         $ret .= sprintf('<tr>
                 <td>%s</td>

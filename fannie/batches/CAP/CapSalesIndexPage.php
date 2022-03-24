@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class CapSalesIndexPage extends FanniePage 
@@ -48,6 +48,7 @@ class CapSalesIndexPage extends FanniePage
         <li>EDLP<ul>
             <li><a href="EdlpUploadPage.php">Upload EDLP Max Prices</a></li>
             <li><a href="EdlpBatchPage.php">Create Price Change Batch</a></li>
+            <li><a href="EdlpCatalogOverwrite.php">Update Item and Vendor Catalog Costs</a></li>
         </ul></li>
         </ul>
         <?php

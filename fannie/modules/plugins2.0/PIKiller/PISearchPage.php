@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 if (!class_exists('PIKillerPage')) {
     include('lib/PIKillerPage.php');
@@ -136,10 +136,10 @@ class PISearchPage extends PIKillerPage {
         </form></td>
         </tr>
         <?php
-        $this->add_script($FANNIE_URL . 'item/autocomplete.js');
-        $this->add_onload_command("bindAutoComplete('#last', '" . $FANNIE_URL . "ws/', 'mLastName');\n");
-        $this->add_onload_command("bindAutoComplete('#first', '" . $FANNIE_URL . "ws/', 'mFirstName');\n");
-        $this->add_onload_command('$(\'#memNum_t\').focus();');
+        $this->addScript($FANNIE_URL . 'item/autocomplete.js');
+        $this->addOnloadCommand("bindAutoComplete('#last', '" . $FANNIE_URL . "ws/', 'mLastName');\n");
+        $this->addOnloadCommand("bindAutoComplete('#first', '" . $FANNIE_URL . "ws/', 'mFirstName');\n");
+        $this->addOnloadCommand('$(\'#memNum_t\').focus();');
         return ob_get_clean();
     }
 

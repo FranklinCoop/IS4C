@@ -24,13 +24,14 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class DeleteVendorPage extends FannieRESTfulPage
 {
     protected $title = "Fannie : Delete Vendor";
     protected $header = "Delete Vendors";
+    public $discoverable = false;
 
     protected $must_authenticate = true;
     protected $auth_classes = array('pricechange');
@@ -57,6 +58,7 @@ class DeleteVendorPage extends FannieRESTfulPage
             $prep[] = $dbc->prepare('UPDATE vendorDepartments SET vendorID=? WHERE vendorID=?');
             $prep[] = $dbc->prepare('UPDATE vendorSKUtoPLU SET vendorID=? WHERE vendorID=?');
             $prep[] = $dbc->prepare('UPDATE VendorBreakdowns SET vendorID=? WHERE vendorID=?');
+            $prep[] = $dbc->prepare('UPDATE VendorAliases SET vendorID=? WHERE vendorID=?');
             foreach ($prep as $p) {
                 $dbc->execute($p, array($newID, $this->id));
             }
@@ -108,7 +110,7 @@ class DeleteVendorPage extends FannieRESTfulPage
         return 'VendorIndexPage.php';
     }
 
-    public function helpText()
+    public function helpContent()
     {
         return '<p>When deleting a vendor, all existing items from that vendor
             must be re-assigned to a new vendor. This is best suited for merging

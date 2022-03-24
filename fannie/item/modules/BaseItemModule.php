@@ -151,7 +151,7 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
                 p.discount,
                 p.line_item_discountable,
                 p.brand AS manufacturer,
-                x.distributor,
+                n.vendorName AS distributor,
                 u.description as ldesc,
                 p.default_vendor_id,
                 v.units AS caseSize,
@@ -162,11 +162,19 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
                 p.deposit,
                 p.discounttype,
                 p.wicable,
-                p.store_id
+                p.store_id,
+                CASE WHEN c.upc IS NOT NULL THEN 1 ELSE 0 END AS inventoried,
+                c.count AS lastCount,
+                c.countDate,
+                c.par AS invPar,
+                i.onHand,
+                0 AS isAlias
             FROM products AS p 
-                LEFT JOIN prodExtra AS x ON p.upc=x.upc 
                 LEFT JOIN productUser AS u ON p.upc=u.upc 
                 LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id = v.vendorID
+                LEFT JOIN vendors AS n ON p.default_vendor_id=n.vendorID
+                LEFT JOIN InventoryCache AS i ON p.upc=i.upc AND p.store_id=i.storeID
+                LEFT JOIN InventoryCounts AS c ON p.upc=c.upc AND p.store_id=c.storeID AND c.mostRecent=1
             WHERE p.upc=?';
         $p_def = $dbc->tableDefinition('products');
         if (!isset($p_def['last_sold'])) {
@@ -180,9 +188,9 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
                 $items[$row['store_id']] = $row;
             }
             return $items;
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     private function getNewItem($upc)
@@ -217,7 +225,10 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
             'cost' => 0,
             'discounttype' => 0,
             'wicable' => 0,
+            'inventoried' => 0,
+            'isAlias' => 0,
         );
+        $ret = '';
 
         /**
           Check for entries in the vendorItems table to prepopulate
@@ -297,7 +308,7 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
             $rowItem['wicable'] = $dmodel->dept_wicable();
         }
 
-        return $rowItem;
+        return array($rowItem, $ret);
     }
 
     private function highlightUPC($upc)
@@ -350,7 +361,7 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
             $rowItem['distributor'] = $this->getVendorName($rowItem['default_vendor_id']);
 
             /* find previous and next items in department */
-            list($prevUPC, $nextUPC) = $this->prevNextItem($rowItem['department'], $upc);
+            list($prevUPC, $nextUPC) = $this->prevNextItem($upc, $rowItem['department']);
 
             $lcP = $dbc->prepare('SELECT likeCode FROM upcLike WHERE upc=?');
             $likeCode = $dbc->getValue($lcP,array($upc));
@@ -366,7 +377,8 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
                 }
             }
         } else {
-            $rowItem = $this->getNewItem($upc);
+            list($rowItem, $msg) = $this->getNewItem($upc);
+            $ret .= $msg;
             $new_item = true;
 
             foreach ($stores as $id => $obj) {
@@ -392,8 +404,18 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
         }
         $ret .= ' <label style="color:darkmagenta;">Modified</label>
                 <span style="color:darkmagenta;">'. $rowItem['modified'] . '</span>';
-        $ret .= ' | <label style="color:darkmagenta;">Last Sold</label>
-                <span style="color:darkmagenta;">'. (empty($rowItem['last_sold']) ? 'n/a' : $rowItem['last_sold']) . '</span>';
+        $ret .= ' | <label style="color:darkmagenta;">Last Sold</label> ';
+        $netStore = COREPOS\Fannie\API\lib\Store::getIdByIp();
+        foreach ($items as $store_id => $item) {
+            $ret .= sprintf('<span style="color:darkmagenta;" class="last-sold %s" id="last-sold%d">%s</span>',
+                ($store_id == $netStore ? '' : 'collapse'),
+                $store_id,
+                (!empty($item['last_sold']) ? $item['last_sold'] : 'n/a')
+            );
+        }
+        if (FannieConfig::config('COOP_ID') == 'WFC_Duluth') {
+            $ret .= ' | <a href="mapping/FindItem.php?id=' . $upc . '">Find it!</a>';
+        }
         $ret .= '</div>'; // end panel-heading
 
         $ret .= '<div class="panel-body">';
@@ -408,7 +430,6 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
 
         $nav_tabs = '<ul id="store-tabs" class="nav nav-tabs small" role="tablist">';
         $ret .= '{{nav_tabs}}<div class="tab-content">';
-        $netStore = COREPOS\Fannie\API\lib\Store::getIdByIp();
         foreach ($items as $store_id => $rowItem) {
             $active_tab = false;
             if (FannieConfig::config('STORE_MODE') !== 'HQ' || $netStore == $store_id || ($netStore == false && $store_id == FannieConfig::config('STORE_ID'))) {
@@ -421,28 +442,30 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
             }
             $nav_tabs .= '<li role="presentation" ' . ($active_tab ? 'class="active"' : '') . '>'
                 . '<a href="#' . $tabID . '" aria-controls="' . $tabID . '" '
-                . 'onclick="$(\'.tab-content .chosen-select:visible\').chosen();"'
+                . 'onclick="$(\'.tab-content .chosen-select:visible\').chosen();
+                    $(\'.last-sold\').hide(); $(\'#last-sold' . $store_id . '\').show();"'
                 . 'role="tab" data-toggle="tab">'
                 . $store_description . '</a></li>';
             $ret .= '<div role="tabpanel" class="tab-pane' . ($active_tab ? ' active' : '') . '"
                 id="' . $tabID . '">';
 
             $ret .= '<input type="hidden" class="store-id" name="store_id[]" value="' . $store_id . '" />';
-            $ret .= '<table class="table table-bordered">';
+            $ret .= '<div id="" class=""><table id="productTable" class="table table-bordered">';
 
-            $jsVendorID = $rowItem['default_vendor_id'] > 0 ? $rowItem['default_vendor_id'] : 'no-vendor';
+            $jsVendorID = $rowItem['default_vendor_id'] != 0 ? $rowItem['default_vendor_id'] : 'no-vendor';
             $vFieldsDisabled = $jsVendorID == 'no-vendor' || !$active_tab ? 'disabled' : '';
+            $aliasDisabled = $rowItem['isAlias'] ? 'disabled' : '';
             $limit = 30 - strlen(isset($rowItem['description'])?$rowItem['description']:'');
-            $cost = sprintf('%.2f', $rowItem['cost']);
+            $cost = sprintf('%.3f', $rowItem['cost']);
             $price = sprintf('%.2f', $rowItem['normal_price']);
             $ret .= <<<HTML
 <tr>
     <th class="text-right">Description</th>
     <td colspan="5">
         <div class="input-group" style="width:100%;">
-            <input type="text" maxlength="30" class="form-control syncable-input" required
-                name="descript[]" id="descript" value="{$rowItem['description']}"
-                onkeyup="$(this).next().html(30-(this.value.length));" />
+            <input type="text" maxlength="30" class="form-control syncable-input descript-input" required
+                name="descript[]" value="{$rowItem['description']}" 
+                onkeyup="$(this).next().html(30-(this.value.length)); $(this).val($(this).val().toUpperCase());" />
             <span class="input-group-addon">{$limit}</span>
         </div>
     </td>
@@ -489,7 +512,7 @@ HTML;
                 <tr>
                     <th class="text-right">Brand</th>
                     <td colspan="5">
-                        <input type="text" name="manufacturer[]" 
+                        <input type="text" name="manufacturer[]"
                             class="form-control input-sm brand-field syncable-input"
                             value="' . $rowItem['manufacturer'] . '" />
                     </td>';
@@ -501,29 +524,18 @@ HTML;
             if (isset($rowItem['default_vendor_id']) && $rowItem['default_vendor_id'] <> 0) {
                 $normalizedVendorID = $rowItem['default_vendor_id'];
             }
-            /**
-              Use a <select> box if the current vendor corresponds to a valid
-              entry OR if no vendor entry exists. Only allow free text
-              if it's already in place
-            */
             $ret .= ' <th class="text-right">Vendor</th> ';
-            if ($normalizedVendorID || empty($rowItem['distributor'])) {
-                $ret .= '<td colspan="3" class="form-inline"><select name="distributor[]" 
-                            class="chosen-select form-control vendor_field syncable-input"
-                            onchange="baseItem.vendorChanged(this.value);">';
-                $ret .= '<option value="0">Select a vendor</option>';
-                $vendR = $dbc->query('SELECT vendorID, vendorName FROM vendors WHERE inactive=0 ORDER BY vendorName');
-                while ($vendW = $dbc->fetchRow($vendR)) {
-                    $ret .= sprintf('<option %s>%s</option>',
-                                ($vendW['vendorID'] == $normalizedVendorID ? 'selected' : ''),
-                                $vendW['vendorName']);
-                }
-                $ret .= '</select>';
-            } else {
-                $ret .= "<td colspan=\"3\"><input type=text name=distributor[] size=8 value=\""
-                    .(isset($rowItem['distributor'])?$rowItem['distributor']:"")
-                    ."\" class=\"form-control vendor-field syncable-input\" />";
+            $ret .= '<td colspan="3" class="form-inline"><select name="distributor[]" 
+                        class="chosen-select form-control vendor_field syncable-input"
+                        onchange="baseItem.vendorChanged(this.value);">';
+            $ret .= '<option value="0">Select a vendor</option>';
+            $vendR = $dbc->query('SELECT vendorID, vendorName FROM vendors WHERE inactive=0 ORDER BY vendorName');
+            while ($vendW = $dbc->fetchRow($vendR)) {
+                $ret .= sprintf('<option %s>%s</option>',
+                            ($vendW['vendorID'] == $rowItem['default_vendor_id'] ? 'selected' : ''),
+                            $vendW['vendorName']);
             }
+            $ret .= '</select>';
             $ret .= ' <button type="button" 
                         title="Create new vendor"
                         class="btn btn-default btn-sm newVendorButton">
@@ -633,7 +645,7 @@ HTML;
             $disc_opts = array(
                 0 => 'No',
                 1 => 'Yes',
-                2 => 'Trans Only',
+                2 => 'Trxn Only',
                 3 => 'Line Only',
             );
             $rowItem['discount'] = $this->mapDiscounts($rowItem['discount'], $rowItem['line_item_discountable']);
@@ -674,28 +686,40 @@ HTML;
                 dept_start:'#department{$store_id}', 
                 callback:function(){
                     \$('#department{$store_id}').trigger('chosen:updated');
+                    if ($('#store-sync').prop('checked') === false) {
+                        return;
+                    }
                     baseItem.chainSubs({$store_id});
+                    var opts = $('#department{$store_id}').html();
+                    $('.chosen-dept').each(function(i, e) {
+                        if (e.id != 'department{$store_id}') {
+                            $(e).html(opts);
+                            $(e).trigger('chosen:updated');
+                            baseItem.chainSubs(e.id.substring(10));
+                        }
+                    });
                 }
             });">
             {$superOpts}
         </select>
         <select name="department[]" id="department{$store_id}" 
-            class="form-control chosen-select syncable-input" 
+            class="form-control chosen-select chosen-dept syncable-input"
             onchange="baseItem.chainSubs({$store_id});">
             {$deptOpts}
         </select>
         <select name="subdept[]" id="subdept{$store_id}" 
-            class="form-control chosen-select syncable-input">
+            class="form-control chosen-select chosen-subdept syncable-input">
             <option {$subZero} value="0">None</option>
             {$subOpts}
         </select>
     </td>
     <th class="small text-right">SKU</th>
     <td colspan="2">
-        <input type="text" name="vendorSKU" class="form-control input-sm"
-            value="{$rowItem['sku']}" 
+        <input type="text" name="vendorSKU" value="{$rowItem['sku']}" 
+            class="form-control input-sm sku-field syncable-input"
             onchange="$('#vsku{$jsVendorID}').val(this.value);" 
-            {$vFieldsDisabled} id="product-sku-field" />
+            {$vFieldsDisabled} {$aliasDisabled} />
+        <input type="hidden" name="isAlias" value="{$rowItem['isAlias']}" />
     </td>
 </tr>
 <tr>
@@ -728,7 +752,7 @@ HTML;
         &nbsp;&nbsp;&nbsp;&nbsp;
         <label>InUse
         <input type="checkbox" value="{$store_id}" name="prod-in-use[]" 
-            class="in-use-checkbox syncable-checkbox" {$inUseCheck} 
+            class="in-use-checkbox" {$inUseCheck} 
             onchange="$('#extra-in-use-checkbox').prop('checked', $(this).prop('checked'));" />
         </label>
         </td>
@@ -741,9 +765,9 @@ HTML;
         </td>
         <th class="small text-right">Deposit</th>
         <td colspan="2">
-            <input type="text" name="deposit-upc[]" class="form-control input-sm syncable-input"
+            <input type="text" name="deposit-upc[]" class="form-control input-sm deposit-upc syncable-input"
                 value="{$deposit}" placeholder="Deposit Item PLU/UPC"
-                onchange="\$('#deposit').val(this.value);" />
+                />
         </td>
     </tr>
     <tr>
@@ -753,7 +777,7 @@ HTML;
                 class="form-control input-sm product-case-size"
                 value="{$rowItem['caseSize']}" 
                 onchange="\$('#vunits{$jsVendorID}').val(this.value);" 
-                {$vFieldsDisabled} />
+                {$vFieldsDisabled} {$aliasDisabled} />
         </td>
         <th class="small text-right">Pack Size</th>
         <td class="col-sm-1">
@@ -783,9 +807,23 @@ HTML;
             </select>
         </td>
     </tr>
-</table>
-</div>
 HTML;
+            if ($rowItem['inventoried']) {
+                $ret .= sprintf('<tr>
+                    <th class="small text-right">On Hand</th><td class="small">%d</td>
+                    <th class="small text-right">Last Count</th><td colspan="2" class="small">%d on %s</td>
+                    <th class="small text-right">Par</th><td class="small">%s</td>
+                    <td colspan="3" class="small"><a href="inventory/InvCountPage.php?id=%s&store=%d">Adjust count/par</a></td>
+                    </tr>',
+                    $rowItem['onHand'],
+                    $rowItem['lastCount'], $rowItem['countDate'],
+                    $rowItem['invPar'],
+                    $upc,
+                    $store_id
+                );
+            }
+            $ret .= $this->getRowMods($upc, $active_tab, $store_id);
+            $ret .= '</table></div></div>';
             if (FannieConfig::config('STORE_MODE') != 'HQ') {
                 break;
             }
@@ -821,6 +859,38 @@ HTML;
         return $ret;
     }
 
+    private function getRowMods($upc, $active_tab, $store_id)
+    {
+        $mods = FannieConfig::config('PRODUCT_ROWS');
+        asort($mods);
+        $ret = '';
+        foreach (array_keys($mods) as $mod) {
+            if (!class_exists($mod, false)) {
+                include(__DIR__ . '/' . $mod . '.php');
+            }
+            $obj = new $mod();
+            $ret .= $obj->formRow($upc, $active_tab, $store_id);
+        }
+
+        return $ret;
+    }
+
+    private function saveRowMods($upc)
+    {
+        $mods = FannieConfig::config('PRODUCT_ROWS');
+        asort($mods);
+        foreach (array_keys($mods) as $mod) {
+            if (!class_exists($mod, false)) {
+                include(__DIR__ . '/' . $mod . '.php');
+            }
+            $obj = new $mod();
+            $obj->setConfig($this->config);
+            $obj->setForm($this->form);
+            $obj->setConnection($this->connection);
+            $obj->saveFormData($upc);
+        }
+    }
+
     public function getFormJavascript($upc)
     {
         return file_get_contents(__DIR__ . '/baseItem.js');
@@ -835,7 +905,7 @@ HTML;
         }
     }
 
-    function SaveFormData($upc)
+    function saveFormData($upc)
     {
         $FANNIE_PRODUCT_MODULES = FannieConfig::config('PRODUCT_MODULES', array());
         $upc = BarcodeLib::padUPC($upc);
@@ -848,18 +918,23 @@ HTML;
             $model->store_id($stores[$i]);
             if (!$model->load()) {
                 // fully init new record
+                $model->pricemethod(0);
+                $model->groupprice(0.00);
+                $model->quantity(0);
                 $model->special_price(0);
                 $model->specialpricemethod(0);
                 $model->specialquantity(0);
                 $model->specialgroupprice(0);
                 $model->advertised(0);
                 $model->tareweight(0);
-                $model->start_date('0000-00-00');
-                $model->end_date('0000-00-00');
+                $model->start_date('1900-01-01');
+                $model->end_date('1900-01-01');
                 $model->discounttype(0);
                 $model->wicable(0);
                 $model->scaleprice(0);
                 $model->inUse(1);
+                $model->created(date('Y-m-d H:i:s'));
+                $model->last_sold(null);
             }
 
             $taxes = $this->formNoEx('tax', array());
@@ -911,9 +986,11 @@ HTML;
             if (isset($brand[$i])) {
                 $model->brand($brand[$i]);
             }
+            /**
             $model->pricemethod(0);
             $model->groupprice(0.00);
             $model->quantity(0);
+            */
             $dept = $this->formNoEx('department', array());
             if (isset($dept[$i])) {
                 $model->department($dept[$i]);
@@ -950,7 +1027,7 @@ HTML;
             if (isset($local[$i])) {
                 $model->local($local[$i]);
             }
-            $deposit = FormLib::get('deposit-upc');
+            $deposit = FormLib::get('deposit-upc', array());
             if (isset($deposit[$i])) {
                 if ($deposit[$i] == '') {
                     $deposit[$i] = 0;
@@ -977,6 +1054,7 @@ HTML;
         if (!isset($FANNIE_PRODUCT_MODULES['ProdUserModule']) && $dbc->tableExists('productUser')) {
             $this->saveProdUser($upc);
         }
+        $this->saveRowMods($upc);
     }
 
     private function getVendorID($name)
@@ -1062,7 +1140,19 @@ HTML;
         try {
             $sku = $this->form->vendorSKU;
             $caseSize = $this->form->caseSize;
-            if (!empty($sku)) {
+            $alias = $this->form->isAlias;
+            if ($alias) {
+                return true;
+            }
+            if (count($vitem->find()) > 0 && $sku != '') {
+                $editP = $dbc->prepare('
+                    UPDATE vendorItems
+                    SET sku=?
+                    WHERE upc=?
+                        AND vendorID=? 
+                '); 
+                $editR = $dbc->execute($editP, array($sku, $upc, $vendorID));
+            } elseif (!empty($sku) && $sku != $upc) {
                 /**
                   If a SKU is provided, update any
                   old record that used the UPC as a
@@ -1074,15 +1164,8 @@ HTML;
                     WHERE sku=?
                         AND upc=?
                         AND vendorID=?');
-                $existsR = $dbc->execute($existsP, array($sku, $upc, $vendorID));
-                if ($dbc->numRows($existsR) > 0 && $sku != $upc) {
-                    $delP = $dbc->prepare('
-                        DELETE FROM vendorItems
-                        WHERE sku =?
-                            AND upc=?
-                            AND vendorID=?');
-                    $dbc->execute($delP, array($upc, $upc, $vendorID));
-                } else {
+                $exists = $dbc->getValue($existsP, array($upc, $upc, $vendorID));
+                if ($exists && $sku != $upc && $sku != $exists) {
                     $fixSkuP = $dbc->prepare('
                         UPDATE vendorItems
                         SET sku=?
@@ -1153,6 +1236,9 @@ HTML;
         $superID = '';
         $dbc = $this->db();
 
+        $dDef = $dbc->tableDefinition('departments');
+        $active = isset($dDef['active']) ? ' d.active=1 ' : '';
+
         $deptQ = '
             SELECT dept_no,
                 dept_name,
@@ -1164,9 +1250,10 @@ HTML;
                 LEFT JOIN subdepts AS s ON d.dept_no=s.dept_ID
                 LEFT JOIN superdepts AS m ON d.dept_no=m.dept_ID ';
         if (is_array($range_limit) && count($range_limit) == 2) {
-            $deptQ .= ' WHERE m.superID BETWEEN ? AND ? ';
+            $deptQ .= ' WHERE m.superID BETWEEN ? AND ? AND ' . $active;
         } else {
             $range_limit = array();
+            $deptQ .= ' WHERE ' . $active;
         }
         $deptQ .= '
             GROUP BY d.dept_no,

@@ -23,13 +23,13 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class PatronageByOwner extends FannieReportPage 
 {
     public $description = '[Patronage] lists top patrons by purchases/avg basket';
-    public $report_set = 'Reports';
+    public $report_set = 'Membership :: Patronage';
     public $themed = true;
 
     protected $report_headers = array('Owner', 'Total Purchased', 'Avg Bskt', 'Transactions');

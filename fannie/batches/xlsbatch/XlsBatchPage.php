@@ -21,9 +21,11 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\jobs\QueueManager;
+
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class XlsBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
@@ -45,7 +47,22 @@ class XlsBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             'display_name' => 'Price',
             'default' => 1,
             'required' => true
-        )
+        ),
+        'cost' => array(
+            'display_name' => 'Cost',
+            'default' => 2,
+            'required' => false,
+        ),
+        'vendor' => array(
+            'display_name' => 'Vendor',
+            'default' => 3,
+            'required' => false,
+        ),
+        'name' => array(
+            'display_name' => 'Name',
+            'default' => 4,
+            'required' => false,
+        ),
     );
 
     private $results = '';
@@ -71,6 +88,9 @@ class XlsBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
         $dtQ = $dbc->prepare("SELECT discType FROM batchType WHERE batchTypeID=?");
         $discountType = $dbc->getValue($dtQ, array($btype));
+        if ($discountType === false || !is_numeric($discountType)) {
+            $discountType = 0;
+        }
 
         $insQ = $dbc->prepare("
             INSERT INTO batches 
@@ -80,6 +100,9 @@ class XlsBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $args = array($date1,$date2,$bname,$btype,$discountType,$owner);
         $insR = $dbc->execute($insQ,$args);
         $batchID = $dbc->insertID();
+        $bu = new BatchUpdateModel($dbc);
+        $bu->batchID($batchID);
+        $bu->logUpdate($bu::UPDATE_CREATE);
 
         return $batchID;
     }
@@ -99,13 +122,28 @@ class XlsBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
         $upcChk = $dbc->prepare("SELECT upc FROM products WHERE upc=?");
 
-        $model = new BatchListModel($dbc);
-        $model->batchID($batchID);
-        $model->pricemethod(0);
-        $model->quantity(0);
-        $model->active(0);
+        $insP = $dbc->prepare("INSERT INTO batchList 
+            (batchID, pricemethod, quantity, active, upc, salePrice, groupSalePrice, signMultiplier)
+            VALUES
+            (?, 0, 0, 0, ?, ?, ?, ?)");
+        $batchList = $dbc->tableDefinition('batchList');
+        $saveCost = false;
+        if (isset($batchList['cost'])) {
+            $insP = $dbc->prepare("INSERT INTO batchList 
+                (batchID, pricemethod, quantity, active, upc, salePrice, groupSalePrice, cost, signMultiplier)
+                VALUES
+                (?, 0, 0, 0, ?, ?, ?, ?, ?)");
+            $saveCost = true;
+        }
+
+        $lc1P = $dbc->prepare("UPDATE likeCodes SET signOrigin=? WHERE likeCode=?");
+        $lc2P = $dbc->prepare("UPDATE likeCodes SET origin=? WHERE likeCode=?");
+        $originP = $dbc->prepare("SELECT origin FROM likeCodes WHERE likeCode=?");
+
+        $queue = new QueueManager();
 
         $ret = '';
+        $dbc->startTransaction();
         foreach ($linedata as $line) {
             if (!isset($line[$indexes['upc_lc']])) continue;
             if (!isset($line[$indexes['price']])) continue;
@@ -115,12 +153,22 @@ class XlsBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $upc = str_replace("-","",$upc);    
             $price = trim($price,' ');
             $price = trim($price,'$');
+            $mult = 1;
             if (!is_numeric($upc)) {
                 $ret .= "<i>Omitting item. Identifier {$upc} isn't a number</i><br />";
                 continue; 
             } elseif(!is_numeric($price)){
                 $ret .= "<i>Omitting item. Price {$price} isn't a number</i><br />";
                 continue;
+            }
+
+            $cost = 0;
+            if ($indexes['cost'] && isset($line[$indexes['cost']])) {
+                $tmp = trim($line[$indexes['cost']]);
+                $tmp = trim($tmp, '$');
+                if (is_numeric($tmp)) {
+                    $cost = $tmp;
+                }
             }
 
             $upc = ($ftype=='UPCs') ? BarcodeLib::padUPC($upc) : 'LC'.$upc;
@@ -132,11 +180,47 @@ class XlsBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 if ($dbc->num_rows($chkR) ==  0) continue;
             }   
 
-            $model->upc($upc);
-            $model->salePrice($price);
-            $model->groupSalePrice($price);
-            $model->save();
+            if (isset($line[5]) && trim($line[5]) == 's') {
+                $mult = 0;
+            }
+
+            $insArgs = array($batchID, $upc, $price, $price);
+            if ($saveCost) {
+                $insArgs[] = $cost;
+            }
+
+            if ($this->config->COOP_ID == 'WFC_Duluth' && substr($upc, 0, 2) == 'LC' && $indexes['vendor'] && $indexes['name']) {
+                $vendor = isset($line[$indexes['vendor']]) ? trim($line[$indexes['vendor']]) : '';
+                $name = isset($line[$indexes['name']]) ? trim($line[$indexes['name']]) : '';
+                if ($vendor != '' && $name != '') {
+                    $this->queueUpdate($queue, $upc, $vendor, $name);
+                }
+            }
+            if ($this->config->COOP_ID == 'WFC_Duluth' && substr($upc, 0, 2) == 'LC' && isset($line[6]) && isset($line[7])) {
+                $signOrigin = strtoupper(trim($line[7])) == 'Y' ? 1 : 0;
+                $origin = strtoupper(trim($line[6]));
+                $like = substr($upc, 2);
+                $dbc->execute($lc1P, array($signOrigin, $like));
+                if ($origin) {
+                    $current = $dbc->getValue($originP, array($like));
+                    $dbc->execute($lc2P, array($origin, $like));
+                    if (strtoupper(trim($current)) != $origin) {
+                        $mult = 0;
+                    }
+                }
+            }
+
+            $insArgs[] = $mult;
+            $dbc->execute($insP, $insArgs);
+            /** Worried about speed here. Log many?
+            $bu = new BatchUpdateModel($dbc);
+            $bu->batchID($batchID);
+            $bu->upc($upc);
+            $bu->logUpdate($bu::UPDATE_ADDED);
+             */
+
         }
+        $dbc->commitTransaction();
 
         $ret .= '
         <p>
@@ -147,6 +231,35 @@ class XlsBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $this->results = $ret;
 
         return true;
+    }
+
+    private function queueUpdate($queue, $upc, $vendor, $name)
+    {
+        $vID = -1;
+        if ($vendor == 'ALBERTS') {
+            $vID = 28;
+        } elseif ($vendor == 'CPW') {
+            $vID = 25;
+        } elseif ($vendor == 'RDW') {
+            $vID = 136;
+        } elseif ($vendor == 'UNFI') {
+            $vID = 1;
+        } 
+
+        $job = array(
+            'class' => 'COREPOS\\Fannie\\API\\jobs\\SqlUpdate',
+            'data' => array(
+                'table' => 'likeCodes',
+                'set' => array(
+                    //'likeCodeDesc' => $name,
+                    'preferredVendorID' => $vID,
+                ),
+                'where' => array(
+                    'likeCode' => substr($upc, 2),
+                ),
+            ),
+        );
+        $queue->add($job);
     }
 
     function results_content()

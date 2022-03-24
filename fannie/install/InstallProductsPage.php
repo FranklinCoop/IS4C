@@ -91,7 +91,7 @@ class InstallProductsPage extends \COREPOS\Fannie\API\InstallPage {
         <br />
         <br /><b>Available Modules</b> <br />
         <?php
-        $mods = FannieAPI::ListModules('COREPOS\Fannie\API\item\ItemModule',True);
+        $mods = FannieAPI::listModules('COREPOS\Fannie\API\item\ItemModule',True);
         sort($mods);
         ?>
         <table class="table">
@@ -191,6 +191,47 @@ class InstallProductsPage extends \COREPOS\Fannie\API\InstallPage {
         confset('FANNIE_PRODUCT_MODULES', $saveStr);
         ?>
         </table>
+        <?php
+        $rowMods = FannieAPI::listModules('COREPOS\Fannie\API\item\ItemRow',True);
+        if (!isset($FANNIE_PRODUCT_ROWS)) {
+            $FANNIE_PRODUCT_ROWS = array();
+        }
+        $formRows = FormLib::get('_prMods', false);
+        $formPos = FormLib::get('_prPos', false);
+        if ($formRows !== false) {
+            $FANNIE_PRODUCT_ROWS = array();
+            for ($i=0; $i<count($formRows); $i++) {
+                if (is_numeric($formPos[$i])) {
+                    $FANNIE_PRODUCT_ROWS[$formRows[$i]] = $formPos[$i];
+                }
+            }
+        }
+        ?>
+        <h4 class="install">Product Row Modules</h4>
+        Row modules are smaller versions of Product Information Modules that appear
+        directly within the primary product information module (BaseModule) as an
+        additional horizontal row.
+        <table class="table">
+        <tr>
+            <th>Name</th>
+            <th>Position</th>
+        </tr>
+        <?php
+        foreach ($rowMods as $rm) {
+            printf('<tr><td>%s<input type="hidden" name="_prMods[]" value="%s" /></td>
+                    <td><input type="number" class="form-control" name="_prPos" value="%s" /></td></tr>',
+                    $rm, $rm,
+                    (isset($FANNIE_PRODUCT_ROWS[$rm]) ? $FANNIE_PRODUCT_ROWS[$rm] : '')
+            );
+        }
+        $saveStr = "array(";
+        foreach ($FANNIE_PRODUCT_ROWS as $k => $v) {
+            $saveStr .= "'{$k}'=>" . sprintf('%d', $v) . ',';
+        }
+        $saveStr = $saveStr == 'array(' ? $saveStr . ')' : substr($saveStr, 0, strlen($saveStr)-1) . ')';
+        confset('FANNIE_PRODUCT_ROWS', $saveStr);
+        ?>
+        </table>
         <hr />
         <label>Default Batch View</label>
         <?php
@@ -225,23 +266,25 @@ class InstallProductsPage extends \COREPOS\Fannie\API\InstallPage {
         echo installTextField('FANNIE_SO_TEMPLATE', $FANNIE_SO_TEMPLATE, 0);
         ?> 
         <hr />
+        <h4 class="install">Tags & Signs</h4>
         <label>Default Shelf Tag Layout</label>
         <?php
         $layouts = 'No Layouts Found!';
         if (!function_exists('scan_layouts')) {
-            include($FANNIE_ROOT.'admin/labels/scan_layouts.php');
+            include(__DIR__ . '/../admin/labels/scan_layouts.php');
         }
         $layouts = scan_layouts();
         echo installSelectField('FANNIE_DEFAULT_PDF', $FANNIE_DEFAULT_PDF, $layouts, 'Fannie Standard');
         ?>
         <label>Shelf Tag Data Source</label>
         <?php
-        $mods = FannieAPI::listModules('COREPOS\Fannie\API\item\TagDataSource');
-        $source = array('' => 'Default');
-        foreach ($mods as $m) {
-            $source[$m] = $m;
-        }
-        echo installSelectField('FANNIE_TAG_DATA_SOURCE', $FANNIE_TAG_DATA_SOURCE, $source);
+        $mods = FannieAPI::listModules('\COREPOS\Fannie\API\item\TagDataSource');
+        //$source = array('' => 'Default');
+        //$source = array_merge($source, FannieAPI::listModules('\COREPOS\Fannie\API\item\TagDataSource'));
+        //foreach ($mods as $mod) {
+        //    $source[$mod] = $mod;
+        //}
+        echo installSelectField('FANNIE_TAG_DATA_SOURCE', $FANNIE_TAG_DATA_SOURCE, $mods);
 
 
         $printers = array();
@@ -253,24 +296,23 @@ class InstallProductsPage extends \COREPOS\Fannie\API\InstallPage {
         }
         echo 'Printer for instant label: '.installSelectField('FANNIE_SINGLE_LABEL_PRINTER', $FANNIE_SINGLE_LABEL_PRINTER, $printer_options);
 
-        $layouts = array(""=>"");
-        $dh = scandir(dirname(__FILE__).'/../admin/labels/pdf_layouts/');
-        foreach($dh as $filename) {
-          if($filename != "." && $filename != "..") {
-            $file = substr($filename, 0, strlen($filename)-4);
-            $layouts[$file] =  str_replace("_", " ", $file);
-          }
-        }
-
         echo 'Layout for instant label: '.installSelectField('FANNIE_SINGLE_LABEL_LAYOUT', $FANNIE_SINGLE_LABEL_LAYOUT, $layouts, 'Zebra_Single_Label');
         ?>
-
-
+        <label>Enabled Tag Layouts</label>
+        <?php
+        echo installMultiSelectField('FANNIE_ENABLED_TAGS', $FANNIE_ENABLED_TAGS, $layouts);
+        ?>
         <label>Default Signage Layout</label>
         <?php
         $mods = FannieAPI::listModules('\COREPOS\Fannie\API\item\FannieSignage');
         echo installSelectField('FANNIE_DEFAULT_SIGNAGE', $FANNIE_DEFAULT_SIGNAGE, $mods);
         ?>
+        <label>Enabled Sign Layouts</label>
+        <?php
+        echo installMultiSelectField('FANNIE_ENABLED_SIGNAGE', $FANNIE_ENABLED_SIGNAGE, $mods);
+        ?>
+        <hr />
+        <h4 class="install">Purchase Orders</h4>
         <label>Default Purchase Order Export</label>
         <?php
         $mods = COREPOS\Fannie\API\item\InventoryLib::orderExporters();
@@ -282,8 +324,14 @@ class InstallProductsPage extends \COREPOS\Fannie\API\InstallPage {
         $mods = array_merge($mods, FannieAPI::listModules('\COREPOS\Fannie\API\item\Accounting'));
         echo installSelectField('FANNIE_ACCOUNTING_MODULE', $FANNIE_ACCOUNTING_MODULE, $mods);
         ?>
+        <label>From Email Address for Purchase Orders</label>
+        <?php echo installTextField('FANNIE_PO_EMAIL', $FANNIE_PO_EMAIL, ''); ?>
+        <label>From Email Name for Purchase Orders</label>
+        <?php echo installTextField('FANNIE_PO_EMAILNAME', $FANNIE_PO_EMAILNAME, ''); ?>
         <hr />
         <h4 class="install">Service Scale Integration</h4>
+        <p class='ichunk' style="margin:0.4em 0em 0.4em 0em;"><b>Scale PLU Length</b>
+        <?php echo installTextField('FANNIE_SPLU_LENGTH', $FANNIE_SPLU_LENGTH, 4); ?>
         <p class='ichunk' style="margin:0.4em 0em 0.4em 0em;"><b>Data Gate Weigh directory</b>
         <?php
         echo installTextField('FANNIE_DGW_DIRECTORY', $FANNIE_DGW_DIRECTORY, '');

@@ -23,7 +23,7 @@
 
 namespace COREPOS\pos\parser\parse;
 use COREPOS\pos\lib\DisplayLib;
-use \CoreLocal;
+use COREPOS\pos\lib\MemberLib;
 use COREPOS\pos\parser\Parser;
 
 class BalanceCheck extends Parser 
@@ -40,16 +40,18 @@ class BalanceCheck extends Parser
     function parse($str)
     {
         $ret = $this->default_json();
-        \COREPOS\pos\lib\MemberLib::chargeOk();
-        $memChargeCommitted=CoreLocal::get("availBal") - CoreLocal::get("memChargeTotal");
-        $title = _('Member #') . CoreLocal::get('memberID');
-        $msg = _("Current AR balance is ") . CoreLocal::get("balance") . "<br />"
-             . _("Available AR balance is ") . CoreLocal::get("availBal");
+        MemberLib::chargeOk();
+        $memChargeCommitted=$this->session->get("availBal") - $this->session->get("memChargeTotal");
+        $title = _('Member #') . $this->session->get('memberID');
+        $bal = $this->session->get('InvertAR') ? -1*$this->session->get('balance') : $this->session->get('balance');
+        $avail = $this->session->get('InvertAR') ? -1*$this->session->get('availBal') : $this->session->get('availBal');
+        $msg = _(sprintf("Current AR balance is %.2f", $bal)) . '<br />'
+             . _(sprintf("Available AR balance is %.2f", $avail));
         $ret['output'] = DisplayLib::boxMsg(
             $msg, 
             $title, 
             true, 
-            array_merge(array('Tender [Store Credit]' => 'parseWrapper(\'MI\');'), DisplayLib::standardClearButton())
+            array_merge(array(_('Tender [Store Credit]') => 'parseWrapper(\'MI\');'), DisplayLib::standardClearButton())
         );
 
         return $ret;

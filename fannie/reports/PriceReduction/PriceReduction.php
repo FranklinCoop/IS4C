@@ -23,13 +23,13 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class PriceReduction extends FannieReportPage 
 {
     public $description = '[Price Reduction Report] lists items above desired margin';
-    public $report_set = 'Reports';
+    public $report_set = 'Price Reports';
     public $themed = true;
 
     protected $report_headers = array('UPC', 'Description', 'Movement (Daily)', 'Cost', 'Price', 'Margin Goal', 'actMarg', '+/- Marg', 'SRP', 'RoundSRP', '+/-:Price');
@@ -72,10 +72,10 @@ class PriceReduction extends FannieReportPage
                     LEFT JOIN vendorItems as V ON P.upc = V.upc AND P.default_vendor_id = V.vendorID
                     LEFT JOIN vendorDepartments as D ON (V.vendorID = D.vendorID) AND (D.deptID = V.vendorDept) 
                     LEFT JOIN departments as S ON (P.department = S.dept_no)
-                WHERE P.inUse = 1 AND P.price_rule_id = 0
+                WHERE P.store_id=1
                     AND P.cost <> 0 
                     AND m.superID=? 
-                GROUP BY P.upc 
+                    AND P.upc IN (SELECT upc FROM products WHERE inUse=1 GROUP BY upc)
                 ORDER BY P.modified
                 ; ";
                     

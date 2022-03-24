@@ -20,20 +20,26 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *********************************************************************************/
+use COREPOS\Fannie\API\lib\Store;
 if (basename(__FILE__) != basename($_SERVER['PHP_SELF'])) {
     return;
 }
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
-if (FannieConfig::config('SO_UI') === 'bootstrap') {
-    header('Location: NewSpecialOrdersPage.php');
+$edit = FannieAuth::validateUserQuiet('ordering_edit');
+if (Store::getIdByIp() == 2 || $edit || FannieConfig::config('SO_UI') === 'bootstrap') {
+    $url = 'NewSpecialOrdersPage.php';
+    if (isset($_REQUEST['card_no'])) {
+        $url .= sprintf('?card_no=%d', $_REQUEST['card_no']);
+    }
+    header('Location: ' . $url);
     return;
 }
 if (!function_exists('checkLogin')) {
-    include($FANNIE_ROOT.'auth/login.php');
+    include(__DIR__ . '/../auth/login.php');
 }
 $dbc = FannieDB::get($FANNIE_OP_DB);
 
@@ -67,7 +73,7 @@ $header = "Manage Special Orders";
 if (isset($_REQUEST['card_no']) && is_numeric($_REQUEST['card_no'])){
     $header = "Special Orders for Member #".((int)$_REQUEST['card_no']);
 }
-//include($FANNIE_ROOT.'src/header.html');
+//include(__DIR__ . '/../src/header.html');
 echo '<html>
     <head><title>'.$page_title.'</title>
     <link rel="STYLESHEET" href="'.$FANNIE_URL.'src/style.css" type="text/css">
@@ -80,6 +86,11 @@ echo '<html>
     </head>
     <body id="bodytag">';
 echo '<h3>'.$header.'</h3>';
+$new = 'NewSpecialOrdersPage.php';
+if (isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING']) {
+    $new .= '?' . $_SERVER['QUERY_STRING'];
+}
+echo '<div style="text-align: center; background: #00aa00;" class="alert alert-info"><a style="color:#fff" href="'.$new.'">Newer Version</a></div>';
 if (isset($_REQUEST['card_no'])){
     printf('(<a href="clearinghouse.php?f1=%s&f2=%s&f3=%s&order=%s">Back to All Owners</a>)<br />',
         (isset($_REQUEST['f1'])?$_REQUEST['f1']:''),    
@@ -166,6 +177,7 @@ foreach($assignments as $k=>$v){
     printf("<option %s value=\"%d\">%s</option>",
         ($k==$f2?'selected':''),$k,$v);
 }
+printf('<option %s value="20">Spices</option>',($f2=="20"?'selected':''));
 printf('<option %s value="2%%2C8">Meat+Cool</option>',($f2=="2,8"?'selected':''));
 echo '</select>';
 echo '&nbsp;';
@@ -225,9 +237,10 @@ while($w = $dbc->fetch_row($r)){
 
 if ($f2 !== '' || $f3 !== ''){
     $filter2 = ($f2!==''?sprintf("AND (m.superID IN (%s) OR o.noteSuperID IN (%s))",$f2,$f2):'');
+    $supers = ($f2 !== '' ? 'superdepts' : 'MasterSuperDepts');
     $filter3 = ($f3!==''?sprintf("AND p.mixMatch=%s",$dbc->escape($f3)):'');
     $q = "SELECT p.order_id FROM {$TRANS}PendingSpecialOrder AS p
-        LEFT JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
+        LEFT JOIN {$supers} AS m ON p.department=m.dept_ID
         LEFT JOIN {$TRANS}SpecialOrders AS o ON p.order_id=o.specialOrderID
         WHERE 1=1 $filter2 $filter3
         GROUP BY p.order_id";
@@ -403,4 +416,4 @@ function togglePrint(username,oid){
 }
 </script>
 <?php
-//include($FANNIE_ROOT.'src/footer.html');
+//include(__DIR__ . '/../src/footer.html');

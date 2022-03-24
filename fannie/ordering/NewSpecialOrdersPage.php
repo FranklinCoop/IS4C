@@ -98,13 +98,14 @@ class NewSpecialOrdersPage extends FannieRESTfulPage
         return $assignments;
     }
 
-    protected function getOrderSuppliers($dbc)
+    protected function getOrderSuppliers($dbc, $new=true)
     {
         $suppliers = array('');
+        $table = $new ? 'PendingSpecialOrder' : 'CompleteSpecialOrder';
         $TRANS = $this->config->get('TRANS_DB') . $dbc->sep();
         $prep = $dbc->prepare("
             SELECT mixMatch 
-            FROM {$TRANS}PendingSpecialOrder 
+            FROM {$TRANS}{$table}
             WHERE trans_type='I'
             GROUP BY mixMatch 
             ORDER BY mixMatch");
@@ -251,7 +252,7 @@ class NewSpecialOrdersPage extends FannieRESTfulPage
         }
 
         $ret = '';
-        if ($this->card_no) {
+        if ($this->card_no !== false) {
             $ret .= sprintf('(<a href="%s?f1=%s&f2=%s&f3=%s&order=%s">Back to All Owners</a>)<br />',
                     filter_input(INPUT_SERVER, 'PHP_SELF'), $filter_status, $filter_buyer, $filter_supplier, FormLib::get('order'));
         }
@@ -284,6 +285,11 @@ class NewSpecialOrdersPage extends FannieRESTfulPage
             '<select id="f_4" onchange="refilter();"',
             $stores['html']
         );
+        $stores['html'] = str_replace(
+            '</select>',
+            '<option value="-1">No Store!</option></select>',
+            $stores['html']
+        );
         $stores['html'] = str_replace('form-control', 'form-control input-sm', $stores['html']);
 
         $filterstring = "";
@@ -293,7 +299,9 @@ class NewSpecialOrdersPage extends FannieRESTfulPage
             $filterstring .= ' AND statusFlag=?';
             $filterargs[] = $filter_status;
         }
-        if ($filter_store) {
+        if ($filter_store == -1) {
+            $filterstring .= ' AND o.storeID=0 ';
+        } elseif ($filter_store) {
             $filterstring .= ' AND o.storeID=? ';
             $filterargs[] = $filter_store;
         }
@@ -303,7 +311,7 @@ class NewSpecialOrdersPage extends FannieRESTfulPage
         $ret .= "Current Orders";
         $ret .= "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
         $ret .= sprintf('<a href="OldSpecialOrdersPage.php%s">Old Orders</a>',
-            ($this->card_no ? '?card_no='.$this->card_no :'')
+            ($this->card_no !== false ? '?card_no='.$this->card_no :'')
         );
         $ret .= "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
         $ret .= "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
@@ -350,7 +358,7 @@ class NewSpecialOrdersPage extends FannieRESTfulPage
         /**
           Also filter by member number if applicable
         */
-        if ($this->card_no) {
+        if ($this->card_no !== false) {
             $filterstring .= " AND p.card_no=?";
             $filterargs[] = $this->card_no;
             $ret .= sprintf('<input type="hidden" id="cardno" value="%d" />',$this->card_no);
@@ -467,8 +475,8 @@ class NewSpecialOrdersPage extends FannieRESTfulPage
             </p>
             </form>';
 
-        $this->add_script('../src/javascript/tablesorter/jquery.tablesorter.js');
-        $this->add_onload_command("\$('.tablesorter').tablesorter();");
+        $this->addScript('../src/javascript/tablesorter/jquery.tablesorter.js');
+        $this->addOnloadCommand("\$('.tablesorter').tablesorter();");
         
         return $ret;
     }

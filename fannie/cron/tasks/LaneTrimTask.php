@@ -40,23 +40,36 @@ Deprecates lanes.clean.php.';
         'weekday' => '*',
     );
 
+    private function laneConnect($ln)
+    {
+        try {
+            $sql = new SQLManager($ln['host'],$ln['type'],$ln['trans'],$ln['user'],$ln['pw']);
+        } catch (Exception $ex) {
+            $sql = false;
+        }
+
+        return $sql;
+    }
+
     public function run()
     {
         set_time_limit(0);
 
         foreach ($this->config->get('LANES') as $ln) {
 
-            $sql = new SQLManager($ln['host'],$ln['type'],$ln['trans'],$ln['user'],$ln['pw']);
+            $sql = $this->laneConnect($ln);
             if ($sql === false || !$sql->isConnected()) {
                 $this->cronMsg("Could not connect to lane: ".$ln['host']);
                 continue;
             }
 
             $table = 'localtrans_today';
-            $cleanQ = "DELETE FROM $table WHERE ".$sql->datediff($sql->now(),'datetime')." <> 0";
-            $cleanR = $sql->query($cleanQ,$ln['trans']);
-            if ($cleanR === false) {
-                $this->cronMsg("Could not clean $table on lane: ".$ln['host']);
+            if ($sql->tableExists($table)) {
+                $cleanQ = "DELETE FROM $table WHERE ".$sql->datediff($sql->now(),'datetime')." <> 0";
+                $cleanR = $sql->query($cleanQ,$ln['trans']);
+                if ($cleanR === false) {
+                    $this->cronMsg("Could not clean $table on lane: ".$ln['host']);
+                }
             }
 
             $table = 'localtranstoday';

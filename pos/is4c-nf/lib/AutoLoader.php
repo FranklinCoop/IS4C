@@ -24,12 +24,12 @@
 use COREPOS\pos\lib\LocalStorage\LaneCache;
 use COREPOS\pos\lib\MiscLib;
 use COREPOS\pos\plugins\Plugin;
+use COREPOS\pos\lib\LocalStorage\WrappedStorage;
+
+use COREPOS\common\mvc\FormValueContainer;
 
 if (!defined('CONF_LOADED')) {
     include_once(dirname(__FILE__).'/LocalStorage/conf.php');
-}
-if (!class_exists('COREPOS\\pos\\lib\\LocalStorage\\LaneCache', false)) {
-    include(dirname(__FILE__) . '/LocalStorage/LaneCache.php');
 }
 
 /**
@@ -39,14 +39,12 @@ if (!class_exists('COREPOS\\pos\\lib\\LocalStorage\\LaneCache', false)) {
 */
 class AutoLoader 
 {
-
     /**
       Autoload class by name
       @param $name class name
     */
     static public function loadClass($name)
     {
-        global $CORE_LOCAL;
         $map = CoreLocal::get("ClassLookup");
         if (!is_array($map)) {
             // attempt to build map before giving up
@@ -57,30 +55,24 @@ class AutoLoader
         }
 
         if (!isset($map[$name]) && strpos($name, '\\') > 0) {
-            $pieces = explode('\\', $name);
             if ($name[0] == '\\') { // some old PHP5.3 versions leave the leading backslash
                 $name = substr($name, 1);
             }
             $sep = DIRECTORY_SEPARATOR;
-            $our_path = false;
-            if (strpos($name, 'COREPOS\\pos\\') === 0) {
-                $our_path = __DIR__ . $sep . '..' . $sep . strtr(substr($name, 12), '\\', $sep) . '.php';
-            } elseif (strpos($name, 'COREPOS\\common\\') === 0) {
-                $our_path = __DIR__ . $sep . '..' . $sep . '..' . $sep . '..' . $sep . 'common' . $sep
-                    . strtr(substr($name, 15), '\\', $sep) . '.php';
-            }
-            if ($our_path) {
-                $map[$name] = $our_path;
+            if (strpos($name, 'COREPOS\\common\\') === 0) {
+                $ourPath = __DIR__ . $sep . '..' . $sep . '..' . $sep . '..' . $sep . 'common' . $sep . strtr(substr($name, 15), '\\', $sep) . '.php';
+                $map[$name] = $ourPath;
+                CoreLocal::set('ClassLookup', $map);
+            } elseif (strpos($name, 'COREPOS\\pos\\') === 0) {
+                $ourPath = __DIR__ . $sep . '..' . $sep . strtr(substr($name, 12), '\\', $sep) . '.php';
+                $map[$name] = $ourPath;
                 CoreLocal::set('ClassLookup', $map);
             }
         } elseif (!isset($map[$name])) {
             // class is unknown
-            // rebuild map to see if the definition
-            // file has been added
-            $map = self::loadMap();
-            if (!is_array($map)) {
-                return;
-            }
+            // don't auto-rebuild. signing out will
+            // do a full filesystem re-map if needed
+            return;
         }
 
         if (isset($map[$name]) && !class_exists($name,false)) {
@@ -90,7 +82,37 @@ class AutoLoader
                 CoreLocal::set('ClassLookup', $map);
             }
         }
+
+        //self::loadStats($name);
     }
+
+    /*
+    static private function loadStats($class)
+    {
+        if (!class_exists('COREPOS\\ClassCache\\ClassCache')) {
+            return false;
+        }
+        $stats = CoreLocal::get('ClassStats');
+        if (!is_array($stats)) {
+            $stats = array();
+        }
+        $now = microtime(true);
+        $loads = isset($stats[$class]) ? $stats[$class] : array();
+        array_push($loads, $now);
+        while (count($loads) > 5) {
+            array_shift($loads);
+        }
+        $stats[$class] = $loads;
+        if (count($loads) == 5 && $loads[4] - $loads[0] < 2.0) {
+            $cache = new COREPOS\ClassCache\ClassCache(__DIR__ . '/../cache.php');
+            $added = $cache->add($class);
+            unset($stats[$class]);
+        }
+        CoreLocal::set('ClassStats', $stats);
+
+        return true;
+    }
+     */
 
     /**
       Map available classes. Class names should
@@ -98,18 +120,40 @@ class AutoLoader
     */
     static public function loadMap()
     {
-        $class_map = array();
-        $search_path = realpath(dirname(__FILE__).'/../');
-        self::recursiveLoader($search_path, $class_map);
-        CoreLocal::set('ClassLookup', $class_map);
+        $classMap = array();
+        $searchPath = realpath(dirname(__FILE__).'/../plugins/');
+        self::recursiveLoader($searchPath, $classMap);
+        CoreLocal::set('ClassLookup', $classMap);
+        //self::classCache();
 
-        return $class_map;
+        return $classMap;
     }
 
-    static private $class_paths = array(
+    /*
+    static private function classCache()
+    {
+        if (!class_exists('COREPOS\\ClassCache\\ClassCache')) {
+            return false;
+        }
+        $cachefile = __DIR__ . '/../cache.php';
+        $cache = new COREPOS\ClassCache\ClassCache($cachefile);
+        $cache->clean();
+        foreach (self::listModules('COREPOS\\pos\\parser\\PreParser') as $p) {
+            $added = $cache->add($p);
+        }
+        foreach (self::listModules('COREPOS\\pos\\parser\\Parser') as $p) {
+            $added = $cache->add($p);
+        }
+
+        return true;
+    }
+     */
+
+    static private $classPaths = array(
         'COREPOS\pos\lib\Scanning\DiscountType' => '/Scanning/DiscountTypes',
         'COREPOS\pos\lib\FooterBoxes\FooterBox' => '/FooterBoxes',
         'COREPOS\pos\lib\Kickers\Kicker' => '/Kickers',
+        'COREPOS\pos\lib\Notifier' => '/Notifiers',
         'COREPOS\\pos\\parser\\Parser' => '/../parser/parse',
         'COREPOS\\pos\\parser\\PreParser' => '/../parser/preparse',
         'COREPOS\pos\lib\Scanning\PriceMethod' => '/Scanning/PriceMethods',
@@ -131,9 +175,10 @@ class AutoLoader
         'COREPOS\pos\lib\ReceiptBuilding\Messages\ReceiptMessage' => '/ReceiptBuilding/Messages',
         'COREPOS\pos\lib\ReceiptBuilding\CustMessages\CustomerReceiptMessage' => '/ReceiptBuilding/CustMessages',
         'COREPOS\pos\lib\Scanning\VariableWeightReWrite' => '/Scanning/VariableWeightReWrites',
+        'COREPOS\pos\lib\MemberActions\MemberAction' => '/MemberActions',
     );
 
-    private static $base_classes = array(
+    private static $baseClasses = array(
         'COREPOS\\pos\\lib\\MemberLookup' => '/MemberLookup.php',
         'COREPOS\\pos\\lib\\ItemNotFound' => '/ItemNotFound.php',
     );
@@ -141,57 +186,62 @@ class AutoLoader
     /**
       Get a list of available modules with the
       given base class
-      @param $base_class string class name
-      @param $include_base whether base class should be included
+      @param $baseClass string class name
+      @param $includeBase whether base class should be included
         in the return value
       @return an array of class names
     */
-    static public function listModules($base_class, $include_base=False)
+    static public function listModules($baseClass, $includeBase=False)
     {
         $ret = array();
         
         // lookup plugin modules, then standard modules
-        $map = Plugin::pluginMap();
-        if (isset(self::$class_paths[$base_class])) {
-            $path = realpath(dirname(__FILE__) . self::$class_paths[$base_class]);
+        $map = array_filter(CoreLocal::get('ClassLookup'), function ($i) {
+            return strpos($i, 'plugins') > 0;
+        });
+        if (isset(self::$classPaths[$baseClass])) {
+            $path = realpath(dirname(__FILE__) . self::$classPaths[$baseClass]);
             $map = Plugin::pluginMap($path,$map);
         }
-        if (isset(self::$base_classes[$base_class])) {
-            $path = realpath(dirname(__FILE__) . self::$base_classes[$base_class]);
-            $map[$base_class] = $path;
+        if (isset(self::$baseClasses[$baseClass])) {
+            $path = realpath(dirname(__FILE__) . self::$baseClasses[$baseClass]);
+            $map[$baseClass] = $path;
 
         }
 
         foreach($map as $name => $file) {
 
             // matched base class
-            if ($name === $base_class) {
-                if ($include_base) $ret[] = $name;
+            if ($name === $baseClass) {
+                if ($includeBase) $ret[] = $name;
                 continue;
             }
-            if (in_array($name, self::$blacklist)) {
+            if (in_array($name, self::$ignoreClass)) {
                 continue;
             }
 
             if (strstr($file,'plugins')) {
                 $parent = Plugin::memberOf($file);
-                if ($base_class !== 'COREPOS\\pos\\plugins\\Plugin' && $parent && !Plugin::isEnabled($parent)) {
+                if ($baseClass !== 'COREPOS\\pos\\plugins\\Plugin' && $parent && !Plugin::isEnabled($parent)) {
                     continue;
                 }
             }
 
             ob_start();
-            $ns_class = self::fileToFullClass($file);
-            if (!class_exists($name, false) && class_exists($ns_class)) {
-                $name = $ns_class;
-            } elseif (!class_exists($name)) { 
+            $nsClass = self::fileToFullClass($file);
+            if (!class_exists($nsClass, false) && !class_exists($name, false)) {
+                include_once($file);
+            }
+            if (!class_exists($name, false) && class_exists($nsClass, false)) {
+                $name = $nsClass;
+            } elseif (!class_exists($name, false)) { 
                 ob_end_clean();
                 continue;
             }
 
-            if (is_subclass_of($name,$base_class)) {
+            if (is_subclass_of($name,$baseClass)) {
                 $ret[] = $name;
-            } elseif ($ns_class === $base_class && $include_base) {
+            } elseif ($nsClass === $baseClass && $includeBase) {
                 $ret[] = $name;
             }
 
@@ -201,11 +251,11 @@ class AutoLoader
         return $ret;
     }
 
-    static private $blacklist = array();
-    static public function blacklist($class)
+    static private $ignoreClass = array();
+    static public function ignoreClass($class)
     {
-        if (!in_array($class, self::$blacklist)) {
-            self::$blacklist[] = $class;
+        if (!in_array($class, self::$ignoreClass)) {
+            self::$ignoreClass[] = $class;
         }
     }
 
@@ -265,12 +315,28 @@ class AutoLoader
             $fullname = $path . DIRECTORY_SEPARATOR . $file;
             if (is_dir($fullname) && !in_array($file, $exclude)) {
                 self::recursiveLoader($fullname, $map);
-            } else if (substr($file,-4) == '.php') {
+            } elseif (substr($file,-4) == '.php') {
                 $class = substr($file,0,strlen($file)-4);
                 $map[$class] = realpath($fullname);
             }
         }
         closedir($dir);
+    }
+
+    public static function ownURL()
+    {
+        if (isset($_SERVER['PHP_SELF']) && !empty($_SERVER['PHP_SELF'])) {
+            return $_SERVER['PHP_SELF'];
+        } elseif (isset($_SERVER['SCRIPT_NAME']) && !empty($_SERVER['SCRIPT_NAME'])) {
+            return $_SERVER['SCRIPT_NAME'];
+        } elseif (isset($_SERVER['DOCUMENT_URI']) && !empty($_SERVER['DOCUMENT_URI'])) {
+            return $_SERVER['DOCUMENT_URI'];
+        } elseif (isset($_SERVER['REQUEST_URI']) && !empty($_SERVER['REQUEST_URI'])) {
+            $tmp = explode('?', $_SERVER['REQUEST_URI'], 2);
+            return $tmp[0];
+        }
+
+        throw new Exception("Can't find my own URL");
     }
 
     /**
@@ -287,10 +353,15 @@ class AutoLoader
     {
         $stack = debug_backtrace();
         if (count($stack) == 1) {
-            $page = basename($_SERVER['PHP_SELF']);
+            $session = new WrappedStorage();
+            $form = new FormValueContainer();
+            $page = basename(self::ownURL());
             $class = substr($page,0,strlen($page)-4);
             if (CoreLocal::get('CashierNo') !== '' && $class != 'index' && class_exists($class)) {
-                $page = new $class();
+                $page = new $class($session, $form);
+            } elseif ($class === '') {
+                trigger_error('Your environment is not populating PHP_SELF correctly.
+                    Details: ' . print_r($_SERVER, true), E_USER_ERROR);
             } elseif ($redirect) {
                 $url = MiscLib::baseURL();
                 header('Location: ' . $url . 'login.php');
@@ -316,11 +387,16 @@ COREPOS\common\ErrorHandler::setErrorHandlers();
   but the gettext functions may or may not
   be available
 */
+if (!defined('LC_MESSAGES')) {
+    // manually define for windows
+    define('LC_MESSAGES', 5);
+}
 if (function_exists('setlocale') && defined('LC_MESSAGES') && CoreLocal::get('locale') !== '') {
     setlocale(LC_MESSAGES, CoreLocal::get('locale') . '.utf8');
     putenv('LC_MESSAGES=' . CoreLocal::get('locale') . '.utf8');
     if (function_exists('bindtextdomain')) {
         bindtextdomain('pos-nf', realpath(dirname(__FILE__).'/../locale'));
+        bind_textdomain_codeset('pos-nf', 'UTF-8');
         textdomain('pos-nf');
     }
 }

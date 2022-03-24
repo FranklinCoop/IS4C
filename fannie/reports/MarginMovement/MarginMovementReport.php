@@ -23,12 +23,12 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class MarginMovementReport extends FannieReportPage 
 {
-    public $description = '[Margin Movement] lists item movement with margin information.';
+    public $description = '[Margin Movement] (Achived Margin) lists item movement with margin information.';
     public $report_set = 'Movement Reports';
 
     protected $title = "Fannie : Margin Movement Report";
@@ -75,12 +75,13 @@ class MarginMovementReport extends FannieReportPage
         $deptMulti = FormLib::get('departments', array());
         $subs = FormLib::get('subdepts', array());
         $include_sales = FormLib::get('includeSales', 0);
+        $store = FormLib::get('store');
     
         $buyer = FormLib::get('buyer', '');
 
         // args/parameters differ with super
         // vs regular department
-        $args = array($date1.' 00:00:00', $date2.' 23:59:59');
+        $args = array($date1.' 00:00:00', $date2.' 23:59:59', $store);
         $where = ' 1=1 ';
         if ($buyer !== '') {
             if ($buyer == -2) {
@@ -107,7 +108,12 @@ class MarginMovementReport extends FannieReportPage
                     d.department,
                     t.dept_name,
                     SUM(total) AS total,
-                    SUM(d.cost) AS cost,"
+                    SUM(
+                        CASE WHEN (d.cost > 0 AND d.total < 0) OR (d.cost < 0 AND d.total > 0)
+                            THEN -1*d.cost
+                            ELSE d.cost
+                        END
+                    ) AS cost,"
                     . DTrans::sumQuantity('d') . " AS qty
                   FROM $dlog AS d "
                     . DTrans::joinProducts('d', 'p', 'inner')
@@ -119,12 +125,13 @@ class MarginMovementReport extends FannieReportPage
             $query .= 'LEFT JOIN MasterSuperDepts AS s ON d.department=s.dept_ID ';
         }
         $query .= "WHERE tdate BETWEEN ? AND ?
+            AND " . DTrans::isStoreID($store, 'd') . "
             AND $where
             AND d.cost <> 0 ";
         if ($include_sales != 1) {
             $query .= "AND d.discounttype=0 ";
         }
-        $query .= "GROUP BY d.upc,p.description,d.department,t.dept_name
+        $query .= "GROUP BY d.upc,p.brand,p.description,d.department,t.dept_name
             ORDER BY sum(total) DESC";
 
         $prep = $dbc->prepare($query);
@@ -178,8 +185,9 @@ class MarginMovementReport extends FannieReportPage
             $sum_cost += $row[5];
             $sum_ttl += $row[6];
         }
+        $sum_margin = (1-($sum_cost/$sum_ttl))*100;
 
-        return array('Totals', null, null, null, null, sprintf('%.2f',$sum_cost), sprintf('%.2f',$sum_ttl), '', null, null);
+        return array('Totals', null, null, null, null, sprintf('%.2f',$sum_cost), sprintf('%.2f',$sum_ttl), sprintf("%.2f%%", $sum_margin), null, null);
     }
 
     public function form_content()

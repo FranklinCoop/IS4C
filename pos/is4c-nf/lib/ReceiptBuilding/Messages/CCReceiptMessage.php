@@ -56,15 +56,14 @@ class CCReceiptMessage extends ReceiptMessage {
     {
         $date = ReceiptLib::build_time(time());
         list($emp, $reg, $trans) = ReceiptLib::parseRef($ref);
-        $sort = 'asc';
 
         $slip = '';
-        $idclause = '';
         $dbc = Database::tDataConnect();
-        if ($reprint)
+        if ($reprint) {
             $dbc = Database::mDataConnect();
-        if ($sigSlip && is_numeric(CoreLocal::get('paycard_id'))) {
-            $idclause = ' AND transID='.CoreLocal::get('paycard_id');
+            if ($dbc === false) {
+                return '';
+            }
         }
 
         $trans_type = $dbc->concat('p.cardType', "' '", 'p.transType', '');
@@ -72,7 +71,12 @@ class CCReceiptMessage extends ReceiptMessage {
         $query = "SELECT $trans_type AS tranType,
                     CASE WHEN p.transType = 'Return' THEN -1*p.amount ELSE p.amount END as amount,
                     p.PAN,
-                    CASE WHEN p.manual=1 THEN 'Manual' ELSE 'Swiped' END as entryMethod,
+                    CASE 
+                        WHEN p.manual=1 THEN 'Manual'
+                        WHEN p.manual=-1 THEN 'Chip'
+                        WHEN p.manual=-2 THEN 'NFC'
+                        ELSE 'Swiped'
+                    END as entryMethod,
                     p.issuer,
                     p.xResultMessage,
                     p.xApprovalNumber,
@@ -82,15 +86,25 @@ class CCReceiptMessage extends ReceiptMessage {
                     p.transID
                   FROM PaycardTransactions AS p
                   WHERE dateID=" . date('Ymd') . "
-                    AND empNo=" . $emp . "
-                    AND registerNo=" . $reg . "
-                    AND transNo=" . $trans . $idclause . "
                     AND p.validResponse=1
                     AND (p.xResultMessage LIKE '%APPROVE%' OR p.xResultMessage LIKE '%PENDING%')
-                    AND p.cardType IN ('Credit', 'Debit', 'EMV')
-                  ORDER BY p.requestDatetime";
+                    AND p.cardType IN ('Credit', 'Debit', 'EMV', 'R.Credit', 'R.EMV') ";
+        $moreSpecific = $query;
+        $moreSpecific .= "
+                    AND empNo=" . $emp . "
+                    AND registerNo=" . $reg . "
+                    AND transNo=" . $trans;
+        $query .= " ORDER BY p.requestDatetime";
+        $moreSpecific .= " ORDER BY p.requestDatetime";
+        if ($sigSlip) {
+            $query .= ' DESC';
+            $moreSpecific .= ' DESC';
+        }
 
-        $result = $dbc->query($query);
+        $result = $dbc->query($moreSpecific);
+        if ($sigSlip && $dbc->numRows($result) == 0) {
+            $result = $dbc->query($query);
+        }
 
         $emvP = $dbc->prepare('
             SELECT content
@@ -101,6 +115,10 @@ class CCReceiptMessage extends ReceiptMessage {
                 AND transNo=?
                 AND transID=?
         ');
+        $recurring = 20;
+        $payments_left = 4;
+        $r_phone = '218-728-0884';
+        $r_email = 'billing@wholefoods.coop';
         
         while ($row = $dbc->fetchRow($result)) {
             $slip .= ReceiptLib::centerString("................................................")."\n";
@@ -150,6 +168,14 @@ class CCReceiptMessage extends ReceiptMessage {
                     for ($i=1; $i<= CoreLocal::get('chargeSlipCount'); $i++) {
                         $slip .= ReceiptLib::centerString(CoreLocal::get("chargeSlip" . $i))."\n";
                     }
+                    if (strpos($row['tranType'], ' R.')) {
+                        $para1 = 'Whole Foods Co-op (WFC) will charge four (4) additional $20 payments to your card. Payments will occur monthly starting one month from today. Each $20 payment will purchase four (4) shares of class B equity in WFC. Entries on your bank statement may be labeled recurring.';
+                        $para2 = 'To cancel this arrangement at any point, contact WFC by phone at 218-728-0884 or by email at equity@wholefoods.coop.';
+                        $para3 = 'WFC does not keep any credit card information on file. As such if a monthly payment fails or is declined, no future monthly charges will be made. You will retain ownership of all equity purchased up to that point and may pay the remaining balance any time before the due date, one year from today.';
+                        $slip .= wordwrap($para1, 55) . "\n\n";
+                        $slip .= wordwrap($para2, 55) . "\n\n";
+                        $slip .= wordwrap($para3, 55) . "\n\n";
+                    }
                     $slip .= $row['tranType']."\n" // trans type:  purchase, canceled purchase, refund or canceled refund
                         ."Card: ".$row['issuer']."  ".$row['PAN']."\n"
                         ."Reference:  ".$ref."\n"
@@ -176,9 +202,21 @@ class CCReceiptMessage extends ReceiptMessage {
                     $col2[] = "Authorization:  ".$row['xResultMessage'];
                     $col2[] = ReceiptLib::boldFont()."Amount: ".$amt.ReceiptLib::normalFont();
                     $slip .= ReceiptLib::twoColumns($col1,$col2);
+                    if (strpos($row['tranType'], ' R.')) {
+                        $slip .= ReceiptLib::boldFont() . 'This is a recurring payment' . ReceiptLib::normalFont() . "\n"
+                            . wordwrap(
+                                sprintf('You will be billed monthly %d additional times for $%.2f. ', $payments_left, $recurring)
+                                . 'The charges on your bank statement will be labeled "recurring". '
+                                . sprintf('Call %s or email %s to cancel. ', $r_phone, $r_email)
+                                . 'Please do not include your credit card number in an email. ',
+                                55) . "\n";
+                    }
                 }
             }
             $slip .= ReceiptLib::centerString(".................................................")."\n";
+            if ($sigSlip) {
+                break;
+            }
         }
 
         return $slip;

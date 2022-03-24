@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class TrendsReport extends FannieReportPage
@@ -36,6 +36,58 @@ class TrendsReport extends FannieReportPage
     public $description = '[Trends] shows daily sales totals for items over a given date range. Items can be included by UPC, department, or manufacturer.';
     public $report_set = 'Movement Reports';
     public $themed = true;
+
+    public function report_description_content()
+    {
+        if ($this->report_format != 'html') {
+            return array();
+        }
+
+        $url = $this->config->get('URL');
+        $this->addScript($url . 'src/javascript/jquery.js');
+        $this->addScript($url . 'src/javascript/jquery-ui.js');
+        $this->addCssFile($url . 'src/javascript/jquery-ui.css');
+
+        $dates_form = '<form method="post" action="' . $_SERVER['PHP_SELF'] . '">';
+        foreach ($_GET as $key => $value) {
+            if ($key != 'date1' && $key != 'date2' && $key != 'store') {
+                if (is_array($value)) {
+                    foreach ($value as $v) {
+                        $dates_form .= sprintf('<input type="hidden" name="%s[]" value="%s" />', $key, $v);
+                    }
+                } else {
+                    $dates_form .= sprintf('<input type="hidden" name="%s" value="%s" />', $key, $value);
+                }
+            }
+        }
+        foreach ($_POST as $key => $value) {
+            if ($key != 'date1' && $key != 'date2' && $key != 'store') {
+                if (is_array($value)) {
+                    foreach ($value as $v) {
+                        $dates_form .= sprintf('<input type="hidden" name="%s[]" value="%s" />', $key, $v);
+                    }
+                } else {
+                    $dates_form .= sprintf('<input type="hidden" name="%s" value="%s" />', $key, $value);
+                }
+            }
+        }
+        $stores = FormLib::storePicker();
+        $dates_form .= '
+            <label>Start Date</label>
+            <input class="date-field" type="text" name="date1" value="' . FormLib::get('date1') . '" /> 
+            <label>End Date</label>
+            <input class="date-field" type="text" name="date2" value="' . FormLib::get('date2') . '" /> 
+            <input type="hidden" name="excel" value="" id="excel" />
+            ' . $stores['html'] . '
+            <button type="submit" onclick="$(\'#excel\').val(\'\');return true;">Change Dates</button>
+            <button type="submit" onclick="$(\'#excel\').val(\'csv\');return true;">Download</button>
+            </form>';
+
+        $this->add_onload_command("\$('.date-field').datepicker({dateFormat:'yy-mm-dd'});");
+        
+        return array($dates_form);
+ 
+    }
 
     public function fetch_report_data()
     {
@@ -55,16 +107,17 @@ class TrendsReport extends FannieReportPage
             CASE WHEN p.description IS NULL THEN t.description ELSE p.description END AS description';
         $group_cols = '
             t.upc, 
-            p.brand, 
+            CASE WHEN p.brand IS NULL THEN \'\' ELSE p.brand END, 
             CASE WHEN p.description IS NULL THEN t.description ELSE p.description END';
         if (FormLib::get('lookup-type') == 'likecode') {
             $select_cols = '
                 u.likeCode AS prodID,
                 \'\' AS brand,
-                u.likeCodeDesc AS description';
+                l.likeCodeDesc AS description';
             $group_cols = '
                 u.likeCode,
-                u.likeCodeDesc';
+                l.likeCodeDesc';
+            $from_where['query'] = str_replace('=u.upc', '=u.upc LEFT JOIN likeCodes AS l ON u.likeCode=l.likeCode ', $from_where['query']);
         }
 
         $query = "
@@ -73,7 +126,7 @@ class TrendsReport extends FannieReportPage
                 MONTH(t.tdate) AS month,
                 DAY(t.tdate) AS day,
                 $select_cols, "
-                . DTrans::sumQuantity('t') . " AS total
+                . DTrans::sumQuantity('t', true) . " AS total
             " . $from_where['query'] . "
                 AND trans_status <> 'M'
                 AND trans_type = 'I'
@@ -88,7 +141,12 @@ class TrendsReport extends FannieReportPage
                 DAY(t.tdate)";
         $prep = $dbc->prepare($query);
         $from_where['args'][] = $store;
-        $result = $dbc->execute($prep,$from_where['args']);
+        try {
+            $result = $dbc->execute($prep,$from_where['args']);
+        } catch (Exception $ex) {
+            // MySQL 5.6 GROUP BY
+            return array();
+        }
     
         // variable columns. one per dates
         $dates = array();
@@ -186,10 +244,10 @@ class TrendsReport extends FannieReportPage
 </p>
 </form>
         <?php
-        $this->add_script($this->config->URL . 'item/autocomplete.js');
+        $this->addScript($this->config->URL . 'item/autocomplete.js');
         $ws = $this->config->URL . 'ws/';
-        $this->add_onload_command("bindAutoComplete('#brand-field', '$ws', 'brand');\n");
-        $this->add_onload_command("bindAutoComplete('#upc-field', '$ws', 'item');\n");
+        $this->addOnloadCommand("bindAutoComplete('#brand-field', '$ws', 'brand');\n");
+        $this->addOnloadCommand("bindAutoComplete('#upc-field', '$ws', 'item');\n");
 
         return ob_get_clean();
     }

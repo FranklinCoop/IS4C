@@ -21,9 +21,11 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\lib\Store;
+
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class ItemStatusPage extends FannieRESTfulPage
@@ -46,6 +48,7 @@ class ItemStatusPage extends FannieRESTfulPage
 
         $this->__routes[] = 'get<tagID><upc>';
         $this->__routes[] = 'get<floorID><upc>';
+        $this->__routes[] = 'get<narrowTag><upc>';
 
         return parent::preprocess();
     }
@@ -71,7 +74,7 @@ class ItemStatusPage extends FannieRESTfulPage
             }
         }
 
-        $_SESSION['LastTagQueue'] = $this->tagID;
+        $this->session->LastTagQueue = $this->tagID;
         $tag->id($this->tagID);
         $tag->description($info['description']);
         $tag->brand($info['brand']);
@@ -96,7 +99,40 @@ class ItemStatusPage extends FannieRESTfulPage
         $loc->upc(BarcodeLib::padUPC($this->upc));
         $loc->floorSectionID($this->floorID);
         $loc->save();
-        $_SESSION['LastFloorSection'] = $this->floorID;
+        $this->session->LastFloorSection = $this->floorID;
+
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?id=' . $this->upc);
+
+        return false;
+    }
+
+    public function get_narrowTag_upc_handler()
+    {
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
+        $upc = BarcodeLib::padUPC($this->upc);
+        $pu = new ProductUserModel($dbc);
+        $pu->upc($upc);
+        if (!$pu->load()) {
+            $p = new ProductsModel($dbc);
+            $p->upc($upc);
+            $p->load();
+            $pu->brand($p->brand());
+            $pu->description($p->description());
+            $pu->signCount(1);
+            $pu->save();
+        }
+        $pu->reset();
+        $pu->upc($upc);
+
+        $action = FormLib::get('narrowTag');
+        if ($action == 'remove') {
+            $pu->narrow(0);
+            $pu->save();
+        } elseif ($action == 'add') {
+            $pu->narrow(1);
+            $pu->save();
+        }
 
         header('Location: ' . $_SERVER['PHP_SELF'] . '?id=' . $this->upc);
 
@@ -116,8 +152,14 @@ class ItemStatusPage extends FannieRESTfulPage
 
         $dbc = FannieDB::getReadOnly($FANNIE_OP_DB);
         $product = new ProductsModel($dbc);
+        $narrowTag = $dbc->prepare('SELECT narrow FROM productUser WHERE upc=?');
+        $isNarrow = $dbc->getValue($narrowTag, array($upc));
         $vendor = new VendorsModel($dbc);
         $product->upc($upc);
+        if ($this->config->get('STORE_MODE') == 'HQ') {
+            $product->store_id(Store::getIdByIp());
+        }
+
         if (!$product->load()) {
             $ret .= '<div class="alert alert-danger">Item not found</div>';
             return $ret;
@@ -127,13 +169,13 @@ class ItemStatusPage extends FannieRESTfulPage
 
         $ret .= '<p><strong>Brand</strong>: ' . $product->brand();
         $ret .= ', <strong>Desc.</strong>: ' . $product->description();
-        $ret .= ', <strong>Vendor</strong>:'; 
+        $ret .= ', <strong>Vendor</strong>:';
         if ($vendor->vendorName() != 'UNFI') {
-            $ret .= '<span class="alert-danger">' . $vendor->vendorName() . '</span></p>';
+            $ret .= '<span class="alert-warning">' . $vendor->vendorName() . '</span></p>';
         } else {
             $ret .= $vendor->vendorName() . '</p>';
         }
-            
+
 
         $ret .= '<p><strong>Price</strong>: $' . sprintf('%.2f', $product->normal_price());
         if ($product->discounttype() > 0) {
@@ -145,15 +187,15 @@ class ItemStatusPage extends FannieRESTfulPage
                 FROM batchList as l
                     INNER JOIN batches AS b ON l.batchID=b.batchID
                 WHERE l.upc=?
-                    AND ' . $dbc->curdate() . ' >= b.startDate 
+                    AND ' . $dbc->curdate() . ' >= b.startDate
                     AND ' . $dbc->curdate() . ' <= b.endDate');
             $batchR = $dbc->execute($batchP, array($upc));
             if ($batchR && $dbc->num_rows($batchR)) {
                 $batchW = $dbc->fetch_row($batchR);
                 $batchW['startDate'] = date('Y-m-d', strtotime($batchW['startDate']));
                 $batchW['endDate'] = date('Y-m-d', strtotime($batchW['endDate']));
-                $ret .= ' (' . $batchW['batchName'] . ' ' 
-                    . $batchW['startDate'] . ' - ' . $batchW['endDate'] 
+                $ret .= ' (' . $batchW['batchName'] . ' '
+                    . $batchW['startDate'] . ' - ' . $batchW['endDate']
                     . ')';
             } else {
                 $ret .= ' (Unknown batch)';
@@ -172,8 +214,8 @@ class ItemStatusPage extends FannieRESTfulPage
         $supersR = $dbc->execute($supersP, array($product->department()));
         $master = false;
         // preserve queue selection if user is entering several tags
-        if (isset($_SESSION['LastTagQueue']) && is_numeric($_SESSION['LastTagQueue'])) {
-            $master = $_SESSION['LastTagQueue'];
+        if (isset($this->session->LastTagQueue) && is_numeric($this->session->LastTagQueue)) {
+            $master = $this->session->LastTagQueue;
         }
         $ret .= '<p><strong>Super(s)</strong>: ';
         while ($supersW = $dbc->fetch_row($supersR)) {
@@ -185,7 +227,7 @@ class ItemStatusPage extends FannieRESTfulPage
             }
         }
         $ret .= '</p>';
-        
+
         $shelftagsP = $dbc->prepare('
             SELECT count(s.upc) as c
             FROM shelftags as s
@@ -204,8 +246,15 @@ class ItemStatusPage extends FannieRESTfulPage
         $ret .= sprintf('<p><strong>Dept</strong>: %d %s, <strong>SubDept</strong>: %d %s</p>',
             $dept->dept_no(), $dept->dept_name(),
             $sub->subdept_no(), $sub->subdept_name());
-        
+
         $ret .= '<p> Tags in this queue: ' . $tags . '</p> ';
+        if ($isNarrow) {
+            $ret .= 'Flagged As: <span class="alert-warning">Narrow Tag</span>';
+            $ret .= '
+                <form class="form-inline" method="get">
+                </form>
+            ';
+        }
 
         $ret .= '<p><form class="form-inline" method="get">';
         $tags = new ShelftagsModel($dbc);
@@ -233,6 +282,25 @@ class ItemStatusPage extends FannieRESTfulPage
         $ret .= $queues->toOptions($master);
         $ret .= '</select></form></p>';
 
+        $ret .= '<form class="form-inline" method="get">';
+        if ($isNarrow) {
+            $ret .= '
+                <input type="hidden" name="narrowTag" value="remove">
+                <input type="hidden" name="upc" value="' . $upc . '" />
+                <button class="btn btn-default" type="submit">
+                    Remove Flag: <span class="text-warning">Narrow</span></button>
+            ';
+        } else {
+            $ret .= '
+                <input type="hidden" name="narrowTag" value="add">
+                <input type="hidden" name="upc" value="' . $upc . '" />
+                <button class="btn btn-default" type="submit">
+                    Add Flag: Narrow</button>
+            ';
+        }
+        $ret .= '</form><br>';
+
+        /*
         $ret .= '<p><form class="form-inline" method="get">
             <label>Loc.</label>
             <select name="floorID" class="form-control">
@@ -243,8 +311,8 @@ class ItemStatusPage extends FannieRESTfulPage
         $selected = 0;
         if ($loc->floorSectionID()) {
             $selected = $loc->floorSectionID();
-        } elseif (isset($_SESSION['LastFloorSection'])) {
-            $selected = $_SESSION['LastFloorSection'];
+        } elseif (isset($this->session->LastFloorSection)) {
+            $selected = $this->session->LastFloorSection;
         }
         $sections = new FloorSectionsModel($dbc);
         foreach ($sections->find('name') as $s) {
@@ -257,6 +325,7 @@ class ItemStatusPage extends FannieRESTfulPage
         $ret .= '<input type="hidden" name="upc" value="' . $upc . '" />
             <button class="btn btn-default" type="submit">Update Location</button>
             </form></p>';
+        */
 
         if (FannieAuth::validateUserQuiet('pricechange') || FannieAuth::validateUserQuiet('audited_pricechange')) {
             $ret .= '<p><a href="../ItemEditorPage.php?searchupc=' . $this->id . '"
@@ -270,19 +339,32 @@ class ItemStatusPage extends FannieRESTfulPage
 
     public function get_view()
     {
-        $this->add_script('../autocomplete.js');
-        $this->add_onload_command("bindAutoComplete('#upc', '../../ws/', 'item');\n");
+        $this->addScript('../autocomplete.js');
+        $this->addOnloadCommand("bindAutoComplete('#upc', '../../ws/', 'item');\n");
         if (FormLib::get('linea') != 1) {
-            $this->add_onload_command("\$('#upc').focus();\n");
+            $this->addOnloadCommand("\$('#upc').focus();\n");
         }
         $this->addOnloadCommand("enableLinea('#upc', function(){ \$('#upc-form').append('<input type=hidden name=linea value=1 />').submit(); });\n");
-        return '<form id="upc-form" action="' . $_SERVER['PHP_SELF'] . '" method="get">
-            <div class="form-group form-inline">
-                <label>UPC</label>
-                <input type="text" name="id" id="upc" class="form-control" />
-                <button type="submit" class="btn btn-default">Check Item</button>
+        return '
+            <div class="row">
+                <div class="col-md-6">
+                    <form id="upc-form" action="' . $_SERVER['PHP_SELF'] . '" method="get">
+                    <div class="form-group form-inline">
+                        <label>UPC</label>
+                        <input type="text" name="id" id="upc" class="form-control" />
+                        <button type="submit" class="btn btn-default">Check Item</button>
+                    </div>
+                    </form>
+                </div>
+                <div class="col-md-6">
+                    <ul>
+                        <li><a href="../../admin/labels/ShelfTagIndex.php">Print Shelf Tags</a></li>
+                        <li><a href="../../modules/plugins2.0/ShelfAudit/SaMenuPage.php">Menu</a></li>
+                    </ul>
+                </div>
             </div>
-            </form>';
+                
+            ';
     }
 
     public function helpContent()

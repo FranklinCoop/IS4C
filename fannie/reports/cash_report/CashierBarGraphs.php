@@ -1,7 +1,7 @@
 <?php
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 if (!class_exists('FPDF')) {
     include(dirname(__FILE__) . '/../../src/fpdf/fpdf.php');
@@ -44,21 +44,18 @@ class CashierBarGraphs extends FannieRESTfulPage
 
     public function get_view()
     {
-        ob_start();
-        ?>
-        <form method=get action=<?php echo $_SERVER['PHP_SELF'] ?>
-            class="form-inline">
-        <p>
-        <label>Enter Employee Number</label>
-        <input type=text id=emp_no name="id" class="form-control" />
-        <button type="submit" class="btn btn-default">Get Report</button>
-        <label><input type=checkbox name=pdf /> PDF</label>
-        </p>
-        </form>
-        <?php
-        $this->add_onload_command('$(\'#emp_no\').focus();');
-
-        return ob_get_clean();
+        $this->addOnloadCommand('$(\'#emp_no\').focus();');
+        return <<<HTML
+<form method=get action="CashierBarGraphs.php">
+    class="form-inline">
+<p>
+    <label>Enter Employee Number</label>
+    <input type=text id=emp_no name="id" class="form-control" />
+    <button type="submit" class="btn btn-default">Get Report</button>
+    <label><input type=checkbox name=pdf /> PDF</label>
+</p>
+</form>
+HTML;
     }
 
     public function get_id_handler()
@@ -252,6 +249,12 @@ class CashierBarGraphs extends FannieRESTfulPage
                 <li><em>Canceled</em> in this context means voiding a line
                     in a transaction.</li>
             </ul>';
+    }
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertInternalType('boolean', $this->readinessCheck());
+        $phpunit->assertInternalType('string', $this->get_view());
     }
 }
 

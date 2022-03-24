@@ -23,13 +23,13 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class ScaleItemsReport extends FannieReportPage 
 {
     public $description = '[Scale Items] lists items with Hobart scale information';
-    public $report_set = 'Operational Data';
+    public $report_set = 'Service Scales';
     public $themed = true;
 
     protected $report_headers = array('UPC', 'Description', 'Weight', 'Tare', 'Shelf Life',

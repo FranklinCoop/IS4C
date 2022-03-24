@@ -141,12 +141,47 @@ class PgsqlAdapter implements DialectAdapter
     {
         $ret = array_reduce($expressions, function($carry, $e) { return $carry . $e . '||'; }, '');
         
-        return substr($ret, 0, strlen($ret)-1);
+        return substr($ret, 0, strlen($ret)-2);
     }
 
     public function setLockTimeout($seconds)
     {
         return sprintf('SET LOCAL lock_timeout = \'%ds\'', $seconds);
+    }
+
+    public function setCharSet($charset)
+    {
+        return "SET NAMES '$charset'";
+    }
+
+    public function getProcessList()
+    {
+        return 'SELECT pid AS "ID",
+                state AS "STATE",
+                query AS "INFO",
+                usename AS "USER",
+                client_addr AS "HOST",
+                EXTRACT(EPOCH FROM (current_timestamp - backend_start)) AS "TIME"
+            FROM pg_stat_activity';
+    }
+
+    public function kill($intID)
+    {
+        if ($intID != (int)$intID || ((int)$intID) == 0) {
+            throw new \Exception('Invalid query ID');
+        }
+
+        return sprintf('SELECT pg_cancel_backend(%d)', $intID);
+    }
+
+    public function space($num)
+    {
+        return "REPEAT(' ', {$num})";
+    }
+
+    public function numberFormat($num)
+    {
+        return "FORMAT('%s', ROUND({$num}, 2))";
     }
 }
 

@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../../classlib2.0/FannieAPI.php');
 }
 
 /**
@@ -62,6 +62,12 @@ class GumBothReport extends FannieReportPage
                     MIN(loanDate) AS nearest,
                     MAX(loanDate) as farthest
                   FROM GumLoanAccounts
+                  WHERE gumLoanAccountID NOT IN (
+                    SELECT m.gumLoanAccountID
+                    FROM GumLoanPayoffMap AS m
+                      INNER JOIN GumPayoffs AS p ON m.gumPayoffID=p.gumPayoffID
+                      WHERE p.checkIssued=1
+                  )
                   GROUP BY termInMonths
                   ORDER BY termInMonths';
         $result = $dbc->query($query);

@@ -23,7 +23,7 @@
 
 require(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class EditItemsFromSearch extends FannieRESTfulPage
@@ -34,6 +34,8 @@ class EditItemsFromSearch extends FannieRESTfulPage
     public $description = '[Edit Search Results] takes a set of advanced search items and allows
     editing some fields on all items simultaneously. Must be accessed via Advanced Search.';
     public $themed = true;
+    protected $must_authenticate = true;
+    protected $auth_classes = array('pricechange');
 
     private $upcs = array();
     private $save_results = array();
@@ -70,6 +72,7 @@ class EditItemsFromSearch extends FannieRESTfulPage
         $extra = new ProdExtraModel($dbc);
         for ($i=0; $i<count($upcs); $i++) {
             $upc = BarcodeLib::padUPC($upcs[$i]);
+            $model->reset();
             $model->upc($upc);
             
             $model = $this->setArrayValue($model, 'department', $dept, $i);
@@ -191,6 +194,7 @@ class EditItemsFromSearch extends FannieRESTfulPage
             $ret .= '<ul style="color:green;"><li>Saved!</li></ul>';
         }
 
+        $this->u = $this->upcs;
         return $ret . $this->post_u_view();
     }
 
@@ -288,6 +292,19 @@ class EditItemsFromSearch extends FannieRESTfulPage
         $taxes = $this->getTaxes($dbc);
         $depts = $this->getDepts($dbc);
 
+        if (!isset($this->u) || !is_array($this->u)) {
+            $this->u = array();
+        }
+        $hidden = implode("\n", array_map(function ($i) { return '<input name="u[]" type="hidden" value="' .$i . '" />'; }, $this->u)); 
+        $ret .= <<<HTML
+<form action="EditFieldFromSearch.php" method="post">
+    {$hidden}
+    <button type="submit" class="btn btn-default">Edit A Different Field</button>
+</form>
+<br />
+HTML;
+
+
         $ret .= '<form action="EditItemsFromSearch.php" method="post">';
         $ret .= '<table class="table small">';
         $ret .= '<tr>
@@ -308,8 +325,7 @@ class EditItemsFromSearch extends FannieRESTfulPage
 
         /**
           List known brands from vendorItems as a drop down selection
-          rather than free text entry. prodExtra remains an imperfect
-          solution but this can at least start normalizing that data
+          rather than free text entry.
         */
         $ret .= '<td><select class="form-control input-sm" onchange="updateAll(this.value, \'.brandField\');">';
         $ret .= $this->getBrandOpts($dbc);
@@ -350,11 +366,11 @@ class EditItemsFromSearch extends FannieRESTfulPage
         list($in_sql, $args) = $dbc->safeInClause($this->upcs);
         $query = 'SELECT p.upc, p.description, p.department, d.dept_name,
                     p.tax, p.foodstamp, p.discount, p.scale, p.local,
-                    x.manufacturer, x.distributor, p.line_item_discountable,
+                    p.brand, v.vendorName AS distributor, p.line_item_discountable,
                     p.inUse
                   FROM products AS p
                   LEFT JOIN departments AS d ON p.department=d.dept_no
-                  LEFT JOIN prodExtra AS x ON p.upc=x.upc
+                  LEFT JOIN vendors AS v ON v.vendorID=p.default_vendor_id
                   WHERE p.upc IN (' . $in_sql . ')
                   ORDER BY p.upc';
         $prep = $dbc->prepare($query);
@@ -382,7 +398,7 @@ class EditItemsFromSearch extends FannieRESTfulPage
                             $row['upc'], $row['upc'], $row['upc'],
                             $row['upc'],
                             $row['description'],
-                            $row['manufacturer'],
+                            $row['brand'],
                             $row['distributor'],
                             $deptOpts,
                             $taxOpts,
@@ -404,7 +420,7 @@ class EditItemsFromSearch extends FannieRESTfulPage
 
     private function discountOpts($reg, $line)
     {
-        $opts = array('No', 'Yes', 'Trans Only', 'Line Only');
+        $opts = array('No', 'Yes', 'Trxn Only', 'Line Only');
         $index = 0;
         if ($reg == 1 && $line == 1) {
             $index = 1;

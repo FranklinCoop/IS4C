@@ -67,10 +67,10 @@ class VirtCoupDisplay extends NoInputCorePage
         $memberID = CoreLocal::get("memberID");
         $sql = Database::pDataConnect();
 
-        $query = "select coupID,description FROM houseVirtualCoupons
-            WHERE card_no=".$memberID." AND ".
-            $sql->now()." > start_date AND ".
-            $sql->now()." < end_date";
+        $query = sprintf("select coupID,description FROM houseVirtualCoupons
+            WHERE card_no=%d 
+                AND " . $sql->curdate() . " BETWEEN start_date AND end_date",
+            $memberID);
         $result = $sql->query($query);
         $num_rows = $sql->num_rows($result);
 
@@ -122,7 +122,7 @@ class VirtCoupDisplay extends NoInputCorePage
         $db = $this->db;
 
         echo "<div class=\"baseHeight\">"
-            ."<form id=\"selectform\" method=\"post\" action=\"{$_SERVER['PHP_SELF']}\">";
+            ."<form id=\"selectform\" method=\"post\" action=\"" . AutoLoader::ownURL() . '">';
 
         /*  No results. Just enter or CL to cancel
          */

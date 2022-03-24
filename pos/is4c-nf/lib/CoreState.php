@@ -26,6 +26,7 @@ use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\DiscountModule;
 use COREPOS\pos\lib\FormLib;
 use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\models\op\TendersModel;
 use \CoreLocal;
 
 /**
@@ -41,7 +42,7 @@ class CoreState
   in this file. Normally called once on
   startup.
 */
-static public function initiate_session() 
+static public function initiateSession() 
 {
     self::systemInit();
     self::memberReset();
@@ -128,12 +129,24 @@ static public function systemInit()
     CoreLocal::set("plainmsg","");
 
     /**
+     * @var perfLog
+     * Logging for performance metrics
+     */
+    CoreLocal::set('perfLog', array());
+
+    /**
+     * @var portOverrides
+     * Track port re-negotiation
+     */
+    CoreLocal::set('portOverrides', array());
+
+    /**
       Load lane and store numbers from LaneMap array
       if present
     */
     if (is_array(CoreLocal::get('LaneMap'))) {
-        $my_ips = MiscLib::getAllIPs();
-        foreach ($my_ips as $ip) {
+        $myIPs = MiscLib::getAllIPs();
+        foreach ($myIPs as $ip) {
             if (!isset($map[$ip])) {
                 continue;
             }
@@ -382,6 +395,14 @@ static public function transReset()
     */
     CoreLocal::set("lastWeight",0.00);
 
+    /**
+     * @var lotterySpin
+     * Set to a random value between 0 and 1 once per transaction
+     * Doing one "spin" per transaction allow for UI cues about
+     * the result before the end of the transaction
+     */
+    CoreLocal::set('lotterySpin', false);
+
     if (!is_array(CoreLocal::get('PluginList'))) {
         CoreLocal::set('PluginList', array());
     }
@@ -424,7 +445,8 @@ static public function printReset()
       signature slips cannot be suppressed
       and will always print.
     */
-    CoreLocal::set("receiptToggle",1);
+    $default = CoreLocal::get('receiptToggleDefault') !== '' ? CoreLocal::get('receiptToggleDefault') : 1;
+    CoreLocal::set("receiptToggle", $default);
 
     /**
       @var autoReprint
@@ -536,17 +558,17 @@ static public function memberReset()
 */
 static public function loadData() 
 {
-    $query_local = "select card_no from localtemptrans";
+    $queryLocal = "select card_no from localtemptrans";
     
-    $db_local = Database::tDataConnect();
-    $result_local = $db_local->query($query_local);
-    $num_rows_local = $db_local->num_rows($result_local);
+    $dbLocal = Database::tDataConnect();
+    $resultLocal = $dbLocal->query($queryLocal);
+    $numRowsLocal = $dbLocal->numRows($resultLocal);
 
-    if ($num_rows_local > 0) {
-        $row_local = $db_local->fetchRow($result_local);
+    if ($numRowsLocal > 0) {
+        $rowLocal = $dbLocal->fetchRow($resultLocal);
         
-        if ($row_local["card_no"] && strlen($row_local["card_no"]) > 0) {
-            \COREPOS\pos\lib\MemberLib::setMember($row_local['card_no'], 1);
+        if ($rowLocal["card_no"] && strlen($rowLocal["card_no"]) > 0) {
+            \COREPOS\pos\lib\MemberLib::setMember($rowLocal['card_no'], 1);
         }
     }
 }
@@ -577,10 +599,9 @@ static public function customReceipt()
         CoreLocal::set($typeStr.$numeral,$text);
 
         if (!isset($counts[$typeStr])) {
-            $counts[$typeStr] = 1;
-        } else {
-            $counts[$typeStr]++;
+            $counts[$typeStr] = 0;
         }
+        $counts[$typeStr]++;
     }
     
     foreach($counts as $key => $num) {
@@ -617,6 +638,15 @@ static public function cashierLogin($transno=False, $age=0)
     }
 }
 
+static private function setParams($parameters)
+{
+    foreach ($parameters->find() as $global) {
+        $key = $global->param_key();
+        $value = $global->materializeValue();
+        CoreLocal::set($key, $value, true);
+    }
+}
+
 static public function loadParams()
 {
     $dbc = Database::pDataConnect();
@@ -631,32 +661,36 @@ static public function loadParams()
     $parameters = new \COREPOS\pos\lib\models\op\ParametersModel($dbc);
     $parameters->lane_id(0);
     $parameters->store_id(0);
-    foreach ($parameters->find() as $global) {
-        $key = $global->param_key();
-        $value = $global->materializeValue();
-        CoreLocal::set($key, $value, true);
-    }
+    self::setParams($parameters);
 
     // apply store-specific settings next
     // with any overrides that occur
     $parameters->reset();
     $parameters->store_id(CoreLocal::get('store_id'));
     $parameters->lane_id(0);
-    foreach ($parameters->find() as $local) {
-        $key = $local->param_key();
-        $value = $local->materializeValue();
-        CoreLocal::set($key, $value, true);
-    }
+    self::setParams($parameters);
 
     // apply lane-specific settings last
     // with any overrides that occur
     $parameters->reset();
     $parameters->lane_id(CoreLocal::get('laneno'));
     $parameters->store_id(0);
-    foreach ($parameters->find() as $local) {
-        $key = $local->param_key();
-        $value = $local->materializeValue();
-        CoreLocal::set($key, $value, true);
+    self::setParams($parameters);
+
+    // load tender map from tenders instead of parameters
+    $map = array();
+    if (CoreLocal::get('NoCompat') == 1) {
+        $model = new TendersModel($dbc);
+        $map = $model->getMap();
+    } else {
+        $table = $dbc->tableDefinition('tenders');
+        if (isset($table['TenderModule'])) {
+            $model = new TendersModel($dbc);
+            $map = $model->getMap();
+        }
+    }
+    if (count($map) > 0 || !is_array(CoreLocal::get('TenderMap'))) {
+        CoreLocal::set('TenderMap', $map);
     }
 }
 

@@ -37,6 +37,13 @@ class Tags4x8P extends \COREPOS\Fannie\API\item\FannieSignage
     protected $left = 5.5; // left margin
     protected $top = 15; // top margin
 
+    protected $noDates = false;
+
+    public function noDates($toggle)
+    {
+        $this->noDates = $toggle;
+    }
+
     public function drawPDF()
     {
         $pdf = new \FPDF('P', 'mm', 'Letter');
@@ -61,6 +68,9 @@ class Tags4x8P extends \COREPOS\Fannie\API\item\FannieSignage
             $sku = $item['sku'];
             $ppu = $item['pricePerUnit'];
             $vendor = substr($item['vendor'],0,7);
+            if ($this->noDates) {
+                $vendor = $item['vendor'];
+            }
             $upc = $item['upc'];
 
             if ($num % 32 == 0) {
@@ -76,7 +86,7 @@ class Tags4x8P extends \COREPOS\Fannie\API\item\FannieSignage
                 'height' => 7,
                 'valign' => 'T',
                 'align' => 'L',
-                'suffix' => date('  n/j/y'),
+                'suffix' => $this->noDates ? '' : date('  n/j/y'),
                 'fontsize' => 8,
                 'font' => $this->font,
             );

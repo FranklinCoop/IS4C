@@ -1,7 +1,15 @@
 <?php
+use COREPOS\Fannie\API\item\StandardAccounting;
 include('../../../../config.php');
-include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+include(__DIR__ . '/../../../../classlib2.0/FannieAPI.php');
 $dbc = FannieDB::get($FANNIE_OP_DB);
+
+$month = FormLib::get('month', date('n')-1);
+$year = FormLib::get('year', date('Y'));
+if ($month == 0) {
+    $month = 12;
+    $year -= 1;
+}
 
 if (isset($_GET['excel'])){
     header('Content-Type: application/ms-excel');
@@ -10,7 +18,9 @@ if (isset($_GET['excel'])){
     $storeInfo = FormLib::storePicker();
     echo '<form action="index.php" method="get">'
         . $storeInfo['html'] . 
-        '<input type="submit" value="Change" />
+        ' Month <input type="text" name="month" value="' . $month . '" />
+        Year <input type="text" name="year" value="' . $year . '" />
+        <input type="submit" value="Change" />
         </form>';
 }
 
@@ -60,21 +70,19 @@ td.center {
 <?php
 
 echo "<b>";
-$monthMinus = 1;
-if (isset($_GET["monthMinus"])) $monthMinus = $_GET["monthMinus"];
-$stamp = strtotime("-$monthMinus month");
+$stamp = mktime(0, 0, 0, $month, 1, $year);
 echo strtoupper(date("F",$stamp));
 echo " ";
 echo date("Y",$stamp);
-$dlog = "is4c_trans.dlog_90_view";
 $dlog = "trans_archive.dlogBig";
+$dtrans = "trans_archive.bigArchive";
 echo " NABS</b><br />";
 if (!isset($_GET["excel"]))
-    echo "<a href=index.php?excel=xls&monthMinus=$monthMinus&store=$store>Save to Excel</a>";
+    echo "<a href=index.php?excel=xls&month=$month&year=$year&store=$store>Save to Excel</a>";
 echo "<p />";
 
 $output = \COREPOS\Fannie\API\data\DataCache::getFile('monthly');
-if (!$output){
+if (true || !$output){
     ob_start();
 
     $start = date("Y-m-01",$stamp);
@@ -126,24 +134,25 @@ if (!$output){
 
     echo "<br /><b>Total by pCode</b>";
     $totalQ = $dbc->prepare("select d.salesCode,sum(l.total),
-        (sum(l.total)-(sum(l.total)*d.margin)) as cost
+        (sum(l.total)-(sum(l.total)*d.margin)) as cost, l.store_id
         FROM $dlog as l left join departments as d on l.department = d.dept_no
         WHERE card_no IN $accountStr
         and (l.department < 600 or l.department = 902)
         and l.department <> 0 and l.trans_type <> 'T'
         and tdate BETWEEN ? AND ?
         AND " . DTrans::isStoreID($store, 'l') . "
-        GROUP BY d.salesCode,d.margin
+        GROUP BY d.salesCode,d.margin,l.store_id
         ORDER BY d.salesCode");
     $totalR = $dbc->execute($totalQ,$args);
     $data = array();
     while ($totalW=$dbc->fetch_row($totalR)){
-        if (empty($data["$totalW[0]"])){
-            $data["$totalW[0]"] = array($totalW[1],$totalW[2]);
+        $code = StandardAccounting::extend($totalW['salesCode'], $totalW['store_id']);
+        if (empty($data[$code])){
+            $data[$code] = array($totalW[1],$totalW[2]);
         }
         else {
-            $data["$totalW[0]"][0] += $totalW[1];
-            $data["$totalW[0]"][1] += $totalW[2];
+            $data[$code][0] += $totalW[1];
+            $data[$code][1] += $totalW[2];
         }
     }
     echo tablify($data,array(0,1,2),array("pCode","Retail","Wholesale"),
@@ -151,28 +160,32 @@ if (!$output){
         2,array(1,2));
 
     $totalQ = $dbc->prepare("select d.salesCode,sum(l.total),
-        (sum(l.total)-(sum(l.total)*d.margin)) as cost
+        (sum(l.total)-(sum(l.total)*d.margin)) as cost, l.store_id
         FROM $dlog as l left join departments as d on l.department = d.dept_no
         WHERE card_no = ?
         and (l.department < 600 or l.department = 902)
         and l.department <> 0 and l.trans_type <> 'T'
         and tdate BETWEEN ? AND ?
         AND " . DTrans::isStoreID($store, 'l') . "
-        GROUP BY d.salesCode,d.margin
+        GROUP BY d.salesCode,d.margin, l.store_id
         ORDER BY d.salesCode");
+    $taxP = $dbc->prepare("SELECT SUM(total) FROM {$dlog} WHERE tdate BETWEEN ? AND ? AND card_no=? AND upc='TAX' AND " . DTrans::isStoreID($store));
     foreach ($accounts as $account){
         echo "<br /><b>Total for $account</b>";
         $totalR = $dbc->execute($totalQ,array($account,$span[0],$span[1],$store));
         $data = array();
         while ($totalW=$dbc->fetch_row($totalR)){
-            if (empty($data["$totalW[0]"])){
-                $data["$totalW[0]"] = array($totalW[1],$account,$totalW[2]);
+            $code = StandardAccounting::extend($totalW['salesCode'], $totalW['store_id']);
+            if (empty($data[$code])){
+                $data[$code] = array($totalW[1],$account,$totalW[2]);
             }
             else {
-                $data["$totalW[0]"][0] += $totalW[1];
-                $data["$totalW[0]"][2] += $totalW[2];
+                $data[$code][0] += $totalW[1];
+                $data[$code][2] += $totalW[2];
             }
         }
+        $taxes = sprintf('%.2f', $dbc->getValue($taxP, array($span[0], $span[1], $account, $store)));
+        $data['TAX'] = array(0, $taxes, 0);
         echo tablify($data,array(0,1,2,3),array("pCode","Retail","Account","Wholesale"),
             array($ALIGN_LEFT,$ALIGN_RIGHT|$TYPE_MONEY,$ALIGN_CENTER,$ALIGN_RIGHT|$TYPE_MONEY),
             2,array(1,3));

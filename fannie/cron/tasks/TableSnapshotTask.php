@@ -84,6 +84,14 @@ class TableSnapshotTask extends FannieTask
         }
 
         try {
+            $model = new FloorSectionsListTableModel($sql);
+            $model->refresh();
+        } catch (Exception $ex) {
+            $this->cronMsg("Could not repopulate FloorSectionsListTable. Details: " . $ex->getMessage(),
+                    FannieLogger::NOTICE);
+        }
+
+        try {
             if ($sql->dbmsName() == "mssql") {
                 $sql->query("SELECT * INTO custdataBackup FROM custdata");
             } else {
@@ -97,6 +105,23 @@ class TableSnapshotTask extends FannieTask
             */
             $this->cronMsg("Failed to back up custdata. Details: " . $ex->getMessage(),
                     FannieLogger::ERROR);
+        }
+
+        try {
+            $map = $this->config->get('ARCHIVE_DB') . $sql->sep() . 'ProductAttributeMap';        
+            $attr = $this->config->get('OP_DB') . $sql->sep() . 'ProductAttributes';
+            $query = "
+                INSERT INTO {$map} (dateID, upc, productAttributeID)
+                SELECT " . $sql->dateymd($sql->curdate()) . ",
+                    upc,
+                    MAX(productAttributeID)
+                FROM {$attr}
+                GROUP BY upc
+                ORDER BY upc";
+            $sql->query($query);
+        } catch (Exception $ex) {
+            $this->cronMsg("Could not get snapshot attributes. Details: " . $ex->getMessage(),
+                    FannieLogger::NOTICE);
         }
     }
 }

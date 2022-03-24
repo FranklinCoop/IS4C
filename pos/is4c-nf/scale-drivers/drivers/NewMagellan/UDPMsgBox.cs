@@ -24,15 +24,12 @@ using System;
 using System.Threading;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using CustomForms;
 
-namespace CustomUDP {
+[assembly: AssemblyVersion("1.0.*")]
 
-public class UdpState{
-    public IPEndPoint e ;
-    public UdpClient u ;
-}
-    
+namespace CustomUDP {
 
 public class UDPMsgBox {
     public Thread My_Thread;
@@ -40,29 +37,68 @@ public class UDPMsgBox {
     protected DelegateForm parent;
     protected int port;
     protected UdpClient u;
+    private bool runAsync;
 
-
-    public UDPMsgBox(int p){ 
+    public UDPMsgBox(int p, bool a){ 
         this.My_Thread = new Thread(new ThreadStart(this.Read));
         this.running = true;
         this.port = p;
+        this.runAsync = a;
     }
     
     public void SetParent(DelegateForm p){ parent = p; }
 
-    public void Read(){ 
-        IPEndPoint e = new IPEndPoint(IPAddress.Any, 0);
-        u = new UdpClient(this.port);
-
-        while(running){
+    private UdpClient GetClient()
+    {
+        UdpClient client = null;
+        while (true) {
             try {
-                Byte[] b = u.Receive(ref e);
-                this.SendBytes(b);
-            }
-            catch (Exception ex){ 
-                System.Console.WriteLine(ex.ToString());
+                client = new UdpClient(this.port);
+                break;
+            } catch (System.Net.Sockets.SocketException ex) {
+                //this.port++;
+                throw ex;
             }
         }
+        if (client != null && this.port > 9450) {
+            parent.MsgSend("SETUDP" + this.port);
+        }
+
+        return client;
+    }
+
+    public void Read()
+    {
+        this.u = this.GetClient();
+        if (this.runAsync) {
+            Console.WriteLine("UDP is async");
+            this.ReadAsync();
+        } else {
+            Console.WriteLine("UDP is synchronous");
+            IPEndPoint e = new IPEndPoint(IPAddress.Any, 0);
+            while(running){
+                try {
+                    Byte[] b = this.u.Receive(ref e);
+                    this.SendBytes(b);
+                }
+                catch (Exception ex){
+                    System.Console.WriteLine(ex.ToString());
+                }
+            }
+        }
+    }
+
+    public void ReadAsync()
+    {
+       u.BeginReceive(new AsyncCallback(HandleAsync), null);
+    }
+
+    public void HandleAsync(IAsyncResult res)
+    {
+        IPEndPoint e = new IPEndPoint(IPAddress.Any, 0);
+        Byte[] b = this.u.EndReceive(res, ref e);
+        this.ReadAsync();
+        this.SendBytes(b);
     }
 
     private void SendBytes(Byte[] receiveBytes){
@@ -74,7 +110,7 @@ public class UDPMsgBox {
 
     public void Stop(){
         running = false;
-        u.Close();
+        this.u.Close();
         My_Thread.Join();
     }
 

@@ -11,8 +11,16 @@ class PagesFannieTest extends PHPUnit_Framework_TestCase
         $config = FannieConfig::factory();
         $logger = new FannieLogger();
         $op_db = $config->get('OP_DB');
-        $dbc = FannieDB::forceReconnect(FannieConfig::config('OP_DB'));
+        $dbc = FannieDB::forceReconnect($op_db);
         $dbc->throwOnFailure(true);
+        if (strstr($config->get('SERVER_DBMS'), 'mysql')) {
+            $dbc->query("SET SESSION sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'");
+        }
+
+        $reports[] = 'AuthReport';
+        if (!class_exists('AuthReport', false)) {
+            include(__DIR__ . '/../../fannie/auth/ui/AuthReport.php');
+        }
 
         foreach ($reports as $report_class) {
             $obj = new $report_class();
@@ -20,6 +28,7 @@ class PagesFannieTest extends PHPUnit_Framework_TestCase
             $obj->setLogger($logger);
             $dbc->selectDB($op_db);
             $obj->setConnection($dbc);
+            $obj = FannieDispatch::twig($obj);
 
             $pre = $obj->preprocess();
             $this->assertInternalType('boolean',$pre);
@@ -50,11 +59,26 @@ class PagesFannieTest extends PHPUnit_Framework_TestCase
     {
         $pages = FannieAPI::listModules('FanniePage', true);
         $pages[] = 'COREPOS\\Fannie\\API\\FannieCRUDPage';
+        if (!class_exists('TableSyncPage', false)) {
+            include(__DIR__ . '/../../fannie/sync/TableSyncPage.php');
+        }
+        if (!class_exists('SyncIndexPage', false)) {
+            include(__DIR__ . '/../../fannie/sync/SyncIndexPage.php');
+        }
+        if (!class_exists('SyncRulesPage', false)) {
+            include(__DIR__ . '/../../fannie/sync/SyncRulesPage.php');
+        }
+        if (!class_exists('MagicDoc', false)) {
+            include(__DIR__ . '/../../fannie/install/sql/MagicDoc.php');
+        }
         $config = FannieConfig::factory();
         $logger = new FannieLogger();
         $op_db = $config->get('OP_DB');
         $dbc = FannieDB::get($op_db);
         $dbc->throwOnFailure(true);
+        if (strstr($config->get('SERVER_DBMS'), 'mysql')) {
+            $dbc->query("SET SESSION sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'");
+        }
 
         $speed = array();
         foreach ($pages as $page_class) {
@@ -63,6 +87,7 @@ class PagesFannieTest extends PHPUnit_Framework_TestCase
             $obj->setLogger($logger);
             $dbc->selectDB($op_db);
             $obj->setConnection($dbc);
+            $obj = FannieDispatch::twig($obj);
             if ($page_class == 'WfcHtViewSalaryPage') continue; // header/redirect problem
 
             ob_start();
@@ -85,6 +110,29 @@ class PagesFannieTest extends PHPUnit_Framework_TestCase
         var_dump($speed);
     }
 
+    public function testInstallPages()
+    {
+        $pages = array('InstallUpdatesPage');
+        $config = FannieConfig::factory();
+        $logger = new FannieLogger();
+        $op_db = $config->get('OP_DB');
+        $dbc = FannieDB::get($op_db);
+        $dbc->throwOnFailure(true);
+        foreach ($pages as $page) {
+            if (!class_exists($page)) {
+                include(__DIR__ . '/../../fannie/install/' . $page . '.php');
+            }
+            $obj = new $page();
+            $obj->setConfig($config);
+            $obj->setLogger($logger);
+            $dbc->selectDB($op_db);
+            $obj->setConnection($dbc);
+            $obj = FannieDispatch::twig($obj);
+
+            $this->assertNotEquals(0, strlen($obj->body_content()));
+        }
+    }
+
     public function testBase()
     {
         $obj = new FanniePage();
@@ -97,12 +145,9 @@ class PagesFannieTest extends PHPUnit_Framework_TestCase
         $dbc->selectDB($op_db);
         $obj->setConnection($dbc);
         
-        $this->assertEquals($obj->getHeader(), $obj->get_header());
+        $this->assertNotEquals(0, strlen($obj->getHeader()));
         $this->assertEquals($obj->checkAuth(), $obj->check_auth());
-
-        // lists page-draw time. may differ across runs
         $this->assertNotEquals(0, $obj->getFooter());
-        $this->assertNotEquals(0, $obj->get_footer());
 
         $obj = new FannieReportPage();
         $obj->setConfig($config);
@@ -123,6 +168,20 @@ class PagesFannieTest extends PHPUnit_Framework_TestCase
         $obj->setLogger($logger);
         $dbc->selectDB($op_db);
         $obj->setConnection($dbc);
+
+        $obj = new COREPOS\Fannie\API\FannieGraphReportPage();
+        $obj->setConfig($config);
+        $obj->setLogger($logger);
+        $dbc->selectDB($op_db);
+        $obj->setConnection($dbc);
+        $this->assertNotEquals(0, strlen($obj->report_content()));
+        $this->assertEquals(0, strlen($obj->graphHTML()));
+        $this->assertEquals(0, strlen($obj->graphJS()));
+        $obj->preprocess();
+
+        $obj = new COREPOS\Fannie\API\FannieReportTool();
+        $this->assertEquals(0, $obj->coverage());
+
         /*
         $obj->themed = true;
         $this->assertNotEquals(0, strlen($obj->getHeader()));

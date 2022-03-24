@@ -1,11 +1,12 @@
 <?php
+use COREPOS\Fannie\API\item\StandardAccounting;
 //header('Content-Type: application/ms-excel');
 //header('Content-Disposition: attachment; filename="EOMreport.xls"');
 include('../../../../config.php');
 if (!class_exists('FannieAPI')) {
     include(dirname(__FILE__).'/../../../../classlib2.0/FannieAPI.php');
 }
-include($FANNIE_ROOT.'src/functions.php');
+include(__DIR__ . '/../../../../src/functions.php');
 $dbc = FannieDB::get($FANNIE_OP_DB);
 
 if (isset($_GET["excel"])){
@@ -19,6 +20,7 @@ $_SERVER['REQUEST_URI'] = str_replace("index.php","",$_SERVER['REQUEST_URI']);
         . $storeInfo['html'] . 
         '<input type="submit" value="Change" />
         </form>';
+    echo '<p><a href="../../../../modules/plugins2.0/CoreWarehouse/reports/EOMReport.php">Or use the newer one</a></p>';
 }
 
 $store = FormLib::get('store', false);
@@ -52,7 +54,7 @@ $end = date("Y-m-t",$stamp);
 $args = array($start.' 00:00:00',$end.' 23:59:59', $store);
 
 $output = \COREPOS\Fannie\API\data\DataCache::getFile("monthly");
-if (true || !$output || isset($_REQUEST['recache'])){
+if (!$output || isset($_REQUEST['recache'])){
     if (isset($_REQUEST['recache'])) {
         $_SERVER['REQUEST_URI'] = $_SERVER['PHP_SELF']; // remove recache from URI
         $_SERVER['REQUEST_URI'] = str_replace("index.php","",$_SERVER['REQUEST_URI']);
@@ -66,7 +68,8 @@ if (true || !$output || isset($_REQUEST['recache'])){
     $query1="select t.department,
     s.superID,
     d.salesCode,d.dept_name,
-    SUM(t.total)
+    SUM(t.total),
+    t.store_id
     FROM $dlog as t 
         INNER JOIN departments as d ON t.department = d.dept_no
         LEFT JOIN MasterSuperDepts AS s ON s.dept_ID = d.dept_no    
@@ -76,7 +79,7 @@ if (true || !$output || isset($_REQUEST['recache'])){
         AND t.trans_type <> 'T'
         AND t.trans_type IN ('I', 'D')
     GROUP BY
-    s.superID,t.department,d.dept_name,d.salesCode
+    s.superID,t.department,d.dept_name,d.salesCode,t.store_id
     order by s.superID,t.department";
 
     $query2 = "SELECT 
@@ -220,6 +223,9 @@ if (true || !$output || isset($_REQUEST['recache'])){
     $supers = array();
     $misc = array();
     while ($w = $dbc->fetchRow($res)) {
+        $code = StandardAccounting::extend($w['salesCode'], $w['store_id']);
+        $w['salesCode'] = $code;
+        $w[2] = $code;
         $s = $w['superID'];
         if ($s > 0) {
             $depts[] = $w;
@@ -339,7 +345,7 @@ if (true || !$output || isset($_REQUEST['recache'])){
 }
 echo $output;
 
-    $newTaxQ = 'SELECT description,
+    $newTaxQ = 'SELECT MAX(description) AS description,
                     SUM(regPrice) AS ttl,
                     numflag AS taxID
                 FROM is4c_trans.transarchive AS t
@@ -347,7 +353,7 @@ echo $output;
                     AND ' . DTrans::isStoreID($store, 't') . '
                     AND upc=\'TAXLINEITEM\'
                     AND ' . DTrans::isNotTesting() . '
-                GROUP BY taxID, description';
+                GROUP BY taxID';
     $sql = FannieDB::get($FANNIE_OP_DB);
     $prep = $sql->prepare($newTaxQ);
     $res = $sql->execute($prep, $args);
@@ -356,9 +362,14 @@ echo $output;
         $collected[$row['taxID']] = $row['ttl'];
     }
     $state = 0.06875;
-    $city = 0.01;
+    $city = 0.015;
     $deli = 0.0225;
     $county = 0.005;
+    $startDT = new DateTime($start);
+    $noCounty = new DateTime('2017-10-01');
+    if ($startDT >= $noCount) {
+        //$county = 0;
+    }
     echo '<table border="1" cellspacing="0" cellpadding="4">';
     echo '<tr><th>Tax Collected on Regular rate items</th>
             <th>' . sprintf('%.2f', $collected[1]) . '</th>

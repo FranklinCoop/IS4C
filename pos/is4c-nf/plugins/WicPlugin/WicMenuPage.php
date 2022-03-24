@@ -35,6 +35,10 @@ class WicMenuPage extends NoInputCorePage
                     CoreLocal::set('WicMode', true);
                     $this->change_page(MiscLib::baseURL() . 'gui-modules/pos2.php');
                     return false;
+                case 'eWICON':
+                    CoreLocal::set('WicMode', 2);
+                    $this->change_page(MiscLib::baseURL() . 'gui-modules/pos2.php');
+                    return false;
                 case 'WICOFF':
                     CoreLocal::set('WicMode', false);
                     $this->change_page(MiscLib::baseURL() . 'gui-modules/pos2.php');
@@ -76,7 +80,7 @@ class WicMenuPage extends NoInputCorePage
         <div class="centeredDisplay colored rounded">
         <span class="larger">WIC Mode is <?php echo CoreLocal::get('WicMode') ? 'ON' : 'OFF'; ?></span>
         <form name="selectform" method="post" id="selectform"
-            action="<?php echo $_SERVER['PHP_SELF']; ?>">
+            action="<?php echo AutoLoader::ownURL(); ?>">
         <?php if (CoreLocal::get('touchscreen')) { ?>
         <button type="button" class="pos-button coloredArea"
             onclick="scrollDown('#selectlist');">
@@ -90,6 +94,7 @@ class WicMenuPage extends NoInputCorePage
             echo '<option value="WICOFF" selected>Exit WIC Mode</option>';
         } else {
             echo '<option value="WICON" selected>Enter WIC Mode</option>';
+            echo '<option value="eWICON">Enter eWIC Mode</option>';
         }
         ?>
             <option value="WICT">Tender WIC</option>

@@ -23,14 +23,14 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class MemberPatronageReport extends FannieReportPage 
 {
     public $description = '[Member Patronage] shows a member\'s patronage information each fiscal year. Note this is
     calculated and entered annually, not assembled on the fly from transaction information.';
-    public $report_set = 'Membership';
+    public $report_set = 'Membership :: Patronage';
     public $themed = true;
 
     protected $header = "Patronage Report";
@@ -90,6 +90,7 @@ HTML;
                 0 as ttl 
             FROM patronage as p
             WHERE p.cardno=? 
+                AND FY > 0
             ORDER BY FY");
         $pR = $dbc->execute($pQ,array($id));
 

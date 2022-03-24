@@ -32,7 +32,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class VendorIndexPage extends FannieRESTfulPage 
@@ -41,7 +41,8 @@ class VendorIndexPage extends FannieRESTfulPage
     protected $header = "Manage Vendors";
 
     protected $must_authenticate = true;
-    protected $auth_classes = array('pricechange');
+    //protected $auth_classes = array('pricechange');
+    private $canEdit = false;
 
     public $description = '[Vendor Editor] creates or update information about vendors.';
 
@@ -55,10 +56,39 @@ class VendorIndexPage extends FannieRESTfulPage
             'post<delivery>',
             'post<id><shipping>',
             'post<id><rate>',
-            'post<id><inactive>'
+            'post<id><inactive>',
+            'post<id><autoID>'
         );
+        $this->canEdit = FannieAuth::validateUserQuiet('pricechange'); 
 
         return parent::preprocess();
+    }
+
+    protected function post_id_autoID_handler()
+    {
+        if (!$this->canEdit) return false;
+
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
+        $map = new AutoOrderMapModel($dbc);
+        $map->vendorID($this->id);
+        $enables = FormLib::get('autoEnable', array());
+        $accounts = FormLib::get('autoAccount', array());
+        for ($i=0; $i<count($this->autoID); $i++) {
+            $map->storeID($this->autoID[$i]);
+            $active = in_array($map->storeID(), $enables);
+            $map->active($active ? 1 : 0);
+            $map->accountID($accounts[$i]);
+            $map->save();
+        }
+
+        $vendor = new VendorsModel($dbc);
+        $vendor->vendorID($this->id);
+        $vendor->orderMinimum(FormLib::get('minOrder', 0));
+        $vendor->halfCases(FormLib::get('halfs', false) ? 1 : 0);
+        $vendor->save();
+
+        return false;
     }
 
     protected function get_id_autoAdd_handler()
@@ -70,6 +100,7 @@ class VendorIndexPage extends FannieRESTfulPage
 
     protected function post_new_name_handler()
     {
+        if (!$this->canEdit) return false;
         echo $this->newVendor($this->name);
 
         return false;
@@ -84,6 +115,7 @@ class VendorIndexPage extends FannieRESTfulPage
 
     protected function post_info_handler()
     {
+        if (!$this->canEdit) return false;
         $id = FormLib::get('vendorID','');
         if ($id === '') {
             echo json_encode(array('error'=>1, 'msg'=>'Bad request'));
@@ -101,7 +133,7 @@ class VendorIndexPage extends FannieRESTfulPage
         $vModel->vendorID($id);
         $vModel->phone(FormLib::get('phone'));
         $vModel->fax(FormLib::get('fax'));
-        $vModel->email(FormLib::get('email'));
+        $vModel->email(trim(FormLib::get('email')));
         $vModel->website($web);
         $vModel->notes(FormLib::get('notes'));
         $vModel->address(FormLib::get('address'));
@@ -110,15 +142,6 @@ class VendorIndexPage extends FannieRESTfulPage
         $vModel->zip(FormLib::get('zip'));
         $vModel->localOriginID($localID);
         $success = $vModel->save();
-
-        $vcModel = new VendorContactModel($dbc);
-        $vcModel->vendorID($id);
-        $vcModel->phone(FormLib::get('phone'));
-        $vcModel->fax(FormLib::get('fax'));
-        $vcModel->email(FormLib::get('email'));
-        $vcModel->website($web);
-        $vcModel->notes(FormLib::get('notes'));
-        $vcModel->save();
 
         $ret = array('error'=>0, 'msg'=>'');
         if ($success) {
@@ -134,6 +157,7 @@ class VendorIndexPage extends FannieRESTfulPage
 
     protected function post_id_inactive_handler()
     {
+        if (!$this->canEdit) return false;
         $dbc = $this->connection;
         $dbc->setDefaultDB($this->config->OP_DB);
         $vModel = new VendorsModel($dbc);
@@ -146,6 +170,7 @@ class VendorIndexPage extends FannieRESTfulPage
 
     protected function post_id_shipping_handler()
     {
+        if (!$this->canEdit) return false;
         $ret = array('error'=>0);
         if ($this->id === ''){
             $ret['error'] = 'Bad request';
@@ -165,6 +190,7 @@ class VendorIndexPage extends FannieRESTfulPage
 
     protected function post_id_rate_handler()
     {
+        if (!$this->canEdit) return false;
         $ret = array('error'=>0);
         if ($this->id === ''){
             $ret['error'] = 'Bad request';
@@ -185,6 +211,7 @@ class VendorIndexPage extends FannieRESTfulPage
 
     protected function post_delivery_handler()
     {
+        if (!$this->canEdit) return false;
         $delivery = new VendorDeliveriesModel(FannieDB::get($this->config->get('OP_DB')));
         $delivery->vendorID(FormLib::get('vID', 0));
         $delivery->frequency(FormLib::get('frequency', 'weekly'));
@@ -214,6 +241,7 @@ class VendorIndexPage extends FannieRESTfulPage
 
     private function autoPopulate($vendorID)
     {
+        if (!$this->canEdit) return false;
         $dbc = FannieDB::get($this->config->get('OP_DB'));
         
         $query = '
@@ -232,7 +260,7 @@ class VendorIndexPage extends FannieRESTfulPage
                 AND p.upc NOT IN (
                     SELECT upc FROM vendorItems WHERE vendorID=?
                 ) AND p.upc NOT IN (
-                    SELECT upc FROM vendorSKUtoPLU WHERE vendorID=?
+                    SELECT upc FROM VendorAliases WHERE vendorID=?
                 )';
         $prep = $dbc->prepare($query);
         $args = array($vendorID, $vendorID, $vendorID);
@@ -257,6 +285,8 @@ class VendorIndexPage extends FannieRESTfulPage
     {
         $dbc = FannieDB::get($this->config->get('OP_DB'));
         $ret = "";
+        $noEdit = !$this->canEdit ? 'disabled' : '';
+        $noShow = !$this->canEdit ? 'collapse' : '';
 
         $model = new VendorsModel($dbc);
         $model->vendorID($id);
@@ -265,10 +295,10 @@ class VendorIndexPage extends FannieRESTfulPage
         $ret .= "<b>Id</b>: $id &nbsp; <b>Name</b>: " . $model->vendorName();
         $ret .= ' <label>Active
             <input type="checkbox" onchange="vendorEditor.toggleActive(this, ' . $id . ')" ' 
-                . ($model->inactive() == 1 ? '' : 'checked') . ' />
+                . ($model->inactive() == 1 ? '' : 'checked') . ' ' . $noEdit . ' />
             </label>';
-        $ret .= sprintf(' | <a href="RenameVendorPage.php?id=%d">Rename %s</a>', $id, $model->vendorName());
-        $ret .= sprintf(' | <a href="DeleteVendorPage.php?id=%d">Delete %s</a>', $id, $model->vendorName());
+        $ret .= sprintf(' | <a class="%s" href="RenameVendorPage.php?id=%d">Rename %s</a>', $noShow, $id, $model->vendorName());
+        $ret .= sprintf(' | <a class="%s" href="DeleteVendorPage.php?id=%d">Delete %s</a>', $noShow, $id, $model->vendorName());
         $ret .= '</div>';
 
         $itemQ = $dbc->prepare("SELECT COUNT(*) FROM vendorItems WHERE vendorID=?");
@@ -288,16 +318,18 @@ class VendorIndexPage extends FannieRESTfulPage
                 <div class="panel-body">
                 This vendor contains ' . $num . ' items<br />';
         if ($num > 0) {
-            $ret .= "<a href=\"BrowseVendorItems.php?vid=$id\">Browse vendor catalog</a>";  
+            $ret .= "<a class=\"{$noShow}\" href=\"BrowseVendorItems.php?vid=$id\">Browse vendor catalog</a>";  
             if ($num <= 750) {
                 $ret .= "<br />";
-                $ret .= "<a href=\"EditVendorItems.php?id=$id\">Edit vendor catalog</a>";  
+                $ret .= "<a class=\"{$noShow}\" href=\"EditVendorItems.php?id=$id\">Edit vendor catalog</a>";  
             }
         }
         $ret .= "<br />";
-        $ret .= "<a href=\"DefaultUploadPage.php?vid=$id\">Upload new vendor catalog</a>";
+        $ret .= "<a class=\"{$noShow}\" href=\"UpdateUploadPage.php?vid=$id\">Upload & Update vendor catalog</a>";
         $ret .= "<br />";
-        $ret .= "<a href=\"VendorIndexPage.php?id=$id&autoAdd=1\">Add existing items to catalog</a>";
+        $ret .= "<a class=\"{$noShow}\" href=\"DefaultUploadPage.php?vid=$id\">Upload & Replace vendor catalog</a>";
+        $ret .= "<br />";
+        $ret .= "<a class=\"{$noShow}\" href=\"VendorIndexPage.php?id=$id&autoAdd=1\">Add existing items to catalog</a>";
         $ret .= '</div></div>';
 
         $ret .= '</div><div class="container-fluid col-sm-3">';
@@ -306,11 +338,13 @@ class VendorIndexPage extends FannieRESTfulPage
             <div class="panel panel-default">
                 <div class="panel-heading">Mappings</div>
                 <div class="panel-body">';
-        $ret .= "<a href=\"UploadPluMapPage.php?vid=$id\">Upload PLU/SKU mapping</a>";
+        $ret .= "<a class=\"{$noShow}\" href=\"VendorAliasesPage.php?id=$id\">Manage Aliases</a>";
         $ret .= "<br />";
-        $ret .= "<a href=\"SkuMapPage.php?id=$id\">View or Edit PLU/SKU mapping</a>";
+        $ret .= "<a class=\"{$noShow}\" href=\"UploadPluMapPage.php?vid=$id\">Upload PLU/SKU mapping</a>";
         $ret .= "<br />";
-        $ret .= "<a href=\"UnitBreakdownPage.php?id=$id\">View or Edit Breakdown mapping</a>";
+        $ret .= "<a class=\"{$noShow}\" href=\"SkuMapPage.php?id=$id\">View or Edit PLU/SKU mapping</a>";
+        $ret .= "<br />";
+        $ret .= "<a class=\"{$noShow}\" href=\"UnitBreakdownPage.php?id=$id\">View or Edit Breakdown mapping</a>";
         $ret .= '</div></div>';
 
         $ret .= '</div><div class="container-fluid col-sm-3">';
@@ -330,25 +364,25 @@ class VendorIndexPage extends FannieRESTfulPage
         $ret .= "<a href=\"../../batches/UNFI/\">Vendor Price Batch Tools</a>";
         $ret .= "</p><p>";
         if ($num == 0) {
-            $ret .= "<a href=\"VendorDepartmentEditor.php?vid=$id\">This vendor's items are not yet arranged into subcategories</a>";
+            $ret .= "<a class=\"{$noShow}\" href=\"VendorDepartmentEditor.php?vid=$id\">This vendor's items are not yet arranged into subcategories</a>";
             $ret .= '<p />';
-            $ret .= "<a href=\"VendorDepartmentUploadPage.php?vid=$id\">Upload Subcategory List</a>";
+            $ret .= "<a class=\"{$noShow}\" href=\"VendorDepartmentUploadPage.php?vid=$id\">Upload Subcategory List</a>";
         } else {
             $ret .= "This vendor's items are divided into ";
             $ret .= $num." subcategories";
             $ret .= "<br />";
-            $ret .= "<a href=\"VendorDepartmentEditor.php?vid=$id\">View or Edit vendor-specific margin(s)</a>";
+            $ret .= "<a class=\"{$noShow}\" href=\"VendorDepartmentEditor.php?vid=$id\">View or Edit vendor subcategory margin(s)</a>";
             $ret .= "<br />";
-            $ret .= "<a href=\"VendorMarginsPage.php?id=$id\">And Even More Margins</a>";
+            $ret .= "<a class=\"{$noShow}\" href=\"VendorMarginsPage.php?id=$id\">View or Edit vendor-specific POS department margins</a>";
             $ret .= '<p />';
-            $ret .= "<a href=\"VendorDepartmentUploadPage.php?vid=$id\">Upload Subcategory List</a>";
+            $ret .= "<a class=\"{$noShow}\" href=\"VendorDepartmentUploadPage.php?vid=$id\">Upload Subcategory List</a>";
         }
         $ret .= '</p>';
         $ret .= '
             <div class="form-group">
                 <div class="input-group">
                     <span class="input-group-addon">Shipping</span>
-                    <input type="text" id="vc-shipping" name="shipping" 
+                    <input type="text" id="vc-shipping" name="shipping" ' . $noEdit . '
                         onchange="vendorEditor.saveShipping(this.value);"
                         title="Markup percentage to account for shipping fees"
                         class="form-control" value="' . $model->shippingMarkup() * 100 . '" />
@@ -358,7 +392,7 @@ class VendorIndexPage extends FannieRESTfulPage
             <div class="form-group">
                 <div class="input-group">
                     <span class="input-group-addon">Discount Rate</span>
-                    <input type="text" id="vc-discount" name="discount-rate" 
+                    <input type="text" id="vc-discount" name="discount-rate" ' . $noEdit . '
                         title="Markdown percentage from catalog list costs"
                         onchange="vendorEditor.saveDiscountRate(this.value);"
                         class="form-control" value="' . $model->discountRate() * 100 . '" />
@@ -442,9 +476,56 @@ class VendorIndexPage extends FannieRESTfulPage
             <textarea class="form-control" rows="5" name="notes" id="vcNotes">' . $model->notes() . '</textarea>
             </div>
             </div>';
-        $ret .= '<button type="submit" class="btn btn-default">Save Vendor Contact Info</button>';
+        $ret .= '<button ' . $noEdit . ' type="submit" class="btn btn-default">Save Vendor Contact Info</button>';
         $ret .= '</form>';
         $ret .= '</div></div>';
+
+        $stores = new StoresModel($dbc);
+        $stores->hasOwnItems(1);
+        $map = new AutoOrderMapModel($dbc);
+        $map->vendorID($id);
+        $ret .= '<div class="panel panel-default">
+            <div class="panel-heading">Auto Order</div>
+            <div class="panel-body">
+            <div class="form-group">
+                <label>Minimum Order</label>
+                <div class="input-group">
+                    <span class="input-group-addon">$</span>
+                    <input type="text" name="minOrder" class="form-control auto-order"
+                        value="' . $model->orderMinimum() . '" ' . $noEdit . ' />
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Allow Half Cases
+                    <input type="checkbox" name="halfs" class="auto-order" value="1"
+                        ' . ($model->halfCases() ? 'checked' : '') . ' ' . $noEdit . ' />
+                </label>
+            </div>
+            <table class="table table-bordered">
+            <tr><th>Store</th><th>Enabled</th><th>Account#</th></tr>';
+        foreach ($stores->find() as $store) {
+            $map->storeID($store->storeID());
+            $exists = $map->load();
+            $ret .= sprintf('<tr>
+                <td>%s</td>
+                <input type="hidden" name="autoID[]" value="%d" class="auto-order" />
+                <td><input type="checkbox" %s class="auto-order" name="autoEnable[]" value="%d" %s /></td>
+                <td><input type="text" class="form-control auto-order" name="autoAccount[]" value="%s" %s /></td>
+                </tr>',
+                $store->description(),
+                $store->storeID(),
+                ($map->active() ? 'checked' : ''),
+                $store->storeID(), $noEdit,
+                $map->accountID(), $noEdit
+            );
+        }
+        $ret .= '</table>
+                <button type="button" class="btn btn-default" ' . $noEdit . '
+                    onclick="vendorEditor.saveAutoOrder(' . $id . '); return false;">Save</button>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <a class="' . $noShow . '" href="ParsPage.php?id=' . $id . '">Pars Algorithm</a>
+                </div>
+            </div>';
 
         $delivery = new VendorDeliveriesModel($dbc);
         $delivery->vendorID($id);
@@ -461,7 +542,7 @@ class VendorIndexPage extends FannieRESTfulPage
             $func = strtolower(date('l', $dt));
             $labels .= '<th><label for="' . $func . '">' . date('D', $dt) . '</label></th>'; 
             $checks .= '<td><input type="checkbox" id="' . $func . '" name="' . $func . '"
-                        ' . ($delivery->$func() ? 'checked' : '') . ' class="delivery" /></td>';
+                        ' . ($delivery->$func() ? 'checked' : '') . ' class="delivery" ' . $noEdit . '/></td>';
             $dt = mktime(0, 0, 0, date('n', $dt), date('j', $dt)+1, date('Y', $dt));
         }
         $ret .= '<table class="table"><tr>' . $labels . '</tr><tr>' . $checks . '</tr></table>';
@@ -512,7 +593,7 @@ class VendorIndexPage extends FannieRESTfulPage
         ?>
         <p id="vendorarea">
         <select onchange="if (this.value=='new') vendorEditor.vendorNew(); else location='?vid='+this.value;" 
-            id=vendorselect class="form-control">
+            id=vendorselect class="form-control chosen">
         <?php echo $vendors; ?>
         </select>
         </p>
@@ -526,8 +607,11 @@ class VendorIndexPage extends FannieRESTfulPage
         </p>
         <?php
 
-        $this->add_script('index.js');
+        $this->addScript('index.js');
         $this->addOnloadCommand("\$('#vendorselect').focus();\n");
+        $this->addScript('../../src/javascript/chosen/chosen.jquery.min.js');
+        $this->addCssFile('../../src/javascript/chosen/bootstrap-chosen.css');
+        $this->addOnloadCommand("\$('select.chosen').chosen();\n");
 
         return ob_get_clean();
     }
@@ -568,12 +652,28 @@ class VendorIndexPage extends FannieRESTfulPage
             <p>PLU/SKU mapping is for resolving situations where the
             store and the vendor use different UPCs. This is often
             the case with items sold in bulk using a PLU.</p>
-            <p>Vendor Subcategories are optional. If the vendor\'s
-            catalog is divided into vendor-specific subcategories,
-            custom margin targets can be set for those sets of
-            items.</p>
             <p>Contact Info and Delivery Schedule are wholly optional.
-            Jot down whatever is useful.</p>';
+            Jot down whatever is useful.</p>
+            <p>Several margin adjustments can be associated with a vendor.
+            An item\'s default margin is chosen, from lowest to highest priority, 
+            from these options:
+                <ul>
+                    <li><em>(default)</em> The POS department\'s margin.</li>
+                    <li>The vendor catalog subcategory\'s margin</li>
+                    <li>The vendor <strong>and</strong> POS department specific margin</li>
+                </ul>
+            This structure creates increasingly specific overrides from the default, POS-department
+            based margins. Higher priority rules only need to exist where the target margin
+            deviates from the default. Both vendor subcategories and the additional vendor+POS-department
+            overrides are entirely optional.</p>
+            <p>Two additional adjustments can be applied <em>in addition</em> to the baseline margin above.
+            The shipping percentage <strong>increases</strong> the item\'s cost before applying the
+            baseline margin resulting in a higher retail price. The discount rate <strong>decreases</strong>
+            an item\'s cost before applying the baseline margin resulting in a lower retail price. The names
+            refer to common use cases, but in practice to price all a vendor\'s items e.g. 5% above or below
+            the default POS department margin it\'s easier to use one of these fields than create dozens and/or
+            hundreds of subcategory or vendor+POS-department overrides.</p>
+            ';
     }
 
     public function unitTest($phpunit)

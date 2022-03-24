@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class PurchasingSearchPage extends FannieRESTfulPage 
@@ -34,6 +34,7 @@ class PurchasingSearchPage extends FannieRESTfulPage
     public $description = '[Search Purchase Orders] finds orders/invoices containing a given item.';
 
     protected $must_authenticate = true;
+    protected $enable_linea = true;
 
     public function get_id_view()
     {
@@ -42,6 +43,8 @@ class PurchasingSearchPage extends FannieRESTfulPage
 
         $start = FormLib::get('date1');
         $end = FormLib::get('date2');
+        $store = FormLib::get('store');
+        $searchBy = FormLib::get('searchBy');
 
         $query = 'SELECT o.placedDate, o.orderID, o.vendorInvoiceID,
                 v.vendorName, i.sku, i.internalUPC, i.description,
@@ -49,35 +52,58 @@ class PurchasingSearchPage extends FannieRESTfulPage
                 FROM PurchaseOrderItems AS i
                     LEFT JOIN PurchaseOrder AS o ON i.orderID=o.orderID
                     LEFT JOIN vendors AS v ON o.vendorID=v.vendorID
-                WHERE (i.internalUPC=? OR i.sku LIKE ?) ';
+                WHERE ';
+        $args = array();
+        switch ($searchBy) {
+            case 'Invoice #':
+                $query .= ' o.vendorInvoiceID=?';
+                $args[] = $this->id;
+                break;
+            case 'SKU':
+                $query .= ' i.sku LIKE ?';
+                $args[] = '%' . $this->id;
+                break;
+            case 'UPC':
+            default:
+                $query .= ' i.internalUPC=?';
+                $args[] = BarcodeLib::padUPC($this->id);
+                break;
+        }
         if ($start !== '' && $end !== '') {
             $query .= ' AND o.placedDate BETWEEN ? AND ? ';
         }
+        if ($store) {
+            $query .= ' AND o.storeID=? ';
+        }
         $query .= 'ORDER BY o.placedDate DESC';
 
-        $args = array(BarcodeLib::padUPC($this->id), '%'.$this->id);
         if ($start !== '' && $end !== '') {
             $args[] = $start . ' 00:00:00';
             $args[] = $end . ' 23:59:59';
+        }
+        if ($store) {
+            $args[] = $store;
         }
 
         $prep = $dbc->prepare($query);
         $res = $dbc->execute($prep, $args);
 
-        $ret = '<table class="table">';
-        $ret .= '<tr><th>Date</th><th>Invoice</th><th>Vendor</th>
-                <th>UPC</th><th>SKU</th><th>Brand</th><th>Desc</th>
-                <th>Qty</th></tr>';
+        $ret = '<p><a href="PurchasingSearchPage.php" class="btn btn-default">Back</a></p>
+                <table class="table">';
+        $ret .= '<tr><th>Date</th><th class="hidden-xs">Invoice</th><th>Vendor</th>
+                <th class="hidden-xs">UPC</th><th class="hidden-xs">SKU</th>
+                <th class="hidden-xs">Brand</th><th>Desc</th>
+                <th class="hidden-xs">Qty</th></tr>';
         while($row = $dbc->fetch_row($res)) {
             $ret .= sprintf('<tr>
                             <td><a href="ViewPurchaseOrders.php?id=%d">%s</a></td>
-                            <td><a href="ViewPurchaseOrders.php?id=%d">%s</a></td>
+                            <td class="hidden-xs"><a href="ViewPurchaseOrders.php?id=%d">%s</a></td>
                             <td>%s</td>
-                            <td><a href="../item/ItemEditorPage.php?searchupc=%s">%s</a></td>
+                            <td class="hidden-xs"><a href="../item/ItemEditorPage.php?searchupc=%s">%s</a></td>
+                            <td class="hidden-xs">%s</td>
+                            <td class="hidden-xs">%s</td>
                             <td>%s</td>
-                            <td>%s</td>
-                            <td>%s</td>
-                            <td>%d</td>
+                            <td class="hidden-xs">%d</td>
                             </tr>',
                             $row['orderID'], date('Y-m-d', strtotime($row['placedDate'])),
                             $row['orderID'], $row['vendorInvoiceID'],
@@ -96,13 +122,22 @@ class PurchasingSearchPage extends FannieRESTfulPage
 
     public function get_view()
     {
+        $stores = FormLib::storePicker();
         $ret = '<form class="form-horizontal" action="PurchasingSearchPage.php" method="get">';
         $ret .= '<div class="row">';
         $ret .= '<div class="col-sm-6">';
 
         $ret .= '<div class="form-group">';
-        $ret .= '<label for="upcsku" class="col-sm-3 control-label">UPC or SKU</label>';
+        $ret .= '<div class="col-sm-3">
+            <select name="searchBy" class="form-control input-sm">
+            <option>UPC</option><option>SKU</option><option>Invoice #</option></select>
+            </div>';
         $ret .= '<div class="col-sm-9"><input class="form-control" type="text" id="upcsku" name="id" /></div>';
+        $ret .= '</div>';
+
+        $ret .= '<div class="form-group">';
+        $ret .= '<label class="col-sm-3 control-label">Store</label>';
+        $ret .= '<div class="col-sm-9">' . $stores['html'] . '</div>';
         $ret .= '</div>';
 
         $ret .= '<div class="form-group">';
@@ -129,6 +164,7 @@ class PurchasingSearchPage extends FannieRESTfulPage
         $ret .= '</form>';
 
         $this->add_onload_command("\$('.form-control:first').focus();\n");
+        $this->addOnloadCommand("enableLinea('#upcsku');");
 
         return $ret;
     }

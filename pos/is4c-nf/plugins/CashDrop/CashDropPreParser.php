@@ -22,6 +22,7 @@
 *********************************************************************************/
 
 use COREPOS\pos\parser\PreParser;
+use COREPOS\pos\lib\Database;
 
 class CashDropPreParser extends PreParser {
 
@@ -38,6 +39,7 @@ class CashDropPreParser extends PreParser {
 
         // lookup cashier total
         $db = Database::mDataConnect();
+        if ($db === false) return false;
         $q = sprintf("SELECT sum(-total) FROM dtransactions WHERE
             trans_subtype='CA' AND trans_status <> 'X' AND emp_no=%d",
             CoreLocal::get('CashierNo'));

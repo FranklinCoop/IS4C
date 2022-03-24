@@ -18,7 +18,7 @@ class OrderNotifications
         $order = $this->getOrder($orderID);
         $items = $this->getItems($orderID, $transID);
         $ret = false;
-        if ($items[0]['staff'] && $order->sendEmails()) {
+        if (isset($items[0]) && $items[0]['staff'] && $order->sendEmails()) {
             $formatted = $this->formatItems($items);
             $formatted['store'] = $this->getStore($orderID);
             $addr = $this->getAddress($order);
@@ -73,6 +73,10 @@ class OrderNotifications
                 return preg_replace('/[^0-9]/', '', $order->phone()) . '@tmomail.net';
             case 5:
                 return preg_replace('/[^0-9]/', '', $order->phone()) . '@vzwpix.com';
+            case 6:
+                return preg_replace('/[^0-9]/', '', $order->phone()) . '@msg.fi.google.com';
+            case 7:
+                return preg_replace('/[^0-9]/', '', $order->phone());
             default:
                 return false;
         }
@@ -92,7 +96,16 @@ class OrderNotifications
             $template = new ScheduledEmailTemplatesModel($dbc);
             $template->scheduledEmailTemplateID($config->get('SO_TEMPLATE'));
             $template->load();
-            $ret = ScheduledEmailSendTask::sendEmail($template, $addr, $items);
+            if (preg_match('/^[0-9]+$/', $addr)) { // send text message
+                $sns = new COREPOS\Fannie\Plugin\AWS\SNS($config);
+                $msg = $template->textCopy();
+                foreach ($items as $name => $value) {
+                    $msg = str_replace('{{' . $name . '}}', $value, $msg);
+                }
+                $ret = $sns->sendSMS($addr, $msg);
+            } else {
+                $ret = ScheduledEmailSendTask::sendEmail($template, $addr, $items);
+            }
             $dbc->selectDB($config->get('TRANS_DB'));
         }
 

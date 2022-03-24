@@ -21,9 +21,11 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\lib\Operators as Op;
+
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 class ObfWeeklyReport extends FannieReportPage
@@ -42,7 +44,7 @@ class ObfWeeklyReport extends FannieReportPage
     public $page_set = 'Plugin :: Open Book Financing';
     public $report_set = 'Sales Reports';
     public $description = '[OBF Weekly Report] shows open book financing sales and labor data for a given week.';
-    public $themed = true;
+    public $discoverable = false;
 
     protected $required_fields = array('weekID');
     protected $new_tablesorter = false;
@@ -69,12 +71,13 @@ class ObfWeeklyReport extends FannieReportPage
         '#CDB49B',
         '#99C299',
         '#CDB49B',
-        '#6685C2',
-        '#FF4D4D',
         '#99C299',
-        '#C299EB',
-        '#FFB280',
-        '#FFFF66',
+        '#CDB49B',
+        '#99C299',
+        '#CDB49B',
+        '#99C299',
+        '#CDB49B',
+        '#99C299',
     );
 
     public function report_description_content()
@@ -94,10 +97,10 @@ class ObfWeeklyReport extends FannieReportPage
         $other = $store == 1 ? 2 : 1;
 
         return array(
-            'Week ' . date('F d, Y', $start_ts) . ' to ' . date('F d, Y', $end_ts) . '<br />',
-            "<a href=\"?weekID={$prev}&store={$store}\">Prev Week</a> 
+            '<div>Week ' . date('F d, Y', $start_ts) . ' to ' . date('F d, Y', $end_ts) . '</div>',
+            "<div class=\"hidden-print\"><a href=\"?weekID={$prev}&store={$store}\">Prev Week</a> 
             | <a href=\"?weekID={$next}&store={$store}\">Next Week</a>
-            | <a href=\"?weekID={$this->form->weekID}&store={$other}\">Other Store</a>",
+            | <a href=\"?weekID={$this->form->weekID}&store={$other}\">Other Store</a></div>",
         );
     }
 
@@ -132,6 +135,7 @@ class ObfWeeklyReport extends FannieReportPage
         $total_sales->quarterActual = 0.0;
         $total_sales->quarterProjected = 0.0;
         $total_sales->quarterLaborSales = 0.0;
+        $total_sales->forecast = 0.0;
 
         return $total_sales;
     }
@@ -211,8 +215,8 @@ class ObfWeeklyReport extends FannieReportPage
 
     protected function projectHours($splhGoal, $dept_proj, $dept_trend)
     {
-        $proj_hours = $dept_proj / $splhGoal;
-        $trend_hours = $dept_trend / $splhGoal;
+        $proj_hours = $splhGoal == 0 ? 0 : $dept_proj / $splhGoal;
+        $trend_hours = $splhGoal == 0 ? 0 : $dept_trend / $splhGoal;
 
         return array($proj_hours, $trend_hours);
     }
@@ -241,7 +245,7 @@ class ObfWeeklyReport extends FannieReportPage
             }
             if (isset($data[$i][3]) && preg_match('/^[\d,]+$/', $data[$i][3])) {
                 $amt = str_replace(',', '', $data[$i][3]);
-                $percentage = ((float)$amt) / ((float)$total_sales->projected);
+                $percentage = Op::div((float)$amt, (float)$total_sales->projected);
                 $data[$i][3] = number_format($percentage*100, 2) . '%';
             }
         }
@@ -249,8 +253,11 @@ class ObfWeeklyReport extends FannieReportPage
         return $data;
     }
 
-    protected function headerRow($header, $text='black')
+    protected function headerRow($header, $text='black', $link=false)
     {
+        if ($link) {
+            $header = sprintf('<a href="ObfDepartmentReport.php?id=%d&week=%d">%s</a>', $link[0], $link[1], $header);
+        }
         return array($header, '', '', '', '', '', '', '', '', '',
                     'meta' => FannieReportPage::META_BOLD | FannieReportPage::META_COLOR,
                     'meta_background' => $this->colors[0],
@@ -937,10 +944,9 @@ class ObfWeeklyReport extends FannieReportPage
         foreach (array(1,2) as $storeID) {
             $tArgs = array_merge($args, array($storeID)); 
             $transR = $dbc->execute($transP, $tArgs);
+            $trans_info[$storeID] = 0;
             if (!$future && $transR) {
                 $trans_info[$storeID] = $dbc->numRows($transR);
-            } else {
-                $trans_info[$storeID] = 0;
             }
         }
 
@@ -990,12 +996,14 @@ class ObfWeeklyReport extends FannieReportPage
             foreach (array(1,2) as $storeID) {
                 $tArgs = array_merge($args, array($storeID)); 
                 $transR = $dbc->execute($transP, $tArgs);
+                $trans_info[$storeID] = 0;
                 if ($transR) {
-                    $month_trans = $dbc->numRows($transR);
-                    $avg_trans = ($month_trans / $num_days) * 7;
-                    $trans_info[$storeID] = $avg_trans;
-                } else {
-                    $trans_info[$storeID] = 0;
+                    $tran_count = $dbc->numRows($transR);
+                    $trans_info[$storeID] = $tran_count;
+                    if (!isset($dateInfo['averageWeek']) || $dateInfo['averageWeek']) {
+                        $avg_trans = ($tran_count / $num_days) * 7;
+                        $trans_info[$storeID] = $avg_trans;
+                    }
                 }
             }
 
@@ -1009,8 +1017,11 @@ class ObfWeeklyReport extends FannieReportPage
                 $sales->lastYearTransactions($trans_info[$row['storeID']]);
                 $sales->obfCategoryID($row['id']);
                 $sales->superID($row['superID']);
-                $avg_sales = ($row['sales'] / $num_days) * 7;
-                $sales->lastYearSales($avg_sales);
+                $sales->lastYearSales($row['sales']);
+                if (!isset($dateInfo['averageWeek']) || $dateInfo['averageWeek']) {
+                    $avg_sales = ($row['sales'] / $num_days) * 7;
+                    $sales->lastYearSales($avg_sales);
+                }
                 if ($future) {
                     $sales->actualSales(0);
                     $labor = $class_lib::getLabor($dbc);
@@ -1023,100 +1034,35 @@ class ObfWeeklyReport extends FannieReportPage
                 $sales->save();
             }
 
-            /** plugged new store numbers **/
-            foreach (array(1, 2, 3, 7, 8, 9) as $catID) {
-                $sales->lastYearTransactions($trans_info[2]);
-                $sales->obfCategoryID($catID);
-                if ($future) {
-                    $sales->actualSales(0);
-                    $labor = $class_lib::getLabor($dbc);
-                    $labor->obfWeekID($week->obfWeekID());
-                    $labor->obfCategoryID($catID);
-                    foreach ($labor->find() as $l) {
-                        $sales->growthTarget($l->growthTarget());
-                    }
-                }
-                if ($catID == 1) {
-                    $sales->superID(6);
-                    $sales->lastYearSales(54178.24);
-                    $sales->save();
-                } elseif ($catID == 2) {
-                    $sales->superID(10); 
-                    $sales->lastYearSales(10778.62);
-                    $sales->save();
-                    $sales->superID(11); 
-                    $sales->lastYearSales(35928.54);
-                    $sales->save();
-                    $sales->superID(16); 
-                    $sales->lastYearSales(13173.87);
-                    $sales->save();
-                } elseif ($catID == 3) {
-                    $sales->superID(1); 
-                    $sales->lastYearSales(27089.13);
-                    $sales->save();
-                    $sales->superID(4); 
-                    $sales->lastYearSales(61306.97);
-                    $sales->save();
-                    $sales->superID(5); 
-                    $sales->lastYearSales(23524.77);
-                    $sales->save();
-                    $sales->superID(7); 
-                    $sales->lastYearSales(285.16);
-                    $sales->save();
-                    $sales->superID(8); 
-                    $sales->lastYearSales(17108.92);
-                    $sales->save();
-                    $sales->superID(9); 
-                    $sales->lastYearSales(2566.35);
-                    $sales->save();
-                    $sales->superID(13); 
-                    $sales->lastYearSales(15683.19);
-                    $sales->save();
-                    $sales->superID(17); 
-                    $sales->lastYearSales(26376.25);
-                    $sales->save();
-                } elseif ($catID == 7) {
-                    $sales->superID(6);
-                    $sales->lastYearSales(0.92*25576.85);
-                    $sales->save();
-                } elseif ($catID == 8) {
-                    $sales->superID(10); 
-                    $sales->lastYearSales(0.92*5088.447);
-                    $sales->save();
-                    $sales->superID(11); 
-                    $sales->lastYearSales(0.92*16961.49);
-                    $sales->save();
-                    $sales->superID(16); 
-                    $sales->lastYearSales(0.92*6219.213);
-                    $sales->save();
-                } elseif ($catID == 9) {
-                    $sales->superID(1); 
-                    $sales->lastYearSales(0.92*12788.43);
-                    $sales->save();
-                    $sales->superID(4); 
-                    $sales->lastYearSales(0.92*28942.23);
-                    $sales->save();
-                    $sales->superID(5); 
-                    $sales->lastYearSales(0.92*11105.74);
-                    $sales->save();
-                    $sales->superID(7); 
-                    $sales->lastYearSales(0.92*134.62);
-                    $sales->save();
-                    $sales->superID(8); 
-                    $sales->lastYearSales(0.92*8076.90);
-                    $sales->save();
-                    $sales->superID(9); 
-                    $sales->lastYearSales(0.92*1211.54);
-                    $sales->save();
-                    $sales->superID(13); 
-                    $sales->lastYearSales(0.92*7403.83);
-                    $sales->save();
-                    $sales->superID(17); 
-                    $sales->lastYearSales(0.92*12451.89);
-                    $sales->save();
-                }
+            if ($week->obfWeekID() > 265) {
+                $prep = $dbc->prepare("SELECT SUM(total) FROM {$dlog2}
+                            WHERE tdate BETWEEN ? AND ?
+                                AND store_id=?
+                                AND upc IN (SELECT upc FROM " . FannieDB::fqn('products', 'op') . " WHERE department=80)");
+                $hsAdj = $dbc->getValue($prep, array(
+                    date('Y-m-d 00:00:00', $dateInfo['start_ly']),
+                    date('Y-m-d 23:59:59', $dateInfo['end_ly']),
+                    1));
+                $upP = $dbc->prepare("UPDATE ObfSalesCache SET lastYearSales = lastYearSales + ?
+                    WHERE obfCategoryID=2 AND superID=10 AND obfWeekID=?");
+                $dbc->execute($upP, array($hsAdj, $week->obfWeekID()));
+                $upP = $dbc->prepare("UPDATE ObfSalesCache SET lastYearSales = lastYearSales - ?
+                    WHERE obfCategoryID=3 AND superID=18 AND obfWeekID=?");
+                $dbc->execute($upP, array($hsAdj, $week->obfWeekID()));
+
+                $denAdj = $dbc->getValue($prep, array(
+                    date('Y-m-d 00:00:00', $dateInfo['start_ly']),
+                    date('Y-m-d 23:59:59', $dateInfo['end_ly']),
+                    2));
+                $upP = $dbc->prepare("UPDATE ObfSalesCache SET lastYearSales = lastYearSales + ?
+                    WHERE obfCategoryID=8 AND superID=10 AND obfWeekID=?");
+                $dbc->execute($upP, array($denAdj, $week->obfWeekID()));
+                $upP = $dbc->prepare("UPDATE ObfSalesCache SET lastYearSales = lastYearSales - ?
+                    WHERE obfCategoryID=9 AND superID=18 AND obfWeekID=?");
+                $dbc->execute($upP, array($denAdj, $week->obfWeekID()));
             }
         }
+
     }
 
     protected $salesP = null;
@@ -1191,9 +1137,11 @@ class ObfWeeklyReport extends FannieReportPage
 
         $this->stockP = $dbc->prepare('
             SELECT SUM(stockPurchase) AS ttl
-            FROM ' . $this->config->get('TRANS_DB') . $dbc->sep() . 'stockpurchases
+            FROM ' . $this->config->get('TRANS_DB') . $dbc->sep() . 'stockpurchases AS s
+                INNER JOIN ' . FannieDB::fqn('custdata', 'op') . ' AS c ON s.card_no=c.CardNo AND c.personNum=1
             WHERE tdate BETWEEN ? AND ?
                 AND dept=992
+                AND c.Type=\'PC\'
                 AND trans_num NOT LIKE \'1001-30-%\'
         ');
     }
@@ -1247,7 +1195,7 @@ class ObfWeeklyReport extends FannieReportPage
         return $stock !== false ? $stock / 20 : 0;
     }
 
-    protected function ownershipThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly)
+    protected function ownershipThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly, $average_week=true)
     {
         $args3 = array(
             date('Y-m-d 00:00:00', $start_ts),
@@ -1260,7 +1208,9 @@ class ObfWeeklyReport extends FannieReportPage
         );
         $last_week = $this->getStock($dbc, $args4);
         $days = date('t', $start_ly);
-        $last_week = round(($last_week / $days) * 7);
+        if ($average_week) {
+            $last_week = round(($last_week / $days) * 7);
+        }
 
         return array(
             'Ownership This Week',

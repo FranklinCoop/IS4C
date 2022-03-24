@@ -42,6 +42,19 @@ class FanniePage extends \COREPOS\common\ui\CorePage
     protected $title = 'Page window title';
     protected $header = 'Page displayed header';
 
+    public $default_db = false;
+
+    /** wrapper around $_SESSION superglobal **/
+    protected $session;
+
+    /**
+     * Validated means the request includes a random token matching the session token
+     * Auto validation means the individual page does not want to manage
+     * token checks manually.
+     */
+    protected $validated = false;
+    protected $autoValidate = false;
+
     /**
       Include javascript necessary to integrate linea
       scanner device
@@ -60,6 +73,9 @@ class FanniePage extends \COREPOS\common\ui\CorePage
         if (isset($coop_id) && $coop_id == 'WEFC_Toronto') {
             $this->auth_classes[] = 'admin';
         }
+
+        $path = realpath(__DIR__ . '/../');
+        $this->session = new COREPOS\common\NamedSession($path);
     }
 
     public function preprocess()
@@ -71,6 +87,30 @@ class FanniePage extends \COREPOS\common\ui\CorePage
         */
         if ($this->config->get('WINDOW_DRESSING')) {
             $this->window_dressing = true;
+        }
+
+        return $ret;
+    }
+
+    protected function getMessages()
+    {
+        if (!$this->current_user || !is_object($this->connection)) {
+            return '';
+        }
+        $uid = FannieAuth::getUID($this->current_user);
+        $msg = new COREPOS\Fannie\API\auth\Notifications($this->connection, $this->config);
+        $msgs = $msg->getMessages($uid);
+        $ret = '';
+        foreach ($msgs as $m) {
+            $ret .= '<div class="alert alert-info">';
+            if ($m['url']) {
+                $ret .= '<a href="' . $url . '">';
+            }
+            $ret .= $m['message'];
+            if ($m['url']) {
+                $ret .= '</a>';
+            }
+            $ret .= '</div>';
         }
 
         return $ret;
@@ -101,7 +141,7 @@ class FanniePage extends \COREPOS\common\ui\CorePage
                 $this->addScript($url . 'src/javascript/jquery-ui.js');
             }
             $this->addScript($url . 'src/javascript/calculator.js');
-            $this->addScript($url . 'src/javascript/core.js');
+            $this->addScript($url . 'src/javascript/core.js?date=20200312');
             if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
                 // windows has trouble with symlinks
                 $this->addCssFile($url . 'src/javascript/jquery-ui-1.10.4/css/smoothness/jquery-ui.min.css?id=20140625');
@@ -112,6 +152,7 @@ class FanniePage extends \COREPOS\common\ui\CorePage
             $this->addCssFile($url . 'src/css/core.css');
             $this->addCssFile($url . 'src/css/print.css');
             $this->add_onload_command('standardFieldMarkup();');
+            $this->addOnloadCommand("logJsErrors('{$url}');");
         } else {
             include(dirname(__FILE__) . '/../src/header.html');
         }
@@ -119,7 +160,13 @@ class FanniePage extends \COREPOS\common\ui\CorePage
         if ($this->enable_linea) {
             $this->addScript($url . 'src/javascript/linea/cordova-2.2.0.js');
             $this->addScript($url . 'src/javascript/linea/ScannerLib-Linea-2.0.0.js');
+            if (strpos(filter_input(INPUT_SERVER, 'HTTP_USER_AGENT'), 'iPod touch')) {
+                $this->addScript($url . 'src/javascript/linea/WebHub.js');
+            }
+            $this->addScript($url . 'src/javascript/linea/core.js?date=20200311');
         }
+
+        echo $this->getMessages();
 
         return ob_get_clean();
     }
@@ -170,11 +217,6 @@ class FanniePage extends \COREPOS\common\ui\CorePage
         return true;
     }
 
-    public function get_header()
-    {
-        return $this->getHeader();
-    }
-
     /**
       Get the standard footer
       @return An HTML string
@@ -197,15 +239,26 @@ class FanniePage extends \COREPOS\common\ui\CorePage
 
         return ob_get_clean();
     }
-    public function get_footer()
-    {
-        return $this->getFooter();
-    }
 
     protected function lineaJS()
     {
         ob_start();
         ?>
+function lineaBarcode(upc, selector, callback) {
+    upc = upc.substring(0,upc.length-1);
+    if ($(selector).length > 0){
+        $(selector).val(upc);
+        if (typeof callback === 'function') {
+            callback();
+        } else {
+            $(selector).closest('form').submit();
+        }
+    }
+}
+var IPC_PARAMS = { selector: false, callback: false };
+function ipcWrapper(upc, typeID, typeStr) {
+    lineaBarcode(upc, IPC_PARAMS.selector, IPC_PARAMS.callback);
+}
 /**
   Enable linea scanner on page
   @param selector - jQuery selector for the element where
@@ -221,6 +274,9 @@ function enableLinea(selector, callback)
     Device = new ScannerDevice({
         barcodeData: function(data, type) {
             var upc = data.substring(0,data.length-1);
+            if (upc.length == 6) {
+                upc = '0' + upc;
+            }
             if ($(selector).length > 0){
                 $(selector).val(upc);
                 if (typeof callback === 'function') {
@@ -246,7 +302,14 @@ function enableLinea(selector, callback)
     if (typeof WebBarcode == 'object') {
         WebBarcode.onBarcodeScan(function(ev) {
             var data = ev.value;
-            var upc = data.substring(0,data.length-1);
+            lineaBarcode(data, selector, callback);
+        });
+    }
+
+    // for webhub
+    WebHub.Settings.set({
+        barcodeFunction: function (upc, typeID, typeStr) {
+            upc = upc.substring(0,upc.length-1);
             if ($(selector).length > 0){
                 $(selector).val(upc);
                 if (typeof callback === 'function') {
@@ -255,8 +318,8 @@ function enableLinea(selector, callback)
                     $(selector).closest('form').submit();
                 }
             }
-        });
-    }
+        }
+    });
 
     function lineaSilent()
     {
@@ -270,7 +333,6 @@ function enableLinea(selector, callback)
     }
     lineaSilent();
 }
-
         <?php
 
         return ob_get_clean();
@@ -348,7 +410,33 @@ function enableLinea(selector, callback)
                             </h4>
                         </div>
                         <div class="modal-body">' . $help . '</div>
+                        <div id="help-feedback" class="container col-sm-6 collapse">
+                            <input type="hidden" name="page" class="help-feedback" value="' . filter_input(INPUT_SERVER, 'PHP_SELF') . '" />
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" name="email" class="help-feedback form-control" 
+                                    placeholder="Optional; if blank you won\'t get a response" />
+                            </div>
+                            <div class="form-group">
+                                <label>How could "Help" on this page be improved</label>
+                                <textarea name="comments" class="form-control help-feedback" rows="10"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <button type="button" class="btn btn-default" onclick="
+                                    $.ajax({ method: \'post\', url: \'' . $this->config->URL . 'admin/HelpPopup.php\',
+                                        data: $(\'.help-feedback\').serialize() })
+                                    .always(function() { $(\'#help-feedback\').hide(); $(\'#help-feedback-done\').show(); });
+                                ">
+                                    Send Feedback
+                                </button>
+                            </div>
+                        </div>
+                        <div id="help-feedback-done" class="collapse">
+                            <div class="alert alert-success">Feedback submitted</div>
+                        </div>
                         <div class="modal-footer">
+                            <button type="button" id="feedback-btn" class="btn btn-default" 
+                                onclick="$(\'#help-feedback\').show();$(this).hide();">Feedback</button>
                             <button type="button" class="btn btn-default" data-dismiss="modal"
                                 onclick="var helpWindow=window.open(\''. $this->config->URL . 'admin/HelpPopup.php\',
                                 \'CORE Help\', \'height=500,width=300,scrollbars=1,resizable=1\');"
@@ -382,20 +470,69 @@ function enableLinea(selector, callback)
             $this->loginRedirect();
             exit;
         }
+
+        if (!isset($_COOKIE['__perma'])) {
+            $perma = uniqid('', true);
+            setcookie('__perma', $perma, time()+60*60*24*999,'/');
+        } elseif (isset($_COOKIE['__perma']) && !isset($this->session->__perma)) {
+            $redis = $this->getRedis();
+            if ($redis) {
+                $vals = $redis->get($_COOKIE['__perma']);
+                if ($vals) {
+                    $vals = unserialize($vals);
+                    foreach ($vals as $k => $v) {
+                        $this->session->{$k} = $v;
+                    }
+                    $this->session->__perma = true;
+                }
+            }
+        }
+
+        if (FormLib::get('_token_') && isset($this->session->csrfToken)) {
+            $this->validated = FormLib::get('_token_') === $this->session->csrfToken;
+            if (!$this->validated && $this->autoValidate) {
+                echo 'HTTP 400';
+                exit;
+            }
+        } elseif (!isset($this->session->csrfToken)) {
+            $this->session->csrfToken = COREPOS\common\FormLib::generateToken();
+        }
+        $this->addOnloadCommand("if (typeof appendTokens == 'function') { appendTokens('{$this->session->csrfToken}'); }");
     }
 
-    public function postFlight()
+    protected function postFlight()
     {
-        if ($this->enable_linea) {
-            echo '<script type="text/javascript">';
-            echo $this->lineaJS();
-            echo '</script>';
+        if ($this->session->changed() && isset($_COOKIE['__perma'])) {
+            $redis = $this->getRedis();
+            if ($redis) {
+                $data = $this->session->getPerma();
+                $data = serialize($data);
+                $res = $redis->setEx($_COOKIE['__perma'], 60*60*24*30, $data);
+            }
+        }
+    }
+
+    protected function getRedis()
+    {
+        $conf = $this->config->get('PLUGIN_SETTINGS');
+        $redis_host = isset($conf['SatelliteRedis']) ? $conf['SatelliteRedis'] : '127.0.0.1';
+        try {
+            $redis = new \Predis\Client($redis_host);
+            return $redis;
+        } catch (Exception $ex) {
+            return false;
         }
     }
 
     public function setPermissions($p)
     {
         $this->auth_classes = array($p);
+    }
+
+    protected $twig = null;
+    public function setTwig($t)
+    {
+        $this->twig = $t;
     }
 }
 

@@ -28,13 +28,13 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class PatronageOverDatesReport extends FannieReportPage
 {
     public $description = '[Patronage Over Date Range] lists top, or all, customers by purchases/avg basket over a range of dates';
-    public $report_set = 'Membership';
+    public $report_set = 'Membership :: Patronage';
     public $themed = true;
 
     protected $report_headers = array();
@@ -192,7 +192,7 @@ class PatronageOverDatesReport extends FannieReportPage
         }
 
         if (isset($mdata['99999'])) {
-            $this->non_member = $mdata['99999'];
+            $this->non_member[] = $mdata['99999'];
         }
 
         // Compose the rows of the report in a 2D array.

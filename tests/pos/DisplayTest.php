@@ -6,6 +6,8 @@ use COREPOS\pos\lib\DisplayLib;
 use COREPOS\pos\lib\PrehLib;
 use COREPOS\pos\lib\TransRecord;
 use COREPOS\pos\lib\Tenders\TenderModule;
+use COREPOS\pos\lib\LocalStorage\WrappedStorage;
+use COREPOS\pos\lib\Notifiers\NumPad;
 
 /**
  * @backupGlobals disabled
@@ -16,7 +18,8 @@ class DisplayTest extends PHPUnit_Framework_TestCase
     public function testScreenDisplay()
     {
         lttLib::clear();
-        $u = new COREPOS\pos\parser\parse\UPC();
+        $session = new WrappedStorage();
+        $u = new COREPOS\pos\parser\parse\UPC($session);
         $u->check('666');
         $u->parse('666');
 
@@ -126,7 +129,7 @@ class DisplayTest extends PHPUnit_Framework_TestCase
 
         CoreLocal::set('quantity', 2);
         CoreLocal::set('multiple', 1);
-        $u = new COREPOS\pos\parser\parse\UPC();
+        $u = new COREPOS\pos\parser\parse\UPC($session);
         $u->check('4627');
         $u->parse('4627');
         $item = array(
@@ -169,7 +172,7 @@ class DisplayTest extends PHPUnit_Framework_TestCase
         CoreLocal::set('quantity', 0);
         CoreLocal::set('multiple', 0);
         CoreLocal::set('currentid', 1);
-        $v = new COREPOS\pos\parser\parse\Void();
+        $v = new COREPOS\pos\parser\parse\VoidCmd($session);
         $v->check('VD');
         $v->parse('VD');
         $void = array(
@@ -255,5 +258,14 @@ class DisplayTest extends PHPUnit_Framework_TestCase
         }
 
         return $ret;
+    }
+
+    public function testNumPad()
+    {
+        $np = new NumPad();
+        CoreLocal::set('touchscreen', true);
+        $this->assertNotEquals(0, strlen($np->draw()));
+        CoreLocal::set('touchscreen', false);
+        $this->assertEquals('', $np->draw());
     }
 }

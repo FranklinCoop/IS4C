@@ -92,6 +92,25 @@ class FormLib extends \COREPOS\common\FormLib
         $lm = mktime(0,0,0,date('n')-1,1,date('Y'));
         $last_month = array(date('Y-m-01',$lm),date('Y-m-t',$lm));
 
+        $ly = mktime(0,0,0,date('n'),date('j'),date('Y')-1);
+        $todayLY = array(date('Y-m-d', $ly), date('Y-m-d', $ly));
+
+        $mondayLY = $ly;
+        while(date('N',$mondayLY) != $week_start) {
+            $mondayLY = mktime(0,0,0,date('n',$mondayLY),date('j',$mondayLY)+1,date('Y',$mondayLY));
+        }
+        $thisWeekLY = array(date('Y-m-d', $mondayLY), date('Y-m-d', mktime(0,0,0,date('n',$mondayLY),date('j',$mondayLY)+6,date('Y',$mondayLY))));
+        $thisMonthLY = array(date('Y-m-01', $ly), date('Y-m-t', $ly));
+
+        $tomLY = mktime(0,0,0,date('n',$ly),date('j',$ly)+1,date('Y',$ly));
+        $tomorrowLY = array(date('Y-m-d', $tomLY), date('Y-m-d', $tomLY));
+        $nextWeekLY = array(
+            date('Y-m-d', mktime(0,0,0,date('n',$mondayLY),date('j',$mondayLY)+7,date('Y',$mondayLY))),
+            date('Y-m-d', mktime(0,0,0,date('n',$mondayLY),date('j',$mondayLY)+13,date('Y',$mondayLY))),
+        );
+        $nmLY = mktime(0,0,0, date('n',$ly)+1, date('j',$ly), date('Y',$ly));
+        $nextMonthLY = array(date('Y-m-01', $nmLY), date('Y-m-t', $nmLY));
+
         $extra_opts = sprintf('
             <div class="panel panel-default">
                 <div class="panel-heading">Other dates</div>
@@ -135,6 +154,44 @@ class FormLib extends \COREPOS\common\FormLib
                     Last month
                 </label>
                 </td></tr>
+                <tr><td>
+                <label>
+                    <input class="radio-inline" id="od30" type="radio" name="other_dates" 
+                        onclick="$(\'#%s\').val(\'%s\');$(\'#%s\').val(\'%s\')" />
+                    Today last year
+                </label>
+                </td><td>
+                <label>
+                    <input class="radio-inline" id="od31" type="radio" name="other_dates" 
+                        onclick="$(\'#%s\').val(\'%s\');$(\'#%s\').val(\'%s\')" />
+                    This week last year
+                </label>
+                </td><td>
+                <label>
+                    <input class="radio-inline" id="od32" type="radio" name="other_dates" 
+                        onclick="$(\'#%s\').val(\'%s\');$(\'#%s\').val(\'%s\')" />
+                    This month last year
+                </label>
+                </td></tr>
+                <tr><td>
+                <label>
+                    <input class="radio-inline" id="od40" type="radio" name="other_dates" 
+                        onclick="$(\'#%s\').val(\'%s\');$(\'#%s\').val(\'%s\')" />
+                    Tomorrow last year
+                </label>
+                </td><td>
+                <label>
+                    <input class="radio-inline" id="od41" type="radio" name="other_dates" 
+                        onclick="$(\'#%s\').val(\'%s\');$(\'#%s\').val(\'%s\')" />
+                    Next week last year
+                </label>
+                </td><td>
+                <label>
+                    <input class="radio-inline" id="od42" type="radio" name="other_dates" 
+                        onclick="$(\'#%s\').val(\'%s\');$(\'#%s\').val(\'%s\')" />
+                    Next month last year
+                </label>
+                </td></tr>
                 </table>
             </div>
             </div>',
@@ -143,7 +200,13 @@ class FormLib extends \COREPOS\common\FormLib
             $one,$this_month[0],$two,$this_month[1],
             $one,$yesterday[0],$two,$yesterday[1],
             $one,$last_week[0],$two,$last_week[1],
-            $one,$last_month[0],$two,$last_month[1]
+            $one,$last_month[0],$two,$last_month[1],
+            $one,$todayLY[0],$two,$todayLY[1],
+            $one,$thisWeekLY[0],$two,$thisWeekLY[1],
+            $one,$thisMonthLY[0],$two,$thisMonthLY[1],
+            $one,$tomorrowLY[0],$two,$tomorrowLY[1],
+            $one,$nextWeekLY[0],$two,$nextWeekLY[1],
+            $one,$nextMonthLY[0],$two,$nextMonthLY[1]
         );
 
         return $extra_opts;
@@ -162,18 +225,20 @@ class FormLib extends \COREPOS\common\FormLib
       @return keyed [array]
         - html => [string] select box
         - names => [array] store names
+        - onchange => [string] optional onchange action
     */
-    public static function storePicker($field_name='store', $all=true)
+    public static function storePicker($field_name='store', $all=true, $onchange='')
     {
         $op_db = FannieConfig::config('OP_DB');
         $dbc = FannieDB::getReadOnly($op_db);
 
-        $clientIP = filter_input(INPUT_SERVER, 'REMOTE_ADDR');
-        $ranges = FannieConfig::config('STORE_NETS');
-
         $stores = new StoresModel($dbc);
+        $byIP = COREPOS\Fannie\API\lib\Store::getIdByIp();
         $current = FormLib::get($field_name, false);
-        $ret = '<select name="' . $field_name . '" class="form-control">';
+        if ($current !== false) {
+            $byIP = false;
+        }
+        $ret = '<select name="' . $field_name . '" class="form-control" onchange="' . $onchange . '">';
         if ($all) {
             $labels = array(0 => _('All Stores'));
             $ret .= '<option value="0">' . $labels[0] . '</option>';
@@ -184,12 +249,7 @@ class FormLib extends \COREPOS\common\FormLib
             $selected = '';
             if ($store->storeID() == $current) {
                 $selected = 'selected';
-            } elseif (
-                $current === false
-                && isset($ranges[$store->storeID()]) 
-                && class_exists('\\Symfony\\Component\\HttpFoundation\\IpUtils')
-                && \Symfony\Component\HttpFoundation\IpUtils::checkIp($clientIP, $ranges[$store->storeID()])
-                ) {
+            } elseif ($byIP !== false && $byIP == $store->storeID()) {
                 $selected = 'selected';
             }
             $ret .= sprintf('<option %s value="%d">%s</option>',
@@ -211,14 +271,14 @@ class FormLib extends \COREPOS\common\FormLib
       Generate a very standard form with date and department fields
       @return [string] html form
     */
-    public static function dateAndDepartmentForm()
+    public static function dateAndDepartmentForm($standardFieldNames=false)
     {
         ob_start();
         ?>
 <form method="get" class="form-horizontal">
 <div class="row">
     <div class="col-sm-6">
-        <?php echo self::standardDepartmentFields('buyer');  ?>
+        <?php echo $standardFieldNames ? self::standardDepartmentFields('super-dept', 'departments', 'dept-start', 'dept-end') : self::standardDepartmentFields('buyer');  ?>
         <div class="form-group">
             <label class="col-sm-4 control-label">Store</label>
             <div class="col-sm-8">
@@ -368,7 +428,12 @@ class FormLib extends \COREPOS\common\FormLib
           Precalculate options for superdept and dept selects
         */
         $dbc = FannieDB::getReadOnly(FannieConfig::config('OP_DB'));
-        $superR = $dbc->query('SELECT superID, super_name FROM superDeptNames');
+        $def = $dbc->tableDefinition('superDeptNames');
+        $superQ = 'SELECT superID, super_name FROM superDeptNames';
+        if (isset($def['deleted'])) {
+            $superQ .= ' WHERE deleted=0 ';
+        }
+        $superR = $dbc->query($superQ);
         $super_opts = '';
         while ($w = $dbc->fetchRow($superR)) {
             $super_opts .= sprintf('<option value="%d">%s</option>',
@@ -518,13 +583,15 @@ HTML;
             <div class="form-group">
                 <label class="col-sm-4 control-label">Start Date</label>
                 <div class="col-sm-8">
-                    <input type="text" id="date1" name="date1" class="form-control date-field" required />
+                    <input type="text" id="date1" name="date1" class="form-control date-field" 
+                        autocomplete="off" required />
                 </div>
             </div>
             <div class="form-group">
                 <label class="col-sm-4 control-label">End Date</label>
                 <div class="col-sm-8">
-                    <input type="text" id="date2" name="date2" class="form-control date-field" required />
+                    <input type="text" id="date2" name="date2" class="form-control date-field"
+                        autocomplete="off" required />
                 </div>
             </div>
             <div class="form-group">
@@ -549,7 +616,13 @@ HTML;
         $end_date = self::getDate('date2', date('Y-m-d'));
         $dlog = DTransactionsModel::selectDlog($start_date, $end_date);
         $lookupType = self::get('lookup-type', 'dept');
-        $store = self::get('store', 0);
+        $store = self::get('store', false);
+        if ($store === false) {
+            $store = COREPOS\Fannie\API\lib\Store::getIdByIp();
+            if ($store === false) {
+                $store = 0;
+            }
+        }
 
         $query = '
             FROM ' . $dlog . ' AS t 
@@ -558,7 +631,7 @@ HTML;
                 LEFT JOIN MasterSuperDepts AS m ON t.department=m.dept_ID 
                 LEFT JOIN subdepts AS b ON p.subdept=b.subdept_no
                 LEFT JOIN vendors AS v ON p.default_vendor_id=v.vendorID
-                LEFT JOIN prodExtra AS x ON t.upc=x.upc ';
+                LEFT JOIN vendorItems AS i ON p.upc=i.upc AND p.default_vendor_id=i.vendorID';
         $args = array();
         switch ($lookupType) {
             case 'dept':
@@ -568,9 +641,6 @@ HTML;
                 }
                 break;
             case 'manu':
-                break;
-            case 'vendor':
-                $query .= ' LEFT JOIN vendors AS z ON x.distributor=z.vendorName ';
                 break;
             case 'likecode':
                 $query .= ' LEFT JOIN upcLike AS u ON t.upc=u.upc ';
@@ -644,17 +714,15 @@ HTML;
                     $query .= ' AND t.upc LIKE ? ';
                     $args[] = '%' . FormLib::get('manufacturer') . '%';
                 } else {
-                    $query .= ' AND (p.brand LIKE ? OR x.manufacturer LIKE ?) ';
+                    $query .= ' AND (p.brand LIKE ?) ';
                     $manu = '%' . FormLib::get('manufacturer') . '%';
-                    $args[] = $manu;
                     $args[] = $manu;
                     $optimizeP = $dbc->prepare('
                         SELECT p.department
                         FROM products AS p
-                            LEFT JOIN prodExtra AS x ON p.upc=x.upc
-                        WHERE (p.brand LIKE ? OR x.manufacturer LIKE ?)
+                        WHERE p.brand LIKE ?
                         GROUP BY p.department');
-                    $optimizeR = $dbc->execute($optimizeP, array($manu, $manu));
+                    $optimizeR = $dbc->execute($optimizeP, array($manu));
                     $dept_in = '';
                     while ($optimizeW = $dbc->fetch_row($optimizeR)) {
                         $dept_in .= '?,';
@@ -667,18 +735,15 @@ HTML;
                 }
                 break;
             case 'vendor':
-                $query .= ' AND (p.default_vendor_id=? OR z.vendorID=?) ';
+                $query .= ' AND (p.default_vendor_id=?) ';
                 $vID = FormLib::get('vendor', 1);
-                $args[] = $vID;
                 $args[] = $vID;
                 $optimizeP = $dbc->prepare('
                     SELECT p.department
                     FROM products AS p
-                        LEFT JOIN prodExtra AS x ON p.upc=x.upc
-                        LEFT JOIN vendors AS v ON x.distributor=v.vendorName
-                    WHERE (p.default_vendor_id=? OR v.vendorID=?
+                    WHERE p.default_vendor_id=?
                     GROUP BY p.department');
-                $optimizeR = $dbc->execute($optimizeP, array($vID, $vID));
+                $optimizeR = $dbc->execute($optimizeP, array($vID));
                 $dept_in = '';
                 while ($optimizeW = $dbc->fetch_row($optimizeR)) {
                     $dept_in .= '?,';

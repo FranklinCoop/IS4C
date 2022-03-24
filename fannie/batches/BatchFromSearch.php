@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__). '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 class BatchFromSearch extends FannieRESTfulPage
@@ -52,11 +52,15 @@ class BatchFromSearch extends FannieRESTfulPage
     {
         global $FANNIE_OP_DB;
         $dbc = FannieDB::get($FANNIE_OP_DB);
-        $type = $this->form->batchType;
-        $name = $this->form->batchName;
-        $startdate = $this->form->startDate;
-        $enddate = $this->form->endDate;
-        $owner = $this->form->batchOwner;
+        try {
+            $type = $this->form->batchType;
+            $name = $this->form->batchName;
+            $startdate = $this->form->startDate;
+            $enddate = $this->form->endDate;
+            $owner = $this->form->batchOwner;
+        } catch (Exception $ex) {
+            return true;
+        }
         $priority = 0;
         $round = FALSE;
         //$round = $this->form->priceRound;
@@ -88,6 +92,9 @@ class BatchFromSearch extends FannieRESTfulPage
         $batch->priority($priority);
         $batch->owner($owner);
         $batchID = $batch->save();
+        $bu = new BatchUpdateModel($dbc);
+        $bu->batchID($batchID);
+        $bu->logUpdate($bu::UPDATE_CREATE);
 
         if ($this->config->get('STORE_MODE') === 'HQ') {
             StoreBatchMapModel::initBatch($batchID);
@@ -104,18 +111,24 @@ class BatchFromSearch extends FannieRESTfulPage
           If tags were requested and it's price change batch, make them
           Lookup vendor info for each item then add a shelftag record
         */
-        $tagset = $this->form->tagset;
+        try {
+            $tagset = $this->form->tagset;
+        } catch (Exception $ex) {
+            $tagset = '';
+        }
         if ($discounttype == 0 && $tagset !== '') {
             $this->itemsToTags($tagset, $dbc, $upcs, $prices);
         }
 
-        return 'Location: newbatch/BatchManagementTool.php?startAt=' . $batchID;
+        return 'newbatch/EditBatchPage.php?id=' . $batchID;
     }
 
     private function itemsToBatch($batchID, $dbc, $upcs, $prices, $round)
     {
         $rounder = new \COREPOS\Fannie\API\item\PriceRounder();
+        $dbc->startTransaction();
         // add items to batch
+        $bu = new BatchUpdateModel($dbc);
         for($i=0; $i<count($upcs); $i++) {
             $upc = $upcs[$i];
             $price = isset($prices[$i]) ? $prices[$i] : 0.00;
@@ -131,11 +144,17 @@ class BatchFromSearch extends FannieRESTfulPage
             $list->pricemethod(0);
             $list->quantity(0);
             $list->save();
+            $bu->reset();
+            $bu->upc(BarcodeLib::padUPC($upc));
+            $bu->batchID($batchID);
+            $bu->logUpdate($bu::UPDATE_ADDED);
         }
+        $dbc->commitTransaction();
     }
 
     private function itemsToTags($tagset, $dbc, $upcs, $prices)
     {
+        $dbc->startTransaction();
         $tag = new ShelftagsModel($dbc);
         $product = new ProductsModel($dbc);
         for($i=0; $i<count($upcs);$i++) {
@@ -155,6 +174,7 @@ class BatchFromSearch extends FannieRESTfulPage
             $tag->pricePerUnit($info['pricePerUnit']);
             $tag->save();
         }
+        $dbc->commitTransaction();
     }
 
     function post_redoSRPs_handler()
@@ -426,7 +446,7 @@ HTML;
         $json = ob_get_clean();
         $arr = json_decode($json, true);
         $phpunit->assertInternalType('array', $arr);
-        $phpunit->assertEquals(1, count($arr));
+        $phpunit->assertEquals(1, count($arr), 'Should not be empty array; JSON was ' . $json);
         $phpunit->assertEquals($this->u[0], $arr[0]['upc']);
         $phpunit->assertEquals(0, $arr[0]['srp']);
 

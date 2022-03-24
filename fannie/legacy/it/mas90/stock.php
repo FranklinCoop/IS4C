@@ -3,7 +3,7 @@
     header('Content-Disposition: attachment; filename="dailyAR.csv"');
 
 include('../../../config.php');
-require($FANNIE_ROOT'src/SQLManager.php');
+require(__DIR__ . '/../../../src/SQLManager.php');
 include('../../db.php');
 
 $SEP=",";
@@ -11,7 +11,7 @@ $Q = "\"";
 $NL = "\r\n";
 
 $query = "select card_no,sum(total) from dlog_15 where department in (991,992)
-    and ".$sql->datediff($sql->>now(),'tdate')." = 1
+    and ".$sql->datediff($sql->now(),'tdate')." = 1
     group by card_no";
 $result = $sql->query($query);
 

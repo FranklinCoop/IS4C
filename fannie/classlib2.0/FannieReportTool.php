@@ -24,14 +24,15 @@
 namespace COREPOS\Fannie\API;
 
 /**
-  @class FannieReportTool
-
-  This class behaves identically to FanniePage.
-  It exists only for categorization purposes
-  so pages that provide report-esque data but not
-  in the standard, tabular format can be 
-  discovered automatically.
-*/
+ * @class FannieReportTool
+ * @codeCoverageIgnore
+ *
+ * This class behaves identically to FanniePage.
+ * It exists only for categorization purposes
+ * so pages that provide report-esque data but not
+ * in the standard, tabular format can be 
+ * discovered automatically.
+ */
 class FannieReportTool extends \FanniePage 
 {
 
@@ -52,6 +53,12 @@ class FannieReportTool extends \FanniePage
     public $report_set = '';
 
     public $discoverable = true;
+
+    public function coverage()
+    {
+        // code coverage metrics require something callable
+        return 0;
+    }
 
 }
 

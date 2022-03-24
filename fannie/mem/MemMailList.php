@@ -63,6 +63,7 @@ class MemMailList extends FannieReportPage
              case 'Members':
              default:
                 $ret .= "c.Type='PC'
+                  AND m.street >'' and m.street not in ('*','.') and m.city > '' and m.state >'' and m.zip > ''
                   AND (end_date > ".$dbc->now()." 
                     or end_date = '' 
                     or end_date is null
@@ -71,6 +72,7 @@ class MemMailList extends FannieReportPage
                   AND ads_OK = 1
                   AND personNum = 1
                   AND LastName <> 'NEW MEMBER'
+                  AND LastName <> 'NEW WEB MEMBER'
                   order by m.card_no";
                 break;
              case 'Members (All)':
@@ -82,6 +84,7 @@ class MemMailList extends FannieReportPage
                     or end_date='0000-00-00 00:00:00')
                   AND personNum = 1
                   AND LastName <> 'NEW MEMBER'
+                  AND LastName <> 'NEW WEB MEMBER'
                   order by m.card_no";
                 break;
              case 'Business':
@@ -90,8 +93,16 @@ class MemMailList extends FannieReportPage
                   AND LastName <> 'NEW MEMBER'
                   order by m.card_no";
                 break;
+            case 'Members Not in Good Standing':
+                $ret .= "c.memType=12
+                    AND c.personNum = 1
+                    AND m.street not in ('','*','.','\n')
+                    order by m.card_no
+                ";
+                break;
          }
-
+         //where c.personNum =1 and c.memType = 12 and (i.addressFirstLine is not null and i.addressFirstLine not in ('','*','.' ));
+         
          return $ret;
     }
 
@@ -138,6 +149,7 @@ class MemMailList extends FannieReportPage
             <option>Members</option>
             <option>Members (All)</option>
             <option>Business</option>
+            <option>Members Not in Good Standing</option>
         </select>
     </div>
     <div class="form-group">
@@ -159,7 +171,7 @@ HTML;
     {
         $phpunit->assertNotEquals(0, strlen($this->form_content()));
         $form = new COREPOS\common\mvc\ValueContainer();
-        foreach (array('Members', 'Members (All)', 'Business') as $type) {
+        foreach (array('Members', 'Members (All)', 'Business','Members Not in Good Standing') as $type) {
             $form->type = $type;
             $this->setForm($form);
             $phpunit->assertInternalType('array', $this->fetch_report_data());

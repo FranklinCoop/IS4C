@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
 
 /**
@@ -40,17 +40,24 @@ class SaMenuPage extends FannieRESTfulPage {
     function css_content(){
         ob_start();
         ?>
+/*
 input[type="submit"] {
     width:85%;
     font-size: 2em;
+}
+*/
+a[type="submit"] {
+    width: 65vw;
+    font-size: 1em;
 }
         <?php
         return ob_get_clean();
     }
 
     function get_view(){
-        ob_start();
-        ?>
+        // comment out WFC scan coord tools if COOP_ID is somewhere else
+        $wfcTools = ($this->config->get('COOP_ID') != 'WFC_Duluth') ? array('<!--', '-->') : array('', '');
+        return <<<HTML
 <!doctype html>
 <html>
 <head>
@@ -59,29 +66,49 @@ input[type="submit"] {
 </head>
 <body>
 <p>
-<a class="btn btn-default btn-lg"
+<a class="btn btn-default btn-lg" type="submit"
     href="SaHandheldPage.php" />Inventory</a>
 <hr />
 <!--
 <input type="submit" value="Price Check"
     onclick="location='SaPriceChangePage.php';return false;" />
     -->
-<a class="btn btn-default btn-lg"
+<a class="btn btn-default btn-lg" type="submit"
+    href="../../../item/shrink/ShrinkTool.php" />Shrink</a>
+<hr />
+<a class="btn btn-default btn-lg" type="submit"
     href="SaItemList.php" />Quick List</a>
 <hr />
-<a class="btn btn-default btn-lg"
+<a class="btn btn-default btn-lg" type="submit"
     href="../../../item/handheld/ItemStatusPage.php" />Price Check</a>
 <hr />
-<a class="btn btn-default btn-lg"
-    href="SaOrderingPage.php" />Ordering Info</a>
+<a class="btn btn-default btn-lg" type="submit"
+    href="../../../purchasing/EditOnePurchaseOrder.php" />Create Order</a>
 <hr />
-<a class="btn btn-default btn-lg"
-    href="../../../item/mapping/index.php" />Shelf Location</a>
+{$wfcTools[0]}
+<a class="btn btn-default btn-lg" type="submit"
+    href="../../../../../Scannie/content/Scanning/BatchCheck/newMenu.php" />Batch Check</a>
+<hr />
+<a class="btn btn-default btn-lg" type="submit"
+    href="../../../item/CoopDealsLookupPage.php" />C+D Check Sale</a>
+<hr />
+<a class="btn btn-default btn-lg" type="submit"
+    href="../../../../../Scannie/content/Scanning/AuditScanner/ProductScanner.php" />Audie</a>
+<hr />
+<a class="btn btn-default btn-lg" type="submit"
+    href="../DeliInventory/DIScanner.php" />Prepared Inventory</a>
+<hr />
+<a class="btn btn-default btn-lg" type="submit"
+    href="SaOutOfStock.php" />Out of Stocks</a>
+<hr />
+<a class="btn btn-default btn-lg" type="submit"
+    href="../../../item/FloorSections/EditLocations.php?upc=0" />Physical Product Locations</a>
+<hr />
+{$wfcTools[1]}
 </p>
 </body>
 </html>
-        <?php
-        return ob_get_clean();
+HTML;
     }
 }
 

@@ -33,12 +33,28 @@ class InventoryCountsModel extends BasicModel
     'inventoryCountID' => array('type'=>'INT', 'increment'=>true, 'primary_key'=>true),
     'upc' => array('type'=>'VARCHAR(13)', 'index'=>true),
     'storeID' => array('type'=>'INT'),
-    'count' => array('type'=>'DOUBLE'),
+    'count' => array('type'=>'DECIMAL(10,2)'),
     'countDate' => array('type'=>'DATETIME'),
     'mostRecent' => array('type'=>'TINYINT', 'default'=>1),
     'uid' => array('type'=>'VARCHAR(4)'),
-    'par' => array('type'=>'INT'),
+    'par' => array('type'=>'DECIMAL(10,2)'),
     );
 
+    public function doc()
+    {
+        return '
+Use:
+Inventory Counts as the baseline for perpetual inventory.
+All calculations related to inventory levels are calculated
+starting from the date and time of the most recent count.
+
+The only non-obvious field here is par. Par is used not for
+calculated inventory levels but rather when generating orders
+based on inventory levels. It\'s often useful to set a par
+after counting or re-counting an item since someone just looked
+at inventory and can decide if present stock is higher or lower
+than desired.
+            ';
+    }
 }
 

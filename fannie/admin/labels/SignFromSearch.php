@@ -21,12 +21,14 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\lib\Store;
+
 require(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
-class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage 
+class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
 {
 
     protected $title = 'Fannie - Signage';
@@ -42,10 +44,10 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
 
     public function preprocess()
     {
-       $this->__routes[] = 'post<u>'; 
-       $this->__routes[] = 'post<batch>'; 
-       $this->__routes[] = 'get<batch>'; 
-       $this->__routes[] = 'get<queueID>'; 
+       $this->__routes[] = 'post<u>';
+       $this->__routes[] = 'post<batch>';
+       $this->__routes[] = 'get<batch>';
+       $this->__routes[] = 'get<queueID>';
        return parent::preprocess();
     }
 
@@ -68,11 +70,31 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
         if (!is_array($this->u)) {
             $this->u = array($this->u);
         }
+        $this->upcs = array();
         foreach($this->u as $postdata) {
             if (is_numeric($postdata)) {
                 $this->upcs[] = BarcodeLib::padUPC($postdata);
             }
         }
+
+        $dbc = $this->connection;
+        $store = Store::getIdByIp();
+        list($inStr, $args) = $dbc->safeInClause($this->upcs);
+        $args[] = $store;
+        $query = "SELECT upc, fs.name FROM FloorSectionProductMap AS f
+            LEFT JOIN FloorSections AS fs ON f.floorSectionID=fs.floorSectionID
+            WHERE f.upc IN ({$inStr}) AND fs.storeID = ? ORDER BY fs.name;";
+        $prep = $dbc->prepare($query);
+        $res = $dbc->execute($prep,$args);
+        $locations = array();
+        while ($row = $dbc->fetchRow($res)) {
+            $locations[$row['upc']] = $row['name'];
+        }
+        usort($this->upcs, function ($a, $b) use ($locations) {
+            if (!isset($locations[$a]) || !isset($locations[$b])) return 0;
+            if ($locations[$a] == $locations[$b]) return 0;
+            return $locations[$a] < $locations[$b] ? -1 : 1;
+        });
 
         if (!$this->initModule()) {
             echo 'Error: no layouts available';
@@ -92,10 +114,10 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
         /**
           On item text update, kick out a mini form
           to re-POST the correct items to this page
-          
+
           Need to prevent page refresh from re-updating
           items. That causes issues if jumping back
-          and forth between this editor and the 
+          and forth between this editor and the
           normal item editor.
         */
         if (FormLib::get('update') == 'Save Text') {
@@ -113,17 +135,26 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
             $brand = FormLib::get('update_brand', array());
             $desc = FormLib::get('update_desc', array());
             $origin = FormLib::get('update_origin', array());
+            $custom = FormLib::get('custom_origin', array());
+            $repeats = FormLib::get('update_repeat', array());
+            $knownOrigins = $this->signage_obj->getOrigins();
             for ($i=0; $i<count($upc); $i++) {
                 if (isset($brand[$i])) {
                     $this->signage_obj->addOverride($upc[$i], 'brand', $brand[$i]);
                 }
                 if (isset($desc[$i])) {
-                    //$this->signage_obj->addOverride($upc[$i], 'description', $desc[$i]);
+                    $this->signage_obj->addOverride($upc[$i], 'description', $desc[$i]);
                 }
-                if (isset($origin[$i])) {
-                    $this->signage_obj->addOverride($upc[$i], 'originName', $origin[$i]);
+                if (isset($custom[$i]) && !empty($custom[$i])) {
+                    $this->signage_obj->addOverride($upc[$i], 'originName', $custom[$i]);
+                } elseif (isset($origin[$i]) && isset($knownOrigins[$origin[$i]])) {
+                    $this->signage_obj->addOverride($upc[$i], 'originName', $knownOrigins[$origin[$i]]);
+                }
+                if (isset($repeats[$i]) && $repeats[$i] != 1) {
+                    $this->signage_obj->addRepeat($upc[$i], $repeats[$i]);
                 }
             }
+            $this->signage_obj->setRepeats(FormLib::get('repeats', 1));
         }
 
         return $this->drawPdf();
@@ -135,6 +166,7 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
             foreach (FormLib::get('exclude', array()) as $e) {
                 $this->signage_obj->addExclude($e);
             }
+            $this->signage_obj->setInUseFilter(FormLib::get('store', 0));
             $this->signage_obj->drawPDF();
             return false;
         } else {
@@ -176,8 +208,33 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
             }
             echo '</form></body></html>';
             return false;
+        } elseif (is_array(FormLib::get('update_upc'))) {
+            $upc = FormLib::get('update_upc');
+            $brand = FormLib::get('update_brand', array());
+            $desc = FormLib::get('update_desc', array());
+            $origin = FormLib::get('update_origin', array());
+            $custom = FormLib::get('custom_origin', array());
+            $repeats = FormLib::get('update_repeat', array());
+            $knownOrigins = $this->signage_obj->getOrigins();
+            for ($i=0; $i<count($upc); $i++) {
+                if (isset($brand[$i])) {
+                    $this->signage_obj->addOverride($upc[$i], 'brand', $brand[$i]);
+                }
+                if (isset($desc[$i])) {
+                    $this->signage_obj->addOverride($upc[$i], 'description', $desc[$i]);
+                }
+                if (isset($custom[$i]) && !empty($custom[$i])) {
+                    $this->signage_obj->addOverride($upc[$i], 'originName', $custom[$i]);
+                } elseif (isset($origin[$i]) && isset($knownOrigins[$origin[$i]])) {
+                    $this->signage_obj->addOverride($upc[$i], 'originName', $knownOrigins[$origin[$i]]);
+                }
+                if (isset($repeats[$i]) && $repeats[$i] != 1) {
+                    $this->signage_obj->addRepeat($upc[$i], $repeats[$i]);
+                }
+            }
+            $this->signage_obj->setRepeats(FormLib::get('repeats', 1));
         }
-        
+
         return $this->drawPdf();
     }
 
@@ -229,17 +286,38 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
         return $this->post_u_view();
     }
 
+    private function userCanSave()
+    {
+        $authorized = false;
+        if (FannieAuth::validateUserQuiet('admin')) {
+            $authorized = true;
+        } elseif (FannieAuth::validateUserQuiet('signText')) {
+            $authorized = true;
+        }
+
+        return $authorized;
+    }
+
     protected function post_u_view()
     {
         $ret = '';
         $ret .= '<form action="' . filter_input(INPUT_SERVER, 'PHP_SELF') . '" method="post" id="signform">';
         $mods = FannieAPI::listModules('\COREPOS\Fannie\API\item\FannieSignage');
+        $enabled = $this->config->get('ENABLED_SIGNAGE');
+        if (count($enabled) > 0) {
+            $mods = array_filter($mods, function ($i) use ($enabled) {
+                return in_array($i, $enabled) || in_array(str_replace('\\', '-', $i), $enabled);
+            });
+        }
         sort($mods);
+        $tagEnabled = $this->config->get('ENABLED_TAGS');
         foreach (COREPOS\Fannie\API\item\signage\LegacyWrapper::getLayouts() as $l) {
-            $mods[] = 'Legacy:' . $l;
+            if (in_array($l, $tagEnabled) && count($tagEnabled) > 0) {
+                $mods[] = 'Legacy:' . $l;
+            }
         }
         $ret .= '<div class="form-group form-inline">';
-        $ret .= '<label>Layout</label>: 
+        $ret .= '<label>Layout</label>:
             <select name="signmod" class="form-control" onchange="$(\'#signform\').submit()">';
         foreach ($mods as $m) {
             $name = $m;
@@ -252,7 +330,7 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
                     ($m == $this->selected_mod ? 'selected' : ''), $m, $name);
         }
         $ret .= '</select>';
-        
+
         if (isset($this->upcs)) {
             foreach ($this->upcs as $u) {
                 $ret .= sprintf('<input type="hidden" name="u[]" value="%s" />', $u);
@@ -274,25 +352,45 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
             }
         }
         $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;';
-        $ret .= '<button type="submit" name="pdf" value="Print" 
+
+        $stores = new StoresModel($this->connection);
+        $stores->hasOwnItems(1);
+        $ret .= '<select class="form-control" name="store">
+                <option value="0">Any Store</option>';
+        foreach ($stores->find() as $s) {
+            $store_selected = (FormLib::get('store') == $s->storeID()) ? ' SELECTED ' : '';
+            $ret .= sprintf('<option value="%d" %s>%s</option>',
+                $s->storeID(), $store_selected, $s->description());
+        }
+        $ret .= '</select>';
+        $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;';
+        $ret .= '<input type="number" title="Number of copies" style="width: 6em;" name="repeats" class="form-control" value="1" />';
+
+        $ret .= '&nbsp;&nbsp;&nbsp;&nbsp;';
+        $ret .= '<button type="submit" name="pdf" value="Print"
                     class="btn btn-default">Print</button>';
+        $ret .= '&nbsp;&nbsp;&nbsp;<label title="If supported"><input type="checkbox" name="offset" value="1" /> Offset</label>';
         $ret .= '</div>';
         $ret .= '<hr />';
 
         $ret .= $this->signage_obj->listItems();
 
-        $ret .= '<p><button type="submit" name="update" id="updateBtn" value="Save Text"
-                    class="btn btn-default">Save Text</button></p>';
+        if ($this->userCanSave()) {
+            $ret .= '<div id="signHiddenInput"></div>
+            <p><a onClick="updateSigninfo();"
+                class="btn btn-default">[Admin] Save Sign Info</a></p>';
+        }
 
         $this->add_onload_command('$(".FannieSignageField").keydown(function(event) {
             if (event.which == 13) {
                 event.preventDefault();
-                $("#updateBtn").click();
             }
         });');
 
         $ret .= '</form>';
         $this->addScript('../../src/javascript/tablesorter/jquery.tablesorter.js');
+        $this->addScript('../../src/javascript/chkboxMulticlick.js');
+        $this->addOnloadCommand('allow_group_select_checkboxes("printSignTable")');
         $this->addOnloadCommand("\$('.tablesorter').tablesorter();");
 
         return $ret;
@@ -302,7 +400,7 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
     {
         $dbc = $this->connection;
 
-        $batchQ = 'SELECT batchID, 
+        $batchQ = 'SELECT batchID,
                     batchName,
                     startDate,
                     endDate
@@ -315,7 +413,7 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
         $today = date('Y-m-d');
         $batchR = $dbc->execute($batchP, array($today, $today, $today));
 
-        $ret = '<b>Select batch(es)</b>:'; 
+        $ret = '<b>Select batch(es)</b>:';
         $ret .= '<form action="' . filter_input(INPUT_SERVER, 'PHP_SELF') . '" method="post">';
         $ret .= '<select name="batch[]" multiple size="15">';
         while ($batchW = $dbc->fetch_row($batchR)) {
@@ -334,13 +432,47 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
         return $ret;
     }
 
+    public function javascriptContent()
+    {
+        return <<<JAVASCRIPT
+    $('textarea').each(function(){
+        var text = $(this).text();
+        if (text == text.toUpperCase()) {
+            $(this).addClass('alert-danger');
+        }
+    });
+    $('textarea').on('change', function(){
+        $(this).removeClass('alert-danger');
+    });
+    $('input').on('change', function(){
+        $(this).removeClass('alert-danger');
+    });
+    $('input').each(function(){
+        var name = $(this).attr('name');
+        var text = $(this).val();
+        var place = $(this).attr('placeholder');
+        if (text == text.toUpperCase() && place != 'Custom origin...' && name != "repeats" && name != "update_repeat[]") {
+            $(this).addClass('alert-danger');
+        }
+    });
+    function updateSigninfo()
+    {
+        var c = confirm("Permanently change sign info?");
+        if (c == true) {
+            $('#signHiddenInput').html('<input type="hidden" name="update" id="updateBtn" value="Save Text">');
+            $("#signform").submit();
+        }
+    }
+JAVASCRIPT;
+    }
+
     public function helpContent()
     {
         return '<p>
             Create signs and/or tags. First select a layout
             that controls how the tags look. Then select which
             prices to use: current or upcoming, retail or sale/promo.
-            Text for each item can be overriden in the 
+            Text for each item can be overriden in the
             list of items below.
             </p>';
     }

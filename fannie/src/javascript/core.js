@@ -71,6 +71,7 @@ function standardFieldMarkup()
         changeYear: true,
         yearRange: "c-10:c+10",
     });
+    $('input.date-field').attr('autocomplete', 'off');
     $('input.math-field').change(function (event) {
         mathField(event.target);
     });
@@ -279,5 +280,36 @@ function chainSubDepartments(ws_url, params)
             }
         }
     });
+}
+
+function appendTokens(token) {
+    var forms = document.forms;
+    var field = document.createElement('input');
+    field.type = 'hidden';
+    field.name = '_token_';
+    field.value = token;
+    for (var i=0; i<forms.length; i++) {
+        forms[i].appendChild(field);
+    }
+}
+
+function logJsErrors(urlStem) {
+    window.onerror = function(msg, scriptURL, lineNo, colNo, error) {
+        if (msg && msg.toLowerCase().substring(0, 12) != 'script error') {
+            var logEntry = { 
+                message: msg,
+                url: scriptURL,
+                line: lineNo,
+                col: colNo,
+                detail: error,
+                page: window.location
+            };
+            $.ajax({
+                url: urlStem + 'logs/LogJS.php',
+                method: 'get',
+                data: 'id=' + JSON.stringify(logEntry)
+            });
+        }
+    };
 }
 

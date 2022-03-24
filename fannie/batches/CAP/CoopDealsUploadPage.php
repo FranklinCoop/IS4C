@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include_once(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage 
@@ -59,6 +59,14 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
             'display_name' => 'Line Notes',
             'default' => 15,
         ),
+        'promoDiscount' => array(
+            'display_name' => 'Promo Discount',
+            'default' => 18,
+        ),
+        'cost' => array(
+            'display_name' => 'Promo Cost',
+            'default' => 25,
+        ),
     );
 
     private function setupTables($dbc)
@@ -78,15 +86,15 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
         $upcP = $dbc->prepare('SELECT upc FROM products WHERE upc=? AND inUse=1');
         $skuP = $dbc->prepare('
             SELECT s.upc 
-            FROM vendorSKUtoPLU AS s
+            FROM VendorAliases AS s
                 INNER JOIN products AS p ON s.vendorID=p.default_vendor_id AND s.upc=p.upc
             WHERE s.sku=?'
         );
         $insP = $dbc->prepare('
             INSERT INTO CoopDealsItems 
-                (dealSet, upc, price, abtpr, multiplier)
+                (dealSet, upc, price, abtpr, multiplier, promoDiscount, skuMatch, cost)
             VALUES
-                (?, ?, ?, ?, ?)');
+                (?, ?, ?, ?, ?, ?, ?, ?)');
 
         return array($upcP, $skuP, $insP);
     }
@@ -97,16 +105,30 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
         if ($dbc->num_rows($look2)) {
             $row = $dbc->fetch_row($look2);
             return $row['upc'];
-        } else {
-            $sku = str_pad($sku, 7, '0', STR_PAD_LEFT);
-            $look3 = $dbc->execute($skuP, array($sku));
-            if ($dbc->num_rows($look3)) {
-                $row = $dbc->fetch_row($look3);
-                return $row['upc'];
-            }
+        }
+        $sku = str_pad($sku, 7, '0', STR_PAD_LEFT);
+        $look3 = $dbc->execute($skuP, array($sku));
+        if ($dbc->num_rows($look3)) {
+            $row = $dbc->fetch_row($look3);
+            return $row['upc'];
         }
 
         return $upc;
+    }
+
+    private $scaleLinkedItems = null;
+    private function checkScaleItem($dbc, $upc)
+    {
+        if ($this->scaleLinkedItems === null) {
+            $res = $dbc->query("SELECT plu, linkedPLU from scaleItems WHERE linkedPLU IS NOT NULL AND linkedPLU <> ''");
+            $items = array();
+            while ($row = $dbc->fetchRow($res)) {
+                $items[$row['plu']] = $row['linkedPLU'];
+            }
+            $this->scaleLinkedItems = $items;
+        }
+
+        return isset($this->scaleLinkedItems[$upc]) ? $this->scaleLinkedItems[$upc] : false;
     }
 
     private function dealTypes($type)
@@ -138,6 +160,7 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
 
         $rm_checks = (FormLib::get_form_value('rm_cds') != '') ? True : False;
         $col_max = max($indexes);
+        $dbc->startTransaction();
         foreach ($linedata as $data) {
             if (!is_array($data)) continue;
             if (count($data) < $col_max) continue;
@@ -147,10 +170,15 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
             if ($rm_checks)
                 $upc = substr($upc,0,strlen($upc)-1);
             $upc = BarcodeLib::padUPC($upc);
+            $isSKU = 0;
 
             $lookup = $dbc->execute($upcP, array($upc));
             if ($dbc->num_rows($lookup) == 0) {
-                $upc = $this->checkSku($dbc, $upc, $data[$indexes['sku']], $skuP);
+                $sku = $this->checkSku($dbc, $upc, $data[$indexes['sku']], $skuP);
+                if ($sku != $upc) {
+                    $upc = $sku;
+                    $isSKU = 1;
+                }
             }
             $mult = 1;
             if ($indexes['mult'] !== false) {
@@ -161,10 +189,22 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
             }
 
             $price = trim($data[$indexes['price']],"\$");
+            $cost = 0;
+            if ($indexes['cost'] && isset($data[$indexes['cost']])) {
+                $cost = trim($data[$indexes['cost']],"\$");
+            }
+            $promo = $data[$indexes['promoDiscount']];
             foreach ($this->dealTypes($data[$indexes['abt']]) as $type){
-                $dbc->execute($insP,array($month,$upc,$price,$type,$mult));
+                $dbc->execute($insP,array($month,$upc,$price,$type,$mult,$promo,$isSKU,$cost));
+            }
+            $linked = $this->checkScaleItem($dbc, $upc);
+            if ($linked) {
+                foreach ($this->dealTypes($data[$indexes['abt']]) as $type){
+                    $dbc->execute($insP,array($month,$linked,$price,$type,$mult,$promo,$isSKU,$cost));
+                }
             }
         }
+        $dbc->commitTransaction();
 
         return true;
     }
@@ -202,8 +242,8 @@ class CoopDealsUploadPage extends \COREPOS\Fannie\API\FannieUploadPage
     public function unitTest($phpunit)
     {
         $phpunit->assertNotEquals(0, strlen($this->results_content()));
-        $indexes = array('upc'=>0, 'price'=>1, 'abt'=>2, 'sku'=>3, 'mult'=>4);
-        $data = array('4011', 0.99, 'ABTPR', '4011', '2/$2');
+        $indexes = array('upc'=>0, 'price'=>1, 'abt'=>2, 'sku'=>3, 'mult'=>4, 'promoDiscount'=>5);
+        $data = array('4011', 0.99, 'ABTPR', '4011', '2/$2', '20%');
         for ($i=0; $i<14; $i++) {
             $data[] = 0;
         }

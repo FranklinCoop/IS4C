@@ -23,13 +23,13 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class SaleTypeMovementReport extends FannieReportPage 
 {
     public $description = '[Sale Type Movement] breaks down sales by type of promotion';
-    public $report_set = 'Movement';
+    public $report_set = 'Movement Reports';
 
     protected $report_headers = array('Type', '$ Sales', '# Items', '% Sales');
     protected $sort_direction = 1;

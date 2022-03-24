@@ -22,7 +22,7 @@
 *********************************************************************************/
 include(dirname(__FILE__) . '/../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../classlib2.0/FannieAPI.php');
 }
 
 if (!class_exists('SoPoBridge')) {
@@ -30,6 +30,9 @@ if (!class_exists('SoPoBridge')) {
 }
 if (!class_exists('OrderNotifications')) {
     include(__DIR__ . '/OrderNotifications.php');
+}
+if (!class_exists('SpecialOrderLib')) {
+    include(__DIR__ . '/SpecialOrderLib.php');
 }
 
 class OrderViewPage extends FannieRESTfulPage
@@ -69,6 +72,10 @@ class OrderViewPage extends FannieRESTfulPage
         $poID = $bridge->addItemToPurchaseOrder($this->orderID, $this->transID, $this->storeID);
         if ($poID) {
             echo json_encode(array('error'=>false, 'poID'=>$poID));
+            $audit = $this->connection->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+                (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+            $this->connection->execute($audit, array($this->orderID, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Add to PO', 
+                "SPO #{$this->orderID}, Item #{$this->transID}, PO#{$poID}"));
         } else {
             echo json_encode(array('error'=>true));
         }
@@ -133,21 +140,28 @@ class OrderViewPage extends FannieRESTfulPage
         $upR = $dbc->execute($upP, array($this->qty, $this->orderID, $this->transID));
         $this->reprice($this->orderID, $this->transID);
 
+        $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+            (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+        $dbc->execute($audit, array($this->orderID, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Changed Item Quantity',
+            "Item #{$this->transID}, Qty {$this->qty}"));
+
         return $this->get_orderID_items_handler();
     }
 
     protected function post_orderID_description_srp_actual_qty_dept_unitPrice_vendor_transID_changed_handler()
     {
         $dbc = $this->connection;
+        $transDB = $this->config->get('TRANS_DB') . $dbc->sep();
         $dbc->selectDB($this->config->get('TRANS_DB'));
         $basicP = $dbc->prepare('
-            UPDATE PendingSpecialOrder
+            UPDATE ' . $transDB . 'PendingSpecialOrder
             SET description=?,
                 department=?,
                 mixMatch=?,
                 total=?,
                 unitPrice=?,
-                quantity=?
+                quantity=?,
+                trans_status=?
             WHERE order_id=?
                 AND trans_id=?
         ');
@@ -158,6 +172,7 @@ class OrderViewPage extends FannieRESTfulPage
             $this->actual,
             $this->unitPrice,
             $this->qty,
+            FormLib::get('sku'),
             $this->orderID,
             $this->transID,
         ));
@@ -168,8 +183,16 @@ class OrderViewPage extends FannieRESTfulPage
             $info = array('regPrice' => $this->srp, 'total' => $this->actual);
         }
 
+        $uid = FannieAuth::getUID();
+        $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+            (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+        $dbc->execute($audit, array($this->orderID, $uid, date('Y-m-d H:i:s'), 'Edit Item',
+            "Item #{$this->transID}, {$this->description}, {$this->vendor}"));
+        $dbc->execute($audit, array($this->orderID, $uid, date('Y-m-d H:i:s'), 'Edit Item',
+            "Item #{$this->transID}, Unit {$this->unitPrice}, Reg {$info['regPrice']}, Total {$info['total']}"));
+
         $fetchP = $dbc->prepare("SELECT ROUND(100*((regPrice-total)/regPrice),0)
-            FROM PendingSpecialOrder WHERE trans_id=? AND order_id=?");
+            FROM {$transDB}PendingSpecialOrder WHERE trans_id=? AND order_id=?");
         $info['discount'] = $dbc->getValue($fetchP, array($this->transID, $this->orderID));
         echo json_encode($info);
 
@@ -238,6 +261,13 @@ class OrderViewPage extends FannieRESTfulPage
                 AND trans_id=?');
         $delR = $dbc->execute($delP, array($this->orderID, $this->transID));
 
+        $bridge = new SoPoBridge($dbc, $this->config);
+        $bridge->removeItemFromPurchaseOrder($this->orderID, $this->transID);
+
+        $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+            (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+        $dbc->execute($audit, array($this->orderID, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Delete Item', "Item #{$this->transID}"));
+
         return $this->get_orderID_items_handler();
     }
 
@@ -257,6 +287,11 @@ class OrderViewPage extends FannieRESTfulPage
             echo $this->getQtyForm($this->orderID, $result[0], $result[1], $result[2]);
         }
 
+        $dbc = $this->connection;
+        $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+            (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+        $dbc->execute($audit, array($this->orderID, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Add Item', "UPC {$this->upc}, Cases {$this->cases}"));
+
         return false;
     }
 
@@ -272,7 +307,7 @@ class OrderViewPage extends FannieRESTfulPage
         $soModel->phone($this->ph1);
         $soModel->altPhone($this->ph2);
         $soModel->email($this->email);
-        $soModel->sendEmails(FormLib::get('contactBy'));
+        $soModel->sendEmails(FormLib::get('contactBy', 0));
 
         if (FormLib::get('fn', false) !== false) {
             $soModel->firstName(FormLib::get('fn'));
@@ -280,9 +315,25 @@ class OrderViewPage extends FannieRESTfulPage
         if (FormLib::get('ln', false) !== false) {
             $soModel->lastName(FormLib::get('ln'));
         }
+        if (FormLib::get('street', false) !== false) {
+            $soModel->street(FormLib::get('street'));
+        }
+        if (FormLib::get('city', false) !== false) {
+            $soModel->city(FormLib::get('city'));
+        }
+        if (FormLib::get('state', false) !== false) {
+            $soModel->state(FormLib::get('state'));
+        }
+        if (FormLib::get('zip', false) !== false) {
+            $soModel->zip(FormLib::get('zip'));
+        }
         $json = array();
         $json['saved'] = $soModel->save() ? true : false;
         echo json_encode($json);
+
+        $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+            (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+        $dbc->execute($audit, array($this->orderID, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Update Contact Info', ""));
 
         return false;
     }
@@ -326,6 +377,14 @@ class OrderViewPage extends FannieRESTfulPage
                 $memNum = $c->card_no();
                 break;
             }
+        } elseif ($this->config->get('COOP_ID') == 'WFC_Duluth') {
+            $custdata = new CustdataModel($dbc);
+            $custdata->CardNo($memNum);
+            $custdata->personNum(1);
+            $custdata->load();
+            if ($custdata->memType() == 7) {
+                $memNum = '';
+            }
         }
 
         // look up member id if applicable
@@ -345,6 +404,10 @@ class OrderViewPage extends FannieRESTfulPage
             $prep = $dbc->prepare("UPDATE {$TRANS}PendingSpecialOrder SET card_no=?
                 WHERE order_id=?");
             $dbc->execute($prep,array($memNum,$orderID));
+
+            $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
+                (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
+            $dbc->execute($audit, array($orderID, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Set Owner', "Owner #{$memNum}"));
 
             // clear contact fields if member number changed
             // so that defaults are reloaded from meminfo
@@ -380,7 +443,7 @@ class OrderViewPage extends FannieRESTfulPage
             $current_street = $orderModel->street();
             $current_phone = $orderModel->phone();
             if (empty($current_street) && empty($current_phone)) {
-                $contactQ = $dbc->prepare("SELECT street,city,state,zip,phone,email_1,email_2
+                $contactQ = $dbc->prepare("SELECT street,city,state,zip,phone,email_1,email_2 AS altPhone
                         FROM meminfo WHERE card_no=?");
                 $contactR = $dbc->execute($contactQ, array($memNum));
                 if ($dbc->num_rows($contactR) > 0) {
@@ -392,8 +455,16 @@ class OrderViewPage extends FannieRESTfulPage
                     $orderModel->state($contact_row['state']);
                     $orderModel->zip($contact_row['zip']);
                     $orderModel->phone($contact_row['phone']);
-                    $orderModel->altPhone($contact_row['email_2']);
+                    $orderModel->altPhone($contact_row['altPhone']);
                     $orderModel->email($contact_row['email_1']);
+
+                    $prefP = $dbc->prepare($dbc->addSelectLimit("SELECT sendEmails FROM SpecialOrders AS o
+                        INNER JOIN CompleteSpecialOrder AS c ON o.specialOrderID=c.order_id
+                        WHERE c.card_no=?
+                        ORDER BY c.datetime DESC", 1));
+                    $prefVal = $dbc->getValue($prefP, array($memNum));
+                    $orderModel->sendEmails($prefVal ? $prefVal : 0);
+
                     $orderModel->save();
                     $orderModel->specialOrderID($orderID);
                     $orderModel->load();
@@ -406,11 +477,11 @@ class OrderViewPage extends FannieRESTfulPage
             if ($custdata->load()) {
                 $status_row['Type'] = $custdata->Type();
                 if ($status_row['Type'] == 'INACT') {
-                    $status_row['status'] = 'Inactive';
+                    $status_row['status'] = '<span class="lead text-danger">Inactive</span>';
                 } elseif ($status_row['Type'] == 'INACT2') {
-                    $status_row['status'] = 'Inactive';
+                    $status_row['status'] = '<span class="lead text-danger">Inactive</span>';
                 } elseif ($status_row['Type'] == 'TERM') {
-                    $status_row['status'] = 'Terminated';
+                    $status_row['status'] = '<span class="lead text-danger">Terminated</span>';
                 }
             }
         } 
@@ -501,6 +572,9 @@ class OrderViewPage extends FannieRESTfulPage
         $extra .= '<div class="row"><div class="col-sm-6 text-left">';
         $extra .= "<b>Taken by</b>: ".$user."<br />";
         $extra .= "<b>On</b>: ".date("M j, Y g:ia",strtotime($orderDate))."<br />";
+        if ($canEdit) {
+            $extra .= '<a href="SpoEditsPage.php?id=' . $orderID . '">Edit History</a><br />';
+        }
         $extra .= '</div><div class="col-sm-6 text-right form-inline">';
         $extra .= '<b>Call to Confirm</b>: ';
         $extra .= '<select id="ctcselect" class="form-control input-sm">'; 
@@ -547,7 +621,7 @@ class OrderViewPage extends FannieRESTfulPage
                     $n[0],$n[1]);
             }
             $ret .= '</select></td>';
-            $ret .= '<td>&nbsp;</td>';
+            $ret .= '<td><a href="NewSpecialOrdersPage.php?card_no=' . $memNum . '">All Orders for this Account</a></td>';
         }
         $ret .= '<td colspan="4" class="form-inline">Notes For Department:
             <select id="nDept" class="form-control input-sm contact-field" 
@@ -573,6 +647,8 @@ class OrderViewPage extends FannieRESTfulPage
             3 => 'Text (Sprint)',
             4 => 'Text (T-Mobile)',
             5 => 'Text (Verizon)',
+            6 => 'Text (Google Fi)',
+            7 => 'Actual SMS',
         );
         $contactHtml = '';
         foreach ($contactOpts as $id=>$val) {
@@ -583,17 +659,16 @@ class OrderViewPage extends FannieRESTfulPage
 
         $ret .= sprintf('
             <tr>
-                <th>E-mail</th>
-                <td>
-                    <input type="text" id="t_email" value="%s" 
-                        class="form-control input-sm contact-field"
-                        name="email" />
-                </td>
                 <th>Phone</th>
                 <td>
                     <input type="text" id="t_ph1" name="ph1"
                         class="form-control input-sm contact-field"
                         value="%s" />
+                </td>
+                <th>Alt. Phone</th>
+                <td>
+                    <input type="text" id="t_ph2" value="%s" name="ph2"
+                        class="form-control input-sm contact-field" />
                 </td>
                 <td rowspan="2" colspan="4">
                     <textarea id="nText" rows="5" cols="25" 
@@ -602,10 +677,11 @@ class OrderViewPage extends FannieRESTfulPage
                 </td>
             </tr>
             <tr>
-                <th>Alt. Phone</th>
+                <th>E-mail</th>
                 <td>
-                    <input type="text" id="t_ph2" value="%s" name="ph2"
-                        class="form-control input-sm contact-field" />
+                    <input type="text" id="t_email" value="%s" 
+                        class="form-control input-sm contact-field"
+                        name="email" />
                 </td>
                 <th>Prefer</th>
                 <td class="form-inline">
@@ -614,17 +690,44 @@ class OrderViewPage extends FannieRESTfulPage
                     </select>
                     <button class="btn btn-default btn-sm btn-test-send">Test Send</button>
                 </td>
+            </tr>
+            <tr>
+                <th>Address</th>
+                <td><input type="text" class="form-control input-sm contact-field"
+                    name="street" value="%s" /></td>
+                <th>City</th>
+                <td><input type="text" class="form-control input-sm contact-field"
+                    name="city" value="%s" /></td>
+                <td class="form-inline">
+                    <strong>State</strong>
+                    <input type="text" class="form-control input-sm contact-field"
+                    name="state" value="%s" />
+                    <strong>Zip</strong>
+                    <input type="text" class="form-control input-sm contact-field"
+                    name="zip" value="%s" />
+                </td>
             </tr>',
-            $orderModel->email(),
             $orderModel->phone(), 
-            $orderModel->notes(),
             $orderModel->altPhone(),
-            $contactHtml
+            $orderModel->notes(),
+            $orderModel->email(),
+            $contactHtml,
+            $orderModel->street(),
+            $orderModel->city(),
+            $orderModel->state(),
+            $orderModel->zip()
         );
+
+        $noteP = $dbc->prepare('SELECT note FROM ' . FannieDB::fqn('memberNotes', 'op') . ' WHERE cardno=? ORDER BY stamp DESC');
+        $acctNote = $dbc->getValue($noteP, array($memNum));
+        if (trim($acctNote)) {
+            $ret .= '<tr><th>Acct Notes</th><td colspan="4">' . $acctNote . '</td></tr>';
+        }
 
         $ret .= '</table>';
 
-        echo json_encode(array('customer'=>$ret, 'footer'=>$extra));
+        $ret = preg_replace('/[^\x0-\x7E]/','', $ret);
+        echo json_encode(array('customer'=>$ret, 'footer'=>$extra, 'memType'=>$custdata->memType()));
 
         return false;
     }
@@ -655,13 +758,13 @@ class OrderViewPage extends FannieRESTfulPage
         }
         $unitPrice = OrderItemLib::getUnitPrice($item, $mempricing);
         $casePrice = OrderItemLib::getCasePrice($item, $mempricing);
-        if (!OrderItemLib::useSalePrice($item, $mempricing)) {
+        if ($unitPrice == $item['normal_price'] && !OrderItemLib::useSalePrice($item, $mempricing)) {
             $item['discounttype'] = 0;
         }
 
         $ins_array['upc'] = $item['upc'];
         $ins_array['quantity'] = $item['caseSize'];
-        $ins_array['mixMatch'] = substr($item['vendorName'], 0, 26);
+        $ins_array['mixMatch'] = $item['vendorName'];
         $ins_array['description'] = substr($item['description'], 0, 32) . ' SO';
         $ins_array['department'] = $item['department'];
         $ins_array['discountable'] = $item['discountable'];
@@ -730,67 +833,14 @@ class OrderViewPage extends FannieRESTfulPage
 
     private function genericRow($orderID)
     {
-        return array(
-        'order_id'=>$orderID,
-        'datetime'=>date('Y-m-d H:i:s'),
-        'emp_no'=>1001,
-        'register_no'=>30,
-        'trans_no'=>$orderID,
-        'upc'=>'0',
-        'description'=>"SPECIAL ORDER",
-        'trans_type'=>"C",
-        'trans_subtype'=>"",
-        'trans_status'=>"",
-        'department'=>0,
-        'quantity'=>0,
-        'scale'=>0,
-        'cost'=>0,
-        'unitPrice'=>0,
-        'total'=>0,
-        'regPrice'=>0,
-        'tax'=>0,
-        'foodstamp'=>0,
-        'discount'=>0,
-        'memDiscount'=>0,
-        'discountable'=>1,
-        'discounttype'=>0,
-        'voided'=>0,
-        'percentDiscount'=>0,
-        'ItemQtty'=>0,
-        'volDiscType'=>0,
-        'volume'=>0,
-        'VolSpecial'=>0,
-        'mixMatch'=>0,
-        'matched'=>0,
-        'memType'=>0,
-        'staff'=>0,
-        'numflag'=>0,
-        'charflag'=>"",   
-        'card_no'=>0,
-        'trans_id'=>0
-        );
+        $spoLib = new SpecialOrderLib($this->connection, $this->config);
+        return $spoLib->genericRow($orderID);
     }
 
     private function createContactRow($orderID)
     {
-        $dbc = $this->connection;
-        $dbc->selectDB($this->config->get('TRANS_DB'));
-        $TRANS = $this->config->get('TRANS_DB') . $dbc->sep();
-
-        $so_order = new SpecialOrdersModel($dbc);
-        $so_order->specialOrderID($orderID);
-        $so_order->firstName('');
-        $so_order->lastName('');
-        $so_order->street('');
-        $so_order->city('');
-        $so_order->state('');
-        $so_order->zip('');
-        $so_order->phone('');
-        $so_order->altPhone('');
-        $so_order->email('');
-        $so_order->save();
-
-        $dbc->selectDB($this->config->get('OP_DB'));
+        $spoLib = new SpecialOrderLib($this->connection, $this->config);
+        return $spoLib->createContactRow($orderID);
     }
 
     protected function get_orderID_items_handler()
@@ -805,7 +855,7 @@ class OrderViewPage extends FannieRESTfulPage
         }
         
         echo <<<HTML
-<form> 
+<form onkeydown="return event.keyCode != 13;">
 <div class="form-inline">
     <div class="input-group">
         <span class="input-group-addon">UPC</span> 
@@ -859,9 +909,9 @@ HTML;
         $ret .= '<tr><th>UPC</th><th>SKU</th><th>Description</th><th>Cases</th><th>SRP</th><th>Actual</th><th>Qty</th><th>Dept</th><th>&nbsp;</th></tr>';
         $prep = $dbc->prepare("SELECT o.upc,o.description,total,quantity,department,
             v.sku,ItemQtty,regPrice,o.discounttype,o.charflag,o.mixMatch,
-            o.trans_id,o.unitPrice,o.memType,o.staff
+            o.trans_id,o.unitPrice,o.memType,o.staff,o.trans_status,o.discountable
             FROM {$TRANS}PendingSpecialOrder as o
-                LEFT JOIN vendors AS n ON o.mixMatch=n.vendorName
+                LEFT JOIN vendors AS n ON LEFT(n.vendorName, LENGTH(o.mixMatch)) = o.mixMatch
                 LEFT JOIN vendorItems as v on o.upc=v.upc AND n.vendorID=v.vendorID
             WHERE order_id=? AND trans_type='I' 
             ORDER BY trans_id DESC");
@@ -871,13 +921,22 @@ HTML;
         $bridge = new SoPoBridge($dbc, $this->config);
         $store = $dbc->prepare("SELECT storeID FROM {$TRANS}SpecialOrders WHERE specialOrderID=?");
         $storeID = $dbc->getValue($store, array($orderID));
+        $vendorsR = $dbc->query("SELECT vendorName FROM vendors WHERE inactive=0 ORDER BY vendorName");
+        $vendors = array();
+        while ($row = $dbc->fetchRow($vendorsR)) {
+            $vendors[] = $row['vendorName'];
+        }
         while ($row = $dbc->fetch_row($res)) {
             if ($row['trans_id'] == $prev_id) continue;
+            if (strlen($row['trans_status']) > 0) {
+                $row['sku'] = $row['trans_status'];
+            }
             $ret .= sprintf('
                     <tbody>
                     <tr>
-                    <td>%s</td>
-                    <td>%s</td>
+                    <td class="upc">%s</td>
+                    <td><input class="form-control input-sm item-field" name="sku"
+                        value="%s" /></td>
                     <td><input class="form-control input-sm item-field" name="description"
                         value="%s" /></td>
                     <td>%d</td>
@@ -915,16 +974,44 @@ HTML;
                 <input type="text" size="4" value="%.2f" id="unitp%d" name="unitPrice"
                 class="form-control input-sm price-field item-field" /></td>',
                 $row['unitPrice'],$row['trans_id']);
-            $ret .= sprintf('<td class="form-inline">Supplier: <input type="text" value="%s" size="12" 
-                    class="form-control input-sm item-field input-vendor" name="vendor"
-                    maxlength="26" 
-                    /></td>',$row['mixMatch']);
+
+            /**
+              If the current supplier entry matches a known vendor,
+              display supplier options as a <select> from known vendors.
+              Since entries may have been truncated in the database,
+              matching the first 13 characters is sufficent.
+
+              If the current entry does not match any known vendor,
+              revert to showing supplier as a text box.
+            */
+            $supplierInput = '<select name="vendor" class="form-control input-sm item-field input-vendor chosen" style="max-width: 20em;">';
+            $supplierInput .= '<option value=""></option>';
+            $found = false;
+            foreach ($vendors as $v) {
+                if ($v == $row['mixMatch'] || substr($v, 0, 13) == $row['mixMatch']) {
+                    $supplierInput .= "<option selected>{$v}</option>";
+                    $found = true;
+                } else {
+                    $supplierInput .= "<option>{$v}</option>";
+                }
+            }
+            if (!$found && $row['mixMatch'] != '') {
+                $supplierInput = sprintf('<input type="text" value="%s" size="12"
+                    class="form-control input-sm item-field input-vendor" name="vendor" maxlength="13" />',
+                    $row['mixMatch']);
+            } else {
+                $supplierInput .= '</select>';
+            }
+            $ret .= sprintf('<td class="form-inline"><span class="form-inline">Vendor: %s</span></td>', $supplierInput);
+
             $ret .= '<td>Discount</td>';
             if ($row['discounttype'] == 1 || $row['discounttype'] == 2) {
-                $ret .= '<td class="disc-percent" id="discPercent'.$row['trans_id'].'">Sale</td>';
+                $ret .= '<td class="disc-percent" id="discPercent'.$row['upc'].'">Sale</td>';
+            } else if ($row['discountable'] == 0) {
+                $ret .= '<td class="disc-percent" id="discPercent'.$row['upc'].'">Never</td>';
             } else if ($row['regPrice'] != $row['total']) {
                 $ret .= sprintf('<td class="disc-percent" id="discPercent%d">%d%%</td>',$row['upc'],
-                    round(100*(($row['regPrice']-$row['total'])/$row['regPrice'])));
+                    $row['regPrice'] == 0 ? 0 : round(100*(($row['regPrice']-$row['total'])/$row['regPrice'])));
             } else {
                 $ret .= '<td class="disc-percent" id="discPercent'.$row['upc'].'">0%</td>';
             }
@@ -976,9 +1063,9 @@ HTML;
 
         $prep = $dbc->prepare("SELECT o.upc,o.description,total,quantity,department,
             v.sku,ItemQtty,regPrice,o.discounttype,o.charflag,o.mixMatch,
-            o.trans_id,o.unitPrice,o.memType,o.staff
+            o.trans_id,o.unitPrice,o.memType,o.staff,o.discountable
             FROM {$TRANS}PendingSpecialOrder as o
-                LEFT JOIN vendors AS n ON o.mixMatch=n.vendorName
+                LEFT JOIN vendors AS n ON LEFT(n.vendorName, LENGTH(o.mixMatch)) = o.mixMatch
                 LEFT JOIN vendorItems as v on o.upc=v.upc AND n.vendorID=v.vendorID
             WHERE order_id=? AND trans_type='I' 
             ORDER BY trans_id DESC");
@@ -1003,6 +1090,8 @@ HTML;
                 } else {
                     $pricing = "% Discount";
                 }
+            } elseif (isset($w['discountable']) && $w['discountable'] == 0) {
+                $pricing = _('Basics');
             }
             $ret .= sprintf('<tr>
                     <td>%s</td>
@@ -1152,6 +1241,32 @@ HTML;
         return filter_input(INPUT_SERVER, 'PHP_SELF') . '?orderID=' . $orderID;
     }
 
+    protected function get_orderID_handler()
+    {
+        $this->debugInfo = 'running get_orderID_handler';
+        $TRANS = $this->config->get('TRANS_DB') . $this->connection->sep();
+        $open = $this->connection->prepare("SELECT upc FROM {$TRANS}PendingSpecialOrder WHERE order_id=? AND trans_id > 0");
+        $open = $this->connection->getValue($open, array($this->orderID));
+        if ($open !== false) {
+            return true;
+        }
+        $this->debugInfo = 'No pending records';
+        $closed = $this->connection->prepare("SELECT upc FROM {$TRANS}CompleteSpecialOrder WHERE order_id=? AND trans_id > 0");
+        $closed = $this->connection->getValue($closed, array($this->orderID));
+        if ($closed !== false) {
+            return 'OrderReviewPage.php?orderID=' . $this->orderID;
+        }
+        $this->debugInfo .= ' and no complete records';
+        $status = $this->connection->prepare("SELECT statusFlag FROM {$TRANS}SpecialOrders WHERE specialOrderID=?");
+        $status = $this->connection->getValue($status, array($this->orderID));
+        if ($status == 7 || $status == 8 || $status == 9) {
+            return 'OrderReviewPage.php?orderID=' . $this->orderID;
+        }
+        $this->debugInfo .= ' and valid status';
+
+        return true;
+    }
+
     // this shouldn't occur unless something goes wonky creating the new order
     protected function get_view()
     {
@@ -1161,12 +1276,15 @@ HTML;
     protected function get_orderID_view()
     {
         $orderID = (int)$this->orderID;
+        if ($orderID === 0) {
+            return '<div class="alert alert-danger">Invalid order. <a href="OrderViewPage.php">Create new order</a>?</div>';
+        }
         $refer = filter_input(INPUT_SERVER, 'HTTP_REFERER');
         $return_path = ($refer && strstr($refer,'fannie/ordering/NewSpecialOrdersPage.php')) ? $refer : '';
         if (!empty($return_path)) {
-            $_SESSION['specialOrderRedirect'] = $return_path;
-        } elseif (isset($_SESSION['specialOrderRedirect'])) {
-            $return_path = $_SESSION['specialOrderRedirect'];
+            $this->session->specialOrderRedirect = $return_path;
+        } elseif (isset($this->session->specialOrderRedirect)) {
+            $return_path = $this->session->specialOrderRedirect;
         } else {
             $return_path = $this->config->get('URL') . "ordering/";
         }
@@ -1206,23 +1324,34 @@ HTML;
             $ret .= '</div></div>';
         }
 
+        ob_start();
+        $this->get_orderID_customer_handler();
+        $customerInfo = ob_get_clean();
+        $customerInfo = json_decode($customerInfo, true);
+        ob_start();
+        $this->get_orderID_items_handler();
+        $itemInfo = ob_get_clean();
+
         $ret .= <<<HTML
 <p />
+<div class="alert alert-danger">WFC is not currently taking special orders</div>
 <input type=hidden id=redirectURL value="{$return_path}" />
 <div class="panel panel-default">
     <div class="panel-heading">Customer Information</div>
-    <div class="panel-body" id="customerDiv"></div>
+    <div class="panel-body" id="customerDiv">{$customerInfo['customer']}</div>
 </div>
 <div class="panel panel-default">
     <div class="panel-heading">Order Items</div>
-    <div class="panel-body" id="itemDiv"></div>
+    <div class="panel-body" id="itemDiv">{$itemInfo}</div>
 </div>
-<div id="footerDiv"></div>
+<div id="footerDiv">{$customerInfo['footer']}</div>
 <input type=hidden value="{$orderID}" id="init_oid" />
 HTML;
 
-        $this->addScript('orderview.js');
+        $this->addScript('orderview.js?date=20180809');
         $this->addScript('../item/autocomplete.js');
+        $this->addScript('../src/javascript/chosen/chosen.jquery.min.js');
+        $this->addCssFile('../src/javascript/chosen/bootstrap-chosen.css');
 
         return $ret;
     }

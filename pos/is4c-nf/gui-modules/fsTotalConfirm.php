@@ -28,7 +28,7 @@ include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
 class fsTotalConfirm extends NoInputCorePage 
 {
-    private $tendertype;
+    private $tendertype = '';
 
     private function subtotal($choice)
     {
@@ -50,9 +50,8 @@ class fsTotalConfirm extends NoInputCorePage
 
     function preprocess()
     {
-        $this->tendertype = "";
-        if (isset($_REQUEST["selectlist"])) {
-            $choice = $_REQUEST["selectlist"];
+        try {
+            $choice = $this->form->selectlist;
             if ($choice == "EF" || $choice == 'EC') {
                 return $this->subtotal($choice);
             } elseif ($choice == '') {
@@ -60,7 +59,7 @@ class fsTotalConfirm extends NoInputCorePage
 
                 return false;
             }
-        }
+        } catch (Exception $ex) {}
 
         return true;
     }
@@ -75,17 +74,17 @@ class fsTotalConfirm extends NoInputCorePage
     function body_content() 
     {
         $default = 'EF';
-        if (CoreLocal::get('fntlDefault') === '' || CoreLocal::get('fntlDefault') == 1) {
+        if ($this->session->get('fntlDefault') === '' || $this->session->get('fntlDefault') == 1) {
             $default = 'EC';
         }
         ?>
         <div class="baseHeight">
         <div class="centeredDisplay colored rounded">
-        <span class="larger">Customer is using the</span>
-        <form id="selectform" method="post" action="<?php echo filter_input(INPUT_SERVER, 'PHP_SELF'); ?>">
+        <span class="larger"><?php _('Customer is using the'); ?></span>
+        <form id="selectform" method="post" action="<?php echo AutoLoader::ownURL(); ?>">
 
         <?php $stem = MiscLib::baseURL() . 'graphics/'; ?>
-        <?php if (CoreLocal::get('touchscreen')) { ?>
+        <?php if ($this->session->get('touchscreen')) { ?>
         <button type="button" class="pos-button coloredArea"
             onclick="scrollDown('#selectlist');">
             <img src="<?php echo $stem; ?>down.png" width="16" height="16" />
@@ -93,20 +92,20 @@ class fsTotalConfirm extends NoInputCorePage
         <?php } ?>
         <select size="2" name="selectlist" 
             id="selectlist" onblur="$('#selectlist').focus();">
-        <option value='EC' <?php echo ($default == 'EC') ? 'selected' : ''; ?>>Cash Portion
-        <option value='EF' <?php echo ($default == 'EF') ? 'selected' : ''; ?>>Food Portion
+        <option value='EC' <?php echo ($default == 'EC') ? 'selected' : ''; ?>><?php echo _('Cash Portion'); ?>
+        <option value='EF' <?php echo ($default == 'EF') ? 'selected' : ''; ?>><?php echo _('Food Portion'); ?>
         </select>
-        <?php if (CoreLocal::get('touchscreen')) { ?>
+        <?php if ($this->session->get('touchscreen')) { ?>
         <button type="button" class="pos-button coloredArea"
             onclick="scrollUp('#selectlist');">
             <img src="<?php echo $stem; ?>up.png" width="16" height="16" />
         </button>
         <?php } ?>
         <p>
-            <button class="pos-button" type="submit">Select [enter]</button>
+            <button class="pos-button" type="submit"><?php echo _('Select [enter]'); ?></button>
             <button class="pos-button" type="submit" 
                 onclick="$('#selectlist').append($('<option>').val(''));$('#selectlist').val('');">
-                Cancel [clear]
+                <?php echo _('Cancel [clear]'); ?>
             </button>
         </p>
         </div>

@@ -40,13 +40,14 @@ class BatchesModel extends BasicModel
     'priority' => array('type'=>'INT'),
     'owner' => array('type'=>'VARCHAR(50)'),
     'transLimit' => array('type'=>'TINYINT', 'default'=>0),
+    'notes' => array('type'=>'TEXT'),
     );
 
     public function doc()
     {
         return '
 Depends on:
-* batchType
+Wthis->* batchType
 
 Use:
 This table contains basic information
@@ -70,26 +71,36 @@ those same items revert to normal pricing.
     */
     public function forceStartBatch($id)
     {
-        $batchInfoQ = $this->connection->prepare("SELECT batchType,discountType FROM batches WHERE batchID = ?");
-        $batchInfoR = $this->connection->execute($batchInfoQ,array($id));
-        $batchInfoW = $this->connection->fetchRow($batchInfoR);
+        $b_def = $this->connection->tableDefinition($this->name);
+        $bt_def = $this->connection->tableDefinition('batchType');
+        $exit = isset($bt_def['exitInventory']) ? 'exitInventory' : '0 AS exitInventory';
+        $batchInfoQ = $this->connection->prepare("SELECT batchType,discountType,{$exit} FROM batches AS b
+            LEFT JOIN batchType AS t ON b.batchType=t.batchTypeID WHERE batchID = ?");
+        $batchInfoW = $this->connection->getRow($batchInfoQ,array($id));
+        if ($batchInfoW['discountType'] < 0) {
+            return;
+        }
 
         $forceQ = "";
         $forceLCQ = "";
         // verify limit columns exist
-        $b_def = $this->connection->tableDefinition($this->name);
         $p_def = $this->connection->tableDefinition('products');
+        $bl_def = $this->connection->tableDefinition('batchList');
+        $costChange = '';
+        if (isset($batchList['cost'])) {
+            $costChange = ", p.cost = CASE WHEN l.cost IS NOT NULL AND l.cost > 0 THEN l.cost ELSE p.cost END";
+        }
         $has_limit = (isset($b_def['transLimit']) && isset($p_def['special_limit'])) ? true : false;
         $isHQ = FannieConfig::config('STORE_MODE') == 'HQ' ? true : false;
-        if ($batchInfoW['discountType'] != 0) { // item is going on sale
+        if ($batchInfoW['discountType'] > 0) { // item is going on sale
             $forceQ="
                 UPDATE products AS p
                     INNER JOIN batchList AS l ON p.upc=l.upc
                     INNER JOIN batches AS b ON l.batchID=b.batchID
                     " . ($isHQ ? ' INNER JOIN StoreBatchMap AS m ON b.batchID=m.batchID and p.store_id=m.storeID ' : '') . "
-                SET p.start_date = b.startDate, 
+                SET p.start_date = b.startDate,
                     p.end_date=b.endDate,
-                    p.special_price=l.salePrice,
+                    p.special_price=CASE WHEN l.pricemethod=2 THEN p.normal_price ELSE l.salePrice END,
                     p.specialgroupprice=CASE WHEN l.salePrice < 0 THEN -1*l.salePrice ELSE l.salePrice END,
                     p.specialpricemethod=l.pricemethod,
                     p.specialquantity=l.quantity,
@@ -104,6 +115,9 @@ those same items revert to normal pricing.
                     p.modified = NOW()
                 WHERE l.upc not like 'LC%'
                     and l.batchID = ?";
+            if (isset($p_def['batchID'])) {
+                $forceQ = str_replace('NOW()', 'NOW(), p.batchID=b.batchID', $forceQ);
+            }
                 
             $forceLCQ = "
                 UPDATE products AS p
@@ -111,9 +125,9 @@ those same items revert to normal pricing.
                     INNER JOIN batchList as l ON l.upc=concat('LC',convert(v.likecode,char))
                     INNER JOIN batches AS b ON b.batchID=l.batchID
                     " . ($isHQ ? ' INNER JOIN StoreBatchMap AS m ON b.batchID=m.batchID and p.store_id=m.storeID ' : '') . "
-                SET p.special_price = l.salePrice,
-                    p.end_date = b.endDate,
-                    p.start_date=b.startDate,
+                SET p.start_date = b.startDate,
+                    p.end_date=b.endDate,
+                    p.special_price=CASE WHEN l.pricemethod=2 THEN p.normal_price ELSE l.salePrice END,
                     p.specialgroupprice=CASE WHEN l.salePrice < 0 THEN -1*l.salePrice ELSE l.salePrice END,
                     p.specialpricemethod=l.pricemethod,
                     p.specialquantity=l.quantity,
@@ -128,6 +142,9 @@ those same items revert to normal pricing.
                     p.modified = NOW()
                 WHERE l.upc LIKE 'LC%'
                     AND l.batchID = ?";
+            if (isset($p_def['batchID'])) {
+                $forceLCQ = str_replace('NOW()', 'NOW(), p.batchID=b.batchID', $forceLCQ);
+            }
 
             if ($this->connection->dbmsName() == 'mssql') {
                 $forceQ="UPDATE products
@@ -174,13 +191,14 @@ those same items revert to normal pricing.
                     left join batches as b on b.batchID = l.batchID
                     where b.batchID=?";
             }
-        } else { // normal price is changing
+        } elseif ($batchInfoW['discountType'] == 0) { // normal price is changing
             $forceQ = "
                 UPDATE products AS p
                     INNER JOIN batchList AS l ON l.upc=p.upc
                     " . ($isHQ ? ' INNER JOIN StoreBatchMap AS m ON l.batchID=m.batchID and p.store_id=m.storeID ' : '') . "
                 SET p.normal_price = l.salePrice,
                     p.modified = now()
+                    {$costChange}
                 WHERE l.upc not like 'LC%'
                     AND l.batchID = ?";
 
@@ -199,13 +217,16 @@ those same items revert to normal pricing.
                     " . ($isHQ ? ' INNER JOIN StoreBatchMap AS m ON b.batchID=m.batchID and p.store_id=m.storeID ' : '') . "
                 SET p.normal_price = b.salePrice,
                     p.modified=now()
+                    {$costChange}
                 WHERE b.upc LIKE 'LC%'
                     AND b.batchID = ?";
 
             if ($this->connection->dbmsName() == 'mssql') {
+                $costChange = str_replace('p.cost', 'cost', $costChange);
                 $forceQ = "UPDATE products
                       SET normal_price = l.salePrice,
                       modified = getdate()
+                      {$costChange}
                       FROM products as p,
                       batches as b,
                       batchList as l
@@ -227,11 +248,13 @@ those same items revert to normal pricing.
 
                 $forceLCQ = "update products set normal_price = b.salePrice,
                     modified=getdate()
+                    {$costChange}
                     from products as p left join
                     upcLike as v on v.upc=p.upc left join
                     batchList as b on b.upc='LC'+convert(varchar,v.likecode)
                     where b.batchID=?";
             }
+
         }
 
         $forceP = $this->connection->prepare($forceQ);
@@ -242,9 +265,45 @@ those same items revert to normal pricing.
         }
         $forceLCP = $this->connection->prepare($forceLCQ);
         $forceR = $this->connection->execute($forceLCP,array($id));
+        if ($batchInfoW['discountType'] != 0 && $batchInfoW['exitInventory'] == 1) {
+            $storeP = $this->connection->prepare('SELECT storeID FROM StoreBatchMap WHERE batchID=?');
+            $stores = $this->connection->getAllRows($storeP, array($id));
+            $stores = array_map(function ($i) { return $i['storeID']; }, $stores);
+            list($inStr, $args) = $this->connection->safeInClause($stores);
+            $invP = $this->connection->prepare("
+                UPDATE InventoryCounts AS i
+                SET i.par=0
+                WHERE i.mostRecent=1
+                    AND i.storeID IN ({$inStr})
+                    AND i.upc IN (
+                        SELECT b.upc FROM batchList AS b WHERE b.batchID=?
+                    )");
+            $args[] = $id;
+            $invR = $this->connection->execute($invP, $args);
+
+            $args = array( (1 << (20 - 1)), date('Y-m-d H:i:s'));
+            list($inStr, $args) = $this->connection->safeInClause($stores, $args);
+            $args[] = $id;
+            $prodP = $this->connection->prepare("
+                UPDATE products AS p
+                    INNER JOIN batchList AS b ON p.upc=b.upc
+                SET numflag = numflag | ?,
+                    modified = ?
+                WHERE p.store_id IN ({$inStr})
+                    AND b.batchID=?"); 
+            $this->connection->execute($prodP, $args);
+        }
+
+        if ($batchInfoW['discountType'] == 0) {
+            //$this->scaleSendPrice($id);
+        }
 
         $updateType = ($batchInfoW['discountType'] == 0) ? ProdUpdateModel::UPDATE_PC_BATCH : ProdUpdateModel::UPDATE_BATCH;
         $this->finishForce($id, $updateType, $has_limit);
+        
+        $bu = new BatchUpdateModel($this->connection);
+        $bu->batchID($id);
+        $bu->logUpdate($bu::UPDATE_FORCED);
     }
 
     /**
@@ -269,8 +328,8 @@ those same items revert to normal pricing.
             // cannot find batch. do not change products
             return false;
         }
-        if ($self['discountType'] == 0) {
-            // price change batch. nothing to stop.
+        if ($self['discountType'] <= 0) {
+            // price change batch or tracking batch. nothing to stop.
             return true;
         }
         if ($self['current'] == 0) {
@@ -337,6 +396,9 @@ those same items revert to normal pricing.
 
         $updateType = ProdUpdateModel::UPDATE_PC_BATCH;
         $this->finishForce($id, $updateType, $has_limit);
+        $bu = new BatchUpdateModel($this->connection);
+        $bu->batchID($id);
+        $bu->logUpdate($bu::UPDATE_STOPPED);
     }
 
     /**
@@ -427,9 +489,13 @@ those same items revert to normal pricing.
         */
         $FANNIE_LANES = FannieConfig::config('LANES');
         for ($i = 0; $i < count($FANNIE_LANES); $i++) {
-            $lane_sql = new SQLManager($FANNIE_LANES[$i]['host'],$FANNIE_LANES[$i]['type'],
-                $FANNIE_LANES[$i]['op'],$FANNIE_LANES[$i]['user'],
-                $FANNIE_LANES[$i]['pw']);
+            try {
+                $lane_sql = new SQLManager($FANNIE_LANES[$i]['host'],$FANNIE_LANES[$i]['type'],
+                    $FANNIE_LANES[$i]['op'],$FANNIE_LANES[$i]['user'],
+                    $FANNIE_LANES[$i]['pw']);
+            } catch (Exception $ex) {
+                continue;
+            }
             
             if (!isset($lane_sql->connections[$FANNIE_LANES[$i]['op']]) || $lane_sql->connections[$FANNIE_LANES[$i]['op']] === false) {
                 // connect failed
@@ -518,6 +584,41 @@ those same items revert to normal pricing.
         }
 
         return $upcs;
+    }
+
+    public function scaleSendPrice($batchID)
+    {
+        $prep = $this->connection->prepare("SELECT upc, salePrice FROM batchList WHERE upc LIKE '002%' AND batchID=?");
+        $rows = $this->connection->getAllRows($prep, array($batchID));
+        if (count($rows) == 0) {
+            return;
+        }
+
+        $scaleP = $this->connection->prepare('SELECT s.host, s.scaleType, s.scaleDeptName, s.serviceScaleID
+            FROM ServiceScaleItemMap AS m
+                INNER JOIN ServiceScales AS s ON s.serviceScaleID=m.serviceScaleID
+            WHERE m.upc=?');
+        foreach ($rows as $row) {
+            $items = array();
+            $items[] = array(
+                'RecordType' => 'ChangeOneItem',
+                'PLU' => COREPOS\Fannie\API\item\ServiceScaleLib::upcToPLU($row['upc']),
+                'Price' => $row['salePrice'],
+            );
+            $scales = array();
+            $scaleR = $this->connection->execute($scaleP, array($row['upc']));
+            while ($scaleW = $this->connection->fetchRow($scaleR)) {
+                $scales[] = array(
+                    'host' => $scaleW['host'],
+                    'type' => $scaleW['scaleType'],
+                    'dept' => $scaleW['scaleDeptName'],
+                    'id' => $scaleW['serviceScaleID'],
+                    'new' => false,
+                );
+            }
+            COREPOS\Fannie\API\item\HobartDgwLib::writeItemsToScales($items, $scales);
+            COREPOS\Fannie\API\item\EpScaleLib::writeItemsToScales($items, $scales);
+        }
     }
 
     protected function hookAddColumnowner()

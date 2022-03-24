@@ -23,7 +23,7 @@
 
 include(dirname(__FILE__).'/../../../../config.php');
 if (!class_exists('\\FannieAPI')) {
-    include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../../../classlib2.0/FannieAPI.php');
 }
 
 class CWBasketReport extends FannieReportPage 
@@ -58,9 +58,8 @@ class CWBasketReport extends FannieReportPage
         $ret = parent::preprocess();
         // custom: needs graphing JS/CSS
         if ($this->content_function == 'report_content' && $this->report_format == 'html') {
-            $this->add_script('../../../../src/javascript/d3.js/d3.v3.min.js');
-            $this->add_script('../../../../src/javascript/d3.js/charts/singleline/singleline.js');
-            $this->add_css_file('../../../../src/javascript/d3.js/charts/singleline/singleline.css');
+            $this->addScript('../../../../src/javascript/Chart.min.js');
+            $this->addScript('../../../../src/javascript/CoreChart.js');
         }
 
         return $ret;
@@ -78,7 +77,7 @@ class CWBasketReport extends FannieReportPage
             $default .= '<option value="7">Total Spending</option>';
             $default .= '<option value="10">Average Spending</option>';
             $default .= '</select>';
-            $default .= '<div id="chartDiv"></div>';
+            $default .= '<div><canvas id="chartCanvas"></canvas></div>';
             $default .= '</div>';
 
             $this->add_onload_command('showGraph(1)');
@@ -110,6 +109,7 @@ class CWBasketReport extends FannieReportPage
                 INNER JOIN WarehouseDates AS w ON t.date_id=w.warehouseDateID
                 LEFT JOIN ' . $this->config->get('OP_DB') . $dbc->sep() . 'memtype AS m ON m.memtype=t.memType
             WHERE t.date_id BETWEEN ? AND ?
+                AND t.tenderTotal <> 0
             GROUP BY custdataType,
                 w.year,
                 w.isoWeekNumber 
@@ -120,9 +120,11 @@ class CWBasketReport extends FannieReportPage
 
         $data = array();
         while ($w = $dbc->fetchRow($result)) {
+            /*
             if ($w['end'] - $w['start'] < 6) {
                 continue;
             }
+            */
             $span = date('Y-m-d', strtotime($w['start']))
                 . ' - '
                 . date('Y-m-d', strtotime($w['end']));
@@ -213,76 +215,30 @@ class CWBasketReport extends FannieReportPage
     public function javascript_content()
     {
         if ($this->report_format != 'html') {
-            return;
+            return '';
         }
 
-        ob_start();
-        ?>
+        return <<<JAVASCRIPT
 function showGraph(colset) {
-    var ymin = 999999999;
-    var ymax = 0;
+    var yPoints = [];
+    var yLabels = [];
+    var xLabels = $('td.reportColumn0').toArray().map(x => x.innerHTML.trim());
 
-    var ydata = Array();
-    $('td.reportColumn'+colset).each(function(){
-        var y = Number($(this).html());
-        ydata.push(y);
-        if (y > ymax) {
-            ymax = y;
-        }
-        if (y < ymin) {
-            ymin = y;
-        }
-    });
+    ydata = $('td.reportColumn'+colset).toArray().map(x => Number(x.innerHTML));
+    yPoints.push(ydata);
+    yLabels.push('Member');
 
-    var y2data = Array();
-    $('td.reportColumn'+(Number(colset)+1)).each(function(){
-        var y = Number($(this).html());
-        y2data.push(y);
-        if (y > ymax) {
-            ymax = y;
-        }
-        if (y < ymin) {
-            ymin = y;
-        }
-    });
+    y2data = $('td.reportColumn'+(colset+1)).toArray().map(x => Number(x.innerHTML));
+    yPoints.push(y2data);
+    yLabels.push('Non-Member');
 
-    var y3data = Array();
-    $('td.reportColumn'+(Number(colset)+2)).each(function(){
-        var y = Number($(this).html());
-        y3data.push(y);
-        if (y > ymax) {
-            ymax = y;
-        }
-        if (y < ymin) {
-            ymin = y;
-        }
-    });
+    y3data = $('td.reportColumn'+(colset+2)).toArray().map(x => Number(x.innerHTML));
+    yPoints.push(y3data);
+    yLabels.push('Total');
 
-    var xdata = Array();
-    var x = 0;
-    $('td.reportColumn0').each(function(){
-        xdata.push(x);
-        x++;
-    });
-    xmin = xdata[0];
-    xmax = xdata[xdata.length-1];
-
-    var data = Array();
-    var data2 = Array();
-    var data3 = Array();
-    for (var i=0; i < xdata.length; i++) {
-        data.push(Array(xdata[i], ydata[i]));
-        data2.push(Array(xdata[i], y2data[i]));
-        data3.push(Array(xdata[i], y3data[i]));
-    }
-
-    $('#chartDiv').html('');
-    singleline(data, Array(xmin, xmax), Array(ymin, ymax), '#chartDiv');
-    addsingleline(data2, Array(xmin, xmax), Array(ymin, ymax), '#chartDiv', 'red');
-    addsingleline(data3, Array(xmin, xmax), Array(ymin, ymax), '#chartDiv', 'green');
+    CoreChart.lineChart('chartCanvas', xLabels, yPoints, yLabels);
 }
-        <?php
-        return ob_get_clean();
+JAVASCRIPT;
     }
 
     public function helpContent()

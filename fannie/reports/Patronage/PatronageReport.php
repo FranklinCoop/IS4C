@@ -23,14 +23,14 @@
 
 include(dirname(__FILE__) . '/../../config.php');
 if (!class_exists('FannieAPI')) {
-    include($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
+    include(__DIR__ . '/../../classlib2.0/FannieAPI.php');
 }
 
 class PatronageReport extends FannieReportPage 
 {
     public $description = '[Patronage] show per-member patronage information by fiscal year. Note this is
     calculated and entered annually, not assembled on the fly from transaction information.';
-    public $report_set = 'Membership';
+    public $report_set = 'Membership :: Patronage';
     public $themed = true;
 
     protected $header = "Patronage Report";
@@ -53,7 +53,7 @@ class PatronageReport extends FannieReportPage
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
 
-        $fyearQ = $dbc->prepare("SELECT FY FROM patronage GROUP BY FY ORDER BY FY DESC");
+        $fyearQ = $dbc->prepare("SELECT FY FROM patronage WHERE FY > 0 GROUP BY FY ORDER BY FY DESC");
         $fyearR = $dbc->execute($fyearQ);
         $fyear = FormLib::get('fy');
 

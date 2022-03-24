@@ -24,6 +24,8 @@
 class DefaultCsvPoExport 
 {
     public $nice_name = 'CSV (Default)';
+    public $extension = 'csv';
+    public $mime_type = 'test/csv';
 
     public function send_headers()
     {
@@ -31,6 +33,13 @@ class DefaultCsvPoExport
         header("Content-Disposition: attachment; filename=order_export.csv");
         header("Pragma: no-cache");
         header("Expires: 0");
+    }
+
+    public function exportString($id)
+    {
+        ob_start();
+        $this->export_order($id);
+        return ob_get_clean();
     }
 
     public function export_order($id)
@@ -51,11 +60,12 @@ class DefaultCsvPoExport
 
         echo '"'.$vendor->vendorName().'",Order Date,'.date('Y-m-d')."\r\n";
         echo "\r\n";
-        echo "SKU,\"Order Qty\",\"Case Size\",\"Unit Size\",Description\r\n";
+        echo "SKU,\"Order Qty (Cases)\",\"Case Size\",\"Total Units\",\"Unit Size\",Description\r\n";
         foreach ($items->find() as $obj) {
-            echo $obj->sku().',';
+            echo trim($obj->sku()).',';
             echo $obj->quantity().',';
             echo '"'.$obj->caseSize().'",';
+            echo '"'.(is_numeric($obj->caseSize()) ? $obj->caseSize()*$obj->quantity() : $obj->quantity()).'",';
             echo '"'.$obj->unitSize().'",';
             echo '"'.$obj->description().'",';
             echo "\r\n";

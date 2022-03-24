@@ -43,7 +43,7 @@ class AllLanesItemModule extends \COREPOS\Fannie\API\item\ItemModule
 
     public function getFormJavascript($upc)
     {
-        $script = <<<JAVASCRIPT
+        return <<<JAVASCRIPT
 function pollLanes() {
     if (window.$) {
         $(document).ready(function(){
@@ -51,7 +51,7 @@ function pollLanes() {
                 jsonrpc: '2.0',
                 method: '\\\\COREPOS\\\\Fannie\\\\API\\\\webservices\\\\FannieLaneStatusService',
                 id: new Date().getTime(),
-                params: { upc: {{UPC}} }
+                params: { upc: '{$upc}' }
             };
             $.ajax({
                 url: '../ws/',
@@ -85,12 +85,10 @@ function pollLanes() {
             });
         });
     } else { 
-        setTimeout(pollLanes, 50);
+        setTimeout(pollLanes, 120);
     }
 }
-pollLanes();
 JAVASCRIPT;
-        return str_replace('{{UPC}}', ltrim($upc, '0'), $script);
     }
 }
 

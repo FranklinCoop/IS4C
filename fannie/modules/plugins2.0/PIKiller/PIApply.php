@@ -77,6 +77,13 @@ class PIApply extends FannieRESTfulPage
         }
         \COREPOS\Fannie\API\member\MemberREST::post($json['card_no'], $rest);
 
+        if (isset($json['fran']) && $json['fran']) {
+            $delP = $this->connection->prepare("DELETE FROM EquityPaymentPlanAccounts where cardNo=?");
+            $this->connection->execute($delP, array($json['card_no']));
+            $planP = $this->connection->prepare("INSERT INTO EquityPaymentPlanAccounts (cardNo, equityPaymentPlanID) VALUES (?, 4)");
+            $this->connection->execute($planP, array($json['card_no']));
+        }
+
         $custdata = new CustdataModel(FannieDB::get(FannieConfig::config('OP_DB')));
         $custdata->CardNo($json['card_no']);
         foreach ($custdata->find() as $c) {

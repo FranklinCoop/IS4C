@@ -13,13 +13,34 @@ class QueueManager
      */
     private $running = false;
 
+    private $logger;
+
+    public function __construct()
+    {
+        $this->logger = new FannieLogger();
+    }
+
+    public static function available()
+    {
+        $conf = FannieConfig::config('PLUGIN_SETTINGS');
+        $redis_host = isset($conf['SatelliteRedis']) ? $conf['SatelliteRedis'] : '';
+        if ($redis_host === '') {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * Get a connection to Redis server
      */
     private function redisConnect()
     {
         $conf = FannieConfig::config('PLUGIN_SETTINGS');
-        $redis_host = isset($conf['SatelliteRedis']) ? $conf['SatelliteRedis'] : '127.0.0.1';
+        $redis_host = isset($conf['SatelliteRedis']) ? $conf['SatelliteRedis'] : '';
+        if ($redis_host === '') {
+            return false;
+        }
         $this->log("Connecting to Redis {$redis_host}");
         try {
             $redis = new \Predis\Client($redis_host);
@@ -107,6 +128,9 @@ class QueueManager
     {
         if ($this->running) {
             echo $msg ."\n";
+        } else {
+            // turn on for debugging
+            //$this->logger->info($msg);
         }
     }
 

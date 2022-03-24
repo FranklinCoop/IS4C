@@ -16,6 +16,7 @@ if (isset($_GET['excel'])){
     header('Content-Disposition: attachment; filename="dailyReport.xls"');
 } else {
     $storeInfo = FormLib::storePicker();
+    echo '<p>Current: Monthly  | Switch to: <a href="anydate.php">Any Date(s)</a></p>';
     echo '<form action="index.php" method="get">'
         . $storeInfo['html'] . 
         ' Month <input type="text" name="month" value="' . $month . '" />

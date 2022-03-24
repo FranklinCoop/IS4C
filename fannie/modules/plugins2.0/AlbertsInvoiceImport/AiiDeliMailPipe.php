@@ -52,10 +52,11 @@ class AiiDeliMailPipe extends \COREPOS\Fannie\API\data\pipes\AttachmentEmailPipe
                         $order->placed(1);
                         $order->placedDate($date);
                         $order->vendorInvoiceID($data[0]);
+                        $order->inventoryIgnore(1);
                         $orderID = $order->save();
                     }
                     $isBulk = false;
-                    if (strstr($data[11], 'Bulk') && strstr($data[12], 'Meat')) {
+                    if (strstr($data[11], 'Bulk') && (strstr($data[12], 'Meat') || strstr($data[12], 'Poultry'))) {
                         $isBulk = true;
                     }
                     $poi = new PurchaseOrderItemsModel($dbc);
@@ -65,6 +66,9 @@ class AiiDeliMailPipe extends \COREPOS\Fannie\API\data\pipes\AttachmentEmailPipe
                     $caseSize = (($data[5] ? $data[5] : 1) * $data[6]);
                     if ($isBulk) {
                         $caseSize = $data[20];
+                        if ($data[2] == '68499') {
+                            $caseSize = 20;
+                        }
                     }
                     $poi->unitCost(($data[20] * $data[21]) / $caseSize);
                     $poi->caseSize($caseSize);

@@ -22,12 +22,14 @@ class PickTagsPage extends FannieRESTfulPage
 
     protected function post_id_handler()
     {
+        $shelfLife = FormLib::get('shelfLife', false);
         list($inStr, $args) = $this->connection->safeInClause($this->id);
         $map = array();
         for ($i=0; $i<count($this->id); $i++) {
             $map[$this->id[$i]] = $this->form->qty[$i];
         }
         $priced = FormLib::get('priced', false);
+        $offset = FormLib::get('offset', false);
         $lifeP = $this->connection->prepare("SELECT shelflife FROM scaleItems WHERE plu=?");
         $dDate = FormLib::get('dDate', false);
 
@@ -79,7 +81,11 @@ class PickTagsPage extends FannieRESTfulPage
                     $right = str_pad($right, 4, '0', STR_PAD_LEFT);
                     $item['upc'] = substr($item['upc'], 0, 9) . $right;
                 }
-                $life = $this->connection->getValue($lifeP, array($upc));
+                if ($shelfLife > 0) {
+                    $life = $shelfLife;
+                } else {
+                    $life = $this->connection->getValue($lifeP, array($upc));
+                }
                 if ($life && $dDate) {
                     $today = new DateTime($dDate);
                     $today->add(new DateInterval('P' . $life . 'D'));
@@ -195,16 +201,26 @@ class PickTagsPage extends FannieRESTfulPage
         $poList = $this->purchaseOrderList();
         $noPOs = $poList == '' ? 'collapse' : '';
         $today = date('Y-m-d');
+        $shelfLife = FormLib::get('shelfLife', false);
 
         return <<<HTML
 <form method="post">
     <p class="form-inline">
         <button type="submit" class="btn btn-default">Get Tags</button>
         <label><input type="checkbox" name="priced" value="1" /> Include prices</label>
-        <div class="input-group">
-            <span class="input-group-addon">Delivery Date</span>
-            <input type="text" class="form-control date-field" name="dDate" value="{$today}" />
+        <label><input type="checkbox" name="offset" value="1" /> Offset Tags</label>
+        <div class="form-group">
+            <div class="input-group">
+                <span class="input-group-addon">Delivery Date</span>
+                <input type="text" class="form-control date-field" name="dDate" value="{$today}" />
+            </div> 
         </div> 
+        <div class="form-group">
+            <div class="input-group">
+                <span class="input-group-addon">Shelflife</span>
+                <input type="number" class="form-control" name="shelfLife" value="{$shelfLife}" />
+            </div> 
+        </div>
     </p>
     <table class="table table-bordered table-striped">
         <tr><th>Qty</th><th>UPC</th><th>Brand</th><th>Description</th></tr>

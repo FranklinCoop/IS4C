@@ -31,8 +31,10 @@ class WfcSmartSigns16UpP extends \COREPOS\Fannie\API\item\signage\Signage16UpP
             WHERE upc = ?;");
         $organicLocalP = $dbc->prepare("SELECT 'true' FROM products WHERE numflag & (1<<16) != 0 AND upc = ? AND local > 0");
         $organicP = $dbc->prepare("SELECT 'true' FROM products WHERE numflag & (1<<16) != 0 AND upc = ?");
+        $localP = $dbc->prepare("SELECT 'true' FROM products WHERE local > 0 AND upc = ?");
 
         $data = $this->loadItems();
+        $data = $this->sortProductsByPhysicalLocation($this->getDB(), $data, $this->store);
         $count = 0;
         $sign = 0;
         $width = 53.975;
@@ -69,6 +71,7 @@ class WfcSmartSigns16UpP extends \COREPOS\Fannie\API\item\signage\Signage16UpP
             $item['basic'] = $dbc->getValue($basicP, $item['upc']);
             $item['organicLocal'] = $dbc->getValue($organicLocalP, $item['upc']);
             $item['organic'] = $dbc->getValue($organicP, $item['upc']);
+            $item['local'] = $dbc->getValue($localP, $item['upc']);
 
             $pdf->Image($this->getTopImage($item), ($left-2) + ($width*$column), ($top-17) + ($row*$height), $width-6);
             $pdf->Image($this->getBottomImage($item), ($left-2)+($width*$column), $top + ($height*$row) + ($height-$top-2), $width-6);
@@ -92,8 +95,9 @@ class WfcSmartSigns16UpP extends \COREPOS\Fannie\API\item\signage\Signage16UpP
             return __DIR__ . '/noauto/images/local_og_top.png';
         } elseif ($item['organic']) {
             return __DIR__ . '/noauto/images/organic_top_12.png';
+        } elseif ($item['local']) {
+            return __DIR__ . '/noauto/images/local-top.png';
         }
-
 
         return __DIR__ . '/noauto/images/standard_top_12.png';
     }
@@ -110,8 +114,9 @@ class WfcSmartSigns16UpP extends \COREPOS\Fannie\API\item\signage\Signage16UpP
             return __DIR__ . '/noauto/images/local_og_bottom.png';
         } elseif ($item['organic']) {
             return __DIR__ . '/noauto/images/organic_bottom_12.png';
+        } elseif ($item['local']) {
+            return __DIR__ . '/noauto/images/local-bottom.png';
         }
-
 
         return __DIR__ . '/noauto/images/standard_bottom_12.png';
     }

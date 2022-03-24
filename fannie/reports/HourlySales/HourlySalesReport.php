@@ -103,7 +103,7 @@ class HourlySalesReport extends FannieReportPage
             }
             ${'form'.$k} .= "<input type='hidden' name='date1' value='$newDate1'>";
             ${'form'.$k} .= "<input type='hidden' name='date2' value='$newDate2'>";
-            ${'form'.$k} .= '<button class="btn btn-default btn-xs"><span class="glyphicon glyphicon-chevron-'.$row['glyph'].'"></span></button>';
+            ${'form'.$k} .= '<button class="btn btn-default btn-xs"><span class="fas fa-chevron-'.$row['glyph'].'"></span></button>';
             ${'form'.$k} .= '</form>';
         }
 
@@ -212,6 +212,7 @@ HTML;
         $hour = $dbc->hour('tdate');
 
         $dlog = DTransactionsModel::selectDlog($date1, $date2);
+        $nabs = DTrans::memTypeIgnore($dbc);
 
         $query = "SELECT $date_selector, $hour as hour, 
                     sum(d.total) AS ttl, avg(d.total) as avg
@@ -225,6 +226,7 @@ HTML;
         }
         $query .= "WHERE d.trans_type IN ('I','D')
                     AND d.tdate BETWEEN ? AND ?
+                    AND d.memType NOT IN {$nabs}
                     AND $where ";
         if ($this->config->get('COOP_ID') == 'WFC_Duluth') {
             $query .= ' AND d.department NOT IN (993, 998, 703) ';

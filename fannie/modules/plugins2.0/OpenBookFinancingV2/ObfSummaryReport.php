@@ -40,7 +40,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
         array('', 'Last Year', 'Plan Goal', 'Trend', 'Forecast', 'Actual', '% Growth', 'Current O/U', 'Long-Term O/U'),
         array('', 'Last Year', 'Plan Goal', 'Trend', 'Forecast', 'Actual', '% Growth', 'Current O/U', 'Long-Term O/U'),
         array('', 'Last Year', 'Plan Goal', 'Trend', 'Forecast', 'Actual', '% Growth', 'Current O/U', 'Long-Term O/U'),
-        array('', 'Current Year', 'Last Year', '', '', '', '', '', ''),
+        array('', 'Last Year', 'Plan Goal', 'Trend', 'Forecast', 'Actual', '% Growth', 'Current O/U', 'Long-Term O/U'),
     );
 
     protected $class_lib = 'ObfLibV2';
@@ -222,7 +222,20 @@ class ObfSummaryReport extends ObfWeeklyReportV2
 
     private function getPlanSales($weekID)
     {
-        if ($weekID >= 218) {
+        if ($weekID >= 374) {
+            $prep = $this->connection->prepare("select c.obfCategoryID, m.superID, b.storeID, b.planGoal  
+                from " . FannieDB::fqn('ObfBudget', 'plugin:ObfDatabaseV2') . " AS b 
+                    left join " . FannieDB::fqn('ObfCategorySuperDeptMap', 'plugin:ObfDatabaseV2') . " AS m ON b.superID=m.superID 
+                    left join " . FannieDB::fqn('ObfCategories', 'plugin:ObfDatabaseV2') . " AS c ON m.obfCategoryID=c.obfCategoryID AND b.storeID=c.storeID 
+                WHERE c.hasSales=1 and obfWeekID=?");
+            $res = $this->connection->execute($prep, array($weekID));
+            $ret = array();
+            while ($row = $this->connection->fetchRow($res)) {
+                $key = $row['obfCategoryID'] . ',' . $row['superID'];
+                $ret[$key] = $row['planGoal'];
+            }
+            return $ret;
+        } elseif ($weekID >= 218) {
             $prep = $this->connection->prepare("
                 SELECT l.obfCategoryID, s.superID, (1+l.growthTarget)*s.lastYearSales AS plan
                 FROM " . FannieDB::fqn('ObfLabor', 'plugin:ObfDatabaseV2') . " AS l
@@ -267,7 +280,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
     public function preprocess()
     {
         $this->addScript('../../../src/javascript/Chart.min.js');
-        $this->addScript('summary.js');
+        $this->addScript('summary.js?date=20210706');
 
         return FannieReportPage::preprocess();
     }
@@ -328,7 +341,6 @@ class ObfSummaryReport extends ObfWeeklyReportV2
             'end_ly' => $end_ly,
             'averageWeek' => false,
         );
-        var_dump(date('Y-m-d', $dateInfo['start_ly']));
         if (count($num_cached) == 0 || count($ly_cached) == 0) {
             $this->updateSalesCache($week, array($num_cached, $ly_cached), $dateInfo);
         }
@@ -480,6 +492,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
                 $qtd_hours_ou += ($quarter['hours'] - $qt_proj_hours);
 
                 $quarter_actual_sph = $quarter['hours'] == 0 ? 0 : ($qtd_dept_sales)/($quarter['hours']);
+                /*
                 $data[] = array(
                     $category->name() . ' SPLH',
                     '',
@@ -509,6 +522,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
                     'meta_background' => $this->colors[0],
                     'meta_foreground' => 'black',
                 );
+                 */
 
                 $plan_wages += ($dept_proj * ($this->laborPercent[$category->obfCategoryID()]/100));
 
@@ -550,6 +564,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
                 $qtd_hours_ou += ($quarter['hours'] - $qt_proj_hours);
 
                 $quarter_actual_sph = $quarter['hours'] == 0 ? 0 : ($total_sales->quarterActual)/($quarter['hours']);
+                /*
                 $data[] = array(
                     $c->name() . ' SPLH',
                     '',
@@ -579,6 +594,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
                     'meta_background' => $this->colors[0],
                     'meta_foreground' => 'black',
                 );
+                 */
 
                 $total_hours->actual += $labor->hours();
                 $total_hours->projected += $proj_hours;
@@ -610,6 +626,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
                 'meta_foreground' => 'black',
             );
 
+            /*
             $quarter_actual_sph = $total_hours->quarterActual == 0 ? 0 : ($total_sales->quarterActual)/($total_hours->quarterActual);
             $quarter_proj_sph = $total_hours->quarterProjected == 0 ? 0 : ($total_sales->quarterProjected)/($total_hours->quarterProjected);
             $data[] = array(
@@ -641,6 +658,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
                 'meta_background' => $this->colors[0],
                 'meta_foreground' => 'black',
             );
+             */
 
             $data[] = array(
                 'Transactions',
@@ -718,6 +736,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
 
             $quarter_actual_sph = $quarter['hours'] == 0 ? 0 : ($total_sales->quarterActual)/($quarter['hours']);
             $quarter_proj_sph = $qt_proj_hours == 0 ? 0 : ($total_sales->quarterProjected)/($qt_proj_hours);
+            /*
             $data[] = array(
                 'Admin SPLH',
                 '',
@@ -747,6 +766,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
                 'meta_background' => $this->colors[0],
                 'meta_foreground' => 'black',
             );
+             */
 
             $org['hours'] += $labor->hours();
             $org['projHours'] += $proj_hours;
@@ -780,6 +800,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
 
         $quarter_actual_sph = $total_hours->quarterActual == 0 ? 0 : ($total_sales->quarterActual)/($total_hours->quarterActual);
         $quarter_proj_sph = $total_hours->quarterProjected == 0 ? 0 : ($total_sales->quarterProjected)/($total_hours->quarterProjected);
+        /*
         $data[] = array(
             'SLPH per Hour',
             '',
@@ -809,6 +830,7 @@ class ObfSummaryReport extends ObfWeeklyReportV2
             'meta_background' => $this->colors[0],
             'meta_foreground' => 'black',
         );
+         */
 
         $data[] = array(
             'Transactions',
@@ -846,12 +868,14 @@ class ObfSummaryReport extends ObfWeeklyReportV2
 
         $data[] = array('meta'=>FannieReportPage::META_REPEAT_HEADERS);
 
-        $owners = $this->ownershipThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly);
-        $data[] = array($owners[0], $owners[1], $owners[2], '', '', '', '', '', '', 
+        $owners = $this->ownershipThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly, false);
+        $data[] = array($owners[0], $owners[2], '', '', '', $owners[1], '', '', '', '', 
             'meta' => $owners['meta'], 'meta_background' => $owners['meta_background']);
+        /*
         $owners = $this->ownershipThisYear($dbc, $end_ts);
-        $data[] = array($owners[0], $owners[1], $owners[2], '', '', '', '', '', '', 
+        $data[] = array($owners[0], $owners[2], '', '', '', $owners[1], '', '', '', 
             'meta' => $owners['meta'], 'meta_background' => $owners['meta_background']);
+         */
 
         $json = $this->chartData($dbc, $this->form->weekID);
         $this->addOnloadCommand("obfSummary.drawChart('" . json_encode($json) . "')");

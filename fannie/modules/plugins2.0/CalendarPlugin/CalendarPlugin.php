@@ -21,6 +21,8 @@
 
 *********************************************************************************/
 
+use COREPOS\Fannie\API\FanniePlugin;
+
 include_once(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
     include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
@@ -44,12 +46,14 @@ class CalendarPlugin extends \COREPOS\Fannie\API\FanniePlugin {
 
     public $plugin_description = 'Plugin for calendars';
 
+    public $version = 2;
+
+    public $settingsNamespace = 'CalendarPlugin';
 
     public function settingChange()
     {
-        global $FANNIE_PLUGIN_SETTINGS;
-
-        $db_name = $FANNIE_PLUGIN_SETTINGS['CalendarDatabase'];
+        $settings = FanniePlugin::mySettings(__FILE__);
+        $db_name = $settings['CalendarDatabase'];
         if (empty($db_name)) return;
 
         $dbc = FannieDB::get($db_name);

@@ -4,6 +4,7 @@ language: php
 # builds on free service. politeness.
 php:
     - "5.6"
+    - "7.2"
 
 services:
     - mysql
@@ -30,8 +31,8 @@ install:
     - sh tests/pos/travis-init.sh
     - rm composer.json
     - rm composer.lock
-    - composer init -n
-    - composer require codeclimate/php-test-reporter johnkary/phpunit-speedtrap twig/twig twig/extensions predis/predis
+    - composer init --name corepos/ci-env
+    - composer require codeclimate/php-test-reporter johnkary/phpunit-speedtrap predis/predis
     - mkdir -p build/logs
     - npm install acorn
 

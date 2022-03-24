@@ -157,6 +157,16 @@ class DatabarCoupon extends SpecialUPC
         if (isset($upc[$pos]) && $upc[$pos] == "1") {
             $pos += 1;
 
+            $coupon->requiredRulesCode = $upc[$pos];
+            /**
+             * I cannot find any clear specification of what this rule is supposed to do.
+             * All real-life coupons seem to use it identically to rule #0
+             */
+            if ($coupon->requiredRulesCode == 3) {
+                $coupon->requiredRulesCode = 0;
+            }
+            $pos += 1;
+
             $srLength = (int)$upc[$pos];        
             $pos += 1;
             $coupon->secondReq->value = substr($upc,$pos,$srLength);
@@ -315,7 +325,7 @@ class DatabarCoupon extends SpecialUPC
         }
 
         list($coupon->secondReq, $json) = $this->validateRequirement($coupon->secondReq, $json);
-        if (!$coupon->secondReq->valid && (!property_exists($coupon->thirdReq, 'value') || $coupon->requiredRulesCode == 1)) {
+        if (!$coupon->secondReq->valid && !$coupon->firstReq->valid && (!property_exists($coupon->thirdReq, 'value') || $coupon->requiredRulesCode == 1)) {
             // if the secondary requirment isn't valid and
             //    a) there are no more requirments, or
             //    b) all requirements are mandatory
@@ -347,7 +357,7 @@ class DatabarCoupon extends SpecialUPC
                 }
                 break;
             case '3': // either second or third. seems odd, may
-                  // be misreading documentation on this one
+                      // be misreading documentation on this one
                 if (!$coupon->secondReq->valid && !$coupon->thirdReq->valid) {
                     return $json;
                 }
@@ -399,9 +409,6 @@ class DatabarCoupon extends SpecialUPC
            prefix will "line up" with matching items in
            localtemptrans
 
-           The offer code is converted to base-36 to 
-           reduce its character count.
-
            Offer code won't always fit. This is just best
            effort. I've already seen a real coupon using
            a 10 digit prefix. In theory there could even
@@ -409,7 +416,6 @@ class DatabarCoupon extends SpecialUPC
            offer code at all.
         */
         $upcStart = "0" . $valReq->prefix;
-        $offer = base_convert($offer,10,36);
         $remaining = 13 - strlen($upcStart);
         if (strlen($offer) < $remaining) {
             $offer = str_pad($offer,$remaining,'0',STR_PAD_LEFT);
@@ -420,7 +426,7 @@ class DatabarCoupon extends SpecialUPC
 
         TransRecord::addCoupon($couponUPC, $coupon->firstReq->department, -1*$value);
         $json['output'] = DisplayLib::lastpage();
-    
+
         return $json;
     }
 
@@ -502,13 +508,13 @@ class DatabarCoupon extends SpecialUPC
         $chkR = $dbc->query($chkQ);
         $ttlRequired = MiscLib::truncate2($req->value / 100.00);
         if ($dbc->num_rows($chkR) == 0) {
-            $json['output'] = DisplayLib::boxMsg(_(sprintf("Coupon requires transaction of at least \$%.2f"), $ttlRequired));
+            $json['output'] = DisplayLib::boxMsg(_(sprintf("Coupon requires transaction of at least \$%.2f", $ttlRequired)));
             return array($req, $json);
         }
 
         $chkW = $dbc->fetch_row($chkR);
         if ($chkW[0] < $ttlRequired) {
-            $json['output'] = DisplayLib::boxMsg(_(sprintf("Coupon requires transaction of at least \$%.2f"), $ttlRequired));
+            $json['output'] = DisplayLib::boxMsg(_(sprintf("Coupon requires transaction of at least \$%.2f", $ttlRequired)));
             return array($req, $json);
         }
 

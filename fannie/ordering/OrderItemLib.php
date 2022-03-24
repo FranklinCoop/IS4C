@@ -32,14 +32,16 @@ class OrderItemLib
     */
     public static function getItem($upc)
     {
-        $item = self::getItemByUPC($upc);
-        if ($item !== false) {
-            return $item;
-        }
+        if (trim($upc) !== '' && !preg_match('/^0+$/', trim($upc))) {
+            $item = self::getItemByUPC($upc);
+            if ($item !== false) {
+                return $item;
+            }
 
-        $item = self::getItemBySKU($upc);
-        if ($item !== false) {
-            return $item;
+            $item = self::getItemBySKU($upc);
+            if ($item !== false) {
+                return $item;
+            }
         }
 
         $item = self::$generic_item;
@@ -86,7 +88,7 @@ class OrderItemLib
                 LEFT JOIN vendors AS n ON p.default_vendor_id=n.vendorID
                 LEFT JOIN PriceRules AS r ON p.price_rule_id=r.priceRuleID
             WHERE p.upc=?
-                AND p.inUse=1
+                AND (p.inUse=1 OR p.discounttype=1)
         ');
         $prodR = $dbc->execute($prodP, array($upc));
         if ($prodR && $dbc->numRows($prodR) > 0) {

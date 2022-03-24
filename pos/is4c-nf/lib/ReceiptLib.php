@@ -801,25 +801,10 @@ static private function messageModFooters($receipt, $where, $ref, $reprint, $nth
 {
     // check if message mods have data
     // and add them to the receipt
-    $validMods = self::validateMessageMods($where);
-    foreach($validMods as $class =>$thing){   
-        if ($thing['val'] != 0) {
-            $obj = $thing[$class];
-            if ($obj->paper_only)
-                $receipt['print'] .= $obj->message($thing['val'], $ref, $reprint);
-            else
-                $receipt['any'] .= $obj->message($thing['val'], $ref, $reprint);
-        }
-    }
-
-    return $receipt;
-}
-
-static private function validateMessageMods($where) {
     $dbc = Database::tDataConnect();
     $modQ = "SELECT ";
     $selectMods = array();
-    foreach(self::messageMods($where) as $class){
+    foreach(self::messageMods($nth) as $class){
         if (in_array($class, self::$msgMods)) {
             $class = 'COREPOS\\pos\\lib\\ReceiptBuilding\\Messages\\' . $class;
         }
@@ -839,13 +824,16 @@ static private function validateMessageMods($where) {
         $modR = $dbc->query($modQ);
         $row = array();
         if ($dbc->numRows($modR) > 0) $row = $dbc->fetchRow($modR);
-        foreach($selectMods as $class => $mod){
-            if (!isset($row[$class])) continue; 
-            $returnMods[$class]= array($class=>$mod, 'val'=>$row[$class]);
+        foreach($selectMods as $class => $obj){
+            if (!isset($row[$class])) continue;    
+            if ($obj->paper_only)
+                $receipt['print'] .= $obj->message($row[$class], $ref, $reprint);
+            else
+                $receipt['any'] .= $obj->message($row[$class], $ref, $reprint);
         }
     }
-    return $returnMods;
 
+    return $receipt;
 }
 
 static private function messageMods($nth)
@@ -987,13 +975,21 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
     // skip signature slips if using electronic signature capture (unless it's a reprint)
     if ((is_array($tmap) && isset($tmap['MI']) && $tmap['MI'] != 'SignedStoreChargeTender') || $reprint) {
         if (CoreLocal::get("chargeTotal") != 0 && ((CoreLocal::get("End") == 1 && !$second) || $reprint)) {
+            /** PLACEHOLDER: deal with charge stuff via StoreChargeMessage
+            $msg = new StoreChargeMessage();
+            $msg->setPrintHandler(self::$PRINT);
+            */
             if (is_array($receipt)) {
                 $receipt['print'] .= self::printChargeFooterStore($dateTimeStamp, $ref, $chargeProgram);
+                // $receipt['print'] .= $msg->standalone_receipt($ref);
             } else {
                 $receipt .= self::printChargeFooterStore($dateTimeStamp, $ref, $chargeProgram);
+                // $receipt .= $msg->standalone_receipt($ref);
             }
         }
     }
+
+    $receipt .= self::transactionBarcode($ref);
 
     /*
      Check which standalone mods should print.
@@ -1188,6 +1184,19 @@ static public function code39($barcode, $forcePaper=false)
     return $printMod->printBarcode(PrintHandler::BARCODE_CODE39, $barcode);
 }
 
+static public function code128($barcode, $forcePaper=false)
+{
+    if (!is_object(self::$PRINT)) {
+        self::$PRINT= PrintHandler::factory(CoreLocal::get('ReceiptDriver'));
+    }
+    $printMod = self::$PRINT;
+    if ($forcePaper && (get_class(self::$PRINT) == self::$EMAIL || get_class(self::$PRINT) == self::$HTML)) {
+        $printMod = PrintHandler::factory(CoreLocal::get('ReceiptDriver'));
+    }
+
+    return $printMod->printBarcode(PrintHandler::BARCODE_CODE128, $barcode);
+}
+
 static private function haveMailer()
 {
     if (class_exists('PHPMailer')) {
@@ -1222,6 +1231,30 @@ static private function nthReceipt()
     }
 
     return false;
+}
+
+/**
+Create barcode representing transaction
+Format is: CPYYMMDDEEEEERRRTTTT
+    * CP (identifier)
+    * YY last 2 digits of year (yes, y3k problem...)
+    * MM month
+    * DD day
+    * EEEEE emp_no
+    * RRR register_no
+    * TTTT trans_no
+*/
+static private function transactionBarcode($ref)
+{
+    // {ACPYYMMDDEEEEERRRTTTT
+    list($e,$r,$t) = self::parseRef($ref);
+    $txnBarcode = '{A'
+        . 'CP'
+        . substr(date('Ymd') , -6)
+        . str_pad($e, 5, '0', STR_PAD_LEFT)
+        . str_pad($r, 3, '0', STR_PAD_LEFT)
+        . str_pad($t, 4, '0', STR_PAD_LEFT);
+    return self::code128($txnBarcode);
 }
 
 }

@@ -23,6 +23,7 @@
 
 /* SRPs are re-calculated based on the current margin or testing
    settings, which may have changed since the order was imported */
+use \COREPOS\Fannie\API\item\Margin;
 
 /* configuration for your module - Important */
 include(dirname(__FILE__) . '/../../config.php');
@@ -55,25 +56,31 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
         $query = '
             SELECT v.upc,
                 v.sku,
-                COALESCE(p.cost, v.cost) AS cost,
-                CASE
-                    WHEN c.margin IS NOT NULL AND c.margin <> 0 THEN c.margin 
-                    WHEN a.margin IS NOT NULL THEN a.margin
-                    WHEN b.margin IS NOT NULL THEN b.margin
-                    ELSE 0 
-                END AS margin,
+                v.cost,
+                a.margin,
                 COALESCE(n.shippingMarkup, 0) as shipping,
                 COALESCE(n.discountRate, 0) as discount
             FROM vendorItems as v 
                 LEFT JOIN vendorDepartments AS a ON v.vendorID=a.vendorID AND v.vendorDept=a.deptID
                 INNER JOIN vendors AS n ON v.vendorID=n.vendorID
-                LEFT JOIN products as p ON v.upc=p.upc AND v.vendorID=p.default_vendor_id
+            WHERE v.vendorID=?';
+        $dbc2 = FannieDB::getReadOnly($this->config->get('OP_DB'));
+        $fetchP = $dbc2->prepare($query);
+        $fetchR = $dbc2->execute($fetchP, array($id));
+        $prodP = $dbc2->prepare("SELECT p.upc, p.cost, b.margin, c.margin AS specificMargin
+            FROM products as p 
                 LEFT JOIN departments AS b ON p.department=b.dept_no
-                LEFT JOIN VendorSpecificMargins AS c ON c.vendorID=n.vendorID AND p.department=c.deptID
-            WHERE v.vendorID=?
-                AND (a.margin IS NOT NULL OR b.margin IS NOT NULL)';
-        $fetchP = $dbc->prepare($query);
-        $fetchR = $dbc->execute($fetchP, array($id));
+                LEFT JOIN VendorSpecificMargins AS c ON c.vendorID=p.default_vendor_id AND p.department=c.deptID
+            WHERE p.default_vendor_id=?");
+        $prodR = $dbc2->execute($prodP, array($id));
+        $prodData = array();
+        while ($row = $dbc2->fetchRow($prodR)) {
+            $prodData[$row['upc']] = array(
+                'cost' => $row['cost'],
+                'margin' => $row['margin'],
+                'specific' => $row['specificMargin'],
+            );
+        }
         $upP = $dbc->prepare('
             UPDATE vendorItems
             SET srp=?,
@@ -87,11 +94,23 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
         $rounder = new \COREPOS\Fannie\API\item\PriceRounder();
         $upcs = array();
         $dbc->startTransaction();
-        while ($fetchW = $dbc->fetchRow($fetchR)) {
+        while ($fetchW = $dbc2->fetchRow($fetchR)) {
             if (isset($upcs[$fetchW['upc']])) {
                 continue;
             }
             $upcs[$fetchW['upc']] = true;
+            // products data overrides, if available
+            $upc = $fetchW['upc'];
+            if (isset($prodData[$upc])) {
+                if ($prodData[$upc]['cost']) {
+                    $fetchW['cost'] = $prodData[$upc]['cost'];
+                }
+                if ($prodData[$upc]['specific']) {
+                    $fetchW['margin'] = $prodData[$upc]['specific'];
+                } elseif ($prodData[$upc]['margin']) {
+                    $fetchW['margin'] = $prodData[$upc]['margin'];
+                }
+            }
             // calculate a SRP from unit cost and desired margin
             $adj = \COREPOS\Fannie\API\item\Margin::adjustedCost($fetchW['cost'], $fetchW['discount'], $fetchW['shipping']);
             $srp = \COREPOS\Fannie\API\item\Margin::toPrice($adj, $fetchW['margin']);
@@ -105,7 +124,23 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
         }
         $dbc->commitTransaction();
 
-        $ret = "<b>SRPs have been updated</b><br />";
+
+        $ret = "<div><b>SRPs have been updated</b></div>";
+        if ($this->config->get('COOP_ID') == 'WFC_Duluth' && !in_array($id, array(1,21))) {
+            list($found, $vendorName) = $this->checkPriceChanges();
+            if ($found == 0) {
+                $ret .= sprintf("
+                    <div>%d possible price changes found for <strong>%s</strong>
+                    </div>",
+                    $found, $vendorName);
+            } else {
+                $ret .= sprintf("
+                    <div>%d possible price changes found for <strong>%s</strong>
+                    </div><div>Please run the Vendor Pricing Batch Page.</div>",
+                    $found, $vendorName);
+            }
+        }
+
         $ret .= sprintf('<p>
             <a class="btn btn-default" href="index.php">Price Batch Tools</a>
             <a class="btn btn-default" 
@@ -114,6 +149,86 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
             $this->config->get('URL'), $id);
 
         return $ret;
+    }
+
+    private function checkPriceChanges()
+    {
+        global $FANNIE_OP_DB;
+        $dbc = FannieDB::get($FANNIE_OP_DB);
+
+        $marginCase = '
+            CASE
+                WHEN g.margin IS NOT NULL AND g.margin <> 0 THEN g.margin
+                WHEN s.margin IS NOT NULL AND s.margin <> 0 THEN s.margin
+                ELSE d.margin
+            END';
+        $costSQL = Margin::adjustedCostSQL('p.cost', 'b.discountRate', 'b.shippingMarkup');
+        $marginSQL = Margin::toMarginSQL($costSQL, 'p.normal_price');
+        $srpSQL = Margin::toPriceSQL($costSQL, $marginCase);
+        $vendorID = FormLib::get('id');
+
+        $vendor = new VendorsModel($dbc);
+        $vendor->vendorID($vendorID);
+        $vendor->load();
+
+        $query = "SELECT p.upc,
+            p.description,
+            p.brand,
+            p.cost,
+            b.shippingMarkup,
+            b.discountRate,
+            p.normal_price,
+            " . Margin::toMarginSQL($costSQL, 'p.normal_price') . " AS current_margin,
+            " . Margin::toMarginSQL($costSQL, 'v.srp') . " AS desired_margin,
+            " . $costSQL . " AS adjusted_cost,
+            v.srp,
+            " . $srpSQL . " AS rawSRP,
+            v.vendorDept,
+            p.price_rule_id AS variable_pricing,
+            prt.priceRuleTypeID,
+            prt.description AS prtDesc,
+            " . $marginCase . " AS margin,
+            CASE WHEN a.sku IS NULL THEN 0 ELSE 1 END as alias,
+            CASE WHEN l.upc IS NULL THEN 0 ELSE 1 END AS likecoded,
+            c.difference,
+            c.date,
+            r.reviewed,
+            v.sku
+            FROM products AS p
+                LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
+                LEFT JOIN VendorAliases AS a ON p.upc=a.upc AND p.default_vendor_id=a.vendorID
+                INNER JOIN vendors as b ON v.vendorID=b.vendorID
+                LEFT JOIN departments AS d ON p.department=d.dept_no
+                LEFT JOIN vendorDepartments AS s ON v.vendorDept=s.deptID AND v.vendorID=s.vendorID
+                LEFT JOIN VendorSpecificMargins AS g ON p.department=g.deptID AND v.vendorID=g.vendorID
+                LEFT JOIN upcLike AS l ON v.upc=l.upc 
+                LEFT JOIN productCostChanges AS c ON p.upc=c.upc 
+                LEFT JOIN prodReview AS r ON p.upc=r.upc
+                LEFT JOIN PriceRules AS pr ON p.price_rule_id=pr.priceRuleID
+                LEFT JOIN PriceRuleTypes AS prt ON pr.priceRuleTypeID=prt.priceRuleTypeID
+                LEFT JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
+        WHERE v.cost > 0
+            AND v.vendorID = ?
+            AND m.superID IN (1, 3, 4, 5, 8, 9, 13, 17, 18)
+            AND p.normal_price <> v.srp 
+        ";
+
+        $args = array($vendorID);
+        if ($this->config->get('STORE_MODE') == 'HQ') {
+            $query .= ' AND p.store_id=? ';
+            $args[] = $this->config->get('STORE_ID');
+        }
+        $query .= ' AND p.upc IN (SELECT upc FROM products WHERE inUse = 1) ';
+        $query .= " ORDER BY p.upc";
+
+        $prep = $dbc->prepare($query);
+        $result = $dbc->execute($prep, $args);
+        $upcs = array();
+        while ($row = $dbc->fetchRow($result)) {
+            $upcs[$row['upc']] = 1;
+        }
+
+        return array(count($upcs), $vendor->vendorName());
     }
 
     private function normalizePrice($price)

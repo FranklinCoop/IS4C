@@ -1,5 +1,11 @@
 var orderView = (function($) {
     var mod = {};
+    var forceUPC = true;
+
+    mod.forceUPC = function(f) {
+        forceUPC = f;
+    };
+
     mod.saveContactInfo = function()
     {
         var dstr = $('.contact-field').serialize();
@@ -223,7 +229,8 @@ var orderView = (function($) {
             mod.toggleO($(this).data('order'), $(this).data('trans'));
         });
         $('.itemChkA').change(function () {
-            mod.toggleA($(this).data('order'), $(this).data('trans'));
+            var checked = $(this).is(':checked');
+            mod.toggleA($(this).data('order'), $(this).data('trans'), checked);
         });
         $('.add-po-btn').click(function(ev) {
             ev.preventDefault();
@@ -255,13 +262,15 @@ var orderView = (function($) {
         var cardno = $('#memNum').val();
         var upc = $('#newupc').val();
         var qty = $('#newcases').val();
-        $.ajax({
-            type: 'post',
-            data: 'orderID='+oid+'&memNum='+cardno+'&upc='+upc+'&cases='+qty
-        }).done(function(resp){
-            $('#itemDiv').html(resp);
-            mod.afterLoadItems();
-        });
+        if (/^\d+$/.test(upc.trim()) || !forceUPC) {
+            $.ajax({
+                type: 'post',
+                data: 'orderID='+oid+'&memNum='+cardno+'&upc='+upc+'&cases='+qty
+            }).done(function(resp){
+                $('#itemDiv').html(resp);
+                mod.afterLoadItems();
+            });
+        }
     };
     mod.deleteID = function(orderID,transID)
     {
@@ -332,12 +341,13 @@ var orderView = (function($) {
             data: 'toggleMemType=1&orderID='+oid+'&transID='+tid
         });
     };
-    mod.toggleA = function (oid,tid)
+    mod.toggleA = function (oid,tid,checked)
     {
+        console.log(checked);
         $.ajax({
             type: 'post',
             dataType: 'json',
-            data: 'toggleStaff=1&orderID='+oid+'&transID='+tid
+            data: 'toggleStaff=1&orderID='+oid+'&transID='+tid+'&checked='+checked,
         }).done(function(resp) {
             if (resp.sentEmail) {
                 alert('Sent Arrival Notification');
@@ -422,6 +432,30 @@ var orderView = (function($) {
         });
     }
 
+    mod.getComms = function(oid) {
+        $.ajax({
+            url: 'OrderAjax.php',
+            type: 'get',
+            data: 'id='+oid+'&comms=1'
+        }).done(function (resp) {
+            $('#commLog').html(resp);
+        });
+    };
+
+    mod.sendMsg = function() {
+        var msgID = $('#commID').val();
+        if (msgID == 0) {
+            return;
+        }
+        $.ajax({
+            url: 'OrderAjax.php',
+            type: 'post',
+            data: 'id='+$('#orderID').val() + '&commID=' + msgID
+        }).done(function (resp) {
+            $('#commLog').html(resp);
+        });
+    };
+
     return mod;
 
 }(jQuery));
@@ -441,6 +475,8 @@ $(document).ready(function(){
         orderView.saveConfirmDate(e.target.checked, $('#orderID').val());
     });
     orderView.afterLoadItems();
+
+    orderView.getComms($('#orderID').val());
 });
 
 $(window).unload(function() {

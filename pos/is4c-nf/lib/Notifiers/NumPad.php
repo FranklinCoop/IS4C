@@ -90,7 +90,11 @@ var numpad = (function ($) {
         } else if (typeof 'submitWrapper' == 'function') {
             submitWrapper();
         } else {
-            getInput().closest('form').submit();
+            var frm = getInput().closest('form');
+            if (frm.prop('id') == 'qmform') {
+                frm.prop('onsubmit', null);
+            }
+            frm.submit();
         }
     };
 
@@ -118,7 +122,7 @@ $(document).ready(function() {
     <div class="numpad-row">
         <button class="pos-button numpad-btn" onclick="numpad.write('TW');numpad.enter();">TW</button>
         <button class="pos-button numpad-btn" onclick="numpad.write('*');">*</button>
-        <button class="pos-button numpad-btn" onclick="numpad.backspace();">&lt;-</button>
+        <button class="pos-button numpad-btn" onclick="numpad.backspace();">&#x232B</button>
     </div>
     <div class="numpad-row">
         <button class="pos-button numpad-btn" onclick="numpad.write('7');">7</button>
@@ -141,10 +145,10 @@ $(document).ready(function() {
         <button class="pos-button numpad-btn" onclick="numpad.write('.');">.</button>
     </div>
     <div class="numpad-row">
-        <button class="pos-button numpad-wide" onclick="numpad.enter();">Enter</button>
+        <button class="pos-button numpad-wide coloredArea" style="height: 70px;" onclick="numpad.enter();">Enter</button>
     </div>
     <div class="numpad-row">
-        <button class="pos-button numpad-wide" onclick="numpad.clear();">Clear</button>
+        <button class="pos-button numpad-wide errorColoredArea" onclick="numpad.clear();">Clear</button>
     </div>
 </div>
 HTML;

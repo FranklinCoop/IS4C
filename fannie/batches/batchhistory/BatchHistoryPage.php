@@ -95,7 +95,7 @@ HTML;
             $ret .= '<th>' . ucwords($column) . '</th>';
         }
         $ret .= '</thead><tbody>';
-        foreach ($bu->find() as $obj) {
+        foreach ($bu->find('batchID',true) as $obj) {
             $ret .= '<tr class="info">';
             if ($obj->upc()) {
                 foreach ($upcCols as $upcCol) {
@@ -112,7 +112,7 @@ HTML;
                             . $obj->$upcCol() . '</a>';
                         $ret .= ' &nbsp <a style="cursor: pointer;"
                             onClick="get_bid('.$obj->$upcCol().'); return false;">
-                            <span class="glyphicon glyphicon-book"></span></a></td>';
+                            <span class="fas fa-book"></span></a></td>';
                         $ret .= '<td>'.$b->batchName().'</td>';
                     } else {
                         $ret .= '<td>' . $obj->$upcCol() . '</td>';
@@ -153,7 +153,7 @@ HTML;
             $ret .= '<th>' . ucwords($column) . '</th>';
         }
         $ret .= '</thead><tbody>';
-        foreach ($bu->find() as $obj) {
+        foreach ($bu->find('batchID',true) as $obj) {
             $ret .= '<tr class="info">';
             if ($obj->upc()) {
                 foreach ($upcCols as $upcCol) {
@@ -207,7 +207,7 @@ HTML;
         }
         $ret .= '</thead><tbody>';
         $s = 1;
-        foreach ($bu->find() as $obj) {
+        foreach ($bu->find('batchID',true) as $obj) {
             if ($obj->upc() == NULL) {
                 $ret .= '<tr class="warning">';
                 foreach ($columns as $column) {
@@ -237,7 +237,7 @@ HTML;
         }
         $ret .= '</tbody></table>';
 
-        $p = new ProductsModel($dbc);
+        $prodP = $dbc->prepare("SELECT brand, description FROM products WHERE upc=?");
         $ret .= '<div class="" align="center"><h4 style="color: grey">Products</h4></div>';
         $upcCols = array('updateType','upc','modified','user','specialPrice');
         $ret .= '<table class="table table-bordered table-condensed small" id="iTable"><thead>';
@@ -246,16 +246,18 @@ HTML;
         }
         $ret .= '<th>Brand | description</th>';
         $ret .= '</thead><tbody>';
-        foreach ($bu->find() as $obj) {
+        foreach ($bu->find('batchID',true) as $obj) {
             $ret .= '<tr class="info">';
             if (!$obj->upc() == NULL) {
                 foreach ($upcCols as $upcCol) {
                     $ret .= '<td>' . $obj->$upcCol() . '</td>';
                 }
-                $p->reset();
-                $p->upc($obj->upc());
-                $p->load();
-                $ret .= '<td><strong>'.$p->brand().'</strong> '.$p->description().'</td>';
+                $p = $dbc->getRow($prodP, array($obj->upc()));
+                if ($p === false) {
+                    $ret .= '<td>(ITEM NOT FOUND)</td>';
+                } else {
+                    $ret .= '<td><strong>'.$p['brand'].'</strong> '.$p['description'].'</td>';
+                }
             }
             $ret .= '</tr>';
         }

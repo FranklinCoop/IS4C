@@ -879,6 +879,8 @@ class ObfWeeklyReport extends FannieReportPage
         $dbc = $class_lib::getDB();
         $sales = $class_lib::getCache($dbc);
         $sales->obfWeekID($week->obfWeekID());
+
+        $nabs = DTrans::memTypeIgnore($dbc);
         /**
           Lookup total sales for each category
           in a given date range
@@ -898,6 +900,7 @@ class ObfWeeklyReport extends FannieReportPage
                    WHERE c.hasSales=1
                     AND t.tdate BETWEEN ? AND ?
                     AND t.trans_type IN (\'I\', \'D\')
+                    AND t.memType NOT IN ' . $nabs . '
                    GROUP BY m.obfCategoryID, c.storeID, m.superID';
         /**
           Lookup number of transactions 
@@ -917,6 +920,7 @@ class ObfWeeklyReport extends FannieReportPage
                     AND t.trans_type IN (\'I\', \'D\')
                     AND t.upc <> \'RRR\'
                     AND t.store_id=?
+                    AND t.memType NOT IN ' . $nabs . '
                    GROUP BY 
                     YEAR(t.tdate),
                     MONTH(t.tdate),
@@ -1034,7 +1038,7 @@ class ObfWeeklyReport extends FannieReportPage
                 $sales->save();
             }
 
-            if ($week->obfWeekID() > 265) {
+            if ($week->obfWeekID() > 265 && $week->obfWeekID() < 323) {
                 $prep = $dbc->prepare("SELECT SUM(total) FROM {$dlog2}
                             WHERE tdate BETWEEN ? AND ?
                                 AND store_id=?
@@ -1087,7 +1091,23 @@ class ObfWeeklyReport extends FannieReportPage
                                         AS n ON s.superID=n.superID
                                  WHERE s.obfWeekID=?
                                     AND s.obfCategoryID=?
-                                 ORDER BY s.superID,n.super_name');
+                                 ORDER BY 
+                                    CASE
+                                        WHEN s.superID=4 THEN 0
+                                        WHEN s.superID=17 THEN 1
+                                        WHEN s.superID=13 THEN 2
+                                        WHEN s.superID=1 THEN 3
+                                        WHEN s.superID=7 THEN 4
+                                        WHEN s.superID=5 THEN 5
+                                        WHEN s.superID=8 THEN 6
+                                        WHEN s.superID=9 THEN 7
+                                        WHEN s.superID=18 THEN 8 
+                                        WHEN s.superID=10 THEN 9 
+                                        WHEN s.superID=11 THEN 10 
+                                        WHEN s.superID=23 THEN 12 
+                                        WHEN s.superID=15 THEN 13 
+                                        ELSE 99
+                                    END');
 
         /**
           Look up sales for the [sales] quarter in a given category
@@ -1214,6 +1234,51 @@ class ObfWeeklyReport extends FannieReportPage
 
         return array(
             'Ownership This Week',
+            number_format($this_week, 0),
+            number_format($last_week, 0),
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            'meta' => FannieReportPage::META_COLOR,
+            'meta_background' => $this->colors[0],
+            'meta_foreground' => 'black',
+        );
+    }
+
+    private function getNewEquity($dbc, $dlog, $args)
+    {
+        $prep = $dbc->prepare("
+            SELECT SUM(total) AS ttl
+            FROM {$dlog}
+            WHERE tdate BETWEEN ? AND ?
+                AND department IN (991, 992)
+                AND register_no <> 30");
+        return $this->connection->getValue($prep, $args);
+    }
+
+    protected function newEquityThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly)
+    {
+        $argsTY = array(
+            date('Y-m-d', $start_ts),
+            date('Y-m-d', $end_ts),
+        );
+        $dlogTY = DTransactionsModel::selectDlog($argsTY[0], $argsTY[1]);
+        $argsTY[1] .= ' 23:59:59';
+        $this_week = $this->getNewEquity($dbc, $dlogTY, $argsTY);
+        $argsLY = array(
+            date('Y-m-d', $start_ly),
+            date('Y-m-d', $end_ly),
+        );
+        $dlogLY = DTransactionsModel::selectDlog($argsLY[0], $argsLY[1]);
+        $argsLY[1] .= ' 23:59:59';
+        $last_week = $this->getNewEquity($dbc, $dlogLY, $argsLY);
+
+        return array(
+            'New Equity This Week',
             number_format($this_week, 0),
             number_format($last_week, 0),
             '',

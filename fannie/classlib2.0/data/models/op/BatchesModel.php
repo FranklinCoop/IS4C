@@ -41,6 +41,7 @@ class BatchesModel extends BasicModel
     'owner' => array('type'=>'VARCHAR(50)'),
     'transLimit' => array('type'=>'TINYINT', 'default'=>0),
     'notes' => array('type'=>'TEXT'),
+    'applied' => array('type'=>'TINYINT', 'default'=>0),
     );
 
     public function doc()
@@ -468,6 +469,9 @@ those same items revert to normal pricing.
         $update = new ProdUpdateModel($this->connection);
         $update->logManyUpdates(array_keys($upcs), $updateType);
 
+        $applyP = $this->connection->prepare("UPDATE batches SET applied=1 WHERE batchID=?");
+        $this->connection->execute($applyP, array($id));
+
         $updateQ = '
             UPDATE products AS p SET
                 p.normal_price = ?,
@@ -504,23 +508,25 @@ those same items revert to normal pricing.
 
             $updateP = $lane_sql->prepare($updateQ);
             foreach ($upcs as $upc => $data) {
-                $args = array(
-                    $data['normal_price'],
-                    $data['special_price'],
-                    $data['modified'],
-                    $data['specialpricemethod'],
-                    $data['specialquantity'],
-                    $data['specialgroupprice'],
-                    $data['discounttype'],
-                    $data['mixmatchcode'],
-                    $data['start_date'],
-                    $data['end_date'],
-                );
-                if ($has_limit) {
-                    $args[] = $data['special_limit'];
+                if (intval($upc) < 1000000000000) {
+                    $args = array(
+                        $data['normal_price'],
+                        $data['special_price'],
+                        $data['modified'],
+                        $data['specialpricemethod'],
+                        $data['specialquantity'],
+                        $data['specialgroupprice'],
+                        $data['discounttype'],
+                        $data['mixmatchcode'],
+                        $data['start_date'],
+                        $data['end_date'],
+                    );
+                    if ($has_limit) {
+                        $args[] = $data['special_limit'];
+                    }
+                    $args[] = $upc;
+                    $lane_sql->execute($updateP, $args);
                 }
-                $args[] = $upc;
-                $lane_sql->execute($updateP, $args);
             }
         }
 

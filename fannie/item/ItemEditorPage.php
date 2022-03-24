@@ -466,8 +466,8 @@ HTML;
                     $authorized = true;
                 }
             }
-        } elseif (substr($upc, 0, 3) == '002' && $this->config->get('COOP_ID') == 'WFC_Duluth') {
-            $authorized = true;
+        //} elseif (substr($upc, 0, 3) == '002' && $this->config->get('COOP_ID') == 'WFC_Duluth') {
+         //   $authorized = true;
         }
 
         return $authorized;
@@ -515,6 +515,8 @@ HTML;
 <a class="btn btn-default btn-sm iframe fancyboxLink"
     href="{$url}batches/batchhistory/BatchHistoryPage.php?upc={$upc}&nomenu=1"
     title="Extended Histocal Batch Data">Batch Historical</a>
+<a class="btn btn-default btn-sm iframe fancyboxLink"
+    href="{$url}reports/DDD/SingleItemDDDReport.php?upc=$upc">Loss</a>
 </span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <a class="btn btn-default btn-sm iframe fancyboxLink" 

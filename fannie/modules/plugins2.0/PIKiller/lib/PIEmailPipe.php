@@ -31,6 +31,9 @@ if (!class_exists('FannieAPI')) {
 if (!class_exists('PIApply')) {
     include_once(dirname(__FILE__) . '/../PIApply.php');
 }
+if (!class_exists('OttoMem')) {
+    include(__DIR__ . '/../../Otto/OttoMem.php');
+}
 
 /**
   Extract JSON attachments from email and feed them
@@ -59,9 +62,19 @@ class PIEmailPipe extends \COREPOS\Fannie\API\data\pipes\AttachmentEmailPipe
                 }
                 $json = base64_encode($a['content']);
                 fwrite($fp, $json . "\n");
+                $config = FannieConfig::factory();
+                $op_db = $config->get('OP_DB');
+                $dbc = FannieDB::get($op_db);
                 $page = new PIApply();
+                $page->setConfig($config);
+                $page->setConnection($dbc);
                 $page->setJson($json);
                 $page->get_json_handler();
+
+                $om = new OttoMem();
+                $json = base64_decode($json);
+                $json = json_decode($json, true);
+                $om->post($json['card_no'], 'Website');
             }
         }
         fclose($fp);

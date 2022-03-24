@@ -11,12 +11,15 @@ class FileToOrder
         if (!is_array($arr)) {
             throw new \Exception('Invalid file');
         }
+        $log = new \FannieLogger();
         $inv = $this->getHeaderField($arr, 'Invoice');
         $oDate = $this->getHeaderField($arr, 'Order Date');
         $sDate = $this->getHeaderField($arr, 'Ship Date');
         $addr = $this->getShippingAddress($arr);
 
         $items = $this->getItemLines($arr);
+        $log->debug('Line count: ' . count($arr));
+        $log->debug('Item count: ' . count($items));
         if (count($items) == 0) {
             throw new \Exception('Order is empty');
         }
@@ -72,7 +75,7 @@ class FileToOrder
     private function normalizeItemLine($item)
     {
         list($case, $unit) = $this->parseSize($item[2]);
-        return array(
+        $ret = array(
             'description' => $item[2],
             'orderedQty' => $item[0] === null ? 0 : $item[0],
             'shippedQty' => $item[1] === null ? 0 : $item[1],
@@ -82,6 +85,15 @@ class FileToOrder
             'caseSize' => $case,
             'unitSize' => $unit,
         );
+        //fixup for data oddities
+        switch ($ret['sku']) {
+            case '9228':
+                $ret['caseSize'] = 33;
+                $ret['unitSize'] = 'LB';
+                break;
+        }
+
+        return $ret;
     }
 
     private function parseSize($item)

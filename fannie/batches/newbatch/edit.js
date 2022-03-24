@@ -401,8 +401,31 @@ var batchEdit = (function ($) {
         var start = $('#startDate').val();
         var end = $('#endDate').val();
         var id = $('#batchID').val();
+
+        var curDate = new Date();
+        curDate.setMilliseconds(0);
+        curDate.setSeconds(0);
+        curDate.setMinutes(0);
+        curDate.setHours( -(curDate.getTimezoneOffset()/60) );
+
+        var checkEndDate = new Date(end);
+        var checkStartDate = new Date(start);
+
+        var stopBatch = (curDate.getTime() > checkEndDate.getTime() || curDate.getTime() < checkStartDate) ? true : false; 
+        var startBatch = (curDate.getTime() <= checkEndDate.getTime() && curDate.getTime() >= checkStartDate) ? true : false;
+        var batchType = $("#batchType").val();
+        batchType = parseInt(batchType, 10);
+        var forceTypes = [1, 2, 10];
+
         var c = confirm('Change '+action+' date?');
         if (c == true) {
+            if (stopBatch === true && forceTypes.includes(batchType)) {
+                mod.unsaleNow(id);
+            }
+            if (startBatch === true && forceTypes.includes(batchType)) {
+                mod.forceNow(id);
+            }
+
             $.ajax({
                 type: 'post',
                 url: 'EditBatchPage.php',

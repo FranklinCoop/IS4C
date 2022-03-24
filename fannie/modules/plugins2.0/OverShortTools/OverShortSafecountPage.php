@@ -90,6 +90,7 @@ class OverShortSafecountPage extends FanniePage {
         $model->dateStr($dateStr);
         $model->storeID($store);
         $model->rowName($row);
+        $model->countFormat(1);
 
         $temp = explode('|',$data);
         foreach($temp as $t){
@@ -545,6 +546,9 @@ class OverShortSafecountPage extends FanniePage {
         <div id=input>
         <table>
         <tr>
+            <th colspan="5">June 2020 &amp; older version (<a href="OverShortSafecountV2.php">Switch</a>)</th>
+        </tr>
+        <tr>
             <th>Start Date</th><td><input type=text id=startDate autocomplete=off /></td>
             <td>
             <input type=submit Value=Load onclick="loader();" />
@@ -553,7 +557,7 @@ class OverShortSafecountPage extends FanniePage {
             Recent Counts: <select onchange="existingDates(this.value);">
             <option value=''>Select one...</option>
             <?php
-            $res = $dbc->query('SELECT dateStr FROM dailyDeposit GROUP BY dateStr ORDER BY dateStr DESC');
+            $res = $dbc->query('SELECT dateStr FROM dailyDeposit WHERE countFormat=1 GROUP BY dateStr ORDER BY dateStr DESC');
             $count = 0;
             while($row = $dbc->fetch_row($res)) {
                 if ($count++ > 100) {

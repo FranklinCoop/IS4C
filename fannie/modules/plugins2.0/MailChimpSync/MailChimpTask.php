@@ -36,8 +36,6 @@ class MailChimpTask extends FannieTask
     protected function getSettings()
     {
         $FANNIE_PLUGIN_SETTINGS = $this->config->get('PLUGIN_SETTINGS');
-        $APIKEY='a92f83d3e5f7fe52d4579e7902c6491d-us8';
-        $LISTID='54100d18af';
         $APIKEY = $FANNIE_PLUGIN_SETTINGS['MailChimpApiKey'];
         $LISTID = $FANNIE_PLUGIN_SETTINGS['MailChimpListID'];
         if ($FANNIE_PLUGIN_SETTINGS['MailChimpMergeVarName']) {
@@ -74,10 +72,12 @@ class MailChimpTask extends FannieTask
              */
         }
 
+        /*
         if ($field_id === false) {
             $this->cronMsg('Error: could not locate / create owner number field!', FannieLogger::NOTICE);
             return false;
         }
+         */
 
         return true;
     }
@@ -260,7 +260,6 @@ class MailChimpTask extends FannieTask
                 'email_address' => $row['email_1'],
                 'status' => 'subscribed',
                 'merge_fields' => array(
-                    'CARDNO' => $row['card_no'],
                     'FNAME' => $row['FirstName'],
                     'LNAME' => $row['LastName'],
                 ),
@@ -275,6 +274,18 @@ class MailChimpTask extends FannieTask
         }
         if ($addID) {
             $res = $batch->execute();
+            /*
+            for ($i=0; $i<25; $i++) {
+                sleep(30);
+                $status = $batch->check_status();
+                if ($status['status'] == 'finished') {
+                    $resultURL = $status['response_body_url'];
+                    $this->cronMsg("Done. See results: " . $resultURL);
+                    break;
+                }
+                $this->cronMsg("Add batch status: " . json_encode($status));
+            }
+             */
         }
     }
 

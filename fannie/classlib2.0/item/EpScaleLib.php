@@ -42,6 +42,10 @@ class EpScaleLib
         $scale_fields .= 'DNO' . $scale_model->epDeptNo() . chr(253);
         $scale_fields .= 'SAD' . $scale_model->epScaleAddress() . chr(253);
 
+        if (isset($item_info['Price' . $scale_model->storeID()])) {
+            $item_info['Price'] = $item_info['Price' . $scale_model->storeID()];
+        }
+
         $labelInfo = array('labelType'=>103, 'descriptionWidth'=>26, 'textWidth'=>0);
         if (isset($item_info['Label'])) {
             $labelInfo = ServiceScaleLib::labelTranslate($item_info['Label'], $scale_model->scaleType());
@@ -89,16 +93,20 @@ class EpScaleLib
         if ($scale_model->epStoreNo() != 0) {
             $et_line .= 'SNO' . $scale_model->epStoreNo() . chr(253);
         }
+        $text_field = $item_info['ExpandedText'];
+        if (isset($item_info['ExpandedText' . $scale_model->storeID()])) {
+            $text_field = $item_info['ExpandedText' . $scale_model->storeID()];
+        }
         $et_line .= 'DNO' . $scale_model->epDeptNo() . chr(253);
         $et_line .= 'SAD' . $scale_model->epScaleAddress() . chr(253);
         $et_line .= 'PNO' . $item_info['PLU'] . chr(253);
         $et_line .= 'INO' . $item_info['PLU'] . chr(253);
-        $et_line .= 'ITE' . self::expandedText($item_info['ExpandedText'], $item_info, $scale_model) . chr(253);
+        $et_line .= 'ITE' . self::expandedText($text_field, $item_info) . chr(253);
 
         return $et_line;
     }
 
-    static private function expandedText($text, $item_info, $scale_model)
+    static private function expandedText($text, $item_info)
     {
         if ($item_info['MOSA']) {
             $text = str_replace('{mosa}', 'Certified Organic By MOSA', $text);
@@ -110,7 +118,11 @@ class EpScaleLib
             $item_info['OriginText'] = '';
         }
         $text = str_replace('{cool}', $item_info['OriginText'], $text);
+        if (isset($item_info['Reheat']) && $item_info['Reheat']) {
+            $text .= "\n\nReheat product to an internal temperature of 165 degrees F before consumption";
+        }
         $text = str_replace("\r", '', $text);
+
         return str_replace("\n", chr(0xE), $text);
     }
 
@@ -296,7 +308,7 @@ class EpScaleLib
             // so duplicates can be skipped
             if ($scale_model === false) {
                 continue;
-            } elseif (in_array($scale_model->epDeptNo(), $depts)) {
+            } elseif ($scale_model->epDeptNo() == 0 || in_array($scale_model->epDeptNo(), $depts)) {
                 continue;
             } else {
                 $depts[] = $scale_model->epDeptNo();

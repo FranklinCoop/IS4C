@@ -7,6 +7,7 @@ class Creator
 {
     private static $op_models = array(
         '\\COREPOS\\pos\\lib\\models\\op\\AutoCouponsModel',
+        '\\COREPOS\\pos\\lib\\models\\op\\CouponAltsModel',
         '\\COREPOS\\pos\\lib\\models\\op\\CouponCodesModel',
         '\\COREPOS\\pos\\lib\\models\\op\\CustdataModel',
         '\\COREPOS\\pos\\lib\\models\\op\\CustomerNotificationsModel',
@@ -360,6 +361,7 @@ class Creator
                 emp_no,
                 trans_no,
                 upc,
+                description,
                 CASE 
                     WHEN trans_subtype IN ('CP','IC') OR upc LIKE '%000000052' THEN 'T' 
                     WHEN upc = 'DISCOUNT' THEN 'S' 
@@ -378,6 +380,7 @@ class Creator
                 tax,
                 foodstamp,
                 ItemQtty,
+                voided,
                 memType,
                 staff,
                 numflag,

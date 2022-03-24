@@ -53,6 +53,11 @@ class Tags4x8P extends \COREPOS\Fannie\API\item\FannieSignage
         $pdf->SetRightMargin($this->left);  //Set the right margin of the page
         $pdf->SetAutoPageBreak(False); // manage page breaks yourself
 
+        $offset = isset($_POST['offset']) ? $_POST['offset'] : 0;
+        if ($offset == 1) {
+            $this->top = 32;
+        }
+
         $data = $this->loadItems();
         $num = 0; // count tags 
         $x = $this->left;
@@ -66,7 +71,11 @@ class Tags4x8P extends \COREPOS\Fannie\API\item\FannieSignage
             $pak = $item['units'];
             $size = $item['units'] . "-" . $item['size'];
             $sku = $item['sku'];
-            $ppu = $item['pricePerUnit'];
+            if (array_key_exists('pricePerUnit', $item)) {
+                $ppu = $item['pricePerUnit'];
+            } else {
+                $ppu = '';
+            }
             $vendor = substr($item['vendor'],0,7);
             if ($this->noDates) {
                 $vendor = $item['vendor'];

@@ -148,6 +148,7 @@ class FanniePage extends \COREPOS\common\ui\CorePage
             } else {
                 $this->addCssFile($url . 'src/javascript/jquery-ui.css?id=20140625');
             }
+            $this->addCssFile($url . 'src/javascript/fontawesome-5.15.3/css/all.min.css');
             $this->addCssFile($url . 'src/css/configurable.php');
             $this->addCssFile($url . 'src/css/core.css');
             $this->addCssFile($url . 'src/css/print.css');
@@ -515,7 +516,10 @@ function enableLinea(selector, callback)
     protected function getRedis()
     {
         $conf = $this->config->get('PLUGIN_SETTINGS');
-        $redis_host = isset($conf['SatelliteRedis']) ? $conf['SatelliteRedis'] : '127.0.0.1';
+        $redis_host = isset($conf['SatelliteRedis']) ? $conf['SatelliteRedis'] : '';
+        if ($redis_host === '') {
+            return false;
+        }
         try {
             $redis = new \Predis\Client($redis_host);
             return $redis;

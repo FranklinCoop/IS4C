@@ -162,8 +162,9 @@ class DIPage extends FannieRESTfulPage
             $upP = $this->connection->prepare("UPDATE deliInventoryCat SET price=?, modified={$now} WHERE id=?");
             $this->connection->execute($upP, array(trim(FormLib::get('cost'), '$'), $this->id));
         } elseif (FormLib::get('upc', false) !== false) {
+            $this->id = BarcodeLib::padUPC($this->id);
             $upP = $this->connection->prepare("UPDATE deliInventoryCat SET upc=?, modified={$now} WHERE id=?");
-            $this->connection->execute($upP, array(FormLib::get('upc'), $this->id));
+            $this->connection->execute($upP, array(BarcodeLib::padUPC(FormLib::get('upc')), $this->id));
         } elseif (FormLib::get('sku', false) !== false) {
             $upP = $this->connection->prepare("UPDATE deliInventoryCat SET orderno=?, modified={$now} WHERE id=?");
             $this->connection->execute($upP, array(FormLib::get('sku'), $this->id));
@@ -378,6 +379,18 @@ HTML;
                      <th>Total</th><th class="upc">UPC</th><th class="sku">SKU</th><th class="vendor">Source</th></tr>';
             $sum = 0;
             while ($itemW = $this->connection->fetchRow($itemR)) {
+                if (!is_numeric($itemW['cases'])) {
+                    $itemW['cases'] = 0;
+                }
+                if (!is_numeric($itemW['fraction'])) {
+                    $itemW['fraction'] = 0;
+                }
+                if (!is_numeric($itemW['units'])) {
+                    $itemW['units'] = 1;
+                }
+                if (!is_numeric($itemW['price'])) {
+                    $itemW['price'] = 0;
+                }
                 $total = $itemW['cases'] * $itemW['price'];
                 if ($itemW['units'] != 0) {
                     $total = ($itemW['cases'] * $itemW['price']) + (($itemW['fraction'] / $itemW['units']) * $itemW['price']);

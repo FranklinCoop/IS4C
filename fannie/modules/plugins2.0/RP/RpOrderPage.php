@@ -33,6 +33,7 @@ class RpOrderPage extends FannieRESTfulPage
         unset($_SESSION['rpState']);
         $model = new RpSessionsModel($this->connection);
         $model->userID($this->userID);
+        $model->dataType('RP');
         $model->delete();
 
         return 'RpOrderPage.php';
@@ -43,23 +44,46 @@ class RpOrderPage extends FannieRESTfulPage
         $date1 = date('Y-m-d', strtotime(FormLib::get('date1')));
         $date2 = date('Y-m-d', strtotime(FormLib::get('date2')));
         $args = array(FormLib::get('store'), $date1, $date2);
-        $ignore = '0 AS ignored';
+        $ignore = 'CASE WHEN receivedDate < ' . $this->connection->curdate() . ' THEN 1 ELSE 0 END AS ignored';
+
+        /**
+         * Check for past dates. Since the purpose it to view future expected
+         * deliveries, selected weekdays that are in the past should be pushed
+         * forward into the subsequent week
+         */
+        $ts1 = strtotime($date1);
+        $ts2 = strtotime($date2);
+        $today = strtotime(date('Y-m-d'));
+        if ($ts1 < $today) {
+            $ts1 = mktime(0, 0, 0, date('n', $ts1), date('j', $ts1) + 7, date('Y', $ts1));
+        }
+        if ($ts2 < $today) {
+            $ts2 = mktime(0, 0, 0, date('n', $ts2), date('j', $ts2) + 7, date('Y', $ts2));
+        }
+        if ($ts1 > $ts2) {
+            $swap = $ts2;
+            $ts2 = $ts1;
+            $ts1 = $swap;
+        }
+        $date1 = date('Y-m-d', $ts1);
+        $date2 = date('Y-m-d', $ts2);
 
         $extra = strtotime($date2);
         if ($extra) {
-            $extra = mktime(0,0,0,date('n',$extra),date('j',$extra)+2,date('Y',$extra));
+            $extra = mktime(0,0,0,date('n',$extra),date('j',$extra)+3,date('Y',$extra));
             $date3 = date('Y-m-d', $extra);
             // safe embed because it's a formatted date string or false
             // for any user input
-            $ignore = "CASE WHEN receivedDate > {$date2} THEN 1 ELSE 0 END AS ignored";
+            $ignore = "CASE WHEN receivedDate > {$date2} OR receivedDate < " . $this->connection->curdate() . " 
+                THEN 1 ELSE 0 END AS ignored";
             $args[2] = $date3;
         }
 
-        $prep = $this->connection->prepare("SELECT receivedDate, internalUPC AS upc, brand, quantity AS qty,
+        $prep = $this->connection->prepare("SELECT receivedDate, internalUPC AS upc, brand, quantity AS qty, caseSize,
                 {$ignore}
             FROM PurchaseOrderItems AS i
                 INNER JOIN PurchaseOrder AS o ON i.orderID=o.orderID
-            WHERE o.vendorID=-2
+            WHERE (o.vendorID=-2 OR o.vendorInvoiceID LIKE 'PREBOOK %')
                 AND o.userID=-99
                 AND o.placed=1
                 AND o.storeID=?
@@ -76,6 +100,9 @@ class RpOrderPage extends FannieRESTfulPage
         foreach ($qtys as $row) {
             if (!isset($ret[$row['upc']])) {
                 $ret[$row['upc']] = array('upc' => $row['upc'], 'qty' => 0, 'text' => '');
+            }
+            if ($row['caseSize'] > 1) {
+                $row['qty'] *= $row['caseSize'];
             }
             if ($row['ignored'] != 1) {
                 $ret[$row['upc']]['qty'] += $row['qty'];
@@ -106,6 +133,7 @@ class RpOrderPage extends FannieRESTfulPage
         $_SESSION['rpState'] = json_decode($this->json, true);
         $model = new RpSessionsModel($this->connection);
         $model->userID($this->userID);
+        $model->dataType('RP');
         $model->data($this->json);
         $model->save();
         var_dump($_SESSION['rpState']);
@@ -142,17 +170,43 @@ class RpOrderPage extends FannieRESTfulPage
             $query .= ' AND vendorID IN (292, 293, 136)';
         }
 
+        $query = "SELECT p.upc, p.description, v.sku, v.units, v.vendorID, u.likeCode, p.cost
+            FROM products AS p
+                INNER JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
+                LEFT JOIN vendorItems AS v ON p.default_vendor_id=v.vendorID AND p.upc=v.upc
+                LEFT JOIN upcLike AS u ON u.upc=p.upc
+            WHERE p.store_id=1
+                AND m.superID=6
+                AND (p.brand LIKE ? OR p.description LIKE ?)
+            ORDER BY CASE WHEN likeCode IS NULL THEN 1 ELSE 0 END,
+                p.description
+        ";
+        $args = array('%' . $this->searchVendor . '%', '%' . $this->searchVendor . '%');
+
         $ret = array();
         $prep = $this->connection->prepare($query);
         $res = $this->connection->execute($prep, $args);
         while ($row = $this->connection->fetchRow($res)) {
-            $label = $row['description'] . ' ' . $row['units'] . '/' . $row['size'] . ' ($' . $row['cost'] . ')';
+            $label = $row['description'];
+            if ($row['likeCode']) {
+                $label .= ' (LC' . $row['likeCode'] . ')';
+            }
+            if ($row['vendorID'] == 28) {
+                $row['vendorID'] = 292;
+            } elseif ($row['vendorID'] == 25) {
+                $row['vendorID'] = 293;
+            }
+            if ($row['units'] == 0) {
+                $row['units'] = 1;
+            }
             $value = array(
                 'vendorID' => $row['vendorID'],
                 'caseSize' => $row['units'],
                 'sku' => $row['sku'],
                 'upc' => $row['upc'],
                 'item' => $row['description'],
+                'likeCode' => $row['likeCode'],
+                'cost' => $row['cost'] * $row['units'],
             );
             $value = json_encode($value);
             $ret[] = array(
@@ -229,15 +283,13 @@ class RpOrderPage extends FannieRESTfulPage
         }
 
         $sku = $vendor == $item['backupID'] ? $item['backupSKU'] : $item['vendorSKU'];
-        $prod['cost'] = $item['cost'] / $item['caseSize'];
+        if ($item['caseSize'] != 0) {
+            $prod['cost'] = $item['cost'] / $item['caseSize'];
+        } else {
+            $prod['cost'] = $item['cost'];
+        }
         if ($sku == 'DIRECT') {
             $sku = $upc;
-        } else {
-            $vcostP = $this->connection->prepare("SELECT cost FROM vendorItems WHERE vendorID=? AND sku=?");
-            $vcost = $this->connection->getValue($vcostP, array($vendor, $sku));
-            if ($vcost) {
-                $prod['cost'] = $vcost;
-            }
         }
 
         $poi = new PurchaseOrderItemsModel($this->connection);
@@ -272,6 +324,8 @@ class RpOrderPage extends FannieRESTfulPage
         $model->vendorID(FormLib::get('vendor'));
         $model->vendorSKU(FormLib::get('sku'));
         $model->vendorItem(FormLib::get('item'));
+        $model->cost(FormLib::get('cost'));
+        $model->backupID(0);
 
         $lc = FormLib::get('lc');
         $upc = BarcodeLib::padUPC(FormLib::get('upc'));
@@ -310,7 +364,7 @@ class RpOrderPage extends FannieRESTfulPage
 
     protected function get_view()
     {
-        $this->addScript('rpOrder.js?date=20200622');
+        $this->addScript('rpOrder.js?date=20210224');
         $this->addOnloadCommand('rpOrder.initAutoCompletes();');
         $store = FormLib::get('store');
         if (!$store) {
@@ -321,6 +375,7 @@ class RpOrderPage extends FannieRESTfulPage
         $jsState = isset($_SESSION['rpState']) ? json_encode($_SESSION['rpState']) : "false";
         if ($jsState === "false") {
             $sModel = new RpSessionsModel($this->connection);
+            $sModel->dataType('RP');
             $sModel->userID($this->userID);
             if ($sModel->load()) {
                 $jsState = $sModel->data();
@@ -432,6 +487,7 @@ class RpOrderPage extends FannieRESTfulPage
                 LEFT JOIN vendors AS v ON r.vendorID=v.vendorID
                 LEFT JOIN vendors AS b ON r.backupID=b.vendorID
             WHERE r.storeID=?
+                AND r.deleted=0
             ORDER BY c.seq, c.name, r.vendorItem");
         $res = $this->connection->execute($prep, array($store));
         $tables = '';
@@ -461,14 +517,13 @@ class RpOrderPage extends FannieRESTfulPage
             $lcName = $lcRow['likeCodeDesc'];
             $organic = $lcRow['organic'] ? true : false;
             $par = $this->connection->getValue($parP, array($store, $row['upc']));
-            if (($par / $row['caseSize']) < 0.1) {
+            if ($row['caseSize'] != 0 && ($par / $row['caseSize']) < 0.1) {
                 $par = 0.1 * $row['caseSize'];
             }
             $price = $this->connection->getValue($priceP, array(substr($row['upc'], 2)));
-            $cost = $this->connection->getRow($costP,
-                array(isset($row['lookupID']) ? $row['lookupID'] : $row['vendorID'], $row['vendorSKU']));
-            if (!$cost || !$cost['cost']) {
-                $cost = array('cost' => $row['cost'] / $row['caseSize'], 'units' => $row['caseSize']);
+            $cost = array('cost' => $row['cost'], 'units' => $row['caseSize']);
+            if ($row['caseSize'] != 0) {
+                $cost['cost'] = $cost['cost'] / $row['caseSize'];
             }
             $onSale = $this->connection->getValue($saleP, array($row['upc'], $store));
             $startIcon = '';
@@ -547,7 +602,7 @@ class RpOrderPage extends FannieRESTfulPage
                 $row['backupVendor'],
                 $highlight,
                 $tooltip,
-                $cost['cost'] * $row['caseSize'],
+                ($cost ? $cost['cost'] : 0) * $row['caseSize'],
                 ($row['vendorSKU'] ? '(' . $row['vendorSKU'] . ')' : ''),
                 $row['vendorItem'],
                 $startIcon, $endIcon,
@@ -556,15 +611,15 @@ class RpOrderPage extends FannieRESTfulPage
                 $upc,
                 $price,
                 $par,
-                $par / $row['caseSize'],
+                ($row['caseSize'] != 0 ? $par / $row['caseSize'] : 0),
                 ($inOrder ? 'info' : ''),
                 $fieldType,
                 $upc,
                 $orderAmt,
                 $upc, $store, $row['vendorID'],
-                ($inOrder['vendorID'] == $row['vendorID'] ? 'checked' : ''),
+                ($inOrder && $inOrder['vendorID'] == $row['vendorID'] ? 'checked' : ''),
                 $upc, $store, $row['backupID'],
-                ($inOrder['vendorID'] == $row['backupID'] ? 'checked' : ''),
+                ($inOrder && $inOrder['vendorID'] == $row['backupID'] ? 'checked' : ''),
                 ($row['backupID'] ? '' : 'disabled')
             );
         }
@@ -576,6 +631,7 @@ class RpOrderPage extends FannieRESTfulPage
         }
         $weekStart = date('Y-m-d', $ts);
         $weekP = $this->connection->prepare("SELECT * FROM RpSegments WHERE startDate=? AND storeID=?");
+        $nextWeekStart = date('Y-m-d', mktime(0, 0, 0, date('n', $ts), date('j', $ts) + 7, date('Y', $ts)));
         $projected = 'n/a';
         $baseRetain = 60;
         $days = array(
@@ -588,6 +644,7 @@ class RpOrderPage extends FannieRESTfulPage
             'Sun' => 'n/a',
         );
         $week = $this->connection->getRow($weekP, array($weekStart, $store));
+        $nextWeek = $this->connection->getRow($weekP, array($nextWeekStart, $store));
         $modProj = 0;
         if ($week) {
             $projected = number_format($week['sales']);
@@ -621,6 +678,13 @@ class RpOrderPage extends FannieRESTfulPage
                  */
                 $modProj = round($modProj, 2);
             }
+        }
+
+        if ($nextWeek && (date('N') == 6 || date('N') == 7)) {
+            $nextWeekDays = json_decode($nextWeek['segmentation'], true);
+            $mondayTarget = $nextWeek['sales'] * $nextWeekDays['Mon'];
+            $mondayShare = $mondayTarget / $week['sales'];
+            $days['Mon'] = sprintf('%.2f%%', $mondayShare * 100);
         }
 
         $mStamp = date('N') == 1 ? strtotime('today') : strtotime('last monday');
@@ -723,16 +787,22 @@ class RpOrderPage extends FannieRESTfulPage
             <input type="text" class="form-control input-sm" name="upc" id="newUPC" />
         </div>
     </div>
-    <div class="col-sm-6">
+    <div class="col-sm-4">
         <div class="form-group input-group">
             <span class="input-group-addon">SKU</span>
             <input type="text" class="form-control input-sm" name="sku" id="newSKU" />
         </div>
     </div>
-    <div class="col-sm-6">
+    <div class="col-sm-4">
         <div class="form-group input-group">
             <span class="input-group-addon">Case Size</span>
-            <input type="text" class="form-control input-sm" name="caseSize" required id="newCase" />
+            <input type="text" class="form-control input-sm" name="caseSize" required id="newCase" value="1" />
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="form-group input-group">
+            <span class="input-group-addon">Case Cost</span>
+            <input type="text" class="form-control input-sm" name="cost" required id="newCost" />
         </div>
     </div>
     <div class="form-group input-group">

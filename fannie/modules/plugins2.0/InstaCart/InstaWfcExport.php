@@ -123,6 +123,9 @@ class InstaWfcExport extends FannieTask
 
         $dbc->query("DELETE FROM localtemptrans WHERE trans_type='I'
             AND upc NOT IN (SELECT upc FROM productUser WHERE enableOnline=1)");
+
+        $dbc->query("DELETE FROM localtemptrans WHERE trans_type='I'
+            AND upc NOT IN (SELECT upc FROM productOrderLimits WHERE available <= 0)");
         
         /*
         unlink($csvfile);

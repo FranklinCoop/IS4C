@@ -104,13 +104,13 @@ class AutoCoupon extends TotalAction
             }
 
             $next_val = $add['value'] - $val;
-            if (abs($next_val) < 0.005) {
+            if (abs($next_val) < 0.01) {
                 // no need to add another line item
                 // previous one(s) sum to correct total
                 continue;
             }
 
-            TransRecord::addhousecoupon($upc, $add['department'], -1 * $next_val, $description, $add['discountable']);
+            TransRecord::addhousecoupon($upc, $add['department'], -1 * $next_val, $description, $add['discountable'], $add['tax']);
         }
 
         CoreLocal::set('msgrepeat', $repeat);

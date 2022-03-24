@@ -170,7 +170,9 @@ class AdvancedItemSearch extends FannieRESTfulPage
     {
         if ($form->description !== '') {
             if (isset($form->serviceScale)) {
-                $search->where .= ' AND (p.description LIKE ? OR h.itemdesc LIKE ?) ';
+                $search->where .= ' AND (p.description LIKE ? OR h.itemdesc LIKE ? OR j.ingredients LIKE ? OR h.text LIKE ?) ';
+                $search->args[] = '%' . $form->description . '%';
+                $search->args[] = '%' . $form->description . '%';
                 $search->args[] = '%' . $form->description . '%';
                 $search->args[] = '%' . $form->description . '%';
             } else {
@@ -280,6 +282,7 @@ class AdvancedItemSearch extends FannieRESTfulPage
     {
         if ($form->serviceScale !== '') {
             $search->from .= ' INNER JOIN scaleItems AS h ON h.plu=p.upc ';
+            $search->from .= ' LEFT JOIN ScaleIngredients AS j ON j.upc=p.upc ';
             $search->where = str_replace('p.modified', 'h.modified', $search->where);
         }
 
@@ -506,9 +509,10 @@ class AdvancedItemSearch extends FannieRESTfulPage
     */
     private function searchInUse($search, $form)
     {
-        if ($form->in_use !== '') {
-            $search->where .= ' AND p.inUse=? ';
-            $search->args[] = $form->in_use;
+        if ($form->in_use == 1) {
+            $search->where .= ' AND p.inUse=1 ';
+        } elseif ($form->in_use == 2) { 
+            $search->where .= ' AND p.upc IN (SELECT upc FROM products WHERE inUse=1 GROUP BY upc) ';
         }
 
         return $search;
@@ -920,7 +924,6 @@ class AdvancedItemSearch extends FannieRESTfulPage
         echo '&nbsp;&nbsp;&nbsp;&nbsp;';
         echo '<a href="AdvancedItemSearch.php?init=' . base64_encode($dataStr) . '">Permalink for this Search</a>';
         echo $this->streamOutput($items);
-        echo $this->javascript_chkbox();
 
         return false;
     }
@@ -1007,6 +1010,7 @@ class AdvancedItemSearch extends FannieRESTfulPage
         $this->addScript('autocomplete.js');
         $this->addOnloadCommand("bindAutoComplete('#brand-field', '../ws/', 'brand');\n");
         $this->addScript('../src/javascript/tablesorter/jquery.tablesorter.js');
+        $this->addScript('vanillaShiftClick.js');
 
         $model = new SuperDeptNamesModel($dbc);
         $superOpts = $model->toOptions(-1);
@@ -1092,48 +1096,6 @@ class AdvancedItemSearch extends FannieRESTfulPage
         $this->addOnloadCommand("\$('#resultArea').html(\$('#externResults').html());\n");
 
         return $body;
-    }
-
-    public function javascript_chkbox()
-    {
-        return <<<JAVASCRIPT
-<script type="text/javascript">
-var lastChecked = null;
-var i = 0;
-var indexCheckboxes = function(){
-    $('.upcCheckBox').each(function(){
-        $(this).attr('data-index', i);
-        i++;
-    });
-};
-indexCheckboxes();
-$('table').click(function(){
-    indexCheckboxes();
-});
-$('.upcCheckBox').on("click", function(e){
-    if(lastChecked && e.shiftKey) {
-        var i = parseInt(lastChecked.attr('data-index'));
-        var j = parseInt($(this).attr('data-index'));
-        var checked = $(this).is(":checked");
-
-        var low = i;
-        var high = j;
-        if (i>j){
-            var low = j;
-            var high = i;
-        }
-
-        for(var c = low; c < high; c++) {
-            if (c != low && c!= high) {
-                var check = checked ? true : false;
-                $('input[data-index="'+c+'"').prop("checked", check);
-            }
-        }
-    }
-    lastChecked = $(this);
-});
-</script>
-JAVASCRIPT;
     }
 
     public function helpContent()

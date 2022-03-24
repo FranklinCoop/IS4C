@@ -311,7 +311,7 @@ table.shelf-audit tr:hover {
             if ($row['salesCode'] != $code) {
                 continue;
             }
-            if ($row['cost'] == 0 || $row['cost'] == $row['normal_retail']) {
+            if ($row['cost'] == 0 || $row['normal_retail'] == 0 || $row['cost'] == $row['normal_retail']) {
                 $noMatch++;
             } else {
                 $match++;
@@ -330,7 +330,7 @@ table.shelf-audit tr:hover {
     }
 
     function csv_content(){
-        $ret = "UPC,Description,Vendor,Account#,Dept#,\"Dept Name\",Qty,Cost,Unit Cost Total,Normal Retail,Status,Normal Retail Total\r\n";
+        $ret = "UPC,Description,Vendor,Account#,Dept#,\"Dept Name\",Qty,Cost,Unit Cost Total,Normal Retail,Status,Normal Retail Total,Location\r\n";
         $totals = array();
         $vendors = array();
         $manuals = array();
@@ -393,12 +393,13 @@ table.shelf-audit tr:hover {
                 $row['cost'] = $row['normal_retail'] - ($row['margin'] * $row['normal_retail']);
                 $row['retailstatus'] .= '*';
             }
-            $ret .= sprintf("%s,\"%s\",\"%s\",%s,%s,%s,%.2f,%.2f,%.2f,%.2f,%s,%.2f,\r\n",
+            $ret .= sprintf("%s,\"%s\",\"%s\",%s,%s,%s,%.2f,%.2f,%.2f,%.2f,%s,%.2f,%s\r\n",
                 $row['upc'],$row['description'],$row['vendor'],$row['salesCode'],$row['dept_no'],
                 $row['dept_name'],$row['quantity'],$row['cost'], ($row['quantity']*$row['cost']),
                 $row['normal_retail'],
                 $row['retailstatus'],
-                ($row['quantity']*$row['normal_retail'])
+                ($row['quantity']*$row['normal_retail']),
+                $row['section']
             );
 
             if (!isset($totals[$row['salesCode']])) {
@@ -506,13 +507,14 @@ table.shelf-audit tr:hover {
                 <option value="-1">All</option><?php echo $mOpts; ?></select></p>
             <p><a href="?excel=yes&store=<?php echo $this->store; ?>&super=<?php echo $super; ?>">download as csv</a></p>
         <?php
-        if ($this->scans) {
+        if ($this->scans && FannieAuth::validateUserQuiet('admin')) {
             $clear = '<div><a href="SaReportPage.php?clear=yes">Clear Old</a></div>';
             print_r($clear);
         }
         
         $table = '';
         $counter_total = 0;
+        $nfm = new NumberFormatter('en_US', NumberFormatter::PATTERN_DECIMAL);
         foreach($this->scans as $row) {
             
             if (!isset($counter_number)) {
@@ -545,12 +547,12 @@ table.shelf-audit tr:hover {
                     <td id="col_b">'.$row['upc'].'</td>
                     <td id="col_c">'.$row['description'].'</td>
                     <td id="col_d" class="right">'.$row['quantity'].'</td>
-                    <td id="col_e" class="right">'.money_format('%.2n', $row['cost']).'</td>
-                    <td id="col_h" class="right">'.money_format('%!.2n', ($row['quantity']*$row['cost'])).'</td>
-                    <td id="col_e" class="right">'.money_format('%.2n', $row['normal_retail']).'</td>
-                    <td id="col_f" class="right">'.money_format('%.2n', $row['actual_retail']).'</td>
+                    <td id="col_e" class="right">'.sprintf('%.2f', $row['cost']).'</td>
+                    <td id="col_h" class="right">'.sprintf('%.2f', ($row['quantity']*$row['cost'])).'</td>
+                    <td id="col_e" class="right">'.sprintf('%.2f', $row['normal_retail']).'</td>
+                    <td id="col_f" class="right">'.sprintf('%.2f', $row['actual_retail']).'</td>
                     <td id="col_g">'.(($row['retailstatus'])?$row['retailstatus']:'&nbsp;').'</td>
-                    <td id="col_h" class="right">'.money_format('%!.2n', ($row['quantity']*$row['normal_retail'])).'</td>
+                    <td id="col_h" class="right">'.sprintf('%.2f', ($row['quantity']*$row['normal_retail'])).'</td>
                     <td id="col_i"><a href="SaReportPage.php?delete=yes&id='.$row['id'].'">'
                         . \COREPOS\Fannie\API\lib\FannieUI::deleteIcon() . '</td>
                 </tr>';
@@ -563,7 +565,7 @@ table.shelf-audit tr:hover {
             <tfoot>
                 <tr>
                     <td colspan=6>&nbsp;</td>
-                    <td class="right">'.money_format('%.2n', $counter_total).'</td>
+                    <td class="right">'.sprintf('%.2n', $counter_total).'</td>
                     <td>&nbsp;</td>
                 </tr>
             </tfoot>
@@ -591,12 +593,12 @@ table.shelf-audit tr:hover {
                     <td id="col_b">'.$row['upc'].'</td>
                     <td id="col_c">'.$row['description'].'</td>
                     <td id="col_d" class="right">'.$row['quantity'].'</td>
-                    <td id="col_e" class="right">'.money_format('%.2n', $row['cost']).'</td>
-                    <td id="col_h" class="right">'.money_format('%!.2n', ($row['quantity']*$row['cost'])).'</td>
-                    <td id="col_e" class="right">'.money_format('%.2n', $row['normal_retail']).'</td>
-                    <td id="col_f" class="right">'.money_format('%.2n', $row['actual_retail']).'</td>
+                    <td id="col_e" class="right">'.sprintf('%.2f', $row['cost']).'</td>
+                    <td id="col_h" class="right">'.sprintf('%.2f', ($row['quantity']*$row['cost'])).'</td>
+                    <td id="col_e" class="right">'.sprintf('%.2f', $row['normal_retail']).'</td>
+                    <td id="col_f" class="right">'.sprintf('%.2f', $row['actual_retail']).'</td>
                     <td id="col_g">'.(($row['retailstatus'])?$row['retailstatus']:'&nbsp;').'</td>
-                    <td id="col_h" class="right">'.money_format('%!.2n', ($row['quantity']*$row['normal_retail'])).'</td>
+                    <td id="col_h" class="right">'.sprintf('%.2f', ($row['quantity']*$row['normal_retail'])).'</td>
                     <td id="col_i"><a href="SaReportPage.php?delete=yes&id='.$row['id'].'">'
                         . \COREPOS\Fannie\API\lib\FannieUI::deleteIcon() . '</td>
                 </tr>';
@@ -611,12 +613,12 @@ table.shelf-audit tr:hover {
                     <td id="col_b">'.$row['upc'].'</td>
                     <td id="col_c">'.$row['description'].'</td>
                     <td id="col_d" class="right">'.$row['quantity'].'</td>
-                    <td id="col_e" class="right">'.money_format('%.2n', $row['cost']).'</td>
-                    <td id="col_h" class="right">'.money_format('%!.2n', ($row['quantity']*$row['cost'])).'</td>
-                    <td id="col_e" class="right">'.money_format('%.2n', $row['normal_retail']).'</td>
-                    <td id="col_f" class="right">'.money_format('%.2n', $row['actual_retail']).'</td>
+                    <td id="col_e" class="right">'.sprintf('%.2f', $row['cost']).'</td>
+                    <td id="col_h" class="right">'.sprintf('%.2f', ($row['quantity']*$row['cost'])).'</td>
+                    <td id="col_e" class="right">'.sprintf('%.2f', $row['normal_retail']).'</td>
+                    <td id="col_f" class="right">'.sprintf('%.2f', $row['actual_retail']).'</td>
                     <td id="col_g">'.(($row['retailstatus'])?$row['retailstatus']:'&nbsp;').'</td>
-                    <td id="col_h" class="right">'.money_format('%!.2n', ($row['quantity']*$row['normal_retail'])).'</td>
+                    <td id="col_h" class="right">'.sprintf('%.2f', ($row['quantity']*$row['normal_retail'])).'</td>
                     <td id="col_i"><a href="SaReportPage.php?delete=yes&id='.$row['id'].'">'
                         . \COREPOS\Fannie\API\lib\FannieUI::deleteIcon() . '</td>
                 </tr>';
@@ -628,7 +630,7 @@ table.shelf-audit tr:hover {
             <tfoot>
                 <tr>
                     <td colspan=6>&nbsp;</td>
-                    <td class="right">'.money_format('%.2n', $counter_total).'</td>
+                    <td class="right">'.sprintf('%.2n', $counter_total).'</td>
                     <td>&nbsp;</td>
                 </tr>
             </tfoot>

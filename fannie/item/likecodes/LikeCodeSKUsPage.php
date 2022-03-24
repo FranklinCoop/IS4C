@@ -34,6 +34,18 @@ class LikeCodeSKUsPage extends FannieRESTfulPage
                 AND l.inUse=1
             GROUP BY l.likeCode');
         $likeCodes = $this->connection->getAllValues($lcP, array($this->store, $this->id));
+        if ($this->store == 0) {
+            $lcP = $this->connection->prepare('
+                SELECT l.likeCode
+                FROM LikeCodeActiveMap AS l
+                    INNER JOIN upcLike AS u ON l.likeCode=u.likeCode
+                    INNER JOIN products AS p ON u.upc=p.upc
+                    INNER JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
+                WHERE m.superID=?
+                    AND l.inUse=1
+                GROUP BY l.likeCode');
+            $likeCodes = $this->connection->getAllValues($lcP, array($this->id));
+        }
         list($inStr, $args) = $this->connection->safeInClause($likeCodes);
         $query = "SELECT l.likeCode,
                 l.likeCodeDesc,
@@ -160,6 +172,7 @@ class LikeCodeSKUsPage extends FannieRESTfulPage
             136 => $this->getItems(136),
         );
         $store = FormLib::get('store');
+        $lcArgs = array($store, $this->id);
         $lcP = $this->connection->prepare('
             SELECT l.likeCode
             FROM LikeCodeActiveMap AS l
@@ -180,13 +193,23 @@ class LikeCodeSKUsPage extends FannieRESTfulPage
                     AND ? IS NOT NULL');
             $sortFirst = 'sortInternal';
             $internalDisable = 'disabled';
+        } elseif ($store == 0) {
+            $lcP = $this->connection->prepare('
+                SELECT l.likeCode
+                FROM LikeCodeActiveMap AS l
+                    INNER JOIN upcLike AS u ON l.likeCode=u.likeCode
+                    INNER JOIN products AS p ON u.upc=p.upc
+                    INNER JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
+                WHERE m.superID=?
+                GROUP BY l.likeCode');
+            $lcArgs = array($this->id);
         }
-        $lcR = $this->connection->execute($lcP, array($store, $this->id));
+        $lcR = $this->connection->execute($lcP, $lcArgs);
         $allCodes = array();
         while ($lcW = $this->connection->fetchRow($lcR)) {
             $allCodes[] = $lcW['likeCode'];
         }
-        $args = array($store);
+        $args = $store != 0 ? array($store) : array();
         list($inStr, $args) = $this->connection->safeInClause($allCodes, $args);
         $query = $this->connection->prepare("SELECT l.likeCode,
                 l.likeCodeDesc,
@@ -202,7 +225,7 @@ class LikeCodeSKUsPage extends FannieRESTfulPage
             FROM likeCodes AS l
                 LEFT JOIN VendorLikeCodeMap AS m ON l.likeCode=m.likeCode
                 LEFT JOIN vendorItems AS v ON m.vendorID=v.vendorID AND m.sku=v.sku
-                LEFT JOIN LikeCodeActiveMap AS a ON l.likeCode=a.likeCode AND a.storeID=?
+                LEFT JOIN LikeCodeActiveMap AS a ON l.likeCode=a.likeCode " . ($store != 0 ? " AND a.storeID=? " : '') . "
             WHERE l.likeCode IN ({$inStr})
             ORDER BY {$sortFirst}, l.likeCodeDesc, l.likeCode, m.vendorID");
         $res = $this->connection->execute($query, $args);
@@ -242,10 +265,30 @@ class LikeCodeSKUsPage extends FannieRESTfulPage
         }
         $tableBody = '';
         $category = '';
+        $categories = '<option value="">Select category</option>';
+        $filterCat = FormLib::get('cat');
+        $filterPri = FormLib::get('pri');
+        $priOpts = '<option value="0">Primary selection</option>
+            <option value="1" ' . ($filterPri == 1 ? 'selected' : '') . '>Not available</option>
+            <option value="2" ' . ($filterPri == 2 ? 'selected' : '') . '>Not selected</option>
+            ';
         foreach ($map as $lc => $data) {
+            $data['cat'] = strtoupper($data['cat']);
             if ($data['cat'] != $category) {
-                $tableBody .= "<tr><th class=\"text-center info\" colspan=\"8\" align=\"center\">{$data['cat']}</th></tr>";
+                if ($filterCat == '' || $filterCat == $data['cat']) {
+                    $tableBody .= "<tr><th class=\"text-center info\" colspan=\"8\" align=\"center\">{$data['cat']}</th></tr>";
+                }
                 $category = $data['cat'];
+                $categories .= sprintf('<option %s>%s</option>', ($filterCat == $data['cat'] ? 'selected' : ''), $data['cat']);
+            }
+            if ($filterCat && $data['cat'] != $filterCat) {
+                $data['inUse'] = 0;
+            }
+            if ($filterPri == 1 && (!isset($data['skus'][$data['vendorID']]) || $data['skus'][$data['vendorID']]['description'] != null)) {
+                $data['inUse'] = 0;
+            }
+            if ($filterPri == 2 && ($data['vendorID'] != null && isset($data['skus'][$data['vendorID']]))) {
+                $data['inUse'] = 0;
             }
             $checkMulti = $data['multi'] ? 'checked' : '';
             $inactiveClass = ($this->id != -1 && $data['inUse'] == 0) ? ' collapse inactiveRow warning' : '';
@@ -280,17 +323,29 @@ class LikeCodeSKUsPage extends FannieRESTfulPage
             $tableBody .= '</tr>';
         }
 
-        $this->addScript('skuMap.js?date=20180228');
+        $this->addScript('skuMap.js?date=20210323');
         foreach (array(292, 293, 136) as $vID) {
             $this->addOnloadCommand("skuMap.autocomplete('.sku-field$vID', $vID);");
             $this->addOnloadCommand("skuMap.unlink('.sku-field$vID', $vID);");
         }
+        $this->addOnloadCommand('skuMap.enableFilters();');
+        $this->addScript('../../src/javascript/chosen/chosen.jquery.min.js');
+        $this->addCssFile('../../src/javascript/chosen/bootstrap-chosen.css');
+        $this->addOnloadCommand("\$('select.filter-field').chosen({search_contains: true});");
         $updateP = $this->connection->prepare('SELECT MIN(modified) FROM vendorItems WHERE vendorID=?');
         $alb = $this->connection->getValue($updateP, array(292));
         $cpw = $this->connection->getValue($updateP, array(293));
         $rdw = $this->connection->getValue($updateP, array(136));
 
         return <<<HTML
+<p class="form-inline">
+<input type="hidden" name="store" class="filter-field" value="{$store}" />
+<input type="hidden" name="id" class="filter-field" value="{$this->id}" />
+Filter: 
+<select name="cat" class="form-control filter-field">{$categories}</select>
+<select name="pri" class="form-control filter-field">{$priOpts}</select>
+<a href="LikeCodeBatchPage.php?{$_SERVER['QUERY_STRING']}" class="btn btn-default">Pricing</a>
+</p>
 <p><label><input type="checkbox" {$internalDisable} onchange="skuMap.toggleInact(this.checked);" /> Show inactive</label>
 (Active {$counts['act']}, Inactive {$counts['inact']})
 <a href="LikeCodeSKUsPage.php?id={$this->id}&store={$store}&export=1" class="btn btn-default" $internalDisable>Export</a>

@@ -44,6 +44,7 @@ CSS;
         $greens = $this->greensTable($store);
         $preps = $this->prepsTable($store);
         $stock = $this->stockFirst($store);
+        $sale = $this->onSale($store);
         $today = date('l, F jS');
         $model = new StoresModel($this->connection);
         $model->storeID($store);
@@ -81,17 +82,13 @@ CSS;
         }
         $pdf->SetX(5);
         $pdf->SetFont('Arial', 'B', 9);
-        $pdf->Cell(120, 7, 'Sanitizing:', 1, 0, 'L');
+        $pdf->Cell(120, 7, 'Tops Sweep:', 1, 0, 'L');
         $pdf->SetFont('Arial', '', 9);
         $pdf->SetX(30);
-        $pdf->Cell(12, 7, '6', 0, 0);
-        $pdf->Cell(12, 7, '8', 0, 0);
-        $pdf->Cell(12, 7, '10', 0, 0);
-        $pdf->Cell(12, 7, '12', 0, 0);
-        $pdf->Cell(12, 7, '2', 0, 0);
-        $pdf->Cell(12, 7, '4', 0, 0);
-        $pdf->Cell(12, 7, '6', 0, 0);
-        $pdf->Cell(12, 7, '8', 0, 0);
+        $pdf->Cell(12, 7, '1', 0, 0);
+        $pdf->Cell(12, 7, '3', 0, 0);
+        $pdf->Cell(12, 7, '5', 0, 0);
+        $pdf->Cell(12, 7, '7', 0, 0);
         $pdf->Ln();
         $pdf->SetX(5);
         $pdf->SetFont('Arial', 'B', 9);
@@ -102,7 +99,7 @@ CSS;
         $pdf->Ln();
 
         $preps = DataConvert::htmlToArray($preps);
-        $pdf->SetXY(5, 140);
+        $pdf->SetXY(5, 150);
         foreach ($preps as $row) {
             $pdf->SetX(5);
             if (!empty($row[0])) {
@@ -112,7 +109,7 @@ CSS;
         }
 
         $greens = DataConvert::htmlToArray($greens);
-        $pdf->SetXY(83, 140);
+        $pdf->SetXY(83, 150);
         foreach ($greens as $row) {
             $pdf->SetX(83);
             if (!empty($row[0])) {
@@ -128,6 +125,58 @@ CSS;
             $pdf->SetX(160);
             if (!empty($row[0])) {
                 $pdf->Cell(50, 7, str_replace('bold', '', $row[0]), 1, 1, 'L');
+            }
+        }
+
+        $sale = str_replace('&', '&amp;', $sale);
+        $sale = DataConvert::htmlToArray($sale);
+        $pdf->SetXY(160, 110);
+        foreach ($sale as $row) {
+            $pdf->SetX(160);
+            if (!empty($row[0])) {
+                $pdf->Cell(50, 7, str_replace('bold', '', $row[0]), 1, 1, 'L');
+            }
+        }
+
+        $pdf->AddPage();
+        $pdf->SetDrawColor(0,0,0);
+        $pdf->Line(108,0,108,279);
+        $pdf->Line(0,135,215,135);
+
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetAutoPageBreak(false);
+        for ($i=0; $i<4; $i++) {
+            $posX = $i % 2 == 0 ? 5 : 110;
+            $posY = ($i/2) % 2 == 0 ? 10 : 140;
+            $pdf->SetXY($posX,$posY);
+
+            $header = true;
+            foreach ($stock as $row) {
+                $pdf->SetX($posX);
+                if (!empty($row[0])) {
+                    $pdf->Cell(60, 5, str_replace('bold', '', $row[0]), 1, 0, 'L');
+                    $pdf->Cell(20, 5, $header ? 'Qty' : '', 1, 0, 'L');
+                    $pdf->Cell(20, 5, $header ? 'Initial' : '', 1, 1, 'L');
+                    if ($header) {
+                        $header = false;
+                    }
+                }
+            }
+
+            $pdf->Ln(5);
+
+            $pdf->SetX($posX);
+            $header = true;
+            foreach ($sale as $row) {
+                $pdf->SetX($posX);
+                if (!empty($row[0])) {
+                    $pdf->Cell(60, 5, str_replace('bold', '', $row[0]), 1, 0, 'L');
+                    $pdf->Cell(20, 5, $header ? 'Qty' : '', 1, 0, 'L');
+                    $pdf->Cell(20, 5, $header ? 'Initial' : '', 1, 1, 'L');
+                    if ($header) {
+                        $header = false;
+                    }
+                }
             }
         }
 
@@ -149,6 +198,7 @@ CSS;
         $greens = $this->greensTable($store);
         $preps = $this->prepsTable($store);
         $stock = $this->stockFirst($store);
+        $sale = $this->onSale($store);
         $today = date('l, F jS');
 
         $stores = FormLib::storePicker('store', false, "window.location='RpDailyPage.php?store='+this.value");
@@ -178,31 +228,19 @@ CSS;
                 <tr><td>&nbsp;</td></tr>
                 <tr><td>&nbsp;</td></tr>
                 <tr><td>&nbsp;</td></tr>
-                <tr><td><b>Sanitizing</b>:
+                <tr><td><b>Tops Sweep</b>:
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    6
+                    1
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    8
+                    3
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    10
+                    5
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    12
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    2
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    4
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    6
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    8
+                    7
                 </td></tr>
                 <tr><td><b>Daily Critical Temp Food spot check</b>: ____________</td></tr>
             </table>
@@ -218,6 +256,8 @@ CSS;
     </div>
     <div class="col-sm-3">
         {$stock}
+        <br />
+        {$sale}
     </div>
 </div>
 </div>
@@ -306,6 +346,12 @@ HTML;
             $record = array('name' => $row['likeCodeDesc']);
             $record['retail'] = $this->connection->getValue($retailP, array($row['likeCode'], $store));
             $info = $this->connection->getRow($infoP, array('LC' . $row['likeCode'], $store));
+            if (!is_array($info)) {
+                $info = array(
+                    'movement' => 0,
+                    'caseSize' => 1,
+                );
+            }
             $record['smoothed'] = $info['movement'];
             $record['caseSize'] = $info['caseSize'];
             $record['total'] = $record['retail'] * $info['movement'];
@@ -366,6 +412,12 @@ HTML;
             $record = array('name' => $row['likeCodeDesc']);
             $record['retail'] = $this->connection->getValue($retailP, array($row['likeCode'], $store));
             $info = $this->connection->getRow($infoP, array('LC' . $row['likeCode'], $store));
+            if (!is_array($info)) {
+                $info = array(
+                    'movement' => 0,
+                    'caseSize' => 1,
+                );
+            }
             $record['smoothed'] = $info['movement'];
             $record['caseSize'] = $info['caseSize'];
             $record['total'] = $record['retail'] * $info['movement'];
@@ -406,10 +458,16 @@ HTML;
     protected function stockFirst($store)
     {
         $nameP = $this->connection->prepare("SELECT likeCodeDesc FROM likeCodes WHERE likeCode=?");
+        $batchP = $this->connection->prepare("SELECT l.batchID FROM batchList AS l
+            INNER JOIN batches AS b ON l.batchID=b.batchID
+            WHERE l.upc=?
+                AND " . $this->connection->curdate() . " BETWEEN b.startDate AND b.endDate
+                AND b.discountType > 0");
         $dataP = $this->connection->prepare("SELECT r.upc
             FROM RpSubTypes AS r
                 LEFT JOIN " . FannieDB::fqn('Smoothed', 'plugin:WarehouseDatabase') . " AS w ON r.upc=w.upc
             WHERE w.storeID=?
+                AND r.upc <> 'LC50'
                 AND subType='stock'
             ORDER BY w.movement * r.price DESC");
         $ret = '<table class="table table-bordered table-striped">
@@ -418,9 +476,36 @@ HTML;
         $count = 0;
         while ($row = $this->connection->fetchRow($dataR)) {
             $name = $this->connection->getValue($nameP, array(substr($row['upc'], 2)));
+            if ($this->connection->getValue($batchP, array($row['upc']))) {
+                $name = '** ' . $name;
+            }
             $ret .= '<tr><td>' . $name . '</td></tr>';
             $count++;
-            if ($count >= 30) {
+            if ($count >= 10) {
+                break;
+            }
+        }
+
+        return $ret . '</table>';
+    }
+
+    protected function onSale($store)
+    {
+        $nameP = $this->connection->prepare("SELECT likeCodeDesc FROM likeCodes WHERE likeCode=?");
+        $batchR = $this->connection->query("SELECT l.upc FROM batchList AS l
+            INNER JOIN batches AS b ON l.batchID=b.batchID
+            WHERE l.upc LIKE 'LC%'
+                AND " . $this->connection->curdate() . " BETWEEN b.startDate AND b.endDate
+                AND b.discountType > 0
+                AND b.batchName LIKE '%Pro%Deal%'");
+        $count = 0;
+        $ret = '<table class="table table-bordered table-striped">
+                <tr><th>On Sale</th></tr>';
+        while ($row = $this->connection->fetchRow($batchR)) {
+            $name = $this->connection->getValue($nameP, array(substr($row['upc'], 2)));
+            $ret .= '<tr><td>' . $name . '</td></tr>';
+            $count++;
+            if ($count >= 20) {
                 break;
             }
         }

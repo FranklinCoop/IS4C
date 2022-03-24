@@ -28,7 +28,7 @@ class PagesFannieTest extends PHPUnit_Framework_TestCase
             $obj->setLogger($logger);
             $dbc->selectDB($op_db);
             $obj->setConnection($dbc);
-            $obj = FannieDispatch::twig($obj);
+            //$obj = FannieDispatch::twig($obj);
 
             $pre = $obj->preprocess();
             $this->assertInternalType('boolean',$pre);
@@ -87,7 +87,7 @@ class PagesFannieTest extends PHPUnit_Framework_TestCase
             $obj->setLogger($logger);
             $dbc->selectDB($op_db);
             $obj->setConnection($dbc);
-            $obj = FannieDispatch::twig($obj);
+            //$obj = FannieDispatch::twig($obj);
             if ($page_class == 'WfcHtViewSalaryPage') continue; // header/redirect problem
 
             ob_start();
@@ -96,7 +96,7 @@ class PagesFannieTest extends PHPUnit_Framework_TestCase
             $this->assertInternalType('boolean',$pre);
 
             $help = $obj->helpContent();
-            $this->assertInternalType('string', $help);
+            $this->assertInternalType('string', $help, 'Missing help content on ' . $page_class);
 
             $auth = $obj->checkAuth();
             $this->assertInternalType('boolean',$pre);
@@ -127,7 +127,7 @@ class PagesFannieTest extends PHPUnit_Framework_TestCase
             $obj->setLogger($logger);
             $dbc->selectDB($op_db);
             $obj->setConnection($dbc);
-            $obj = FannieDispatch::twig($obj);
+            //$obj = FannieDispatch::twig($obj);
 
             $this->assertNotEquals(0, strlen($obj->body_content()));
         }

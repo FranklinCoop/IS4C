@@ -73,7 +73,7 @@ class InstallPluginsPage extends \COREPOS\Fannie\API\InstallPage {
 
     function body_content(){
         //Should this really be done with global?
-        global $FANNIE_PLUGIN_LIST, $FANNIE_PLUGIN_SETTINGS;
+        global $FANNIE_PLUGIN_LIST, $FANNIE_PLUGIN_SETTINGS, $FANNIE_OP_DB;
         ob_start();
 
     echo showInstallTabs('Plugins');
@@ -132,6 +132,8 @@ if (isset($_REQUEST['PLUGINLIST']) || isset($_REQUEST['psubmit'])){
 
 echo '<table id="install" class="table">';
 $count = 0;
+$dbSettings = array();
+$changeEvents = array();
 foreach($mods as $m){
     $enabled = False;
     $instance = new $m();
@@ -168,39 +170,86 @@ foreach($mods as $m){
         printf('<div id="settings_%s" %s>',
             $m, (!$enabled ? 'class="collapse"' : '')
         );
+        if ($instance->version == 2) {
+            $dbSettings = $instance->getSettings();
+        }
+        /**
+         * All the version checking here is because version 1
+         * plugin settings are stored in the config.php
+         * variable $FANNIE_PLUGIN_SETTINGS but version 2
+         * plugin settings are stored in the database
+         */
         foreach($instance->plugin_settings as $field => $info){
             $form_id = $m.'_'.$field;
             // ignore submitted values if plugin was not enabled
-            if ($enabled && isset($_REQUEST[$form_id])) 
-                $FANNIE_PLUGIN_SETTINGS[$field] = $_REQUEST[$form_id];
-            if (!isset($FANNIE_PLUGIN_SETTINGS[$field]))
-                $FANNIE_PLUGIN_SETTINGS[$field] = isset($info['default'])?$info['default']:'';
+            if ($enabled && isset($_REQUEST[$form_id])) {
+                if ($instance->version == 1) {
+                    $FANNIE_PLUGIN_SETTINGS[$field] = $_REQUEST[$form_id];
+                } elseif ($instance->version == 2) {
+                    $dbSettings[$field] = $_REQUEST[$form_id];
+                }
+            }
+            $currentValue = ''; 
+            if ($instance->version == 1) {
+                $currentValue = isset($FANNIE_PLUGIN_SETTINGS[$field]) ? $FANNIE_PLUGIN_SETTINGS[$field] : '';
+                if (!isset($FANNIE_PLUGIN_SETTINGS[$field])) {
+                    $currentValue = isset($info['default'])?$info['default']:'';
+                    $FANNIE_PLUGIN_SETTINGS[$field] = $currentValue;
+                }
+            } elseif ($instance->version == 2) {
+                $currentValue = isset($dbSettings[$field]) ? $dbSettings[$field] : '';
+                if (!isset($dbSettings[$field])) {
+                    $currentValue = isset($info['default'])?$info['default']:'';
+                    $dbSettings[$field] = $currentValue;
+                }
+                if (isset($FANNIE_PLUGIN_SETTINGS[$field])) {
+                    unset($FANNIE_PLUGIN_SETTINGS[$field]);
+                }
+            }
             echo '<b>'.(isset($info['label'])?$info['label']:$field).'</b>: ';
             if (isset($info['options'])) {
                 echo '<select name="' . $form_id . '" class="form-control">';
                 foreach ($info['options'] as $key => $val) {
                     printf('<option %s value="%s">%s</option>',
-                        ($FANNIE_PLUGIN_SETTINGS[$field] == $val) ? 'selected' : '',
+                        ($currentValue == $val) ? 'selected' : '',
                         $val, $key);
                 }
                 echo '</select>';
             } else {
                 printf('<input type="text" name="%s" value="%s" class="form-control" />',
-                    $form_id,$FANNIE_PLUGIN_SETTINGS[$field]);
+                    $form_id,$currentValue);
             }
             // show the default if plugin isn't enabled, but
             // unset so that it isn't saved in the configuration
             if (!$enabled) {
-                unset($FANNIE_PLUGIN_SETTINGS[$field]);
+                if ($instance->version == 1) {
+                    unset($FANNIE_PLUGIN_SETTINGS[$field]);
+                } elseif ($instance->version == 2) {
+                    unset($dbSettings[$field]);
+                }
             }
             // 17Jun13 EL Added <br /> for crampedness problem.
             if (isset($info['description'])) 
                 echo '<br /><span class="noteTxt">'.$info['description'].'</span>';
             echo '<br />';
             //confset($field,"'".$CORE_LOCAL->get($field)."'");
+            /*
+             * Re-key settings w/ namespace, if applicable
+             */
+            if (strlen($instance->settingsNamespace) > 0) {
+                if ($instance->version == 1 && isset($FANNIE_PLUGIN_SETTINGS[$field])) {
+                    $nsKey = $instance->settingsNamespace . "." . $field;
+                    $FANNIE_PLUGIN_SETTINGS[$nsKey] = $FANNIE_PLUGIN_SETTINGS[$field];
+                    unset($FANNIE_PLUGIN_SETTINGS[$field]);
+                } elseif ($instance->version == 2 && isset($dbSettings[$field])) {
+                    $nsKey = $instance->settingsNamespace . "." . $field;
+                    $dbSettings[$nsKey] = $dbSettings[$field];
+                    unset($dbSettings[$field]);
+                }
+            }
         }
         if ($enabled && isset($_REQUEST['psubmit'])) {
-            $instance->settingChange();
+            $changeEvents[] = $instance;
         }
         echo '</div>';
         echo '</td></tr>';
@@ -222,6 +271,19 @@ foreach($FANNIE_PLUGIN_SETTINGS as $key => $val){
 }
 $saveStr = rtrim($saveStr,",").")";
 confset('FANNIE_PLUGIN_SETTINGS',$saveStr);
+
+$dbc = FannieDB::get($FANNIE_OP_DB);
+$dbc->startTransaction();
+$prep = $dbc->prepare("INSERT INTO PluginSettings (name, setting) VALUES (?, ?)");
+$dbc->query('TRUNCATE TABLE PluginSettings');
+foreach ($dbSettings as $key => $val) {
+    $dbc->execute($prep, array($key, $val));
+}
+$dbc->commitTransaction();
+
+foreach ($changeEvents as $instance) {
+    $instance->settingChange();
+}
 
 ?>
 <hr />

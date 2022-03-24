@@ -87,6 +87,7 @@ class EditLocations extends FannieRESTfulPage
     public function post_newSection_handler()
     {
         $upc = FormLib::get('upc');
+        $storeID = COREPOS\Fannie\API\lib\Store::getIdByIp();
         $floorSectionID = FormLib::get('floorSectionID');
         $newSection = FormLib::get('newSection');
         $json = array();
@@ -95,11 +96,25 @@ class EditLocations extends FannieRESTfulPage
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
 
-        $prep = $dbc->prepare("UPDATE FloorSectionProductMap SET floorSectionID = ? 
-            WHERE upc = ? AND floorSectionID = ?;");
-        $res = $dbc->execute($prep, array($newSection, $upc, $floorSectionID));
+        $args = array($upc, $storeID);
+        $prep = $dbc->prepare("SELECT * FROM FloorSectionProductMap AS m
+            LEFT JOIN FloorSections AS f ON m.floorSectionID=f.floorSectionID WHERE upc = ? AND storeID = ?");
+        $res = $dbc->execute($prep, $args);
+        $row = $dbc->fetchRow($res);
+        $exists = ($row['upc'] > 0) ? true : false;
+
+        if ($exists == true && $floorSectionID != 0) {
+            $prep = $dbc->prepare("UPDATE FloorSectionProductMap SET floorSectionID = ? 
+                WHERE upc = ? AND floorSectionID = ?;");
+            $res = $dbc->execute($prep, array($newSection, $upc, $floorSectionID));
+        } elseif ($exists == false || $floorSectionID == 0) {
+            $prep = $dbc->prepare("INSERT INTO FloorSectionProductMap (floorSectionID, upc) 
+                VALUES (?, ?) ");
+            $res = $dbc->execute($prep, array($newSection, $upc));
+        }
+
         if ($er = $dbc->error())
-                $json['error'] = $er;
+            $json['error'] = $er;
         echo json_encode($json);
 
         return false; 
@@ -132,7 +147,8 @@ class EditLocations extends FannieRESTfulPage
 
     public function floorSectionSelect($options, $floorSectionID)
     {
-        $select = "<select class=\"form-control edit-floorSection\">";
+        $select = "<select class=\"form-control edit-floorSection\" style=\"width: 175px; display: inline-block;\">
+            <option value=\"\">NEW FLOOR SECTION</option>";
         foreach ($options as $id => $name) {
             $sel = ($floorSectionID == $id) ? "selected" : "";
             $select .= "<option value=\"$id\" $sel>$name</option>";
@@ -151,9 +167,10 @@ class EditLocations extends FannieRESTfulPage
         $curSub = $row['subSection'];
 
         $options = '<option value=\"0\">&nbsp;</option>';
-        foreach ($subSections as $k => $sub) {
-            $sel = ($curSub == $sub) ? ' selected' : '';
-            $options .= "<option value=\"$sub\" $sel>$sub</option>";
+        $letters = range('a', 'h');
+        foreach ($letters as $letter) {
+            $sel = ($curSub == $letter) ? ' selected' : '';
+            $options .= "<option value=\"$letter\" $sel>$letter</option>";
         }
 
         return array($curSub, $options);
@@ -167,7 +184,8 @@ class EditLocations extends FannieRESTfulPage
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
 
-        $STORE_ID = 2;
+        //$STORE_ID = 2;
+        $storeID = COREPOS\Fannie\API\lib\Store::getIdByIp();
 
         $upc = FormLib::get('upc', false);
         $upc = BarcodeLib::padUpc($upc);
@@ -187,7 +205,7 @@ class EditLocations extends FannieRESTfulPage
             $subSections[$row['floorSectionID']][] = $row['subSection'];
         }
 
-        $args = array($upc, $STORE_ID);
+        $args = array($upc, $storeID);
         $prep = $dbc->prepare("
             SELECT * 
             FROM FloorSectionProductMap AS map 
@@ -210,48 +228,56 @@ class EditLocations extends FannieRESTfulPage
         $td = '';
         $th = '';
         $i = 0;
+        $rProdInfo = $dbc->execute($pProdInfo, array($upc));
+        $wProdInfo = $dbc->fetchRow($rProdInfo);
+        $brand = $wProdInfo['brand'];
+        $description = $wProdInfo['description'];
+        $department = $wProdInfo['dept_name'];
+        $superName = $wProdInfo['super_name'];
+        $td .= sprintf("
+                <tr><td>%s</td></tr>
+                <tr><td>%s</td></tr>
+                <tr><td>%s</td></tr>",
+            $upc,
+            $brand, 
+            $description
+        );
         while ($row = $dbc->fetchRow($res)) {
-            $upc = $row['upc'];
-            $rProdInfo = $dbc->execute($pProdInfo, array($upc));
-            $wProdInfo = $dbc->fetchRow($rProdInfo);
-            $brand = $wProdInfo['brand'];
-            $description = $wProdInfo['description'];
-            $department = $wProdInfo['dept_name'];
-            $superName = $wProdInfo['super_name'];
+            //$upc = $row['upc'];
             $floorSectionID = $row['floorSectionID'];
             list($subSection, $subSectionOpts) = $this->subSectionSelect($upc, $subSections[$floorSectionID], $floorSectionID, $dbc);
-
-            if ($i == 0) {
-                $td .= sprintf("
-                        <tr><td>%s</td></tr>
-                        <tr><td>%s</td></tr>
-                        <tr><td>%s</td></tr>",
-                    $upc,
-                    $brand, 
-                    $description
-                );
-            }
             $i++;
-
             $stripe = ($i % 2 == 0) ? "#FFFFCC" : "transparent";
-
+            $alphabet = range('A', 'Z');
             $td .= sprintf("
-                    <tr style=\"background-color: %s;\"><td><div><strong>Floor Section (%s)</strong></div>%s</td></tr>
-                    <tr style=\"background-color: %s;\"><td><div><strong>Sub-Section (%s)</strong></div>%s</td></tr>
+                    <tr style=\"background-color: %s;\"><td><div>Floor Section<strong> %s</strong></div>%s</td></tr>
+                    <tr style=\"background-color: %s;\"><td><div>Sub-Section<strong> %s</strong></div>%s</td></tr>
                     <td class=\"row-data\" id=\"row-data\" style=\"display: none\" 
                     data-upc=\"%s\" data-floorSectionID=\"%s\" data-subSection=\"%s\" data-storeID=\"%s\">
                     </td></tr>", 
                 $stripe,
-                $i,
+                $alphabet[$i-1],
                 $this->floorSectionSelect($sections, $floorSectionID)
-                    ." <span class=\"btn btn-default glyphicon glyphicon-trash btn-remove-section\" 
+                    ." <span class=\"btn btn-default fas fa-trash btn-remove-section\" 
                         style=\"float:right; margin: 5px;\" data-floorSectionID=\"$floorSectionID\"></span>",
                 $stripe,
-                $i,
-                "<select class=\"form-control edit-subsection\" data-floorSection=\"$floorSectionID\">$subSectionOpts</select>",
-                $upc, $floorSectionID, $subSection, $STORE_ID
+                $alphabet[$i-1],
+                "<select class=\"form-control edit-subsection\" data-floorSection=\"$floorSectionID\" style=\"width: 75px;\">$subSectionOpts</select>",
+                $upc, $floorSectionID, $subSection, $storeID
             );
         }
+        $td .= sprintf("
+                <tr style=\"background-color: %s;\"><td><div>
+                    <b>+ ADD NEW +</b> Floor Section</div>%s</td></tr>
+                <tr style=\"background-color: %s;\"></tr>
+                <td class=\"row-data\" id=\"row-data\" style=\"display: none\" 
+                data-upc=\"%s\" data-floorSectionID=\"%s\" data-subSection=\"%s\" data-storeID=\"%s\">
+                </td></tr>", 
+            'orange',
+            $this->floorSectionSelect($sections, 0),
+            'orange',
+            $upc, 0, 0, $storeID
+        );
         echo $dbc->error();
         $this->addOnloadCommand('$(\'#upc\').focus();');
         $this->addOnloadCommand("enableLinea('#upc');\n");
@@ -277,28 +303,47 @@ class EditLocations extends FannieRESTfulPage
 </div>
 
 <div class="row">
+    <div class="col-lg-4"></div>
     <div class="col-lg-4">
         <div class="form-group">
             <form name="upc-form" method="get">
-                <div class="form-group">
-                    <label for="upc">UPC</label>
-                    <input name="upc" id="upc" value="$upc" class="form-control" autofocus pattern="\d*">
-                </div>
-                <div class="form-group" align="right">
-                    <button class="btn btn-default">Submit</button>
+                <div class="row">
+                    <div class="col-lg-1"></div>
+                    <div class="col-xs-6">
+                        <div class="form-group">
+                            <input name="upc" id="upc" value="$upc" class="input-small small form-control" autofocus pattern="\d*">
+                        </div>
+                    </div>
+                    <div class="col-xs-4">
+                        <div class="form-group">
+                            <button class="btn btn-default btn-xs xs form-control">Submit</button>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
     <div class="col-lg-4"></div>
-    <div class="col-lg-4">
-    </div>
 </div>
-<form class="form-inline" id="table-update">
-<div class="table-responsive"><table class="table table-bordered table-sm small" id="handheldtable"><thead>$th</thead><tbody>$td</tbody></table></div>
-</form>
-<div class="form-group">
-    <a class="btn btn-default" href="../../modules/plugins2.0/ShelfAudit/SaMenuPage.php">Menu</a>
+<div class="container">
+    <div class="row">
+        <div class="col-lg-4"></div>
+        <div class="col-lg-4">
+            <form class="form-inline" id="table-update">
+            <div class="table-responsive"><table class="table table-bordered table-sm small" id="handheldtable"><thead>$th</thead><tbody>$td</tbody></table></div>
+            </form>
+            <div class="form-group" align="center">
+                <a class="btn btn-default menu-btn" href="../../modules/plugins2.0/ShelfAudit/SaMenuPage.php">Mobile Menu</a>
+            </div>
+            <div class="form-group" align="center">
+                <a class="btn btn-default menu-btn" href="../../item/ProdLocationEditor.php?list=1">Edit Locations: by List</a>
+            </div>
+            <div class="form-group" align="center">
+                <a class="btn btn-default menu-btn" href="../../item/FloorSections/EditLocations.php">Edit Sub-Locations: by List</a>
+            </div>
+        </div>
+        <div class="col-lg-4"></div>
+    </div>
 </div>
 HTML;
     }
@@ -308,7 +353,8 @@ HTML;
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
 
-        $STORE_ID = 2;
+        //$STORE_ID = 2;
+        $storeID = COREPOS\Fannie\API\lib\Store::getIdByIp();
 
         $upcs = FormLib::get('upcs', false);
         $upcs = explode("\r\n",$upcs);
@@ -373,12 +419,12 @@ HTML;
                 $brand, 
                 $description,
                 $this->floorSectionSelect($sections, $floorSectionID)
-                    ." <span class=\"form-control btn btn-default glyphicon glyphicon-trash btn-remove-section\"></span>",
+                    ." <span class=\"form-control btn btn-default fas fa-trash btn-remove-section\"></span>",
                 "<select class=\"form-control edit-subsection\" style=\"width: 50px;\">$subSectionOpts</select>"
                     ." <span class=\"form-control btn btn-default btn-add-subsection\">+</span>",
                 $department,
                 $superName,
-                $upc, $floorSectionID, $subSection, $STORE_ID
+                $upc, $floorSectionID, $subSection, $storeID
             );
         }
         echo $dbc->error();
@@ -431,6 +477,14 @@ HTML;
     public function javascriptContent()
     {
         return <<<JAVASCRIPT
+$('head').append('<meta name = "viewport" content = "width=device-width, minimum-scale=1.0, maximum-scale = 1.0, user-scalable = no">');
+
+$('#upc').focus(function(){
+    $(this).select();
+});
+
+$('#fannie-outer-margin').css('margin-left', '0')
+    .css('margin-right', '0');
 $('.btn-add-subsection').click(function(){
     var p = prompt('Enter section to add');
     if (p != null) {
@@ -585,6 +639,9 @@ JAVASCRIPT;
     top: 0;
     right: 0;
     display:none; 
+}
+.menu-btn {
+    width: 200px;
 }
 HTML;
     }

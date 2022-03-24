@@ -120,6 +120,10 @@ static private function addItem($strupc, $strdescription, $strtransType, $strtra
 
     // do not clear refund flag when adding an informational log record
     if ($strtransType != 'L' && CoreLocal::get("refund") == 1) {
+        if (CoreLocal::get('refundUnitOverride')) {
+            $dblunitPrice = CoreLocal::get('refundUnitOverride');
+            $dbltotal = $dblunitPrice * $dblquantity;
+        }
         $dblquantity = (-1 * $dblquantity);
         $dbltotal = (-1 * $dbltotal);
         $dbldiscount = (-1 * $dbldiscount);
@@ -132,6 +136,7 @@ static private function addItem($strupc, $strdescription, $strtransType, $strtra
 
         CoreLocal::set("refund",0);
         CoreLocal::set("refundComment","");
+        CoreLocal::set("refundUnitOverride","");
         CoreLocal::set("autoReprint",1);
 
         if (CoreLocal::get("refundDiscountable")==0) {
@@ -153,7 +158,7 @@ static private function addItem($strupc, $strdescription, $strtransType, $strtra
         'register_no'    => CoreLocal::get('laneno'),
         'emp_no'    => CoreLocal::get('CashierNo'),
         'trans_no'    => MiscLib::nullwrap(CoreLocal::get('transno')),
-        'upc'        => MiscLib::nullwrap($strupc),
+        'upc'        => MiscLib::nullwrap(substr($strupc, 0, 13)),
         'description'    => substr($strdescription, 0, 30),
         'trans_type'    => MiscLib::nullwrap($strtransType),
         'trans_subtype'    => MiscLib::nullwrap($strtranssubType, true),
@@ -657,7 +662,7 @@ static public function addCoupon($strupc, $intdepartment, $dbltotal, $statusFlag
   @param $intdepartment associated POS department
   @param $dbltotal coupon amount (should be negative)
 */
-static public function addhousecoupon($strupc, $intdepartment, $dbltotal, $description='', $discountable=1)
+static public function addhousecoupon($strupc, $intdepartment, $dbltotal, $description='', $discountable=1, $tax=0)
 {
     if (empty($description)) {
         $sql = Database::pDataConnect();
@@ -680,6 +685,8 @@ static public function addhousecoupon($strupc, $intdepartment, $dbltotal, $descr
         'total' => $dbltotal,
         'regPrice' => $dbltotal,
         'discountable' => $discountable,
+        'tax' => $tax,
+        'foodstamp' => $tax > 0 ? 1 : 0,
     ));
 }
 

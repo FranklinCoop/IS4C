@@ -370,6 +370,15 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
         $ret .= '<button type="submit" name="pdf" value="Print"
                     class="btn btn-default">Print</button>';
         $ret .= '&nbsp;&nbsp;&nbsp;<label title="If supported"><input type="checkbox" name="offset" value="1" /> Offset</label>';
+
+        $darkExtendOnly = '&nbsp;&nbsp;&nbsp;<label title="If supported"><input type="checkbox" name="showPrice" value="1" checked />Show Price</label>';
+        $signmod = FormLib::get('signmod');
+        if (FormLib::get('signmod') == 'Legacy:WFC Dark Extended 24UP') 
+            $ret .= $darkExtendOnly;
+        if (FormLib::get('signmod') == 'Legacy:WFC MEAT 14UP') 
+            $ret .= $darkExtendOnly;
+        if (FormLib::get('signmod') == 'Legacy:WFC Dark ServiceCase 12UP') 
+            $ret .= $darkExtendOnly;
         $ret .= '</div>';
         $ret .= '<hr />';
 
@@ -389,8 +398,6 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
 
         $ret .= '</form>';
         $this->addScript('../../src/javascript/tablesorter/jquery.tablesorter.js');
-        $this->addScript('../../src/javascript/chkboxMulticlick.js');
-        $this->addOnloadCommand('allow_group_select_checkboxes("printSignTable")');
         $this->addOnloadCommand("\$('.tablesorter').tablesorter();");
 
         return $ret;
@@ -441,6 +448,10 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
             $(this).addClass('alert-danger');
         }
     });
+    $('textarea').each(function(){
+        $(this).attr('rows', 2)
+            .css('width', '200px');
+    });
     $('textarea').on('change', function(){
         $(this).removeClass('alert-danger');
     });
@@ -463,6 +474,42 @@ class SignFromSearch extends \COREPOS\Fannie\API\FannieReadOnlyPage
             $("#signform").submit();
         }
     }
+
+
+var lastChecked = null;
+var i = 0;
+var indexCheckboxes = function(){
+    $(':checkbox').each(function(){
+        $(this).attr('data-index', i);
+        i++;
+    });
+};
+indexCheckboxes();
+$('table').click(function(){
+    indexCheckboxes();
+});
+$(':checkbox').on("click", function(e){
+    if(lastChecked && e.shiftKey) {
+        var i = parseInt(lastChecked.attr('data-index'));
+        var j = parseInt($(this).attr('data-index'));
+        var checked = $(this).is(":checked");
+
+        var low = i;
+        var high = j;
+        if (i>j){
+            var low = j;
+            var high = i;
+        }
+
+        for(var c = low; c < high; c++) {
+            if (c != low && c!= high) {
+                var check = checked ? true : false;
+                $('input[data-index="'+c+'"').prop("checked", check);
+            }
+        }
+    }
+    lastChecked = $(this);
+});
 JAVASCRIPT;
     }
 
@@ -474,8 +521,72 @@ JAVASCRIPT;
             prices to use: current or upcoming, retail or sale/promo.
             Text for each item can be overriden in the
             list of items below.
-            </p>';
+            </p>
+            <label>Layouts</label> <ul>
+                <li>Themed Price/Sale Sign Templates</li>
+                <ul>
+                    <li><b>Giganto1UpL - 4UpP</b>
+                        print to prepared paper, sale signs with larger than average font for prices. <a data-toggle="collapse" data-target="#GigantoSignImg" href="#">View Sign</a></li>
+                        <img class="collapse" id="GigantoSignImg" src="pdf_layouts/noauto/Giganto 4Up Single.png" style="border: 1px solid lightgrey;"/>
+                    <li><b>Signage12UpL - 4UpL</b>
+                        sale sign, general, needs formated paper. <a data-toggle="collapse" data-target="#SignageImg" href="#">View Sign</a></li>
+                        <img class="collapse" id="SignageImg" src="pdf_layouts/noauto/Signage12Up.png" style="border: 1px solid lightgrey;"/>
+                    <li><b>ItemList2UpP & 4UpP</b>
+                        print entire list of items onto one 2Up or 4Up paper. <a data-toggle="collapse" data-target="#ListImg" href="#">View Sign</a></li>
+                        <img class="collapse" id="ListImg" src="pdf_layouts/noauto/ItemList4Up.png" style="border: 1px solid lightgrey;"/>
+                    <li><b>WfcSmartSigns12UpP - 4UpP</b>
+                        sale & general signs, printed on white paper, this layout includes thematic formatting. <a data-toggle="collapse" data-target="#SmartImg" href="#">View Sign</a></li> 
+                        <img class="collapse" id="SmartImg" src="pdf_layouts/noauto/SmartSigns.png" style="border: 1px solid lightgrey;"/>
+                    <li><b>Giganto4UpSingle</b>
+                        full size paper 4up, for printing a 4Up on a fourth of a sheet of paper. <a data-toggle="collapse" data-target="#GigantoSingleImg" href="#">View Sign</a></li>
+                        <img class="collapse" id="GigantoSingleImg" src="pdf_layouts/noauto/Giganto 4Up Single.png" style="border: 1px solid lightgrey;"/>
+                    <li><b>Produce4UpSingle</b>
+                        same as Giganto4UpSingle. <a data-toggle="collapse" data-target="#Produce4Img" href="#">View Sign</a></li>
+                        <img class="collapse" id="Produce4Img" src="pdf_layouts/noauto/Produce 4Up Single.png" style="border: 1px solid lightgrey;"/>
+                </ul>
+                <li>Shelf Tags, White With Black Text</li>
+                <ul>
+                    <li><b>Legacy: WFC Hybrid</b>
+                        standard white shelf tags. Automatically prints tags in either the full or compact (narrow) format based on how they are set up in POS, automatically calculated and includes movement in upper right hand corner. <a data-toggle="collapse" data-target="#HybridImg" href="#">View Sign</a></li>
+                        <img class="collapse" id="HybridImg" src="pdf_layouts/noauto/Legacy WFC Hybrid.png" style="border: 1px solid lightgrey;"/>
+                    <li><b>TagsDoubleBarcode</b>
+                        shelf tags that have 2 barcodes on them. <a data-toggle="collapse" data-target="#DoubleImg" href="#">View Sign</a></li>
+                        <img class="collapse" id="DoubleImg" src="pdf_layouts/noauto/TagsDoubleBarcode.png" style="border: 1px solid lightgrey;"/>
+                    <li><b>TagsNoPrice</b>
+                        shelf tags with upc & sku barcodes. <a data-toggle="collapse" data-target="#NoPriceImg" href="#">View Sign</a></li>
+                        <img class="collapse" id="NoPriceImg" src="pdf_layouts/noauto/TagsNoPrice.png" style="border: 1px solid lightgrey;"/>
+                </ul>
+                <li>Shelf Tags, Black With White Text</li>
+                <ul>
+                    <li><b> Legacy: WFC Dark Extended 24UP</b>
+                        Black rail shelf-tags for deli vendors items. Includes brand, description and price (price optional). Tags are double sided. Back side of tags includes upc, brand, pos description, vendor, size. <a data-toggle="collapse" data-target="#ExtImg" href="#">View Sign</a></li>
+                        <img class="collapse" id="ExtImg" src="pdf_layouts/noauto/Legacy WFC Dark Extended 24Up.png" style="border: 1px solid lightgrey;"/>
+                    <li><b>Legacy: WFC Dark ServiceCase 12UP</b>
+                        black square signs for deli service case. Front includes name of product and price, back includes PLU, pos description & allergens. <a data-toggle="collapse" data-target="#ServiceCaseImg" href="#">View Sign</a></li>
+<img class="collapse" id="ServiceCaseImg" src="pdf_layouts/noauto/Legacy WFC Dark ServiceCase 12Up.png" style="border: 1px solid lightgrey;"/>
+
+                    <li><b>Legacy: WFC Dark Simple 24UP</b>
+                        black rail shelf-tags, same as Extended 24UP except the only text on the front of the tag is the description; brand & price are omitted. <a data-toggle="collapse" data-target="#DarkSimpleImg" href="#">View Sign</a></li>
+                        <img class="collapse" id="DarkSimpleImg" src="pdf_layouts/noauto/Legacy WFC Dark Simple 24Up.png" style="border: 1px solid lightgrey;"/>
+                    <li><b>Legacy: WFC Meat 14UP</b>
+                        black rail shelf tags primarily used for meat cases. include brand, description & price (price is optional). 2 sided; back includes upc, brand, description,  vendor, sku, size, date printed and movement. <a data-toggle="collapse" data-target="#meatImg" href="#">View Sign</a></li>
+                        <img class="collapse" id="meatImg" src="pdf_layouts/noauto/Legacy WFC Meat 14UP.png" style="border: 1px solid lightgrey;" /></li>
+                </ul>
+                <li>Deli Department Specific Signs</li>
+                <ul>
+                    <li><b>Legacy: Deli Big Special Signs 1UP</b>
+                        Full sheet of paper sign for deli meals, lists entire ingredients list.<a data-toggle="collapse" data-target="#BigSpecImg" href="#">View Sign</a>
+                        <img class="collapse" id="BigSpecImg" src="pdf_layouts/noauto/Legacy Deli Big Special Signs.png" style="border: 1px solid lightgrey;" /></li>
+                    <li><b>Legacy: Soup Signs 4Up</b>
+                        Prints description and list of ingredients on a 4UP sign. <a data-toggle="collapse" data-target="#SoupSignImg" href="#">View Sign</a>
+                        <img class="collapse" id="SoupSignImg" src="pdf_layouts/noauto/Legacy Soup Signs 4Up.png" style="border: 1px solid lightgrey;"/></li>
+                </ul>
+            </ul>
+            ';
     }
+
+//<img class="collapse" id="Img" src="pdf_layouts/noauto/Legacy Soup Signs 4Up.png" style="border: 1px solid lightgrey;"/>
+//<a data-toggle="collapse" data-target="#Img" href="#">View Sign</a>
 
     public function unitTest($phpunit)
     {

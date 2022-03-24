@@ -36,7 +36,29 @@ class RpDirectPage extends FannieRESTfulPage
         $date1 = date('Y-m-d', strtotime(FormLib::get('date1')));
         $date2 = date('Y-m-d', strtotime(FormLib::get('date2')));
         $args = array(FormLib::get('store'), $date1, $date2);
-        $ignore = '0 AS ignored';
+        $ignore = 'CASE WHEN receivedDate < ' . $this->connection->curdate() . ' THEN 1 ELSE 0 END AS ignored';
+
+        /**
+         * Check for past dates. Since the purpose it to view future expected
+         * deliveries, selected weekdays that are in the past should be pushed
+         * forward into the subsequent week
+         */
+        $ts1 = strtotime($date1);
+        $ts2 = strtotime($date2);
+        $today = strtotime(date('Y-m-d'));
+        if ($ts1 < $today) {
+            $ts1 = mktime(0, 0, 0, date('n', $ts1), date('j', $ts1) + 7, date('Y', $ts1));
+        }
+        if ($ts2 < $today) {
+            $ts2 = mktime(0, 0, 0, date('n', $ts2), date('j', $ts2) + 7, date('Y', $ts2));
+        }
+        if ($ts1 > $ts2) {
+            $swap = $ts2;
+            $ts2 = $ts1;
+            $ts1 = $swap;
+        }
+        $date1 = date('Y-m-d', $ts1);
+        $date2 = date('Y-m-d', $ts2);
 
         $date3 = false;
         $extra = FormLib::get('date3');
@@ -45,15 +67,16 @@ class RpDirectPage extends FannieRESTfulPage
             $date3 = date('Y-m-d', $d3ts);
             // safe embed because it's a formatted date string or false
             // for any user input
-            $ignore = "CASE WHEN receivedDate > {$date2} THEN 1 ELSE 0 END AS ignored";
+            $ignore = "CASE WHEN receivedDate > {$date2} OR receivedDate < " . $this->connection->curdate() . " 
+                THEN 1 ELSE 0 END AS ignored";
             $args[2] = $date3;
         }
 
-        $prep = $this->connection->prepare("SELECT receivedDate, internalUPC AS upc, brand, quantity AS qty,
+        $prep = $this->connection->prepare("SELECT receivedDate, internalUPC AS upc, brand, quantity AS qty, caseSize,
                 {$ignore}
             FROM PurchaseOrderItems AS i
                 INNER JOIN PurchaseOrder AS o ON i.orderID=o.orderID
-            WHERE o.vendorID=-2
+            WHERE (o.vendorID=-2 OR o.vendorInvoiceID LIKE 'PREBOOK %')
                 AND o.userID=-99
                 AND o.placed=1
                 AND o.storeID=?
@@ -70,6 +93,9 @@ class RpDirectPage extends FannieRESTfulPage
         foreach ($qtys as $row) {
             if (!isset($ret[$row['upc']])) {
                 $ret[$row['upc']] = array('upc' => $row['upc'], 'qty' => 0, 'text' => '');
+            }
+            if ($row['caseSize'] > 1) {
+                $row['qty'] *= $row['caseSize'];
             }
             if ($row['ignored'] != 1) {
                 $ret[$row['upc']]['qty'] += $row['qty'];
@@ -94,6 +120,7 @@ class RpDirectPage extends FannieRESTfulPage
     {
         $_SESSION['rpState'] = 'false';
         $model = new RpSessionsModel($this->connection);
+        $model->dataType('RP');
         $model->userID($this->userID);
         $model->delete();
 
@@ -110,6 +137,7 @@ class RpDirectPage extends FannieRESTfulPage
         $_SESSION['rpState'] = json_decode($this->json, true);
         $model = new RpSessionsModel($this->connection);
         $model->userID($this->userID);
+        $model->dataType('RP');
         $model->data($this->json);
         $model->save();
         echo 'OK';
@@ -217,6 +245,10 @@ class RpDirectPage extends FannieRESTfulPage
     
         $itemP = $this->connection->prepare("SELECT * FROM RpOrderItems WHERE upc=? AND storeID=?");
         $item = $this->connection->getRow($itemP, array($upc, $store));
+        if ($item === false) {
+            $itemP = $this->connection->prepare("SELECT * FROM RpLocalItems WHERE upc=?");
+            $item = $this->connection->getRow($itemP, array($upc));
+        }
         if (substr($upc, 0, 2) == "LC") {
             $prodP = $this->connection->prepare("SELECT p.brand, p.size, p.cost FROM upcLike AS u
                     INNER JOIN products AS p ON u.upc=p.upc WHERE u.likeCode=?");
@@ -247,21 +279,22 @@ class RpDirectPage extends FannieRESTfulPage
         $farm = FormLib::get('farm');
         if ($farm) {
             $words = array_map('trim', explode(' ', $farm));
+            $words = array_filter($words, function ($i) { return strlen($i) > 0; });
             $initials = array_reduce($words, function($c, $i) { return $c . $i[0]; });
             $sku = $initials . $sku;
-        }
 
-        $poi = new PurchaseOrderItemsModel($this->connection);
-        $poi->orderID($orderID);
-        $poi->sku($sku);
-        $poi->quantity(FormLib::get('qty'));
-        $poi->unitCost($prod['cost']);
-        $poi->caseSize(1);
-        $poi->unitSize($prod['size']);
-        $poi->brand($farm);
-        $poi->description($vendor == $item['backupID'] ? $item['backupItem'] : $item['vendorItem']);
-        $poi->internalUPC($upc);
-        $poi->save();
+            $poi = new PurchaseOrderItemsModel($this->connection);
+            $poi->orderID($orderID);
+            $poi->sku($sku);
+            $poi->quantity(FormLib::get('qty'));
+            $poi->unitCost($prod['cost']);
+            $poi->caseSize(1);
+            $poi->unitSize(isset($prod['size']) ? $prod['size'] : '');
+            $poi->brand($farm);
+            $poi->description($vendor == $item['backupID'] ? $item['backupItem'] : $item['vendorItem']);
+            $poi->internalUPC($upc);
+            $poi->save();
+        }
 
         $vendP = $this->connection->prepare("SELECT vendorName FROM vendors WHERE vendorID=?");
         $vend = $this->connection->getValue($vendP, array($vendor));
@@ -321,7 +354,7 @@ class RpDirectPage extends FannieRESTfulPage
 
     protected function get_view()
     {
-        $this->addScript('rpDirect.js?date=20200622');
+        $this->addScript('rpDirect.js?date=20200708');
         $this->addOnloadCommand('rpOrder.initAutoCompletes();');
         $store = FormLib::get('store');
         if (!$store) {
@@ -332,6 +365,7 @@ class RpDirectPage extends FannieRESTfulPage
         $jsState = isset($_SESSION['rpState']) ? json_encode($_SESSION['rpState']) : "false";
         if ($jsState === "false") {
             $sModel = new RpSessionsModel($this->connection);
+            $sModel->dataType('RP');
             $sModel->userID($this->userID);
             if ($sModel->load()) {
                 $jsState = $sModel->data();
@@ -442,18 +476,51 @@ class RpDirectPage extends FannieRESTfulPage
                 r.caseSize,
                 r.vendorID,
                 r.backupID,
-                r.cost
+                r.cost,
+                c.seq,
+                0 AS pri
             FROM RpOrderItems AS r
                 LEFT JOIN RpOrderCategories AS c ON r.categoryID=c.rpOrderCategoryID
                 LEFT JOIN vendors AS v ON r.vendorID=v.vendorID
                 LEFT JOIN vendors AS b ON r.backupID=b.vendorID
             WHERE r.storeID=?
-            ORDER BY c.seq, c.name, r.vendorItem");
+                AND r.deleted=0
+
+            UNION ALL
+
+            SELECT r.upc,
+                r.categoryID,
+                c.name,
+                v.vendorName AS vendorName,
+                b.vendorName AS backupVendor,
+                r.vendorSKU,
+                r.vendorItem,
+                r.backupSKU,
+                r.backupItem,
+                r.caseSize,
+                r.vendorID,
+                r.backupID,
+                r.cost,
+                c.seq,
+                1 AS pri
+                FROM RpLocalItems AS r
+                    LEFT JOIN RpOrderCategories AS c ON r.categoryID=c.rpOrderCategoryID
+                    LEFT JOIN vendors AS v ON r.vendorID=v.vendorID
+                    LEFT JOIN vendors AS b ON r.backupID=b.vendorID
+                WHERE r.likeCode IN (SELECT likeCode FROM RpLocalLCs)
+                    
+            ORDER BY seq, pri, name, vendorItem
+        ");
         $res = $this->connection->execute($prep, array($store));
         $tables = '';
         $category = false;
         $hiddenItems = '';
+        $seen = array();
         while ($row = $this->connection->fetchRow($res)) {
+            if (isset($seen[$row['upc']])) {
+                continue;
+            }
+            $seen[$row['upc']] = true;
             $likeCode = substr($row['upc'], 2);
             $localLC = $likeCode;
             if (strpos($localLC, '-')) {
@@ -479,9 +546,13 @@ class RpDirectPage extends FannieRESTfulPage
                 $row['vendorSKU'] = $mapped['sku'];
                 $row['lookupID'] = $mapped['vendorID'];
             }
-            $lcRow = $this->connection->getRow($lcP, array(str_replace('LC', '', $row['upc'])));
-            $lcName = $lcRow['likeCodeDesc'];
-            $organic = $lcRow['organic'] ? true : false;
+            $organic = false;
+            $lcName = $row['vendorItem'];
+            if (is_numeric(str_replace('LC', '', $row['upc']))) {
+                $lcRow = $this->connection->getRow($lcP, array(str_replace('LC', '', $row['upc'])));
+                $lcName = $lcRow['likeCodeDesc'];
+                $organic = $lcRow['organic'] ? true : false;
+            }
             $par = $this->connection->getValue($parP, array($store, $row['upc']));
             if (($par / $row['caseSize']) < 0.1) {
                 $par = 0.1 * $row['caseSize'];
@@ -492,7 +563,7 @@ class RpDirectPage extends FannieRESTfulPage
             $price = $this->connection->getValue($priceP, array(substr($row['upc'], 2)));
             $cost = $this->connection->getRow($costP,
                 array(isset($row['lookupID']) ? $row['lookupID'] : $row['vendorID'], $row['vendorSKU']));
-            if ($cost['units'] > 1 && $cost['units'] != $row['caseSize']) {
+            if ($cost && $cost['units'] > 1 && $cost['units'] != $row['caseSize']) {
                 $cost['cost'] /= $cost['units'];
             }
             if (!$cost) {
@@ -559,8 +630,8 @@ class RpDirectPage extends FannieRESTfulPage
             }
             $nextRow = sprintf('<tr class="%s">
                 <td class="upc %s">%s %s</td>
-                <td class="%s"><select class="primaryFarm form-control input-sm" data-default="%s">%s</option></td>
-                <td class="%s"><select class="secondaryFarm form-control input-sm">%s</option></td>
+                <td class="%s"><select class="primaryFarm form-control input-sm" data-default="%s" id="pf%s" onchange="rpOrder.updateFarm(this);">%s</option></td>
+                <td class="%s"><select class="secondaryFarm form-control input-sm" id="sf%s" onchange="rpOrder.updateFarm(this);">%s</option></td>
                 <td class="%s" title="%s">$%.2f %s %s %s%s</td>
                 <td style="display:none;" class="caseSize">%s</td>
                 <td style="display:none;" class="realSize">%s</td>
@@ -590,10 +661,10 @@ class RpDirectPage extends FannieRESTfulPage
                 (in_array($likeCode, $directLCs) && $row['vendorID'] != -2 && $row['backupID'] != -2) ? 'extraLocal' : '',
                 $highlight, $row['upc'], $lcName,
                 $highlight,
-                $farm1,
+                $farm1, $upc,
                 $opt1,
                 $highlight,
-                $opt2,
+                $upc, $opt2,
                 $highlight,
                 $tooltip,
                 $cost['cost'] * $row['caseSize'],
@@ -612,13 +683,13 @@ class RpDirectPage extends FannieRESTfulPage
                 $upc,
                 $orderAmt,
                 $upc, $store, $row['vendorID'],
-                ($inOrder['vendorID'] == $row['vendorID'] ? 'checked' : ''),
+                ($inOrder && $inOrder['vendorID'] == $row['vendorID'] ? 'checked' : ''),
                 '', // in secondary order ($inOrder ? 'info' : ''),
                 $fieldType,
                 $upc,
                 '', // secondary order amount
                 $upc, $store, $row['backupID'],
-                ($inOrder['vendorID'] == $row['backupID'] ? 'checked' : '')
+                ($inOrder && $inOrder['vendorID'] == $row['backupID'] && $row['backupID'] != null ? 'checked' : '')
             );
             if ($appendTables) {
                 $tables .= $nextRow;

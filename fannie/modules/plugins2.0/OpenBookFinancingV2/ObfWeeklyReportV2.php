@@ -234,7 +234,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
     public function preprocess()
     {
         $this->addScript('../../../src/javascript/Chart.min.js');
-        $this->addScript('summary.js');
+        $this->addScript('summary.js?date=20210706');
 
         return FannieReportPage::preprocess();
     }
@@ -295,7 +295,20 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
 
     private function getPlanSales($weekID)
     {
-        if ($weekID >= 218) {
+        if ($weekID >= 374) {
+            $prep = $this->connection->prepare("select c.obfCategoryID, m.superID, b.storeID, b.planGoal  
+                from " . FannieDB::fqn('ObfBudget', 'plugin:ObfDatabaseV2') . " AS b 
+                    left join " . FannieDB::fqn('ObfCategorySuperDeptMap', 'plugin:ObfDatabaseV2') . " AS m ON b.superID=m.superID 
+                    left join " . FannieDB::fqn('ObfCategories', 'plugin:ObfDatabaseV2') . " AS c ON m.obfCategoryID=c.obfCategoryID AND b.storeID=c.storeID 
+                WHERE c.hasSales=1 and obfWeekID=?");
+            $res = $this->connection->execute($prep, array($weekID));
+            $ret = array();
+            while ($row = $this->connection->fetchRow($res)) {
+                $key = $row['obfCategoryID'] . ',' . $row['superID'];
+                $ret[$key] = $row['planGoal'];
+            }
+            return $ret;
+        } elseif ($weekID >= 218) {
             $prep = $this->connection->prepare("
                 SELECT l.obfCategoryID, s.superID, (1+l.growthTarget)*s.lastYearSales AS plan
                 FROM " . FannieDB::fqn('ObfLabor', 'plugin:ObfDatabaseV2') . " AS l
@@ -418,7 +431,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
         $categories = new ObfCategoriesModelV2($dbc);
         $categories->hasSales(1);
         $categories->storeID($store);
-        foreach ($categories->find('name') as $category) {
+        foreach ($categories->find('seq', true) as $category) {
             $data[] = $this->headerRow($category->name(), 'black', array($category->obfCategoryID(), $week->obfWeekID()));
             $sum = array(0.0, 0.0);
             $dept_proj = 0.0;
@@ -534,6 +547,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
             $total_hours->quarterProjected += $qt_proj_hours;
             $total_sales->quarterLaborSales += $quarter['actualSales'];
 
+            /*
             $data[] = array(
                 'Hours',
                 '',
@@ -549,6 +563,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
                 'meta_background' => $this->colors[0],
                 'meta_foreground' => 'black',
             );
+             */
             $total_hours->actual += $labor->hours();
             $qtd_hours_ou += ($quarter['hours'] - $qt_proj_hours);
 
@@ -557,6 +572,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
 
             $quarter_actual_sph = $quarter['hours'] == 0 ? 0 : ($qtd_dept_sales)/($quarter['hours']);
             $quarter_proj_sph = ($qt_proj_hours == 0) ? 0 : ($qtd_dept_plan)/($qt_proj_hours);
+            /*
             $data[] = array(
                 'Sales per Hour',
                 '',
@@ -572,6 +588,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
                 'meta_background' => $this->colors[0],
                 'meta_foreground' => 'black',
             );
+             */
 
             /*
             $data[] = array(
@@ -610,6 +627,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
         $cat->storeID($store);
         $cat->name('Admin', '<>');
         foreach ($cat->find('name') as $c) {
+            continue; // no longer rendering labor data
             $data[] = $this->headerRow($c->name());
             $labor->obfCategoryID($c->obfCategoryID());
             $labor->load();
@@ -714,6 +732,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
             'meta_foreground' => 'black',
         );
 
+        /*
         $data[] = array(
             'Hours',
             '',
@@ -747,6 +766,7 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
             'meta_background' => $this->colors[0],
             'meta_foreground' => 'black',
         );
+         */
 
         $transGrowth = $store == 1 ? 0.925 : 1.0;
         $proj_trans = $total_trans->lastYear * $transGrowth;
@@ -789,11 +809,12 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
 
         $otherStore = $this->getOtherStore($store, $week->obfWeekID());
 
-        $data[] = array('meta'=>FannieReportPage::META_REPEAT_HEADERS);
+        //$data[] = array('meta'=>FannieReportPage::META_REPEAT_HEADERS);
         $cat = new ObfCategoriesModelV2($dbc);
         $cat->hasSales(0);
         $cat->name('Admin');
         foreach ($cat->find('name') as $c) {
+            continue; // no longer doing labor data
             $data[] = $this->headerRow($c->name());
             $labor->obfCategoryID($c->obfCategoryID());
             $labor->load();
@@ -938,8 +959,15 @@ class ObfWeeklyReportV2 extends ObfWeeklyReport
         }
 
         $data[] = array('meta'=>FannieReportPage::META_REPEAT_HEADERS);
-        $data[] = $this->ownershipThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly, false);
-        $data[] = $this->ownershipThisYear($dbc, $end_ts);
+        $owners = $this->ownershipThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly, false);
+        $data[] = array($owners[0], $owners[2], '', '', '', $owners[1], '', '', '', '', 
+            'meta' => $owners['meta'], 'meta_background' => $owners['meta_background']);
+        $owners = $this->ownershipThisYear($dbc, $end_ts);
+        $data[] = array($owners[0], $owners[2], '', '', '', $owners[1], '', '', '', 
+            'meta' => $owners['meta'], 'meta_background' => $owners['meta_background']);
+        $owners = $this->newEquityThisWeek($dbc, $start_ts, $end_ts, $start_ly, $end_ly);
+        $data[] = array($owners[0], $owners[2], '', '', '', $owners[1], '', '', '', 
+            'meta' => $owners['meta'], 'meta_background' => $owners['meta_background']);
 
         $json = $this->chartData($dbc, $this->form->weekID, $store);
         $this->addOnloadCommand("obfSummary.drawChart('" . json_encode($json) . "')");

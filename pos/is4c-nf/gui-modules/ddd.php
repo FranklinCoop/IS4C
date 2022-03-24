@@ -60,9 +60,6 @@ $vals->receiptType = 'ddd';
 $vals->ref = ReceiptLib::receiptNumber();
 TransRecord::finalizeTransaction(true);
 
-if (!class_exists('AjaxEnd')) {
-    include(__DIR__ . '/../AjaxEnd.php');
-}
 $ajax = new AjaxEnd(new WrappedStorage(), $vals);
 $ajax->ajax();
 if (!headers_sent()) {

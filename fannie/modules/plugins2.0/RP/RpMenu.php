@@ -20,8 +20,29 @@ class RpMenu extends FannieRESTfulPage
         <li><a href="RpDirectPage.php">Direct Ordering</a> - local & seasonal</li>
         <li><a href="RpArchivePage.php">Direct Orders Archive</a> - local & seasonal</li>
         <li><a href="RpDailyPage.php">Daily Sheet Info</a> - sales info & item lists</li>
+        <li><a href="RpPrintOrders.php">Reprint Order</a> - reprint an archived order</li>
     </ul>
 </ul>
+<hr />
+<ul>
+    <li>Floral</li>
+    <ul>
+        <li><a href="RpFloralPage.php">Order Guide</a></li>
+        <li><a href="../../../item/shrink/ShrinkTool.php">Enter Shrink</a></li>
+    </ul>
+</ul>
+<!--
+<ul>
+    <li>Plant Pre-Orders</li>
+    <ul>
+        <li><a href="../Pickup/ViewPickups.php">View Customer Orders</a></li>
+        <li><a href="../../../item/inventory/InvCountPage.php">Perpetual Inventory</a></li>
+        <li><a href="../../../purchasing/importers/FairhavenInvoiceImport.php">Upload Fairhaven Invoice</a></li>
+        <li><a href="../../../item/shrink/ShrinkTool.php">Enter Shrink</a></li>
+        <li><a href="../Pickup/PushUpdate.php">Update Website Inventory</a></li>
+    </ul>
+</ul>
+-->
 <hr />
 <ul>
     <li>Data Management</li>
@@ -34,6 +55,26 @@ class RpMenu extends FannieRESTfulPage
         <li><a href="RpFileManager.php">Import from RP</a> - reload data from the RP Excel file</li>
         <li><a href="RpSegmentation.php">Sales Segmentation</a> - projected day-by-day sales for a week</li>
         <li><a href="RpMarginEst.php">Estimate Margin</a> - drop in pricing from RP and preview applied margin</li>
+        <li><a href="RpPreBookPage.php">Enter Pre-Books</a> - input pre-books so they appear in the order guide.</a></li>
+        <li><a href="RpManualEntries.php">View Added Items</a> - report of items manually added to the order guide</a></li>
+    </ul>
+</ul>
+<hr />
+<ul>
+    <li>Pricing</li>
+    <ul>
+        <li>Comparison Shop</li>
+        <ul>
+            <li><a href="../../../item/likecodes/LikeCodeSKUsPage.php?id=6&store=1">Active @ Hillside</a></li>
+            <li><a href="../../../item/likecodes/LikeCodeSKUsPage.php?id=6&store=2">Active @ Denfeld</a></li>
+            <li><a href="../../../item/likecodes/LikeCodeSKUsPage.php?id=6&store=0">Active @ Either</a></li>
+        </ul>
+        <li>Upload Pricesheet</li>
+        <ul>
+            <li><a href="../../../batches/UNFI/load-classes/AlbertsUploadPage.php">Alberts</a></li>
+            <li><a href="../../../batches/UNFI/load-classes/CpwProduceUploadPage.php">CPW</a></li>
+            <li><a href="../../../batches/UNFI/load-classes/RdwUploadPage.php">RDW</a></li>
+        </ul>
     </ul>
 </ul>
 HTML;

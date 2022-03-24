@@ -40,7 +40,7 @@ class QuickKeyLauncher extends Parser
             $this->mode = 'overlay';
         }
 
-        $len = count($tmp);
+        $len = $tmp === false ? 0 : count($tmp);
         if ($tmp && $len <= 2 && is_numeric($tmp[$len-1])) {
             return true;
         } else {
@@ -95,7 +95,9 @@ class QuickKeyLauncher extends Parser
             }
         }
         if (count($my_keys) == 0) {
-            include(dirname(__FILE__) . '/quickkeys/noauto/' . $number . '.php');
+            if (file_exists(dirname(__FILE__) . '/quickkeys/noauto/' . $number . '.php')) {
+                include(dirname(__FILE__) . '/quickkeys/noauto/' . $number . '.php');
+            }
         }
 
         return $my_keys;
@@ -129,6 +131,12 @@ class QuickKeyLauncher extends Parser
             );
         }
         if (!$clearButton) {
+            while ($i % 3 != 0) {
+                $ret .= "<div class=\"qkBox\"><div id=\"qkDiv$count\">";
+                $ret .= "&nbsp;";
+                $ret .= "</div></div>";
+                $i++;
+            }
             $ret .= '<div class="qkBox">
                 <div>
                     <button type="button" class="quick_button pos-button errorColoredArea"

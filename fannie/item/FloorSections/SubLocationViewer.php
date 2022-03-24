@@ -65,8 +65,7 @@ class SubLocationViewer extends FannieRESTfulPage
         while ($row = $dbc->fetchRow($res)) {
             $dept = $row['department'] . '-' . $row['dept_name'];
             $fsName = $row['name'];
-            if (isset($subdata[$fsName]) && isset($subdata[$fsName][$row['subSection']]) 
-                && !array_key_exists($dept, $subdata[$fsName][$row['subSection']])) {
+            if (!isset($subdata[$fsName]) && !isset($subdata[$fsName][$row['subSection']]) ) {
                 $subdata[$fsName][$row['subSection']][$dept] = 1;
             } else {
                 $subdata[$fsName][$row['subSection']][$dept] += 1;

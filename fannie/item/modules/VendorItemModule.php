@@ -71,7 +71,10 @@ class VendorItemModule extends \COREPOS\Fannie\API\item\ItemModule {
         }
         $ret .= '</select>';
 
-        $prep = $dbc->prepare('SELECT * FROM vendorItems WHERE vendorID=? AND upc=?');
+        // we only use the first record for each vendor below, so here we sort
+        // by timestamp to get a deterministic pseudo-default, in cases where
+        // it is otherwise ambiguous
+        $prep = $dbc->prepare('SELECT * FROM vendorItems WHERE vendorID=? AND upc=? ORDER BY modified DESC');
         $style = ($matched) ? 'display:none;' : 'display:table;';
         $cost_class = '';
         foreach ($vendors as $id => $name) {
@@ -199,6 +202,13 @@ class VendorItemModule extends \COREPOS\Fannie\API\item\ItemModule {
             }
             if (empty($skus[$i]) || empty($costs[$i])) {
                 continue; // no submission. don't create a record
+            }
+            /**
+             * Must have a valid value for the data type.
+             * The default in the Model is 1.
+             */
+            if (empty($units[$i])) {
+                $units[$i] = 1;
             }
 
             $chkR = $dbc->execute($chkP,array($ids[$i],$upc));

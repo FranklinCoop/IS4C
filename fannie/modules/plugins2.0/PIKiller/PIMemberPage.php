@@ -330,6 +330,10 @@ class PIMemberPage extends PIKillerPage {
             echo '&nbsp;&nbsp;&nbsp;<a href="PISuspensionPage.php?fixaddress=1&id='.$this->card_no.'"
                 onclick="return confirm(\'Address is correct?\');">Address Corrected</a>';
         }
+        else if ($this->auth_mode == 'Limited' && isset($this->__models['suspended']) && $this->__models['suspended']->reasoncode() == 256){
+            echo '&nbsp;&nbsp;&nbsp;<a href="PISuspensionPage.php?fixpaperwork=1&id='.$this->card_no.'"
+                onclick="return confirm(\'Paperwork is signed?\');">Paperwork completed</a>';
+        }
         echo '</td>';
         echo "<td><a href=\"{$FANNIE_URL}ordering/clearinghouse.php?card_no="
             . ($this->card_no == 11 ? 0 : $this->card_no) ."\">Special Orders</a></td>";
@@ -340,6 +344,14 @@ class PIMemberPage extends PIKillerPage {
 
         $whP = $this->connection->prepare('SELECT * FROM ' . FannieDB::fqn('MemberSummary','plugin:WarehouseDatabase') . ' WHERE card_no=?');
         $whData = $this->connection->getRow($whP, array($this->id));
+        if (!is_array($whData)) {
+            $whData = array(
+                'homeStoreID' => 0,
+                'homeStorePercent' => 0,
+                'yearAverageSpending' => 0,
+                'yearTotalVisits' => 0,
+            );
+        }
 
         echo "<tr>";
         echo '<input type="hidden" name="customerID" value="' . $this->primary_customer['customerID'] . '" />';
@@ -368,13 +380,13 @@ class PIMemberPage extends PIKillerPage {
         echo '<td>'.$this->text_or_field('address2',$this->account['addressSecondLine']).'</td>';
         echo "<td class=\"yellowbg\">UPC: </td>";
         echo '<td colspan=\"2\">'.$this->text_or_field('upc',$this->account['idCardUPC']).'</td>';
+        /*
         echo "<td class=\"yellowbg\">Shop Rate: </td>";
         printf('<td>%.2f</td>', $whData['yearTotalVisits'] / 12);
-        /*
+         */
         echo "<td class=\"yellowbg\">Election Password: </td>";
         $vP = $dbc->prepare("SELECT password FROM Voters WHERE cardNo=?");
         printf('<td>%s</td>', $dbc->getValue($vP, array($this->id)));
-         */
         echo "</tr>";
 
         echo "<tr>";
@@ -425,8 +437,13 @@ class PIMemberPage extends PIKillerPage {
         $opts = array();
         $memtypes = new MemtypeModel($dbc);
         foreach($memtypes->find('memtype') as $mt){
-            $labels[] = $mt->memDesc();
-            $opts[] = $mt->memtype();
+            if ($mt->enabled()) {
+                $labels[] = $mt->memDesc();
+                $opts[] = $mt->memtype();
+            } elseif ($mt->memtype() == $this->account['customerTypeID']) {
+                $labels[] = $mt->memDesc();
+                $opts[] = $mt->memtype();
+            }
         }
         echo '<td>'.$this->text_or_select('memType',$this->account['customerTypeID'],
                 $opts, $labels,array(),$limitedEdit).'</td>';

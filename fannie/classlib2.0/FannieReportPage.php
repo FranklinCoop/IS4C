@@ -145,6 +145,8 @@ class FannieReportPage extends FanniePage
     */
     protected $chart_data_columns = array();
 
+    protected $queueable = false;
+
     protected $form;
 
     /** 
@@ -380,6 +382,9 @@ class FannieReportPage extends FanniePage
     */
     function report_content()
     {
+        if ($this->queueable && FormLib::get('queued', false)) {
+            return $this->queueReport();
+        }
         $data = $this->getData();
         $output = '';
         if ($this->multi_report_mode) {
@@ -730,12 +735,14 @@ class FannieReportPage extends FanniePage
                 break;
             case 'csv':
             case 'txt':
-                $sep = strtolower($format) == 'txt' ? "\t" : ',';
-                foreach ($this->defaultDescriptionContent(count($data)) as $line) {
-                    $ret .= $this->csvLine(array(strip_tags($line)), $sep);
-                }
-                foreach ($this->report_description_content() as $line) {
-                    $ret .= $this->csvLine(array(strip_tags($line)), $sep);
+                if ($this->multi_counter == 1) {
+                    $sep = strtolower($format) == 'txt' ? "\t" : ',';
+                    foreach ($this->defaultDescriptionContent(count($data)) as $line) {
+                        $ret .= $this->csvLine(array(strip_tags($line)), $sep);
+                    }
+                    foreach ($this->report_description_content() as $line) {
+                        $ret .= $this->csvLine(array(strip_tags($line)), $sep);
+                    }
                 }
             case 'xls':
                 break;
@@ -857,7 +864,10 @@ class FannieReportPage extends FanniePage
                         $this->addOnloadCommand("\$.tablesorter.themes.bootstrap['header'] += ' table-condensed small';");
                         $this->addOnloadCommand("\$('.mySortableTable').tablesorter({sortList: $sort, theme:'bootstrap', headerTemplate: '{content} {icon}', widgets: ['uitheme','zebra']});");
                     }
-                    $this->addOnloadCommand("\$('.mySortableTable').floatThead();\n");
+                    // by default this seems to use z-index: 2, but that means it floats *above*
+                    // the datepicker, when that is exposed.  datepicker apparently uses z-index:
+                    // 1 but we cannot override that, so here we at least keep them the same.
+                    $this->addOnloadCommand("\$('.mySortableTable').floatThead({zIndex: 1});\n");
                 } elseif ($this->new_tablesorter) {
                     /**
                       New bootstrap-themed tablesorter requires more setup to style correctly
@@ -1050,6 +1060,8 @@ class FannieReportPage extends FanniePage
             } elseif (is_numeric($row[$i]) && strlen($row[$i]) == 13) {
                 // auto-link UPCs to edit tool
                 $row[$i] = \COREPOS\Fannie\API\lib\FannieUI::itemEditorLink($row[$i]);
+            } elseif (!$header && preg_match('/^LC\d+$/', $row[$i])) {
+                $row[$i] = \COREPOS\Fannie\API\lib\FannieUI::likeCodeEditorLink($row[$i]);
             } else if (!$header && !$date && preg_match('/^\d\d\d\d-\d\d-\d\d$/', $row[$i])) {
                 // cell contains a date column
                 $date = $row[$i];
@@ -1334,6 +1346,39 @@ class FannieReportPage extends FanniePage
             $this->report_format = $format;
             $phpunit->assertNotEquals(0, strlen($this->report_content()));
         }
+    }
+
+    public function setFormat($f)
+    {
+        $this->report_format = $f;
+    }
+
+    private function queueReport()
+    {
+        $fileName = realpath($_SERVER['SCRIPT_FILENAME']);
+        $class = basename($fileName);
+        $class = substr($class, 0, strlen($class) - 4);
+        $email = FannieAuth::getEmail(FannieAuth::getUID());
+        $json = array(
+            'reportFile' => $fileName,
+            'reportClass' => $class,
+            'email' => $email,
+            'formData' => array(),
+        );
+        foreach ($this->form as $k => $v) {
+            $json['formData'][$k] = $v;
+        }
+        $queue = new COREPOS\Fannie\API\jobs\QueueManager();
+        $added = $queue->add(array(
+            'class' => 'COREPOS\\Fannie\\API\\jobs\\QueuedReport',
+            'data' => $json,
+        ));
+
+        if ($added) {
+            return '<div class="alert alert-success">Report queued for ' . $email . '</div>';
+        }
+
+        return '<div class="alert alert-danger">Report could not be queued</div>';
     }
 
 }

@@ -79,7 +79,7 @@ class HouseCoupon extends SpecialUPC
         }
 
         $add = $this->getValue($coupID);
-        TransRecord::addhousecoupon($upc, $add['department'], -1 * $add['value'], $add['description'], $add['discountable']);
+        TransRecord::addhousecoupon($upc, $add['department'], -1 * $add['value'], $add['description'], $add['discountable'], $add['tax']);
 
         $json['output'] = DisplayLib::lastpage();
         $json['udpmsg'] = 'goodBeep';
@@ -525,6 +525,7 @@ class HouseCoupon extends SpecialUPC
         $value = 0;
         $description = isset($infoW['description']) ? $infoW['description'] : '';
         $discountable = 1;
+        $tax = 0;
         switch ($infoW["discountType"]) {
             case "Q": // quantity discount
                 // discount = coupon's discountValue
@@ -562,33 +563,24 @@ class HouseCoupon extends SpecialUPC
                     $value = $infoW['discountValue'];
                 }
                 break;
-            case 'BQ': // Quantity-capped BOGO
+            case 'BQ': // BOGO Qty Limited
                 // get total number of coupon items
-                $valQ = 'SELECT SUM(l.quantity) '
-                        . $this->baseSQL($transDB, $coupID, 'upc') . "
-                        and h.type in ('BOTH', 'DISCOUNT')";
-                $valP = $transDB->prepare($valQ);
-                $qty = $transDB->getValue($valP);
-
-                // add cheapest items to total value until
-                // the allowed number of free items is reached
-                $priceQ = 'SELECT unitPrice '
+                $priceQ = 'SELECT unitPrice, quantity '
                         . $this->baseSQL($transDB, $coupID, 'upc') . "
                         and h.type in ('BOTH', 'DISCOUNT')
-                        ORDER BY unitPrice";
+                        ORDER BY unitPrice ASC";
                 $priceR = $transDB->query($priceQ);
                 $value = 0;
-                $freeItems = 1;
+                $tmp = array();
                 while ($priceW = $transDB->fetchRow($priceR)) {
-                    if ($freeItems*2 > $qty) {
-                        // not enough purchases to add a free item
-                        break;
-                    } elseif ($freeItems > $infoW['discountValue']) {
-                        // exceeds max number of free items
-                        break;
+                    $x = $priceW['quantity'];
+                    for ($x; $x > 0; $x--) {
+                        $tmp[] = $priceW['unitPrice'];
                     }
-                    $value += $priceW['unitPrice'];
-                    $freeItems++;
+                }
+                $f = floor(count($tmp) / 2);
+                for ($f; $f > 0; $f--) {
+                    $value += $tmp[$f-1];
                 }
                 break;
             case 'BH': // BOHO
@@ -686,10 +678,11 @@ class HouseCoupon extends SpecialUPC
                 $qualW = $transDB->getRow($qualP);
                 // qualQty = total quantity of qualifier items found
                 $qualQty = $qualW[0];
-                $deptQ = "SELECT (total/quantity) AS value, quantity
+                $deptQ = "SELECT (total/quantity) AS value, quantity, tax, foodstamp
                     " . $this->baseSQL($transDB, $coupID, 'upc') . "
                     AND h.type IN ('BOTH', 'DISCOUNT')
                     AND l.total > 0
+                    AND unitPrice < 10
                     ORDER BY unitPrice ASC 
                     LIMIT " . $qualQty;
                 $deptP = $transDB->prepare($deptQ);
@@ -698,6 +691,7 @@ class HouseCoupon extends SpecialUPC
                 $j = 0;
                 // $deptPrice = total price of discount items found
                 $deptPrice = 0;
+                $findTax = 999;
                 while ($row = $transDB->fetchRow($deptR)) {
                     // only tally discount item price if elible based on qualifier qty
                     if ($j < $qualQty) {
@@ -707,7 +701,13 @@ class HouseCoupon extends SpecialUPC
                             $deptPrice += $row['value']; 
                             $j++;
                         }
+                        if ($row['foodstamp'] && $row['tax'] < $findTax) {
+                            $findTax = $row['tax'];
+                        }
                     }
+                }
+                if ($findTax < 999) {
+                    $tax = $findTax;
                 }
                 $price = $discoVal * $j;
                 $value = ($deptPrice != 0) ? $price - $deptPrice : 0;
@@ -815,11 +815,11 @@ class HouseCoupon extends SpecialUPC
                 $giftW = $transDB->fetchRow($giftR);
                 $freeCards = floor($giftW['ttl'] / $infoW['minValue']);
                 $value = $infoW['discountValue'] * $freeCards;
-                if ($value > 100) {
-                    $value = 100;
+                if ($value > 80) {
+                    $value = 80;
                 }
                 $discountable = 0;
-                $curR = $transDB->prepare("SELECT SUM(-1 * total) AS ttl FROM translog.localtemptrans WHERE upc='0049999900370'");
+                $curR = $transDB->prepare("SELECT SUM(-1 * total) AS ttl FROM translog.localtemptrans WHERE upc='0049999900467'");
                 $current = $transDB->getValue($curR);
                 if ($value - $current) {
                     TransRecord::addtender('Store Credit', 'SC', $value - $current);
@@ -927,7 +927,7 @@ class HouseCoupon extends SpecialUPC
             $value = $infoW['maxValue'];
         }
 
-        return array('value' => $value, 'department' => $infoW['department'], 'description' => $description, 'discountable'=>$discountable);
+        return array('value' => $value, 'department' => $infoW['department'], 'description' => $description, 'discountable'=>$discountable, 'tax'=>$tax);
     }
 
     /**

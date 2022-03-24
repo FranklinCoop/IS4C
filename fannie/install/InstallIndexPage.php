@@ -169,9 +169,13 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
             $obj = json_decode($json);
             $missing = false;
             foreach (get_object_vars($obj->require) as $package => $version) {
-                if (!is_dir(dirname(__FILE__) . '/../../vendor/' . $package)) {
-                    $missing = true;
-                    echo "<div class=\"alert alert-danger\"><b>Warning</b>: package " . $package . " is not installed.</div>";
+                if (preg_match('/^corepos\/office-plugin-/', $package)) {
+                    error_log("TODO: cannot confirm installation of CORE Office plugin: $package");
+                } else {
+                    if (!is_dir(dirname(__FILE__) . '/../../vendor/' . $package)) {
+                        $missing = true;
+                        echo "<div class=\"alert alert-danger\"><b>Warning</b>: package " . $package . " is not installed.</div>";
+                    }
                 }
             }
             if ($missing) {
@@ -639,6 +643,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'BrandsModel',
         'ConsistentProductRulesModel',
         'CoopDealsItemsModel',
+        'CouponAltsModel',
         'CronBackupModel',
         'CustdataModel',
         'CustdataBackupModel',
@@ -692,6 +697,7 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'PartialBatchesModel',
         'ParametersModel',
         'PatronageModel',
+        'PluginSettingsModel',
         'PriceRulesModel',
         'PriceRuleTypesModel',
         'ProductsModel',
@@ -715,6 +721,8 @@ class InstallIndexPage extends \COREPOS\Fannie\API\InstallPage {
         'ReasoncodesModel',
         'SalesLiftsModel',
         'ScaleItemsModel',
+        'ScaleIngredientsModel',
+        'ScaleIngredientHistoryModel',
         'ScaleLabelsModel',
         'ServiceScalesModel',
         'ServiceScaleItemMapModel',

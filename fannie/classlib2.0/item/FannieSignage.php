@@ -77,6 +77,7 @@ class FannieSignage
         $this->items = $items;
         $this->source = strtolower($source);
         $this->source_id = $source_id;
+        $this->store = Store::getIdByIp();
     }
 
     protected $connection = null;
@@ -212,7 +213,7 @@ class FannieSignage
                 }
             }
 
-            if (!isset($row['signCount']) || $row['signCount'] < 0) {
+            if (!isset($row['signCount']) || $row['signCount'] < 0 || !is_numeric($row['signCount'])) {
                 $row['signCount'] = 1;
             }
             if (isset($this->itemRepeats[$row['upc']])) {
@@ -252,6 +253,8 @@ class FannieSignage
                   FROM shelftags AS s
                     ' . DTrans::joinProducts('s', 'p', 'INNER') . '
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
+                    LEFT JOIN vendorItems AS v ON v.upc=p.upc AND v.vendorID=p.default_vendor_id
+                    LEFT JOIN vendors AS ven ON ven.vendorID=v.vendorID
                   WHERE s.id=?
                   ORDER BY p.department, s.upc';
         $args = array($this->source_id);
@@ -669,7 +672,7 @@ class FannieSignage
         //Draw bars
         $full_width = 0;
         for ($i=0;$i<strlen($code);$i++) {
-            if ($code{$i}=='1') {
+            if ($code[$i]=='1') {
                 if ($vertical) {
                     $pdf->Rect($x, $y+($i*$height), $width, $height, 'F');
                 } else {
@@ -1147,5 +1150,66 @@ class FannieSignage
 
         return true;
     }
+
+    static function sortProductsByPhysicalLocation($dbc, $data, $storeID)
+    {
+
+        $upcs = array();
+        foreach ($data as $k => $row) {
+            $upcs[] = $row['upc']; 
+        }
+        list($inStr, $args) = $dbc->safeInClause($upcs);
+        $args[] = $storeID;
+        $query = "
+SELECT f.upc, v.sections,
+UPPER( CONCAT( SUBSTR(name, 1, 1), SUBSTR(name, 2, 1), SUBSTR(name, -1), '-', sub.SubSection)) AS location,
+UPPER( CONCAT( SUBSTR(name, 1, 1), SUBSTR(name, 2, 1), SUBSTR(name, -1))) AS noSubLocation
+FROM FloorSectionProductMap AS f
+    LEFT JOIN FloorSections AS s ON f.floorSectionID=s.floorSectionID
+    LEFT JOIN FloorSectionsListView AS v ON v.upc=f.upc
+        AND v.storeID=s.storeID
+    LEFT JOIN FloorSubSections AS sub ON f.floorSectionID=sub.floorSectionID
+        AND sub.upc=f.upc
+    WHERE f.upc IN ($inStr)
+        AND s.storeID = ? 
+ORDER BY SUBSTR(name, 1, 1), SUBSTR(name, 2, 1), SUBSTR(name, -1), sub.SubSection;
+        ";
+        $prep = $dbc->prepare($query);
+        $res = $dbc->execute($prep, $args);
+
+        $i = 0;
+        while ($row = $dbc->fetchRow($res)) {
+            $tmpKey = self::getKeyByUpc($data, $row['upc']);
+            $data[$tmpKey]['order'] = $i;
+            $i++;
+        }
+
+        $newData = array();
+        $i = 0;
+        $endOfList = 9999;
+        foreach ($data as $k => $row) {
+            $order = isset($row['order']) ? $row['order'] : $endOfList;
+            //$order = $i;
+            foreach ($row as $name => $value){
+                $newData[$order][$name] = $value;
+            }
+            $i++;
+            $endOfList++;
+        }
+        ksort($newData);
+
+        return $newData;
+    }
+
+    static function getKeyByUpc($data, $upc)
+    {
+        foreach ($data as $k => $row) {
+            if ($row['upc'] == $upc)
+                return $k;
+        }
+
+        return rand();
+    }
+
 }
 

@@ -192,7 +192,7 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
         if ($vendorID !== '') {
             $item = new VendorItemsModel($dbc);
             $item->createIfMissing($upc, $vendorID);
-            $item->updateCostByUPC($upc, $cost, $vendorID);
+            $item->updateCostByUPC($upc, $form->cost, $vendorID);
         }
         
         COREPOS\Fannie\API\data\ItemSync::sync($upc);
@@ -241,7 +241,7 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
         return array(
             'alertBox'=>$ret,
             'upc'=>ltrim($upc, '0'),
-            'enc_desc'=>$encoded_desc
+            'enc_desc'=>base64_encode($desc),
         );
     }
 
@@ -289,7 +289,7 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
         $super = FormLib::get('deptSub');
         $vendorID = FormLib::get('vendor');
         $upc_list = FormLib::get('u', array());
-        $inUse = FormLib::get('inUse', 1);
+        $inUse = FormLib::get('inUse', 0);
         $store = FormLib::get('store', 0);
 
         $sort = FormLib::get('sort','Department');   
@@ -419,7 +419,9 @@ class ProductListPage extends \COREPOS\Fannie\API\FannieReportTool
         } else {
             return 'Unknown search method';
         }
-        $query .= ' AND i.inUse=' . ($inUse==1 ? 1 : 0) . ' ';
+        if ($inUse) {
+            $query .= ' AND i.inUse=1 ';
+        }
         if ($store > 0) {
             $query .= ' AND i.store_id=? ';
             $args[] = $store;

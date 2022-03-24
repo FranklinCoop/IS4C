@@ -2,6 +2,9 @@
 if (!class_exists('FpdfWithBarcode')) {
     include(dirname(__FILE__) . '/../FpdfWithBarcode.php');
 }
+if (!class_exists('FpdfLib')) {
+    include(dirname(__FILE__) . '/FpdfLib.php');
+}
 /*
     Using layouts
     1. Make a file, e.g. New_Layout.php
@@ -51,11 +54,34 @@ $pdf=new WFC_Hybrid_PDF('P','mm','Letter'); //start new instance of PDF
 $pdf->Open(); //open new PDF Document
 $pdf->setTagDate(date("m/d/Y"));
 $dbc = FannieDB::get(FannieConfig::config('OP_DB'));
-$narrowP = $dbc->prepare('SELECT upc FROM productUser WHERE upc=? AND narrow=1');
-$locationP = $dbc->prepare('SELECT s.name FROM FloorSectionProductMap AS m
-    INNER JOIN FloorSections AS s ON m.floorSectionID=s.floorSectionID 
-    WHERE m.upc=? AND s.storeID = 1');
 $store = COREPOS\Fannie\API\lib\Store::getIdByIp();
+
+$narrowP = $dbc->prepare('SELECT upc FROM productUser WHERE upc=? AND narrow=1');
+$upcs = array();
+$locations = array();
+foreach ($data as $k => $row) {
+    $upc = $row['upc'];
+    $upcs[] = $upc;
+}
+list($inStr, $locationA) = $dbc->safeInClause($upcs);
+$locationP = $dbc->prepare("
+SELECT f.upc, 
+UPPER( CONCAT( SUBSTR(name, 1, 1), SUBSTR(name, 2, 1), SUBSTR(name, -1), '-', sub.SubSection)) AS location,
+UPPER( CONCAT( SUBSTR(name, 1, 1), SUBSTR(name, 2, 1), SUBSTR(name, -1))) AS noSubLocation
+FROM FloorSectionProductMap AS f
+    LEFT JOIN FloorSections AS s ON f.floorSectionID=s.floorSectionID
+    LEFT JOIN FloorSubSections AS sub ON f.floorSectionID=sub.floorSectionID 
+        AND sub.upc=f.upc
+    WHERE f.upc IN ($inStr)
+        AND s.storeID = ?
+");
+$locationA[count($locationA)] = $store;
+$res = $dbc->execute($locationP, $locationA);
+while ($row = $dbc->fetchRow($res)) {
+    $upc = ltrim($row['upc'],0);
+    $locations[$upc][] = ($row['location'] != null) ? $row['location'] : $row['noSubLocation'];
+}
+
 $mtLength = $store == 1 ? 3 : 7;
 $signage = new COREPOS\Fannie\API\item\FannieSignage(array());
 $mtP = $dbc->prepare('SELECT p.auto_par
@@ -71,7 +97,6 @@ $updateMT = $dbc->prepare('
 
 $full = array();
 $half = array();
-$location = array();
 foreach ($data as $k => $row) {
     if ($dbc->getValue($narrowP, array($row['upc']))) {
         $row['full'] = false;
@@ -82,21 +107,13 @@ foreach ($data as $k => $row) {
         $row['movementTag'] = $dbc->getValue($mtP, array($row['upc'], $store));
         $full[] = $row;
     }
-    $loc = $dbc->getValue($locationP, array($row['upc']));
-    $data[$k]['location'] = $loc;
 }
 
+
+$full= FpdfLib::sortProductsByPhysicalLocation($dbc, $full, $store);
+$half= FpdfLib::sortProductsByPhysicalLocation($dbc, $half, $store);
 $data = array_merge($full, $half);
 
-function sortByLocation($a, $b)
-{                              
-    $a = $a['location'];       
-    $b = $b['location'];       
-                                           
-    if ($a == $b) return 0;
-    return ($a < $b) ? -1 : 1; 
-}
-//usort($data, 'sortByLocation');
 
 $width = 52; // tag width in mm
 $height = 31; // tag height in mm
@@ -131,18 +148,6 @@ $baseY = 31 + $bTopOff; // baseline Y location of label
 $baseX = 6;  // baseline X location of label
 $down = 31.0;
 
-/*
-list($inStr, $args) = $dbc->safeInClause($full);
-$query = "SELECT upc, fs.name FROM FloorSectionProductMap AS f
-    LEFT JOIN FloorSections AS fs ON f.floorSectionID=fs.floorSectionID
-    WHERE f.upc IN ({$inStr}) AND fs.storeID = 1 ORDER BY fs.name;";
-$prep = $dbc->prepare($query);
-$res = $dbc->execute($prep,$args);
-$locations = array();
-while ($row = $dbc->fetchRow($res)) {
-    $locations[$row['upc']] = $row['name'];
-}*/
-
 //cycle through result array of query
 foreach($data as $row) {
    // extract & format data
@@ -157,7 +162,7 @@ foreach($data as $row) {
         $ppu = isset($row['pricePerUnit']) ? $row['pricePerUnit'] : '';
         $upc = ltrim($row['upc'],0);
         $check = $pdf->GetCheckDigit($upc);
-        $vendor = substr($row['vendor'],0,7);
+        $vendor = substr(isset($row['vendor']) ? $row['vendor'] : '',0,7);
 
         /**
          * Full tags are further sub-divided.
@@ -174,6 +179,12 @@ foreach($data as $row) {
             $border = $mtLength == 7 ? 'TBR' : 'TBL';
             $pdf->Cell(9, 4, sprintf('%.1f', ($row['movementTag']*$mtLength)), $border, 1, 'C');
             $dbc->execute($updateMT, array(($row['movementTag']*$mtLength), $row['upc'], $store));
+            $pdf->SetXY($full_x+38, $full_y+8);
+            $pdf->Cell(9, 4, current($locations[$upc]), 0, 1, 'C');
+            $key = key($locations[$upc]);
+            if (isset($locations[$upc][$key+1])) {
+                next($locations[$upc]);
+            }
         } else {
             //Start laying out a label
             if (strlen($upc) <= 11)
@@ -197,9 +208,18 @@ foreach($data as $row) {
         $pdf->SetX($full_x);
         $pdf->Cell($width-5,4,$ppu,0,0,'R');
 
+        $lbMod = 0;
+        if (strpos($size, '#') != 0) {
+            $lbMod = -5;
+            $pdf->SetFont('Arial','B',12);
+            $pdf->SetXY($full_x,$full_y+17);
+            $pdf->Cell($width-5,8,'/lb',0,0,'R');
+        }
+
         $pdf->SetFont('Arial','B',24);  //change font size
-        $pdf->SetXY($full_x,$full_y+16);
+        $pdf->SetXY($full_x+$lbMod,$full_y+16);
         $pdf->Cell($width-5,8,$price,0,0,'R');
+
    } else {
         $price = $row['normal_price'];
         $desc = strtoupper(substr($row['description'],0,27));
@@ -210,7 +230,7 @@ foreach($data as $row) {
         $upc = ltrim($row['upc'],0);
         $check = $pdf->GetCheckDigit($upc);
         $tagdate = date('m/d/y');
-        $vendor = substr($row['vendor'],0,7);
+        $vendor = substr(isset($row['vendor']) ? $row['vendor'] : '',0,7);
 
         //Start laying out a label
         $pdf->SetFont('Arial','',8);  //Set the font
@@ -266,7 +286,7 @@ foreach($data as $row) {
            if ($curCnt == 0) {
                $curStr .= $word . " ";
                $length += strlen($word)+1;
-           } elseif ($curCnt == 1 && ($length + strlen($word + 1)) < 17) {
+           } elseif ($curCnt == 1 && ($length + strlen($word) + 1) < 17) {
                $curStr .= $word . " ";
                $length += strlen($word)+1;
            } elseif ($curCnt > 1 && ($length + 1) < 17) {
@@ -298,7 +318,8 @@ foreach($data as $row) {
    // one and reset x/y top left margins
    // otherwise if it's the end of a line,
    // reset x and move y down by tag height
-   if ($num % 32 == 0){
+   $modTagsPerPage = ($offset == 0) ? 32 : 24;
+   if ($num % $modTagsPerPage == 0){
     $pdf->AddPage();
     // full size
     $full_x = $left;

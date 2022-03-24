@@ -228,7 +228,7 @@ class OverShortDepositSlips extends FanniePage
             $str .= "\n";
         }
         $pdf->SetX(($width+2)*4 + 5);
-        $pdf->MultiCell(55,8,$str,'LR','L');
+        //$pdf->MultiCell(55,8,$str,'LR','L');
 
         $dbstack = array('buyAmount'=>array(),
                  'depositAmount'=>array());
@@ -255,7 +255,24 @@ class OverShortDepositSlips extends FanniePage
         if (isset($dbstack['depositAmount']['50.00'])) $cash += $dbstack['depositAmount']['50.00'];
         if (isset($dbstack['depositAmount']['100.00'])) $cash += $dbstack['depositAmount']['100.00'];
 
+        $cashP = $dbc->prepare("SELECT rowName, amt FROM dailyDeposit WHERE dateStr=? AND storeID=? AND countFormat=2 AND rowName LIKE 'drop%'");
+        $cashR = $dbc->execute($cashP, array($dateClause, $store));
+        $cashTTL = 0;
+        while ($cashW = $dbc->fetchRow($cashR)) {
+            $label = str_replace('drop', '', $cashW['rowName']);
+            if (is_numeric($label)) {
+                $label = date('m/d', strtotime($label));
+            }
+            $pdf->SetX(($width+2)*4 + 5);
+            $pdf->Cell(15, 8, $label, 'L', 0, 'L');
+            $pdf->Cell(40,8,"\t$".sprintf('%.2f',$cashW['amt']),'TBR',1);
+            $cashTTL += $cashW['amt'];
+        }
+        $pdf->SetX(($width+2)*4 + 5);
+        $pdf->Cell(15,8,'Total','L',0,'L');
+        $pdf->Cell(40,8,"\t$".sprintf('%.2f',$cashTTL),'TBR',1);
 
+        /*
         $pdf->SetX(($width+2)*4 + 5);
         $pdf->Cell(15,8,'Checks','L',0,'L');
         $pdf->Cell(40,8,"\t$".sprintf('%.2f',$ckSum),'TBR',1);
@@ -272,13 +289,14 @@ class OverShortDepositSlips extends FanniePage
         $pdf->SetX(($width+2)*4 + 5);
         $pdf->Cell(15,8,'Total','L',0,'L');
         $pdf->Cell(40,8,"\t$".sprintf('%.2f',$junk+$cash+$coin+$ckSum),'TBR',1);
+         */
 
         $pdf->SetTextColor(255,255,255);
         $pdf->SetX(($width+2)*4+5);
         $pdf->MultiCell(55,8,"Change Request",0,'C',1);
 
         $pdf->SetTextColor(0,0,0);
-        $denoms = array('0.01','0.05','0.10','0.25','1.00','5.00','10.00');
+        $denoms = array('0.01','0.05','0.10','0.25','1.00','5.00','10.00', '20.00');
         $total = array_sum($dbstack['buyAmount']);
         if (!empty($dbstack['buyAmount'])){
             if ($dbstack['buyAmount']['0.01'] > 50)

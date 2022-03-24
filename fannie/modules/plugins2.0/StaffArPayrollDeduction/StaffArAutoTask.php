@@ -45,6 +45,7 @@ class StaffArAutoTask extends FannieTask
                     s.nextPayment AS adjust
                 FROM StaffArAccounts AS s
                     LEFT JOIN " . FannieDB::fqn('custdata', 'op') . " AS c ON s.card_no=c.CardNo AND c.personNum=1
+                WHERE s.nextPayment >= 0
                 ORDER BY c.lastName");
             $csv = "Employee ID (Clock Sequence),\"1 = Earning, 3 = Deduction\",Paycom Deduction Code,adjust ded amount\r\n";
             while ($row = $dbc->fetchRow($res)) {
@@ -63,8 +64,9 @@ class StaffArAutoTask extends FannieTask
             $mail->From = $this->config->get('ADMIN_EMAIL');
             $mail->FromName = 'WFC Staff AR';
             $mail->isHTML = false;
-            $mail->addAddress('tracyjohnson@wholefoods.coop');
             $mail->addAddress('jlepak@wholefoods.coop');
+            $mail->addAddress('shannigan@wholefoods.coop');
+            $mail->addAddress('skvale@wholefoods.coop');
             $mail->addAddress('andy@wholefoods.coop');
             $mail->Subject = 'Payroll Deductions for ' . $next;
             $mail->Body = 'Data file attached';

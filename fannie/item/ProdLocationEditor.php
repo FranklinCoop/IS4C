@@ -50,7 +50,26 @@ class ProdLocationEditor extends FannieRESTfulPage
         $this->__routes[] = 'get<searchupc>';
         $this->__routes[] = 'post<newLocation>';
         $this->__routes[] = 'get<list>';
+        $this->__routes[] = 'post<delete_location>';
         return parent::preprocess();
+    }
+
+    function post_delete_location_handler()
+    {
+        global $FANNIE_OP_DB;
+        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $upc = FormLib::get('upc');
+        $upc = str_pad($upc, 13, '0', STR_PAD_LEFT);
+        $location = FormLib::get('location');
+        $args = array($upc, $location);
+        $prep = $dbc->prepare('
+            DELETE FROM FloorSectionProductMap
+            WHERE upc = ?
+                AND floorSectionID = ?
+        ');
+        $dbc->execute($prep, $args);
+
+        return false;
     }
 
     function post_newLocation_view()
@@ -62,14 +81,11 @@ class ProdLocationEditor extends FannieRESTfulPage
         $newLocation = FormLib::get('newLocation');
 
         $args = array($upc, $newLocation);
-        $chkP = $dbc->prepare("SELECT 1 FROM FloorSectionProductMap WHERE upc=? AND floorSectionID=?");
-        if (!$dbc->getValue($chkP, $args)) {
-            $prep = $dbc->prepare('
-                INSERT INTO FloorSectionProductMap (upc, floorSectionID)
-                    values (?, ?)
-            ');
-            $dbc->execute($prep, $args);
-        }
+        $prep = $dbc->prepare('
+            INSERT INTO FloorSectionProductMap (upc, floorSectionID)
+                values (?, ?)
+        ');
+        $dbc->execute($prep, $args);
 
         $ret = '';
         if ($dbc->error()) {
@@ -170,15 +186,12 @@ class ProdLocationEditor extends FannieRESTfulPage
             if ($section > 0) $item[$upc] = $section;
         }
 
-        $chkP = $dbc->prepare("SELECT 1 FROM FloorSectionProductMap WHERE upc=? AND floorSectionID=?");
         $prep = $dbc->prepare('
             INSERT INTO FloorSectionProductMap (upc, floorSectionID) values (?, ?);
         ');
         foreach ($item as $upc => $section) {
             $args = array($upc, $section );
-            if (!$dbc->getValue($chkP, $args)) {
-                $dbc->execute($prep, $args);
-            }
+            $dbc->execute($prep, $args);
         }
         $ret .= '<div class="alert alert-success">Update Successful</div>';
 
@@ -221,13 +234,10 @@ class ProdLocationEditor extends FannieRESTfulPage
             $dbc->execute($prepZ,$args);
 
             $args = array($upc,$section);
-            $chkP = $dbc->prepare("SELECT 1 FROM FloorSectionProductMap WHERE upc=? AND floorSectionID=?");
-            if (!$dbc->getValue($chkP, $args)) {
-                $prep = $dbc->prepare('
-                    INSERT INTO FloorSectionProductMap (upc, floorSectionID) values (?, ?);
-                ');
-                $dbc->execute($prep, $args);
-            }
+            $prep = $dbc->prepare('
+                INSERT INTO FloorSectionProductMap (upc, floorSectionID) values (?, ?);
+            ');
+            $dbc->execute($prep, $args);
         }
         $ret .= '<div class="alert alert-success">Update Successful</div>';
 
@@ -326,11 +336,11 @@ class ProdLocationEditor extends FannieRESTfulPage
             $ret .= '<table class="table">
                 <thead>
                     <th>UPC</th>
-                    <td>Brand</th>
-                    <td>Description</th>
-                    <td>Dept. No.</th>
-                    <td>Department</th>
-                    <td>Location</th>
+                    <th>Brand</th>
+                    <th>Description</th>
+                    <th>Dept. No.</th>
+                    <th>Department</th>
+                    <th>Location</th>
                 </thead>
                 <form method="post">
                     <input type="hidden" name="save" value="1">
@@ -341,8 +351,8 @@ class ProdLocationEditor extends FannieRESTfulPage
                 ';
             foreach ($item as $key => $row) {
                 $ret .= '
-                    <tr><td><a href="ProdLocationEditor.php?store_id=&upc=' . 
-                        $key . '&searchupc=Update+Locations+by+UPC" target="">' . $key . '</a></td>
+                    <tr><td><a href="ProdLocationEditor.php?store_id=&upc=' .
+                        $key . '&searchupc=Update+Locations+by+UPC" target="_blank">' . $key . '</a></td>
                     <td>' . $row['brand'] . '</td>
                     <td>' . $row['desc'] . '</td>
                     <td>' . $row['dept'] . '</td>
@@ -428,7 +438,7 @@ class ProdLocationEditor extends FannieRESTfulPage
         while ($row = $dbc->fetch_row($result)) {
             $upcsWithLoc[] = $row['upc'];
         }
-        
+
         $upcsMissingLoc = array();
         foreach ($plus as $upc) {
             if (!in_array($upc,$upcsWithLoc)) {
@@ -455,11 +465,12 @@ class ProdLocationEditor extends FannieRESTfulPage
         ';
         $bQuery = $dbc->prepare($bString);
         $bResult = $dbc->execute($bQuery,$bArgs);
-    
+
         $item = array();
         $result = $dbc->execute($query,$args);
 
         $results = array($result,$bResult);
+        $sections = array();
         foreach ($results as $res) {
             while($row = $dbc->fetch_row($res)) {
                 $item[$row['upc']]['upc'] = $row['upc'];
@@ -467,10 +478,26 @@ class ProdLocationEditor extends FannieRESTfulPage
                 $item[$row['upc']]['desc'] = $row['pdesc'];
                 $item[$row['upc']]['brand'] = $row['brand'];
                 $item[$row['upc']]['dept_name'] = $row['dept_name'];
-                $item[$row['upc']]['curSections'] = isset($row['sections']) ? $row['sections'] : '';
+                $section = isset($row['sections']) ? $row['sections'] : '';
+                $item[$row['upc']]['curSections'] = $section;
+                $v = isset($row['curSections']) ? $row['curSections'] : '';
+                if (!in_array($section, $sections)) {
+                    $sections[] = $section;
+                }
             }
             if ($dbc->error()) {
                 echo '<div class="alert alert-danger">' . $dbc->error() . '</div>';
+            }
+        }
+
+        $sectionContent = "<strong>Show Locations: </strong>";
+        foreach ($sections as $section) {
+            if ($section != null) {
+                $sectionContent .= "<span style=\"padding: 10px;\">
+                    <input type=\"checkbox\" class=\"checkboxx\" name=\"$section\"
+                    id=\"$section\" checked>
+                    <label for=\"$section\" style=\"font-weight: normal\">$section</label>
+                    </span>";
             }
         }
 
@@ -494,7 +521,7 @@ class ProdLocationEditor extends FannieRESTfulPage
             echo '<div class="alert alert-danger">'.$er.'</div>';
         }
 
-
+        $ret .= $sectionContent;
         $ret .= '<table class="table mySortableTable tablesorter tablesorter-bootstrap">
             <thead>
                 <th>UPC</th>
@@ -523,13 +550,13 @@ class ProdLocationEditor extends FannieRESTfulPage
             ';
         foreach ($item as $key => $row) {
             $ret .= '
-                <tr><td><a href="ProdLocationEditor.php?store_id=&upc=' . 
+                <tr data-selected=""><td><a href="ProdLocationEditor.php?store_id=&upc=' .
                     $key . '&searchupc=Update+Locations+by+UPC" target="">' . $key . '</a></td>
                 <td>' . $row['brand'] . '</td>
                 <td>' . $row['desc'] . '</td>
                 <td>' . $row['dept'] . '</td>
                 <td>' . $row['dept_name'] . '</td>
-                <td>' . $row['curSections'] . '</td>
+                <td class="locations">' . $row['curSections'] . '</td>
                 <td><Span class="collapse"> </span>
                     <select class="locationSelect form-control input-sm" name="' . $key . '" value="" />
                         <option value="0">* no location selected *</option>';
@@ -548,8 +575,8 @@ class ProdLocationEditor extends FannieRESTfulPage
         $ret .= '<tr><td><input type="submit" class="btn btn-default" value="Update Locations"></td>
             <td><a class="btn btn-default" href="ProdLocationEditor.php">Back</a><br><br></td></table>
             </form>';
-        $this->addScript('../src/javascript/tablesorter/jquery.tablesorter.js');
-        $this->addOnloadCommand("$('.mySortableTable').tablesorter();");
+        // tablesorter scripts not included?
+        //$this->addOnloadCommand("$('.mySortableTable').tablesorter();");
 
         return $ret;
 
@@ -660,8 +687,6 @@ class ProdLocationEditor extends FannieRESTfulPage
                 $brand = $model->brand();
                 $description = $model->description();
                 $sugLocation = $this->getLocation($model->department(),$dbc);
-                $department = $model->department();
-                $dept_name = '';
             } else {
                 while ($row = $dbc->fetch_row($result)) {
                     $floorID = $row['floorSectionID'];
@@ -715,7 +740,9 @@ class ProdLocationEditor extends FannieRESTfulPage
                     $name = 'section' . $primaryKey[$count-1];
                     $oldName = 'mapID' . ($primaryKey[$count-1]);
                     $ret .= '<input type="hidden" name="' . $oldName . '" value="' . $value . '">';
-                    $ret .= '
+                    $ret .= '<div class="location-container"><span style="float: right" class="btn btn-danger delete_location"
+                        data-upc="'.$upc.'" data-location="'.$value.'">
+                        <span class="glyphicon glyphicon-trash"></span></span>
                         <div class="input-group">
                             <span class="input-group-addon">Loc#' . $count . '</span>
                             <select name="' . $name . '" class="form-control">';
@@ -730,7 +757,7 @@ class ProdLocationEditor extends FannieRESTfulPage
                             }
                             $ret .= '>' . $fs_value . '</option>';
                         }
-                        $ret .= '</select></div>
+                        $ret .= '</select></div></div>
                             <br>';
 
                         if ($count == 0) $ret .= '<span class="alert-warning">There is currently no location set for this product.</span>';
@@ -747,7 +774,7 @@ class ProdLocationEditor extends FannieRESTfulPage
 
         $ret .= '</div></div></div>'; //<column B><row><container>
         if (FormLib::get('batchCheck', false)) {
-            $ret .= '<br><a class="btn btn-default" href="../../../Scannie/content/Scanning/BatchCheck/SCS.php">
+            $ret .= '<br><a class="btn btn-default" href="../../../scancoord/ScannieV2/content/Scanning/BatchCheck/SCS.php">
                 Back to Batch Check</a><br><br>';
         } else {
             $ret .= '<br><a class="btn btn-default" href="ProdLocationEditor.php">Back</a><br><br>';
@@ -801,8 +828,29 @@ HTML;
 
    public function javascript_content()
    {
-       ob_start();
-       ?>
+       return <<<JAVASCRIPT
+$(document).ready(function(){
+    $('tr').each(function(){
+        let upc = $(this).find('td:eq(0)').text();
+        if (upc > 1) {
+            let selected = $(this).find('.locationSelect option:selected').val();;
+            $(this).attr('data-selected', selected);
+            let datavalue = $(this).attr('data-selected');
+        }
+    });
+});
+$('.delete_location').click(function(){
+    var upc = $(this).attr('data-upc');
+    var plocation = $(this).attr('data-location');
+    var parent_elm = $(this).closest('div.location-container');
+    $.ajax({
+        type: 'post',
+        data: 'upc='+upc+'&location='+plocation+'&delete_location=1',
+        success: function(response) {
+            parent_elm.hide();
+        }
+    });
+});
 function toggleAll(elem, selector) {
     if (elem.checked) {
         $(selector).prop('checked', true);
@@ -813,8 +861,40 @@ function toggleAll(elem, selector) {
 function updateAll(val, selector) {
     $(selector).val(val);
 }
-       <?php
-       return ob_get_clean();
+$('.checkboxx').on('change', function(){
+    var boxval = $(this).attr('name');
+    if ($(this).prop('checked')) {
+        //became checked
+        $('td').each(function(){
+            var value = $(this).text();
+            if ($(this).hasClass('locations')) {
+                if (value == boxval) {
+                    let tr = $(this).closest('tr');
+                    let selected = tr.attr('data-selected');
+                    tr.find('.locationSelect').val(selected);
+                    tr.show();
+
+                }
+            }
+        });
+    } else {
+        //became un-checked
+        $('td').each(function(){
+            var value = $(this).text();
+            if ($(this).hasClass('locations')) {
+                if (value == boxval) {
+                    let tr = $(this).closest('tr');
+                    let selected = tr.find('.locationSelect option:selected').val();;
+                    tr.attr('data-selected', selected);
+                    tr.find('.locationSelect').val(0);
+                    tr.hide();
+                    //next, i need to change the selected to = 0
+                }
+            }
+        });
+    }
+});
+JAVASCRIPT;
    }
 
     public function helpContent()

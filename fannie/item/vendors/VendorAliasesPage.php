@@ -34,7 +34,7 @@ class VendorAliasesPage extends FannieRESTfulPage
     protected $header = "Vendor Aliases";
 
     protected $must_authenticate = true;
-    protected $auth_classes = array('pricechange');
+    protected $auth_classes = array('admin');
 
     public $description = '[Vendor Aliases] manages items that are sold under one or more UPCs that
         differ from the vendor catalog UPC.';
@@ -173,7 +173,8 @@ class VendorAliasesPage extends FannieRESTfulPage
     protected function get_id_view()
     {
         $dbc = FannieDB::get($this->config->get('OP_DB'));
-        $ret = '<form method="post">
+        $ret = '<div id="myform" style="background-color: white;">
+            <form method="post">
             <input type="hidden" name="id" value="' . $this->id . '" />
             <p><div class="form-inline container-fluid">
                 <label>UPC</label>
@@ -186,13 +187,15 @@ class VendorAliasesPage extends FannieRESTfulPage
                     class="form-control input-sm" />
                 <button type="submit" class="btn btn-submit btn-core">Add/Update</button>
             </div></p>
-            </form>';
+            </form>
+            </div>';
 
         $prep = $dbc->prepare("
             SELECT v.upc,
                 v.sku,
                 v.isPrimary,
                 v.multiplier,
+                p.brand,
                 p.description,
                 p.size
             FROM VendorAliases AS v
@@ -205,17 +208,19 @@ class VendorAliasesPage extends FannieRESTfulPage
             <thead>
                 <th>Vendor SKU</th>
                 <th>Our UPC</th>
-                <th>Item</th>
+                <th>Brand</th>
+                <th>Description</th>
                 <th>Unit Size</th>
                 <th>Multiplier</th>
                 <th>&nbsp;</th>
-                <th><span class="glyphicon glyphicon-print" onclick="$(\'.printUPCs\').prop(\'checked\', true);"></span></th>
+                <th><span class="fas fa-print" onclick="$(\'.printUPCs\').prop(\'checked\', true);"></span></th>
             </thead><tbody>';
         $res = $dbc->execute($prep, array($this->id));
         while ($row = $dbc->fetchRow($res)) {
             $ret .= sprintf('<tr %s>
                 <td>%s</td>
-                <td><a href="../ItemEditorPage.php?searchupc=%s">%s</a></td>
+                <td><a href="../ItemEditorPage.php?searchupc=%s" target="_blank">%s</a></td>
+                <td>%s</td>
                 <td>%s</td>
                 <td>%s</td>
                 <td>%.2f</td>
@@ -225,6 +230,7 @@ class VendorAliasesPage extends FannieRESTfulPage
                 ($row['isPrimary'] ? 'class="info"' : ''),
                 $row['sku'],
                 $row['upc'], $row['upc'],
+                $row['brand'],
                 $row['description'],
                 $row['size'],
                 $row['multiplier'],
@@ -243,6 +249,33 @@ class VendorAliasesPage extends FannieRESTfulPage
                 }); $(\'#tagForm\').submit();"
             >Print Scan Tags</button>
             </form>';
+
+        $formOnTopJs = <<<JAVASCRIPT
+$(window).scroll(function () {
+    var scrollTop = $(this).scrollTop();
+    if (scrollTop > 300) {
+        $('#myform')
+            .css('position', 'fixed')
+            .css('top', '0px')
+            .css('left', '0px')
+            .css('border', '1px solid grey');
+    } else {
+        $('#myform')
+            .css('position', 'relative')
+            .css('border', '1px solid white');
+    }
+});
+JAVASCRIPT;
+        $trimInputWhitespace = <<<HTML
+$('input[type="text"]').on('keyup', function(){
+    let text = $(this).val();
+    text = text.replace(/\W/g, '');
+    $(this).val(text);
+});
+HTML;
+
+        $this->addOnloadCommand($formOnTopJs);
+        $this->addOnloadCommand($trimInputWhitespace);
 
         return $ret;
     }

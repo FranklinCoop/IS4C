@@ -30,12 +30,16 @@ class HobartDgwLib
       @param $item_info [keyed array] of value. Keys correspond to WRITE_ITEM_FIELDS
       @return [string] CSV formatted line
     */
-    static public function getItemLine($item_info)
+    static public function getItemLine($item_info, $scaleType='HOBART_QUANTUMTCP')
     {
         $line = '';
         // first write fields that are present
         foreach(ServiceScaleLib::$WRITE_ITEM_FIELDS as $key => $field_info) {
             if (isset($item_info[$key])) {
+                if ($key == 'Label') {
+                    $labelInfo = ServiceScaleLib::labelTranslate($item_info['Label'], $scaleType);
+                    $item_info['Label'] = $labelInfo['labelType'];
+                }
                 if (isset($field_info['quoted']) && $field_info['quoted']) {
                     $line .= '"' . $item_info[$key] . '",';
                 } else {
@@ -131,11 +135,12 @@ class HobartDgwLib
         foreach ($selected_scales as $scale) {
             $file_name = sys_get_temp_dir() . '/' . $file_prefix . '_writeItem_' . $counter . '.csv';
             $fp = fopen($file_name, 'w');
+            $realType = $scale['type'] == 'HOBART_QUANTUMTCP2' ? 'HOBART_QUANTUMTCP' : $scale['type'];
             fwrite($fp,"Record Type,Task Department,Task Destination,Task Destination Device,Task Destination Type\r\n");
-            fwrite($fp, "ExecuteOneTask,{$scale['dept']},{$scale['host']},{$scale['type']},SCALE\r\n");
+            fwrite($fp, "ExecuteOneTask,{$scale['dept']},{$scale['host']},{$realType},SCALE\r\n");
             fwrite($fp, $header_line);
             foreach($items as $item) {
-                $item_line = self::getItemLine($item);
+                $item_line = self::getItemLine($item, $scale['type']);
                 fwrite($fp, $item_line);
             }
             fclose($fp);
@@ -148,24 +153,36 @@ class HobartDgwLib
             $et_file = sys_get_temp_dir() . '/' . $file_prefix . '_exText' . $counter . '.csv';
             $fp = fopen($et_file, 'w');
             fwrite($fp,"Record Type,Task Department,Task Destination,Task Destination Device,Task Destination Type\r\n");
-            fwrite($fp, "ExecuteOneTask,{$scale['dept']},{$scale['host']},{$scale['type']},SCALE\r\n");
+            fwrite($fp, "ExecuteOneTask,{$scale['dept']},{$scale['host']},{$realType},SCALE\r\n");
             $has_et = false;
             foreach($items as $item) {
                 if (isset($item['ExpandedText']) && isset($item['PLU'])) {
                     $has_et = true;
                     $mode = $new_item ? 'WriteOneExpandedText' : 'ChangeOneExpandedText';
                     fwrite($fp,"Record Type,Expanded Text Number,Expanded Text\r\n");
+                    $realText = $item['ExpandedText'];
+                    if (isset($scale['storeID']) && isset($item['ExpandedText' . $scale['storeID']])) {
+                        $realText = $item['ExpandedText' . $scale['storeID']];
+                    }
                     if ($item['MOSA']) {
-                        $item['ExpandedText'] = str_replace('{mosa}', 'Certified Organic By MOSA', $item['ExpandedText']);
+                        $realText = str_replace('{mosa}', 'Certified Organic By MOSA', $realText);
                     } else {
-                        $item['ExpandedText'] = str_replace('{mosa}', '', $item['ExpandedText']);
+                        $realText = str_replace('{mosa}', '', $realText);
                     }
                     if (!isset($item['OriginText'])) {
                         $item['OriginText'] = '';
                     }
-                    $item['ExpandedText'] = str_replace('{cool}', $item['OriginText'], $item['ExpandedText']);
+                    $realText = str_replace('{cool}', $item['OriginText'], $realText);
+                    if (isset($item['Reheat']) && $item['Reheat']) {
+                        $realText .= "\n\nReheat product to an internal temperature of 165 F before consumption";
+                    }
+
+                    $utf8degree = chr(194) . chr(176);
+                    $iso85591degree = chr(176);
+                    $realText = str_replace($utf8degree, $iso85591degree, $realText);
+
                     $text = '';
-                    foreach (explode("\n", $item['ExpandedText']) as $line) {
+                    foreach (explode("\n", $realText) as $line) {
                         $text .= wordwrap($line, 50, "\n") . "\n";
                     }
                     $text = preg_replace("/\\r/", '', $text);

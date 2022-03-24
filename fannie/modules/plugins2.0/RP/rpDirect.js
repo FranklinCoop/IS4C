@@ -6,7 +6,10 @@ var rpOrder = (function ($) {
         'days': [false, false, false, false, false, false, false],
         'onHand': {},
         'orderAmt': {},
-        'directAmt': {}
+        'directAmt': {},
+        'floralAmt': {},
+        'priFarms': {},
+        'secFarms': {}
     };
     var searchVendor = 0;
     var retainElem = false;
@@ -135,6 +138,12 @@ var rpOrder = (function ($) {
             if (state['directAmt'].__proto__ == Array.prototype) {
                 state['directAmt'] = {};
             }
+            if (!state.hasOwnProperty('priFarms') || state['priFarms'].__proto__ == Array.prototype) {
+                state['priFarms'] = {};
+            }
+            if (!state.hasOwnProperty('secFarms') || state['secFarms'].__proto__ == Array.prototype) {
+                state['secFarms'] = {};
+            }
             var i = 0;
             $('.daycheck').each(function() {
                 if (state['days'][i]) {
@@ -148,7 +157,10 @@ var rpOrder = (function ($) {
             for (i=0; i<oIDs.length; i++) {
                 var elemID = oIDs[i];
                 if (state['directAmt'][elemID] !== '') {
-                    document.getElementById(elemID).value = Number(state['directAmt'][elemID]);
+                    var field = document.getElementById(elemID);
+                    if (field) {
+                        field.value = Number(state['directAmt'][elemID]);
+                    }
                 }
             }
 
@@ -160,15 +172,53 @@ var rpOrder = (function ($) {
                 mod.reCalcRow($(elem).closest('tr'));
             }
 
+            var pIDs = Object.keys(state['priFarms']);
+            for (i=0; i<pIDs.length; i++) {
+                var elemID = pIDs[i];
+                if (state['priFarms'][elemID] !== '') {
+                    var field = document.getElementById(elemID);
+                    if (field) {
+                        field.value = state['priFarms'][elemID];
+                    }
+                }
+            }
+
+            var sIDs = Object.keys(state['secFarms']);
+            for (i=0; i<sIDs.length; i++) {
+                var elemID = sIDs[i];
+                if (state['secFarms'][elemID] !== '') {
+                    var field = document.getElementById(elemID);
+                    if (field) {
+                        field.value = state['secFarms'][elemID];
+                    }
+                }
+            }
+
             var oIDs = Object.keys(state['directAmt']);
             for (i=0; i<oIDs.length; i++) {
                 var elemID = oIDs[i];
                 if (state['directAmt'][elemID] !== '') {
-                    document.getElementById(elemID).value = Number(state['directAmt'][elemID]);
+                    var field = document.getElementById(elemID);
+                    if (field) {
+                        field.value = Number(state['directAmt'][elemID]);
+                    }
                 }
             }
         }
         //saveLoop();
+    };
+
+    mod.updateFarm = function(elem) {
+        if ($(elem).hasClass('primaryFarm')) {
+            var pf = state['priFarms'];
+            pf[elem.id] = elem.value;
+            state['priFarms'] = pf;
+        } else {
+            var sf = state['secFarms'];
+            sf[elem.id] = elem.value;
+            state['secFarms'] = sf;
+        }
+        mod.save();
     };
 
     mod.updateOnHand = function(elem) {
@@ -467,11 +517,22 @@ var rpOrder = (function ($) {
         }
     };
 
+    function endOrderAll(count, meters, buttons) {
+        if (count > 15 || mod.all <= 0) {
+            meters.hide();
+            buttons.prop('disabled', false);
+        } else {
+            setTimeout(function () { endOrderAll(count + 1, meters, buttons) }, 1000);
+        }
+    };
+
+    mod.all = 0;
     mod.orderAll = function() {
         var buttons = $('button.orderAll');
         var meters = $('.progress');
         buttons.prop('disabled', true);
         meters.show();
+        mod.all = 0;
 
         $('input.orderPri').each(function () {
             var qty = $(this).closest('tr').find('input.orderAmt').val();
@@ -488,8 +549,7 @@ var rpOrder = (function ($) {
             }
         });
 
-        meters.hide();
-        buttons.prop('disabled', false);
+        setTimeout(function () { endOrderAll(1, meters, buttons) }, 1000);
     };
 
     mod.defaultFarm = function(farm) {

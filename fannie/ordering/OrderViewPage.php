@@ -220,6 +220,7 @@ class OrderViewPage extends FannieRESTfulPage
     {
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('TRANS_DB'));
+        $checked = FormLib::get('checked');
 
         $upP = $dbc->prepare('
             UPDATE PendingSpecialOrder 
@@ -229,8 +230,12 @@ class OrderViewPage extends FannieRESTfulPage
         $dbc->execute($upP, array($this->orderID, $this->transID));
 
         $json = array();
-        $email = new OrderNotifications($dbc);
-        $json['sentEmail'] = $email->itemArrivedEmail($this->orderID, $this->transID);
+        if ($checked == 'false') {
+            $json['sentEmail'] = '';
+        } else {
+            $email = new OrderNotifications($dbc);
+            $json['sentEmail'] = $email->itemArrivedEmail($this->orderID, $this->transID);
+        }
         echo json_encode($json);
 
         return false;
@@ -307,7 +312,7 @@ class OrderViewPage extends FannieRESTfulPage
         $soModel->phone($this->ph1);
         $soModel->altPhone($this->ph2);
         $soModel->email($this->email);
-        $soModel->sendEmails(FormLib::get('contactBy', 0));
+        $soModel->sendEmails(FormLib::get('contactBy', 8));
 
         if (FormLib::get('fn', false) !== false) {
             $soModel->firstName(FormLib::get('fn'));
@@ -463,7 +468,7 @@ class OrderViewPage extends FannieRESTfulPage
                         WHERE c.card_no=?
                         ORDER BY c.datetime DESC", 1));
                     $prefVal = $dbc->getValue($prefP, array($memNum));
-                    $orderModel->sendEmails($prefVal ? $prefVal : 0);
+                    $orderModel->sendEmails($prefVal ? $prefVal : 8);
 
                     $orderModel->save();
                     $orderModel->specialOrderID($orderID);
@@ -501,8 +506,8 @@ class OrderViewPage extends FannieRESTfulPage
         }
 
         $status = array(
-            0 => "New, No Call",
-            3 => "New, Call",
+            0 => "Ready to Order",
+            3 => "Call before Ordering",
             1 => "Called/waiting",
             2 => "Pending",
             4 => "Placed",
@@ -641,14 +646,17 @@ class OrderViewPage extends FannieRESTfulPage
         $ret .= "</select></td></tr>";
 
         $contactOpts = array(
+            8 => 'Choose...',
             0 => 'Call',
             1 => 'Email',
+            /*
             2 => 'Text (AT&T)',
             3 => 'Text (Sprint)',
             4 => 'Text (T-Mobile)',
             5 => 'Text (Verizon)',
             6 => 'Text (Google Fi)',
-            7 => 'Actual SMS',
+             */
+            7 => 'Text',
         );
         $contactHtml = '';
         foreach ($contactOpts as $id=>$val) {
@@ -1309,17 +1317,17 @@ HTML;
             $ret .= '<div class="row">
                 <div class="col-sm-6 text-left">';
             if ($prev == -1) {
-                $ret .= '<span class="glyphicon glyphicon-chevron-left"></span>Prev';
+                $ret .= '<span class="fas fa-chevron-left"></span>Prev';
             } else {
                 $ret .= sprintf('<a href="?orderID=%d&k=%s" class="btn btn-default btn-xs">
-                    <span class="glyphicon glyphicon-chevron-left"></span>Prev</a>',$prev,$cachekey);
+                    <span class="fas fa-chevron-left"></span>Prev</a>',$prev,$cachekey);
             }
             $ret .= '</div><div class="col-sm-6 text-right">';
             if ($next == -1) {
-                $ret .= '<span class="glyphicon glyphicon-chevron-right"></span>Next';
+                $ret .= '<span class="fas fa-chevron-right"></span>Next';
             } else {
                 $ret .= sprintf('<a href="?orderID=%d&k=%s" class="btn btn-default btn-xs">
-                    <span class="glyphicon glyphicon-chevron-right"></span>Next</a>',$next,$cachekey);
+                    <span class="fas fa-chevron-right"></span>Next</a>',$next,$cachekey);
             }
             $ret .= '</div></div>';
         }
@@ -1328,13 +1336,13 @@ HTML;
         $this->get_orderID_customer_handler();
         $customerInfo = ob_get_clean();
         $customerInfo = json_decode($customerInfo, true);
+        $messageOpts = $this->arrivedMessageOptions($orderID);
         ob_start();
         $this->get_orderID_items_handler();
         $itemInfo = ob_get_clean();
 
         $ret .= <<<HTML
 <p />
-<div class="alert alert-danger">WFC is not currently taking special orders</div>
 <input type=hidden id=redirectURL value="{$return_path}" />
 <div class="panel panel-default">
     <div class="panel-heading">Customer Information</div>
@@ -1344,16 +1352,66 @@ HTML;
     <div class="panel-heading">Order Items</div>
     <div class="panel-body" id="itemDiv">{$itemInfo}</div>
 </div>
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="form-group">
+            <div class="input-group">
+                <select class="form-control" id="commID">
+                    <option value="0">Select a message</option>
+                    <option value="1">Didn't arrive, will re-order</option>
+                    <option value="2">Not available, cancelling order</option>
+                    {$messageOpts}
+                </select>
+                <span class="input-group-btn">
+                    <button onclick="orderView.sendMsg();" class="btn btn-default">Send</button>
+                </span>
+            </div>
+        </div>
+        <div id="commLog"></div>
+    </div>
+</div>
 <div id="footerDiv">{$customerInfo['footer']}</div>
 <input type=hidden value="{$orderID}" id="init_oid" />
 HTML;
 
-        $this->addScript('orderview.js?date=20180809');
+        $this->addScript('orderview.js?date=20180806');
         $this->addScript('../item/autocomplete.js');
         $this->addScript('../src/javascript/chosen/chosen.jquery.min.js');
         $this->addCssFile('../src/javascript/chosen/bootstrap-chosen.css');
+        if (FannieAuth::validateUserQuiet('ordering_edit')) {
+            $this->addOnloadCommand('orderView.forceUPC(false);');
+        }
 
         return $ret;
+    }
+
+    private function arrivedMessageOptions($orderID)
+    {
+        $config = FannieConfig::factory();
+        $settings = $config->get('PLUGIN_SETTINGS');
+        $dbc = $this->connection;
+        $dbc->selectDB($settings['ScheduledEmailDB']);
+        $template = new ScheduledEmailTemplatesModel($dbc);
+        $template->scheduledEmailTemplateID($config->get('SO_TEMPLATE'));
+        $template->load();
+        $msg = $template->textCopy();
+        $notice = new OrderNotifications($this->connection);
+
+        $itemsP = $this->connection->prepare("
+            SELECT description, ItemQtty, quantity, total FROM "
+            . FannieDB::fqn('PendingSpecialOrder', 'trans') . "
+            WHERE order_id = ? AND trans_id > 0");
+        $items = $this->connection->getAllRows($itemsP, array($orderID));
+        $opts = '';
+        foreach ($items as $item) {
+            $formatted = $notice->formatItems(array($item)); 
+            $store = $notice->getStore($orderID);
+            $msg = str_replace('{{store}}', $store, $msg);
+            $msg = str_replace('{{text}}', $formatted['text'], $msg);
+            $opts .= '<option>' . $msg . '</option>';
+        }
+
+        return $opts;
     }
 
     public function unitTest($phpunit)

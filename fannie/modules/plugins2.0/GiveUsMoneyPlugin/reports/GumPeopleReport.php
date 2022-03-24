@@ -38,7 +38,7 @@ class GumPeopleReport extends FannieReportPage
 
     protected $required_fields = array();
     protected $report_headers = array('Mem#', 'First Name', 'Last Name', 'Loan Date', 'Principal', 'Interest Rate', 'Term (Months)', 
-                                    'Maturity Date', 'MaturityAmount', 'C Shares', 'Loan Paid Date', 'Check Number'); 
+                                    'Maturity Date', 'MaturityAmount', 'C Shares', 'Loan Paid Date', 'Check Number', 'Tax ID'); 
 
     public function preprocess()
     {
@@ -57,6 +57,10 @@ class GumPeopleReport extends FannieReportPage
         $query = 'SELECT c.CardNo AS card_no,
                     c.FirstName, 
                     c.LastName,
+                    m.street,
+                    m.city,
+                    m.state,
+                    m.zip,
                     l.loanDate,
                     CASE WHEN l.principal IS NULL THEN 0 ELSE l.principal END as principal,
                     CASE WHEN l.termInMonths IS NULL THEN 0 ELSE l.termInMonths END as termInMonths,
@@ -66,8 +70,11 @@ class GumPeopleReport extends FannieReportPage
                     CASE WHEN l.principal IS NULL THEN 0
                         ELSE principal * POW(1+interestRate, DATEDIFF(DATE_ADD(loanDate, INTERVAL termInMonths MONTH), loanDate)/365.25)
                     END as maturityAmount,
-                    l.gumLoanAccountID
+                    l.gumLoanAccountID,
+                    i.maskedTaxIdentifier,
+                    i.encryptedTaxIdentifier
                   FROM ' . $FANNIE_OP_DB . $dbc->sep() . 'custdata AS c
+                        LEFT JOIN ' . FannieDB::fqn('meminfo', 'op') . ' AS m ON c.CardNo=m.card_no
                         LEFT JOIN GumLoanAccounts AS l 
                             ON l.card_no=c.CardNo AND c.personNum=1
                         LEFT JOIN (
@@ -75,6 +82,7 @@ class GumPeopleReport extends FannieReportPage
                             FROM GumEquityShares
                             GROUP BY card_no
                         ) AS e ON c.cardNo=e.card_no AND c.personNum=1
+                        LEFT JOIN GumTaxIdentifiers AS i ON i.card_no = c.CardNo
                   WHERE 
                     (l.card_no IS NOT NULL
                     AND l.principal > 0)
@@ -95,6 +103,10 @@ class GumPeopleReport extends FannieReportPage
                $row['card_no'],
                $row['LastName'],
                $row['FirstName'],
+               $row['street'],
+               $row['city'],
+               $row['state'],
+               $row['zip'],
                ($row['loanDate'] == '' ? 'n/a' : date('Y-m-d', strtotime($row['loanDate']))),
                sprintf('%.2f', $row['principal']), 
                sprintf('%.2f', $row['interestRate'] * 100), 
@@ -117,6 +129,14 @@ class GumPeopleReport extends FannieReportPage
                 $record[] = 'n/a';
                 $record[] = 'n/a';
             }
+            $ssn = 'xxx-xx-' . $row['maskedTaxIdentifier'];
+            if (false) {
+                $key = file_get_contents('/path/to/key');
+                $privkey = openssl_pkey_get_private($key);
+                $try = openssl_private_decrypt($row['encryptedTaxIdentifier'], $decrypted, $privkey);
+                if ($try) $ssn = $decrypted;
+            }
+            $record[] = $ssn;
             $data[] = $record;
         }
 

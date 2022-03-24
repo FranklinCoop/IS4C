@@ -10,6 +10,11 @@ class ScreeningPage extends FannieRESTfulPage
 
     public function preprocess()
     {
+        $remoteIP = $_SERVER['REMOTE_ADDR'];
+        if (substr($remoteIP, 0, 7) == '10.2.2.') {
+            header('Location: http://10.2.2.2/screening/');
+            return false;
+        }
         $this->addRoute('get<finish>');
         $ret = parent::preprocess();
 
@@ -33,6 +38,7 @@ class ScreeningPage extends FannieRESTfulPage
     <link rel="stylesheet" type="text/css" href="../../../../src/javascript/composer-components/bootstrap-default/css/bootstrap-theme.min.css">
     <meta name="viewport" content="width=device-width, user-scalable=no" />
 </head>
+<body style="background: #ffefcc">
 <body>
     <div class="container">
         <div class="row" align="center">
@@ -55,42 +61,64 @@ HTML;
 
         $any = FormLib::get('any') ? 1 : 0;
         $highTemp = FormLib::get('highTemp') ? 1 : 0;
+        $exp = FormLib::get('exp') ? 1 : 0;
         $empID = $this->id;
 
         $prep = $dbc->prepare("INSERT INTO " . FannieDB::fqn('ScreeningEntries', 'plugin:HrWebDB') . "
-            (screeningEmployeeID, tdate, highTemp, anySymptom) 
-            VALUES (?, ?, ?, ?)");
+            (screeningEmployeeID, tdate, highTemp, anySymptom, exposure) 
+            VALUES (?, ?, ?, ?, ?)");
         $args = array(
             $empID,
             date('Y-m-d H:i:s'),
             $highTemp,
             $any,
+            $exp,
         );
         $dbc->execute($prep, $args);
 
         $this->addOnloadCommand("setTimeout(function() { \$('#finishForm').submit(); }, 250);");
 
-        if ($highTemp || $any) {
+        if ($highTemp || $any || $exp) {
 
             $prep = $dbc->prepare("SELECT screeningEmployeeID, name FROM "
                 . FannieDB::fqn('ScreeningEmployees', 'plugin:HrWebDB') . " WHERE screeningEmployeeID=? AND deleted=0");
             $info = $dbc->getRow($prep, array($empID));
             $subject = 'Screening Positive Notification';
             $body = $info['name'] . ' reported symptoms at the screening station.';
-            $to = 'hr@wholefoods.coop, shannigan@wholefoods.coop';
-            $headers = "From: hillside@wholefoods.coop\r\n";
+            $to = 'hr@wholefoods.coop, shannigan@wholefoods.coop, michael@wholefoods.coop, jkrussow@wholefoods.coop';
+            $headers = "From: hillside-screening@wholefoods.coop\r\n";
             mail($to, $subject, $body, $headers);
+
+            $list = '<ul>';
+            if ($highTemp) {
+                $list .= '<li>Your temperature is at or above 100.4 degrees</li>';
+            }
+            if ($any) {
+                $list .= '<li>You have new covid symptoms</li>';
+            }
+            if ($exp) {
+                $list .= 'You have had contact to a positive covid case that you have not discussed with WFC Management</li>';
+            }
+            $list .= '</ul>';
+            $bList = base64_encode($list);
 
             return <<<HTML
 <div style="font-size: 200% !important;">
-    <div class="alert alert-danger">You've selected symptom(s)</div>
-Please isolate yourself from others immediately, <b>do not clock in for work and go home</b>.
-Contact your manager and HR at 218.491.4821.
+You've indicated {$list}.
+<p>
+Please leave the building. Do not go into the store. Once outside, please call the store (218-728-0884),
+your manager, your store manager (952-687-1381), or general manager (218-428-5747) to discuss your symptoms
+and next steps. You cannot return to the building until you have been cleared by your manager, store manager,
+or general manager. 
+</p>
+<p>
+If this was in error, please let your manager know immediately that you incorrectly indicated yes at the Health Screening. 
+</p>
 </div>
 <p style="font-size: 200%;">
     <a href="ScreeningPage.php" class="btn btn-default btn-lg btn-block">Clear This Screen</a>
 </p>
-<form id="finishForm" action="ScreeningPage.php"><input type="hidden" name="finish" value="1" /></form>
+<form id="finishForm" action="ScreeningPage.php"><input type="hidden" name="finish" value="{$bList}" /></form>
 HTML;
         }
 
@@ -101,12 +129,19 @@ HTML;
     protected function get_finish_view()
     {
         if ($this->finish) {
+            $list = base64_decode($this->finish);
             return <<<HTML
 <div style="font-size: 200% !important;">
-    <div class="alert alert-danger">You've selected symptom(s)</div>
-Please isolate yourself from others immediately, <b>do not clock in for work and go home</b>.
-Contact your manager and HR at 218.491.4821.
-</div>
+You've indicated {$list}.
+<p>
+Please leave the building. Do not go into the store. Once outside, please call the store (218-728-0884),
+your manager, your store manager (952-687-1381), or general manager (218-428-5747) to discuss your symptoms
+and next steps. You cannot return to the building until you have been cleared by your manager, store manager,
+or general manager. 
+</p>
+<p>
+If this was in error, please let your manager know immediately that you incorrectly indicated yes at the Health Screening. 
+</p>
 <p style="font-size: 200%;">
     <a href="ScreeningPage.php" class="btn btn-default btn-lg btn-block">Clear This Screen</a>
 </p>
@@ -132,7 +167,9 @@ HTML;
         $nonce = $dbc->getValue($prep);
         $dbc->query("UPDATE " . FannieDB::fqn('ScreeningNonce', 'plugin:HrWebDB') . " SET nonce=''");
         if ($nonce === false || strlen($nonce) == 0 || $nonce != FormLib::get('nonce')) {
-            return '<div class="alert alert-danger">Session expired</div>' . $this->get_view();
+            // disabled to allow for dual stations. the way the ipads handle history & back button
+            // it isn't really effective anyway.
+            //return '<div class="alert alert-danger">Session expired</div>' . $this->get_view();
         }
 
         $this->addOnloadCommand("\$('input[name=temp]').focus();");
@@ -161,23 +198,27 @@ HTML;
 </p>
 <hr />
 <p>
-<h3>Are you experiencing any COVID-19 related symptoms?</h3>
+<h3>Are you experiencing any <span class="" style="color: #e00; font-weight: bold;">new</span> COVID-19 related symptoms?</h3>
 </p>
 <table class="table" style="font-size: 200%;">
 <tr>
     <th>Dry Cough</th>
-</tr>
-<tr>
     <th>Shortness of Breath</th>
 </tr>
 <tr>
     <th>Fever of 100.5 or above / Chills</th>
-</tr>
-<tr>
     <th>Vomiting / Diarrhea</th>
 </tr>
 <tr>
     <th>Loss of Taste or Smell</th>
+    <th>Fatigue</th>
+</tr>
+    <th>Muscle or Body Aches</th>
+    <th>Headache</th>
+</tr>
+<tr>
+    <th>Sore Throat</th>
+    <th>Congestion or Runny Nose</th>
 </tr>
 </table>
 <p style="font-size: 200%;">
@@ -188,6 +229,21 @@ HTML;
     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
     <label class="radio-inline">
         <input type="radio" name="any" value="0" required />
+        No
+    </label>
+</p>
+<hr />
+<p>
+<h3>Have you had direct contact with a positive COVID-19 case that has not yet been reported to WFC management?</h3>
+</p>
+<p style="font-size: 200%;">
+    <label class="radio-inline">
+        <input type="radio" name="exp" value="1" required />
+        Yes
+    </label>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    <label class="radio-inline">
+        <input type="radio" name="exp" value="0" required />
         No
     </label>
 </p>

@@ -144,7 +144,7 @@ HTML;
         global $FANNIE_OP_DB;
         $dbc = FannieDB::get($FANNIE_OP_DB);
         if (FormLib::get('linea') != 1) {
-            $this->add_onload_command("\$('#upc').focus();\n");
+            $this->add_onload_command("\$('#upc').focus().select();\n");
         }
         $this->addOnloadCommand("enableLinea('#upc', function(){ \$('#upc-form').append('<input type=hidden name=linea value=1 />').submit(); });\n");
         $upc = trim(FormLib::get('upc'));
@@ -164,8 +164,6 @@ HTML;
 
         //$month = $this->session->month;
         $month = FormLib::get('month');
-        $mono = new DateTime($month);
-        $mono = $mono->format('m');
         $args = array($upc, $month);
         $prep = $dbc->prepare('
             SELECT
@@ -175,7 +173,8 @@ HTML;
                 v.sku,
                 p.description,
                 c.price AS srp,
-                m.super_name
+                m.super_name,
+                p.normal_price
             FROM CoopDealsItems AS c
                 LEFT JOIN products AS p ON c.upc=p.upc
                 LEFT JOIN vendorItems AS v ON p.default_vendor_id=v.vendorID
@@ -209,6 +208,7 @@ HTML;
             $brand = $row['brand'];
             $sku = $row['sku'];
             $srp = $row['srp'];
+            $normal_price = $row['normal_price'];
             $superName = $row['super_name'];
             $ret .=  '<tr><td><b>upc</td><td>' . $row['upc'] . '</tr>';
             $ret .=  '<td><b>Desc</b></td><td>' . $row['description'] . '</tr>';
@@ -216,7 +216,8 @@ HTML;
             $ret .=  '<td><b>Flyer Period</b></td><td>' . $flyerPeriod . '</tr>';
             $ret .=  '<td><b>Sku</b></td><td>' . $row['sku'] . '</tr>';
             $srp = $row['srp'];
-            $ret .= '<td><b>Sale Price</b></td><td>' . $srp . '</td></tr>';
+            $ret .= '<td><b>Normal Price / Sale Price</b></td><td>$' . $normal_price . ' > ' . 
+                 '<b>$'.$srp . '</b></td></tr>';
             $ret .=  '<td><b>Department</b></td><td>' . $superName .'</td></tr>';
             $check = $row['upc'];
         }
@@ -232,6 +233,14 @@ HTML;
         }
 
         $year = date('Y');
+        $str = '';
+        preg_match_all('!\d!', $month, $matches);
+        foreach ($matches[0] as $chr) {
+            $str .= $chr;
+        }
+        while ($chr = next($matches[0]));
+        $year = (strlen($str) == 4) ? $str : $year;
+
         if (!isset($months[$this->session->month])) {
             $months[$this->session->month] = date('m');
         }
@@ -290,6 +299,14 @@ HTML;
             ';
             $result = $dbc->execute($selMonthQ,$selMonthA);
             while ($row = $dbc->fetchRow($result)) {
+                $batchCycle = '';
+                if ($flyerPeriod == ' A') {
+                    $batchCycle = 'A';
+                } elseif ($flyerPeriod == ' B') {
+                    $batchCycle = 'B';
+                } else {
+                    $batchCycle = 'TPR';
+                }
                 $sel = "";
                 $option = "option";
                 $add = "";
@@ -301,10 +318,12 @@ HTML;
                     $add = "# ";
                 }
                 if (strpos(strtolower($row['batchName']), strtolower($superName)) !== false) {
-                    if ($sel == "") {
-                        $sel = "selected";
-                    } else {
-                        $sel = " ";
+                    if (strpos($row['batchName'], " $batchCycle ") !== false) {
+                        if ($sel == "") {
+                            $sel = "selected";
+                        } else {
+                            $sel = " ";
+                        }
                     }
                 }
                 $ret .= "<$option value='$batchID' $sel>$add $condensed</option>";

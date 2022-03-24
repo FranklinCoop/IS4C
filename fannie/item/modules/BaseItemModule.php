@@ -175,7 +175,8 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
                 LEFT JOIN vendors AS n ON p.default_vendor_id=n.vendorID
                 LEFT JOIN InventoryCache AS i ON p.upc=i.upc AND p.store_id=i.storeID
                 LEFT JOIN InventoryCounts AS c ON p.upc=c.upc AND p.store_id=c.storeID AND c.mostRecent=1
-            WHERE p.upc=?';
+            WHERE p.upc=?
+            ORDER BY v.modified DESC';
         $p_def = $dbc->tableDefinition('products');
         if (!isset($p_def['last_sold'])) {
             $itemQ = str_replace('p.last_sold', 'NULL as last_sold', $itemQ);
@@ -185,7 +186,13 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
         if ($dbc->numRows($res) > 0) {
             $items = array();
             while ($row = $dbc->fetchRow($res)) {
-                $items[$row['store_id']] = $row;
+                // make sure we only use the *first* record for each store.
+                // this is done specifically to ensure we have the "correct"
+                // (deterministic) pseudo-default vendorItems record, for those
+                // cases where it matters
+                if (!array_key_exists($row['store_id'], $items)) {
+                    $items[$row['store_id']] = $row;
+                }
             }
             return $items;
         }
@@ -390,7 +397,7 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
         if ($prevUPC) {
             $ret .= ' <a class="btn btn-default btn-xs small" href="ItemEditorPage.php?searchupc=' . $prevUPC . '"
                 title="Previous item in this department">
-                <span class="glyphicon glyphicon-chevron-left"></span></a> ';
+                <span class="fas fa-chevron-left"></span></a> ';
         }
         $ret .= '<strong>UPC</strong>
                 <span class="text-danger">';
@@ -400,7 +407,7 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
         if ($nextUPC) {
             $ret .= ' <a class="btn btn-default btn-xs small" href="ItemEditorPage.php?searchupc=' . $nextUPC . '"
                 title="Next item in this department">
-                <span class="glyphicon glyphicon-chevron-right"></span></a>';
+                <span class="fas fa-chevron-right"></span></a>';
         }
         $ret .= ' <label style="color:darkmagenta;">Modified</label>
                 <span style="color:darkmagenta;">'. $rowItem['modified'] . '</span>';
@@ -465,7 +472,8 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
         <div class="input-group" style="width:100%;">
             <input type="text" maxlength="30" class="form-control syncable-input descript-input" required
                 name="descript[]" value="{$rowItem['description']}" 
-                onkeyup="$(this).next().html(30-(this.value.length)); $(this).val($(this).val().toUpperCase());" />
+                style="text-transform:uppercase;"
+                onkeyup="$(this).next().html(30-(this.value.length));" />
             <span class="input-group-addon">{$limit}</span>
         </div>
     </td>
@@ -514,6 +522,7 @@ HTML;
                     <td colspan="5">
                         <input type="text" name="manufacturer[]"
                             class="form-control input-sm brand-field syncable-input"
+                            style="text-transform:uppercase;"
                             value="' . $rowItem['manufacturer'] . '" />
                     </td>';
             /**
@@ -539,7 +548,7 @@ HTML;
             $ret .= ' <button type="button" 
                         title="Create new vendor"
                         class="btn btn-default btn-sm newVendorButton">
-                        <span class="glyphicon glyphicon-plus"></span></button>';
+                        <span class="fas fa-plus"></span></button>';
             $ret .= '</td></tr>'; // end row
 
             if (isset($rowItem['discounttype']) && $rowItem['discounttype'] <> 0) {
@@ -618,6 +627,8 @@ HTML;
                         ($id == $rowItem['department'] ? 'selected':''),
                         $id,$id,$name);
             }
+            $codingP = $dbc->prepare("SELECT salesCode FROM departments WHERE dept_no=?");
+            $coding = $dbc->getValue($codingP, array($rowItem['department']));
 
             $subOpts = isset($subs[$rowItem['department']]) ? $subs[$rowItem['department']] : '';
             // subdept zero is selected
@@ -712,14 +723,16 @@ HTML;
             <option {$subZero} value="0">None</option>
             {$subOpts}
         </select>
+        {$coding}
     </td>
-    <th class="small text-right">SKU</th>
+    <th class="small text-right sku-label" ondblclick="baseItem.toggleSkuOverride();">SKU</th>
     <td colspan="2">
         <input type="text" name="vendorSKU" value="{$rowItem['sku']}" 
             class="form-control input-sm sku-field syncable-input"
             onchange="$('#vsku{$jsVendorID}').val(this.value);" 
             {$vFieldsDisabled} {$aliasDisabled} />
         <input type="hidden" name="isAlias" value="{$rowItem['isAlias']}" />
+        <input type="hidden" name="origSKU" value="{$rowItem['sku']}" {$vFieldsDisabled} />
     </td>
 </tr>
 <tr>
@@ -852,6 +865,7 @@ HTML;
         <input type="text" name="newVendorName" id="newVendorName" class="form-control" />
     </fieldset>
 </div>
+<input type="hidden" value="0" id="skuOverride" name="skuOverride" />
 </div> <!-- end panel-body -->
 </div> <!-- end panel-->
 HTML;
@@ -980,11 +994,11 @@ HTML;
             }
             $desc = $this->formNoEx('descript', array());
             if (isset($desc[$i])) {
-                $model->description($desc[$i]);
+                $model->description(strtoupper($desc[$i]));
             }
             $brand = $this->formNoEx('manufacturer', array());
             if (isset($brand[$i])) {
-                $model->brand($brand[$i]);
+                $model->brand(strtoupper($brand[$i]));
             }
             /**
             $model->pricemethod(0);
@@ -1138,13 +1152,44 @@ HTML;
         $vitem->vendorID($vendorID);
         $vitem->upc($upc);
         try {
-            $sku = $this->form->vendorSKU;
+            $sku = trim($this->form->vendorSKU);
             $caseSize = $this->form->caseSize;
             $alias = $this->form->isAlias;
+            $override = $this->form->skuOverride;
             if ($alias) {
                 return true;
             }
-            if (count($vitem->find()) > 0 && $sku != '') {
+
+            /**
+             * Always require a sku. use upc if none available
+             */
+            if ($sku == '') {
+                $sku = $upc;
+            }
+
+            /**
+             * Must have a valid value for the data type.
+             * The default in the Model is 1.
+             */
+            if (empty($caseSize)) {
+                $caseSize = 1;
+            }
+
+            $chkP = $dbc->prepare("SELECT upc FROM vendorItems
+                WHERE sku=? AND vendorID=? AND upc <> ?");
+            $chk = $dbc->getValue($chkP, array($sku, $vendorID, $upc));
+            if ($chk && $override == 0) {
+                // bail out. same sku cannot be assigned to multiple items
+                return true;
+            }
+
+            $vrecords = $vitem->find();
+            if (count($vrecords) > 1) {
+                // bail out. multiple matching records will cause ambiguity
+                return true;
+            }
+
+            if (count($vrecords) > 0) {
                 $editP = $dbc->prepare('
                     UPDATE vendorItems
                     SET sku=?
@@ -1152,29 +1197,6 @@ HTML;
                         AND vendorID=? 
                 '); 
                 $editR = $dbc->execute($editP, array($sku, $upc, $vendorID));
-            } elseif (!empty($sku) && $sku != $upc) {
-                /**
-                  If a SKU is provided, update any
-                  old record that used the UPC as a
-                  placeholder SKU.
-                */
-                $existsP = $dbc->prepare('
-                    SELECT sku
-                    FROM vendorItems
-                    WHERE sku=?
-                        AND upc=?
-                        AND vendorID=?');
-                $exists = $dbc->getValue($existsP, array($upc, $upc, $vendorID));
-                if ($exists && $sku != $upc && $sku != $exists) {
-                    $fixSkuP = $dbc->prepare('
-                        UPDATE vendorItems
-                        SET sku=?
-                        WHERE sku=?
-                            AND vendorID=?');
-                    $dbc->execute($fixSkuP, array($sku, $upc, $vendorID));
-                }
-            } else {
-                $sku = $upc;
             }
         } catch (Exception $ex) {
             $sku = $upc;
@@ -1203,8 +1225,31 @@ HTML;
                 </td>';
             $row2 = '<th>Description</th><td>' . $model->description() . '</td>
                      <th>Price</th><td>$' . $model->normal_price() . '</td>';
+            $ret = array($row1, $row2);
+            $vendorID = $model->default_vendor_id();
+            $sku = FormLib::get('vendorSKU');
+            if ($vendorID != 0 && $sku != '') {
+                $chkP = $dbc->prepare("SELECT upc FROM vendorItems
+                    WHERE sku=? AND vendorID=? AND upc <> ?");
+                $chk = $dbc->getValue($chkP, array($sku, $vendorID, $upc));
+                if ($chk) {
+                    $ret[] = '<th class="danger">Error</th>
+                        <td class="danger" colspan="3">SKU already assigned to <a href="ItemEditorPage.php?searchupc=' . $chk . '">' . $chk . '</a>.
+                        Other changes saved.</td>';
+                }
 
-            return array($row1, $row2);
+                if ($sku != FormLib::get('origSKU')) {
+                    $multiP = $dbc->prepare("SELECT upc FROM vendorItems WHERE upc=? AND vendorID=?");
+                    $multiR = $dbc->execute($multiP, array($upc, $vendorID));
+                    if ($dbc->numRows($multiR) > 1) {
+                        $ret[] = '<th class="danger">Error</th>
+                            <td class="danger" colspan="3">Could not save SKU due to too many catalog entries.
+                            Other changes saved.</td>';
+                    }
+                }
+            }
+
+            return $ret;
         } else {
             return array('<td colspan="4">Error saving. <a href="ItemEditorPage.php?searchupc=' . $upc . '">Try Again</a>?</td>');
         }

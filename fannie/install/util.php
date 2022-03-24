@@ -75,6 +75,26 @@ function confset($key, $value)
     fclose($fptr);
 }
 
+// update the LANES setting in the config file
+function update_lanes($lanes)
+{
+    $saveStr = 'array(';
+    foreach ($lanes as $lane) {
+        $saveStr .= "array('host'=>'{$lane['host']}',"
+                 . "'type'=>'{$lane['type']}',"
+                 . "'user'=>'{$lane['user']}',"
+                 . "'pw'=>'{$lane['pw']}',"
+                 . "'op'=>'{$lane['op']}',"
+                 . "'trans'=>'{$lane['trans']}',"
+                 . "'offline'=>{$lane['offline']}),";
+    }
+    if ($saveStr != 'array(') {
+        $saveStr = substr($saveStr, 0, strlen($saveStr)-1);
+    }
+    $saveStr .= ')';
+    confset('FANNIE_LANES', $saveStr);
+}
+
 /**
   Briefly connect to host to verify it's accepting
   network connections
@@ -82,7 +102,7 @@ function confset($key, $value)
   @param $dbms [string] database software identifier
   @return [boolean]
 */
-function check_db_host($host,$dbms)
+function check_db_host($host,$dbms,$timeout=1)
 {
     if (!function_exists("socket_create")) {
         return true; // test not possible
@@ -115,7 +135,7 @@ function check_db_host($host,$dbms)
 
     $test = false;
     $sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-    socket_set_option($sock, SOL_SOCKET, SO_SNDTIMEO, array('sec' => 1, 'usec' => 0)); 
+    socket_set_option($sock, SOL_SOCKET, SO_SNDTIMEO, array('sec' => $timeout, 'usec' => 0));
     socket_set_block($sock);
     try {
         $test = @socket_connect($sock,$host,$port);

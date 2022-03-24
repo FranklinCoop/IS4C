@@ -74,7 +74,7 @@ class CoopDealsSignsPage extends FannieRESTfulPage
             FROM is4c_op.batches
             WHERE batchType = 1
                 '.$Qcycle.'
-                AND SUBSTR(startDate,1,4) = ?
+                AND SUBSTR(DATE_ADD(startDate, INTERVAL 7 DAY), 1, 4) = ?
                 '.$Qdealset.'
         ';
         $prep = $dbc->prepare($query);
@@ -172,7 +172,7 @@ class CoopDealsSignsPage extends FannieRESTfulPage
 {$this->get_view()}
 <form method="get" class="form-inline">
     </br>
-    <h4>Print Signs for $month $cycle $year </h4>
+    <h4>Print Signs for <strong>$month $cycle $year</strong> </h4>
     <div class="form-group">
         <a class="btn btn-success" onclick="
             window.open('{$batchLists["12CD"]["MERCH"]}');
@@ -219,6 +219,7 @@ HTML;
 
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
+        $yx = FormLib::get('year', false);
 
         $set = FormLib::get('deal-set');
         $optsR = $dbc->query('
@@ -244,11 +245,13 @@ HTML;
             $cycle_opts .= "<option value='$cycle' $sel>$cycle</option>";
         }
 
-        $years = '';
-        $curYear = 2021;
+        $y = new DateTime();
+        $curYear = $y->format('Y');
+        $years = "";
         $curMonth = date('m');
-        for ($i=2017; $i<$curYear; $i++) {
-            $sel = ($i == FormLib::get('year')) ? " selected " : "";
+        for ($i=$curYear-1; $i<=$curYear+1; $i++) {
+            $sel = ($i == $curYear) ? " selected " : "";
+            $sel = ($yx != false) ? " selected " : "";
             $years .= "<option value='$i' $sel>$i</option>";
         }
 

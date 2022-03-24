@@ -70,7 +70,7 @@ class FannieUploadPage extends \FanniePage
 
     protected $upload_field_name = 'FannieUploadFile';
     protected $upload_file_name = '';
-    protected $allowed_extensions = array('csv','xls','xlsx');
+    protected $allowed_extensions = array('csv','xls','xlsx', 'txt');
 
     protected $error_details = 'n/a';
 
@@ -254,11 +254,14 @@ class FannieUploadPage extends \FanniePage
                         $new = escapeshellarg($tempdir.'/splits/csvUNFISPLIT');
                         system("split -l 2500 $orig $new");
                         $dir = opendir($tempdir.'/splits');
+                        $i = 0;
+                        $files = array();
                         while ($current = readdir($dir)) {
                             if (!strstr($current,"UNFISPLIT")) {
                                 continue;
                             }
-                            $files[$i++] = $current;
+                            $files[$i] = $current;
+                            $i++;
                         }
                         closedir($dir);
                         unlink($this->upload_file_name);
@@ -266,7 +269,7 @@ class FannieUploadPage extends \FanniePage
                     }
 
                     if (!is_array($files)) {
-                        $this->error_detail = 'Split problem';
+                        $this->error_details = 'Split problem';
                         $this->content_function = 'results_content';
                     } else {
                         /* process one file */
@@ -772,6 +775,8 @@ class FannieUploadPage extends \FanniePage
         } elseif (substr(basename($this->upload_file_name),0,3) == 'lsx') {
             // php tempfile nameing only allows a three character prefix
             return $this->xlsxToArray($limit);
+        } elseif (substr(basename($this->upload_file_name),0,3) == 'txt') {
+            return $this->txtToArray($limit);
         } else {
             return array();
         }
@@ -796,6 +801,11 @@ class FannieUploadPage extends \FanniePage
     protected function xlsxToArray($limit)
     {
         return \COREPOS\Fannie\API\data\FileData::xlsxToArray($this->upload_file_name, $limit);
+    }
+
+    protected function txtToArray($limit=0)
+    {
+        return \COREPOS\Fannie\API\data\FileData::txtToArray($this->upload_file_name, $limit);
     }
 
     protected function simpleStats($stats, $key='imported')

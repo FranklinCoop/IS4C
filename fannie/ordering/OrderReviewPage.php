@@ -102,7 +102,8 @@ class OrderReviewPage extends FannieRESTfulPage
         $r = $dbc->execute($q, array($orderID));
         $confirm_date = "";
         if ($dbc->num_rows($r) > 0) {
-            $confirm_date = array_pop($dbc->fetch_row($r));
+            $w = $dbc->fetchRow($r);
+            $confirm_date = $w['entry_date'];
         }
 
         $callback = 1;
@@ -130,6 +131,9 @@ class OrderReviewPage extends FannieRESTfulPage
         }
         $ret .= "<b>Taken by</b>: ".$user."<br />";
         $ret .= "<b>On</b>: ".date("M j, Y g:ia",strtotime($orderDate))."<br />";
+        if (FannieAuth::validateUserQuiet('ordering_edit')) {
+            $ret .= '<a href="SpoEditsPage.php?id=' . $orderID . '">Edit History</a><br />';
+        }
         $ret .= '</div>
             <div class="col-sm-6 text-right">';
         $ret .= '<b>Call to Confirm</b>: ';
@@ -294,8 +298,8 @@ class OrderReviewPage extends FannieRESTfulPage
         $stat = $dbc->getRow($statP, array($this->orderID));
 
         $status = array(
-            0 => "New",
-            3 => "New, Call",
+            0 => "Ready to Order",
+            3 => "Call before Ordering",
             1 => "Called/waiting",
             2 => "Pending",
             4 => "Placed",

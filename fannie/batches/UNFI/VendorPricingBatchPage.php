@@ -49,7 +49,10 @@ class VendorPricingBatchPage extends FannieRESTfulPage
         span.grey {
             color: grey;
         }
-        tr.green td.sub {
+        tr.green-green td.sub {
+            background:#ccffcc;
+        }
+        tr.green-red td.sub {
             background:#ccffcc;
         }
         tr.greenb td.sub {
@@ -157,14 +160,17 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             <input type=hidden id=queueID value=%d />
             <input type=hidden id=superID value=%d />",
             $vendorID,$batchID,$queueID,$superID);
-        $ret .= '<br/><b>View: </b>: 
+        $ret .= '<br/><b>View: </b> 
             <button class="btn btn-danger btn-xs btn-filter active" data-filter-type="red">Red</button> 
             | <button class="btn btn-warning btn-xs btn-filter active" data-filter-type="yellow">Yellow</button> 
-            | <button class="btn btn-success btn-xs btn-filter active" data-filter-type="green">Green</button> 
+            | <button class="btn btn-success btn-xs btn-filter active" data-filter-type="green-green">Green</button> 
+            | <button class="btn btn-success btn-xs btn-filter active" data-filter-type="green-red">Green
+                 <span style="text-shadow: -1px -1px 0 crimson, 1px -1px 0 crimson, -1px 1px 0 crimson, 1px 1px crimson;">Red</span></button> 
             | <button class="btn btn-default btn-xs btn-filter active" data-filter-type="white">White</button> 
             | <button class="btn btn-default btn-xs multi-filter active" data-filter-type="multiple">
-                <span class="glyphicon glyphicon-exclamation-sign" title="View only rows containing multiple SKUs"> </span>
+                <span class="fas fa-exclamation-circle" title="View only rows containing multiple SKUs"> </span>
             </button> 
+            | <input type="" class="date-field" id="reviewed" placeholder="Reviewed on" style="border: 1px solid lightgrey; border-radius: 3px;"/>
             <br/><br/>';
 
         $batchUPCs = array();
@@ -184,16 +190,6 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             END';
         $srpSQL = Margin::toPriceSQL($costSQL, $marginCase);
 
-        /*
-        //  Scan both stores to find a list of items that are inUse.
-        $itemsInUse = array();
-        $query = $dbc->prepare("SELECT upc FROM products WHERE inUse = 1");
-        $result = $dbc->execute($query);
-        while ($row = $dbc->fetchRow($result)) {
-            $itemsInUse[$row['upc']] = 1;
-        }
-        */
-
         $aliasP = $dbc->prepare("
             SELECT v.srp,
                 v.vendorDept,
@@ -202,6 +198,8 @@ class VendorPricingBatchPage extends FannieRESTfulPage
                 INNER JOIN vendorItems AS v ON a.sku=v.sku AND a.vendorID=v.vendorID
             WHERE a.upc=?");
 
+        $vidsStart = FormLib::get('forcedStart', false);
+        $vidsEnd = FormLib::get('forcedEnd', false);
         $query = "SELECT p.upc,
             p.description,
             p.brand,
@@ -239,10 +237,26 @@ class VendorPricingBatchPage extends FannieRESTfulPage
                 LEFT JOIN PriceRuleTypes AS prt ON pr.priceRuleTypeID=prt.priceRuleTypeID
                 LEFT JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
         WHERE v.cost > 0
-                AND v.vendorID=?
-                AND m.SuperID IN (1, 3, 4, 5, 8, 9, 13, 17, 18)
         ";
-        $args = array($vendorID);
+
+        if ($vidsStart != false && $vidsEnd != false) {
+            $ret .= "<h3 align=\"center\">Multiple Vendor View</h3>";
+            $vidsA = array($vidsStart, $vidsEnd);
+            $vidsP = $dbc->prepare("SELECT * FROM batchReviewLog WHERE forced >= ? AND forced < ? 
+                AND vid <> 1 GROUP BY vid;");
+            $vidsR = $dbc->execute($vidsP, $vidsA);
+            $vids = array();
+            while ($row = $dbc->fetchRow($vidsR)) {
+                $vids[$row['vid']] = $row['vid'];
+            }
+            list($inStr, $args) = $dbc->safeInClause($vids);
+            $query .= " AND v.vendorID IN ($inStr) ";
+        } else {
+            $args = array($vendorID);
+            $query .= " AND v.vendorID = ? ";
+        }
+
+        //$query .= " AND m.SuperID IN (1, 3, 4, 5, 8, 9, 13, 17, 18) ";
         if ($superID == -2) {
             $query .= " AND m.superID<>0 ";
         } elseif ($superID != -1) {
@@ -266,7 +280,7 @@ class VendorPricingBatchPage extends FannieRESTfulPage
 
         $vendorModel = new VendorItemsModel($dbc);
 
-        $ret .= "<table class=\"table table-bordered small\" id=\"mytable\">";
+        $ret .= "<div class=\"table-responsive\"><table class=\"table table-bordered table-condensed small\" id=\"mytable\">";
 
         $ret .= "<thead><tr class=\"thead\">
             <th class=\"thead\">UPC</th>
@@ -292,15 +306,15 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             $numRows = $vendorModel->find();
             $multipleVendors = '';
             if (count($numRows) > 1) {
-                $multipleVendors = '<span class="glyphicon glyphicon-exclamation-sign"
+                $multipleVendors = '<span class="fas fa-exclamation-circle"
                     title="Multiple SKUs For This Product">
                     </span> ';
             }
             if ($row['alias']) {
-                $alias = $dbc->getRow($aliasP, array($row['upc']));
-                $row['vendorDept'] = $alias['vendorDept'];
-                $row['srp'] = $alias['srp'] * $alias['multiplier'];
-                $row['srp'] = $rounder->round($row['srp']);
+                //$alias = $dbc->getRow($aliasP, array($row['upc']));
+                //$row['vendorDept'] = $alias['vendorDept'];
+                //$row['srp'] = $alias['srp'] * $alias['multiplier'];
+                //$row['srp'] = $rounder->round($row['srp']);
             }
             if ($row['difference']) {
             }
@@ -313,37 +327,45 @@ class VendorPricingBatchPage extends FannieRESTfulPage
                     ($row['normal_price']+0.10 < $row['rawSRP'])
                     && ($row['srp']-.14 > $row['normal_price']
                     && $row['rawSRP'] - floor($row['rawSRP']) > 0.10)
-                ) ?'red':'green';
+                ) ?'red':'green-green';
                 if ($row['normal_price']-.10 > $row['rawSRP']) {
                     $background = (
                         ($row['normal_price']-.10 > $row['rawSRP'])
                         && ($row['normal_price']-.14 > $row['srp'])
                         && ($row['rawSRP'] < $row['srp']+.10)
-                    )?'yellow':'green';
+                    )?'yellow':'green-green';
                 }
             } elseif (in_array($row['priceRuleTypeID'], $acceptPrtID) || $row['variable_pricing'] == 0 && $row['normal_price'] >= 10.00) {
                 $background = ($row['normal_price'] < $row['rawSRP']
                     && $row['srp'] > $row['normal_price']
                     && $row['rawSRP'] - floor($row['rawSRP']) > 0.10
-                    ) ?'red':'green';
+                    ) ?'red':'green-green';
                 if ($row['normal_price']-0.49 > $row['rawSRP']) {
                     $background = ($row['normal_price']-0.49 > $row['rawSRP']
                         && ($row['normal_price'] > $row['srp'])
-                        && ($row['rawSRP'] < $row['srp']+.10) )?'yellow':'green';
+                        && ($row['rawSRP'] < $row['srp']+.10) )?'yellow':'green-green';
                 }
             }
             if (isset($batchUPCs[$row['upc']])) {
-                $icon = '<span class="glyphicon glyphicon-minus-sign"
+                $icon = '<span class="fas fa-minus-circle"
                     title="Remove from batch">
                     </span>';
             } else {
-                $icon = '<span class="glyphicon glyphicon-plus-sign"
+                $icon = '<span class="fas fa-plus-circle"
                     title="Add to batch">
                     </span>';
             }
             $brand = rtrim(substr($row['brand'], 0, 15));
             $symb = ($row['difference'] > 0) ? "+" : "";
             $row['date'] = ($row['date']) ? "<span class='grey'> <i>on</i> </span> ".$row['date'] : "";
+            //$change = $row['srp'] - $row['normal_price'];
+            //if (abs($change) > 1.99) {
+            //    $change = (abs($change) < 1.99) ? 0 : round($change / 2);
+            //    $row['srp'] = $row['srp'] - $change;
+            //    $row['srp'] = $rounder->round($row['srp']);
+            //}
+            //if (abs(abs($row['normal_price']) - abs($row['rawSRP'])) < 0.03)
+            //    continue;
             $ret .= sprintf("<tr id=row%s class='%s %s'>
                 <td class=\"sub\"><a href=\"%sitem/ItemEditorPage.php?searchupc=%s\">%s</a></td>
                 <td class=\"sub sku\">%s</td>
@@ -360,12 +382,12 @@ class VendorPricingBatchPage extends FannieRESTfulPage
                 <td class=white>
                     <a class=\"add-button %s\" href=\"\"
                         onclick=\"addToBatch('%s'); return false;\">
-                        <span class=\"glyphicon glyphicon-plus-sign\"
+                        <span class=\"fas fa-plus-circle\"
                             title=\"Add item to batch\"></span>
                     </a>
                     <a class=\"remove-button %s\" href=\"\"
                         onclick=\"removeFromBatch('%s'); return false;\">
-                        <span class=\"glyphicon glyphicon-minus-sign\"
+                        <span class=\"fas fa-minus-circle\"
                             title=\"Remove item from batch\"></span>
                     </a>
                 </td>
@@ -388,12 +410,12 @@ class VendorPricingBatchPage extends FannieRESTfulPage
                 100*$row['desired_margin'],
                 $row['upc'],
                 ($row['variable_pricing']>=1?'checked':''),
-                $row['prtDesc'],
+                substr($row['prtDesc'],0,10),
                 (isset($batchUPCs[$row['upc']])?'collapse':''), $row['upc'],
                 (!isset($batchUPCs[$row['upc']])?'collapse':''), $row['upc']
             );
         }
-        $ret .= "</tbody></table>";
+        $ret .= "</tbody></table></div>";
 
         return $ret;
     }
@@ -429,6 +451,7 @@ class VendorPricingBatchPage extends FannieRESTfulPage
 
         ob_start();
         ?>
+        <h3>Original Vendor Pricing Batch Page</h3>
         <form action=VendorPricingBatchPage.php method="get" target="_blank">
         <label>Select a Vendor</label>
         <select name="id" class="form-control">
@@ -452,6 +475,33 @@ class VendorPricingBatchPage extends FannieRESTfulPage
         <button type=submit class="btn btn-default">Continue</button>
         </p>
         </form>
+
+        <div class="well">
+            <h3>New/Testing Vendor Pricing Batch Page</h3>
+            <form action=VPBPIV.php method="get" target="_blank">
+            <label>Select a Vendor</label>
+            <select name="id" class="form-control">
+            <?php echo $vopts; ?>
+            </select>
+            <label>and a Super Department</label>
+            <select name=super class="form-control">
+            <?php echo $opts; ?>
+            </select>
+            <label>Show all items</label>
+            <select name=filter class="form-control">
+            <option>No</option>
+            <option>Yes</option>
+            </select>
+            <label>Shelf Tag Queue</label>
+            <select name="queueID" class="form-control">
+            <?php echo $qopts; ?>
+            </select>
+            <br />
+            <p>
+            <button type=submit class="btn btn-default">Continue</button>
+            </p>
+            </form>
+        </div>
         <?php
 
         return ob_get_clean();
@@ -461,14 +511,16 @@ class VendorPricingBatchPage extends FannieRESTfulPage
     {
         ob_start();
         ?>
-        $('.green').each(function(){
+        $('.green-green').each(function(){
             var price = $(this).find('td:eq(4)').text();
             price = parseFloat(price);
             var srp = $(this).find('td:eq(9)').text();
             srp = parseFloat(srp);
             if (price < srp) {
                 var text = $(this).find('td:eq(10)').text();
-                $(this).find('td:eq(10)').css('background', 'pink');
+                $(this).find('td:eq(10)').css('background', 'pink')
+                    .closest('tr').removeClass('green-green')
+                    .addClass('green-red');
             } else {
                 var text = $(this).find('td:eq(10)').text();
             }
@@ -541,6 +593,24 @@ class VendorPricingBatchPage extends FannieRESTfulPage
                 });
            }
        });
+
+       $('#reviewed').change(function(){
+           var date = $(this).val();
+           $('tr').each(function(){
+                $(this).show();
+           });
+           if (date != '') {
+               $('td').each(function(){
+                   if ($(this).hasClass('reviewed')) {
+                       var text = $(this).text();
+                       if (!date.includes(text)) {
+                           $(this).closest('tr').hide();
+                       }
+                   }
+               });
+
+           }
+       });
         <?php
         return ob_get_clean();
     }
@@ -554,6 +624,18 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             <p>The default <em>Show all items</em> setting, No, omits items
             whose current retail price is identical to the margin-based
             suggested retail price.</p>
+            <h5><strong>Explanation of Table row coloring</strong></h5>
+            <ul>
+                <li><span class="alert-danger">Red</span> columns => suggest price increase</li>
+                <li><span class="alert-warning">Yellow</span> columns => suggest price decrease</li>
+                <li><span class="alert-success">Full Green</span> columns => suggest price decrease, lower priority than yellow</li>
+                <li><span class="alert-success">Green & 
+                    <span style="text-shadow: -1px -1px 0 pink, 1px -1px 0 pink, -1px 1px 0 pink, 1px 1px pink;">Red</span>
+                    </span> columns => suggest price increase, lower priority than full red</li>
+                <li><span class="alert-default">White</span> columns => item is using a custom pricing rule and may not need to be updated</li>
+                <li><button class="btn btn-default btn-xs">
+                    <span class="fas fa-exclamation-circle"</span></button> => shows only items that have multiple vendor item listings</li>
+            </ul>
             ';
     }
 

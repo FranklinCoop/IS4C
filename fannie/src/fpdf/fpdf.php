@@ -414,7 +414,7 @@ function GetStringWidth($s)
     $w = 0;
     $l = strlen($s);
     for($i=0;$i<$l;$i++)
-        $w+=$cw[$s[$i]];
+        $w += $cw[$s[$i]];
     return $w*$this->FontSize/1000;
 }
 
@@ -693,8 +693,8 @@ function MultiCell($w, $h, $txt, $border=0, $align='J', $fill=false)
     $nl = 1;
     while($i<$nb)
     {
-        //Get next character
-        $c=$s[$i];
+        // Get next character
+        $c = $s[$i];
         if($c=="\n")
         {
             // Explicit line break
@@ -785,8 +785,8 @@ function Write($h, $txt, $link='')
     $nl = 1;
     while($i<$nb)
     {
-        //Get next character
-        $c=$s[$i];
+        // Get next character
+        $c = $s[$i];
         if($c=="\n")
         {
             // Explicit line break
@@ -1590,20 +1590,8 @@ protected function _putfonts()
             $this->Error('Font file not found: '.$file);
         $compressed = (substr($file,-2)=='.z');
         if(!$compressed && isset($info['length2']))
-        {
-            $header=(ord($font[0])==128);
-            if($header)
-            {
-                //Strip first binary header
-                $font=substr($font,6);
-            }
-            if($header && ord($font[$info['length1']])==128)
-            {
-                //Strip second binary header
-                $font=substr($font,0,$info['length1']).substr($font,$info['length1']+6);
-            }
-        }
-        $this->_out('<</Length '.strlen($font));
+            $font = substr($font,6,$info['length1']).substr($font,6+$info['length1']+6,$info['length2']);
+        $this->_put('<</Length '.strlen($font));
         if($compressed)
             $this->_put('/Filter /FlateDecode');
         $this->_put('/Length1 '.$info['length1']);
@@ -1709,20 +1697,17 @@ protected function _putfonts()
 
 protected function _tounicodecmap($uv)
 {
-    $filter=($this->compress) ? '/Filter /FlateDecode ' : '';
-    reset($this->images);
-    //while(list($file,$info)=each($this->images))
-    foreach (array_keys($this->images) as $file)
+    $ranges = '';
+    $nbr = 0;
+    $chars = '';
+    $nbc = 0;
+    foreach($uv as $c=>$v)
     {
-        $info = $this->images[$file];
-        $this->_newobj();
-        $this->images[$file]['n']=$this->n;
-        $this->_out('<</Type /XObject');
-        $this->_out('/Subtype /Image');
-        $this->_out('/Width '.$info['w']);
-        $this->_out('/Height '.$info['h']);
-        if($info['cs']=='Indexed')
-            $this->_out('/ColorSpace [/Indexed /DeviceRGB '.(strlen($info['pal'])/3-1).' '.($this->n+1).' 0 R]');
+        if(is_array($v))
+        {
+            $ranges .= sprintf("<%02X> <%02X> <%04X>\n",$c,$c+$v[1]-1,$v[0]);
+            $nbr++;
+        }
         else
         {
             $chars .= sprintf("<%02X> <%04X>\n",$c,$v);
@@ -1915,225 +1900,11 @@ protected function _enddoc()
     $this->_put('trailer');
     $this->_put('<<');
     $this->_puttrailer();
-    $this->_out('>>');
-    $this->_out('startxref');
-    $this->_out($o);
-    $this->_out('%%EOF');
-    $this->state=3;
+    $this->_put('>>');
+    $this->_put('startxref');
+    $this->_put($offset);
+    $this->_put('%%EOF');
+    $this->state = 3;
 }
-
-function _beginpage($orientation)
-{
-    $this->page++;
-    $this->pages[$this->page]='';
-    $this->state=2;
-    $this->x=$this->lMargin;
-    $this->y=$this->tMargin;
-    $this->FontFamily='';
-    //Page orientation
-    if(!$orientation)
-        $orientation=$this->DefOrientation;
-    else
-    {
-        $orientation=strtoupper($orientation[0]);
-        if($orientation!=$this->DefOrientation)
-            $this->OrientationChanges[$this->page]=true;
-    }
-    if($orientation!=$this->CurOrientation)
-    {
-        //Change orientation
-        if($orientation=='P')
-        {
-            $this->wPt=$this->fwPt;
-            $this->hPt=$this->fhPt;
-            $this->w=$this->fw;
-            $this->h=$this->fh;
-        }
-        else
-        {
-            $this->wPt=$this->fhPt;
-            $this->hPt=$this->fwPt;
-            $this->w=$this->fh;
-            $this->h=$this->fw;
-        }
-        $this->PageBreakTrigger=$this->h-$this->bMargin;
-        $this->CurOrientation=$orientation;
-    }
 }
-
-function _endpage()
-{
-    //End of page contents
-    $this->state=1;
-}
-
-function _newobj()
-{
-    //Begin a new object
-    $this->n++;
-    $this->offsets[$this->n]=strlen($this->buffer);
-    $this->_out($this->n.' 0 obj');
-}
-
-function _dounderline($x,$y,$txt)
-{
-    //Underline text
-    $up=$this->CurrentFont['up'];
-    $ut=$this->CurrentFont['ut'];
-    $w=$this->GetStringWidth($txt)+$this->ws*substr_count($txt,' ');
-    return sprintf('%.2f %.2f %.2f %.2f re f',$x*$this->k,($this->h-($y-$up/1000*$this->FontSize))*$this->k,$w*$this->k,-$ut/1000*$this->FontSizePt);
-}
-
-function _parsejpg($file)
-{
-    //Extract info from a JPEG file
-    $a=GetImageSize($file);
-    if(!$a)
-        $this->Error('Missing or incorrect image file: '.$file);
-    if($a[2]!=2)
-        $this->Error('Not a JPEG file: '.$file);
-    if(!isset($a['channels']) || $a['channels']==3)
-        $colspace='DeviceRGB';
-    elseif($a['channels']==4)
-        $colspace='DeviceCMYK';
-    else
-        $colspace='DeviceGray';
-    $bpc=isset($a['bits']) ? $a['bits'] : 8;
-    //Read whole file
-    $f=fopen($file,'rb');
-    $data='';
-    while(!feof($f))
-        $data.=fread($f,4096);
-    fclose($f);
-    return array('w'=>$a[0],'h'=>$a[1],'cs'=>$colspace,'bpc'=>$bpc,'f'=>'DCTDecode','data'=>$data);
-}
-
-function _parsepng($file)
-{
-    //Extract info from a PNG file
-    $f=fopen($file,'rb');
-    if(!$f)
-        $this->Error('Can\'t open image file: '.$file);
-    //Check signature
-    if(fread($f,8)!=chr(137).'PNG'.chr(13).chr(10).chr(26).chr(10))
-        $this->Error('Not a PNG file: '.$file);
-    //Read header chunk
-    fread($f,4);
-    if(fread($f,4)!='IHDR')
-        $this->Error('Incorrect PNG file: '.$file);
-    $w=$this->_freadint($f);
-    $h=$this->_freadint($f);
-    $bpc=ord(fread($f,1));
-    if($bpc>8)
-        $this->Error('16-bit depth not supported: '.$file);
-    $ct=ord(fread($f,1));
-    if($ct==0)
-        $colspace='DeviceGray';
-    elseif($ct==2)
-        $colspace='DeviceRGB';
-    elseif($ct==3)
-        $colspace='Indexed';
-    else
-        $this->Error('Alpha channel not supported: '.$file);
-    if(ord(fread($f,1))!=0)
-        $this->Error('Unknown compression method: '.$file);
-    if(ord(fread($f,1))!=0)
-        $this->Error('Unknown filter method: '.$file);
-    if(ord(fread($f,1))!=0)
-        $this->Error('Interlacing not supported: '.$file);
-    fread($f,4);
-    $parms='/DecodeParms <</Predictor 15 /Colors '.($ct==2 ? 3 : 1).' /BitsPerComponent '.$bpc.' /Columns '.$w.'>>';
-    //Scan chunks looking for palette, transparency and image data
-    $pal='';
-    $trns='';
-    $data='';
-    do
-    {
-        $n=$this->_freadint($f);
-        $type=fread($f,4);
-        if($type=='PLTE')
-        {
-            //Read palette
-            $pal=fread($f,$n);
-            fread($f,4);
-        }
-        elseif($type=='tRNS')
-        {
-            //Read transparency info
-            $t=fread($f,$n);
-            if($ct==0)
-                $trns=array(ord(substr($t,1,1)));
-            elseif($ct==2)
-                $trns=array(ord(substr($t,1,1)),ord(substr($t,3,1)),ord(substr($t,5,1)));
-            else
-            {
-                $pos=strpos($t,chr(0));
-                if($pos!==false)
-                    $trns=array($pos);
-            }
-            fread($f,4);
-        }
-        elseif($type=='IDAT')
-        {
-            //Read image data block
-            $data.=fread($f,$n);
-            fread($f,4);
-        }
-        elseif($type=='IEND')
-            break;
-        else
-            fread($f,$n+4);
-    }
-    while($n);
-    if($colspace=='Indexed' && empty($pal))
-        $this->Error('Missing palette in '.$file);
-    fclose($f);
-    return array('w'=>$w,'h'=>$h,'cs'=>$colspace,'bpc'=>$bpc,'f'=>'FlateDecode','parms'=>$parms,'pal'=>$pal,'trns'=>$trns,'data'=>$data);
-}
-
-function _freadint($f)
-{
-    //Read a 4-byte integer from file
-    $a=unpack('Ni',fread($f,4));
-    return $a['i'];
-}
-
-function _textstring($s)
-{
-    //Format a text string
-    return '('.$this->_escape($s).')';
-}
-
-function _escape($s)
-{
-    //Add \ before \, ( and )
-    return str_replace(')','\\)',str_replace('(','\\(',str_replace('\\','\\\\',$s)));
-}
-
-function _putstream($s)
-{
-    $this->_out('stream');
-    $this->_out($s);
-    $this->_out('endstream');
-}
-
-function _out($s)
-{
-    //Add a line to the document
-    if($this->state==2)
-        $this->pages[$this->page].=$s."\n";
-    else
-        $this->buffer.=$s."\n";
-}
-//End of class
-}
-
-//Handle special IE contype request
-if(isset($_SERVER['HTTP_USER_AGENT']) && $_SERVER['HTTP_USER_AGENT']=='contype')
-{
-    header('Content-Type: application/pdf');
-    exit;
-}
-
-}
-
+?>

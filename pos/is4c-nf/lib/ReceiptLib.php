@@ -801,10 +801,26 @@ static private function messageModFooters($receipt, $where, $ref, $reprint, $nth
 {
     // check if message mods have data
     // and add them to the receipt
+    $validMods = self::validateMessageMods($nth);
+    foreach($validMods as $class =>$thing){   
+        if ($thing['val'] != 0) {
+            $obj = $thing[$class];
+            if ($obj->paper_only)
+                $receipt['print'] .= $obj->message($thing['val'], $ref, $reprint);
+            else
+                $receipt['any'] .= $obj->message($thing['val'], $ref, $reprint);
+        }
+    }
+
+    return $receipt;
+}
+
+static private function validateMessageMods($where) {
     $dbc = Database::tDataConnect();
     $modQ = "SELECT ";
     $selectMods = array();
-    foreach(self::messageMods($nth) as $class){
+    $returnMods = array();
+    foreach(self::messageMods($where) as $class){
         if (in_array($class, self::$msgMods)) {
             $class = 'COREPOS\\pos\\lib\\ReceiptBuilding\\Messages\\' . $class;
         }
@@ -824,16 +840,13 @@ static private function messageModFooters($receipt, $where, $ref, $reprint, $nth
         $modR = $dbc->query($modQ);
         $row = array();
         if ($dbc->numRows($modR) > 0) $row = $dbc->fetchRow($modR);
-        foreach($selectMods as $class => $obj){
-            if (!isset($row[$class])) continue;    
-            if ($obj->paper_only)
-                $receipt['print'] .= $obj->message($row[$class], $ref, $reprint);
-            else
-                $receipt['any'] .= $obj->message($row[$class], $ref, $reprint);
+        foreach($selectMods as $class => $mod){
+            if (!isset($row[$class])) continue; 
+            $returnMods[$class]= array($class=>$mod, 'val'=>$row[$class]);
         }
     }
+    return $returnMods;
 
-    return $receipt;
 }
 
 static private function messageMods($nth)
@@ -989,13 +1002,12 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
         }
     }
 
-    $receipt .= self::transactionBarcode($ref);
-
     /*
      Check which standalone mods should print.
     */
     $validSlips = array();
-    foreach (self::validateMessageMods($where) as $modClass => $mod) {
+    $msgMods = self::validateMessageMods($where);
+    foreach ($msgMods as $modClass => $mod) {
         if ($mod['val'] !=0) {
             $modObj = $mod[$modClass];
             $validSlips[$modObj->standalone_receipt_type] = $modObj;
@@ -1016,6 +1028,8 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
             $receipt .= $mod->standalone_receipt($ref);
         } 
     }
+
+    $receipt .= self::transactionBarcode($ref);
             
     $receipt = self::cutReceipt($receipt, $second);
     

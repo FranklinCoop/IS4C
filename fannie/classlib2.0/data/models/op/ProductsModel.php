@@ -122,12 +122,11 @@ class ProductsModel extends BasicModel
           If a custom data source has been specified, let
           that handle the calculations
         */
-        //if (FannieConfig::config('FANNIE_TAG_DATA_SOURCE') !== '' && class_exists(FannieConfig::config('FANNIE_TAG_DATA_SOURCE'))) {
+        if (FannieConfig::config('FANNIE_TAG_DATA_SOURCE') !== '' && class_exists(FannieConfig::config('FANNIE_TAG_DATA_SOURCE'))) {
             $source = FannieConfig::config('FANNIE_TAG_DATA_SOURCE');
             $obj = new $source();
             return $obj->getTagData($this->connection, $this->upc(), $price);
         }
-
         // note that we only use the first result row from the query below,
         // however it is possible for there to be multiple results due to the
         // vendorItems join.  so here we sort by timestamp to get a

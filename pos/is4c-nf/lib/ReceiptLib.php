@@ -67,7 +67,7 @@ static public function writeLine($text)
                suppress open errors and check result
                instead
             */
-            $fptr = fopen(CoreLocal::get("printerPort"), "w");
+            $fptr = fopen("{$printerPort}", "a");
             fwrite($fptr, $text);
             fclose($fptr);
         }
@@ -680,7 +680,7 @@ static private function setupReprint($where)
             SUM(CASE WHEN discounttype=2 THEN memDiscount ELSE 0 END) AS memSpecial
         FROM localtranstoday
         WHERE " . $where . "
-            AND datetime >= " . $dbc->curdate() . "
+            AND `datetime` >= " . $dbc->curdate() . "
         GROUP BY register_no,
             emp_no,
             trans_no";
@@ -801,7 +801,7 @@ static private function messageModFooters($receipt, $where, $ref, $reprint, $nth
 {
     // check if message mods have data
     // and add them to the receipt
-    $validMods = self::validateMessageMods($nth);
+    $validMods = self::validateMessageMods($where);
     foreach($validMods as $class =>$thing){   
         if ($thing['val'] != 0) {
             $obj = $thing[$class];
@@ -836,7 +836,7 @@ static private function validateMessageMods($where) {
     if (count($selectMods) > 0){
         $modQ .= ' FROM localtranstoday
                 WHERE ' . $where . '
-                    AND datetime >= ' . $dbc->curdate();
+                    AND `datetime` >= ' . $dbc->curdate();
         $modR = $dbc->query($modQ);
         $row = array();
         if ($dbc->numRows($modR) > 0) $row = $dbc->fetchRow($modR);

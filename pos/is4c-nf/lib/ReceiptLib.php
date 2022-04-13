@@ -67,7 +67,7 @@ static public function writeLine($text)
                suppress open errors and check result
                instead
             */
-            $fptr = fopen("{$printerPort}", "a");
+            $fptr = fopen(CoreLocal::get('printerPort'), "a");
             fwrite($fptr, $text);
             fclose($fptr);
         }
@@ -1013,6 +1013,9 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
             $validSlips[$modObj->standalone_receipt_type] = $modObj;
         } 
     }
+
+    $receipt .= self::transactionBarcode($ref);
+    
     /*
      Finds slips neede for each tender.
     */
@@ -1029,10 +1032,8 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
         } 
     }
 
-    $receipt .= self::transactionBarcode($ref);
-            
     $receipt = self::cutReceipt($receipt, $second);
-    
+
     if (!in_array($arg1,$ignoreNR))
         CoreLocal::set("receiptToggle",1);
     if ($reprint){

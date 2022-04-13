@@ -237,7 +237,7 @@ if (!is_array(CoreLocal::get('ReceiptMessageMods'))){
     CoreLocal::set('ReceiptMessageMods', array());
 }
 $available = AutoLoader::listModules('COREPOS\\pos\\lib\\ReceiptBuilding\\Messages\\ReceiptMessage');
-$available = array_map(function($i){ return str_replace('\\', '-', $i); }, $available);
+$available = array_map(function($i){ return explode('\\',$i)[5]; }, $available);
 $current = CoreLocal::get('ReceiptMessageMods');
 $current = array_map(function($i){ return str_replace('\\', '-', $i); }, $current);
 for($i=0;$i<=count($current);$i++){

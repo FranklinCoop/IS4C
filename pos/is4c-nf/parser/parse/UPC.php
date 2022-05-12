@@ -578,7 +578,7 @@ class UPC extends Parser
         $entered = trim($entered);
 
         // leave GS1 barcodes alone otherwise
-        if ($this->source == self::GS1_PREFIX) {
+        if ($this->source == self::GS1_PREFIX || (substr($entered,0,4) == "8110" && strlen($entered) > 13)) {
             return $entered;
         }
 

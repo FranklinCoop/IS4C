@@ -143,45 +143,60 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
             $date1 = $date.' 00:00:00';
             $date2 = $date.' 23:59:59';
             $args = array($date1,$date2,$store);
-
+            $json = array();
+            //id, date, storeID, lineNo, lineName, acctNo, amt, count, total, diff, totalRow, diffShow, diffWith, reportOrder
             $tableData = $this->genRowData($dbc,$dlog,$args, $store);
-            $saveModel = new DailySettlementModel($dbc);
-            foreach ($model->find() as $obj) {
+            //$saveModel = new DailySettlementModel($dbc);
+            //$totals = array();
+            $diffs = array();
+            foreach ($tableData as $lineNo => $rowArr) {
+                $line = array('msg'=>'','lineNo'=>0, 'amt' => 0, 'diff'=>0);
+                $newAmt = $rowArr[2];
+                $newTotal = 0;
+                $newDiff = 0;
+
+                $saveModel = new DailySettlementModel($dbc);
+                $saveModel->date($date);
+                $saveModel->storeID($store);
+                $saveModel->lineNo($lineNo);
+                // deal with the totals.
+                $obj = $saveModel->find();
                 $cellID = $obj->id();
-                $totalID = $obj[0]->totalRow();
-                $oldPOSTotal = $obj[0]->amt();
                 
-                //update cell
-                $rowArr = $tableData[$obj->lineNo()];
-                $saveModel->id($cellID);
-                $saveModel->amt($rowArr[2]);
-                $saveModel->diff($obj->count()-$obj->amt());
-                $saveModel->save();
-                //update section total
-                $totalModel = new DailySettlementModel($dbc);
-                $totalModel->id($totalID,'=');
-                $totalLine = $model->find();
-                //$total = $obj[0]->total();
-                //$posTotal = $obj[0]->amt();
-                //$newTotal = $total-$count+$value;
-                //$json['secID'] = $totalID;
-                //$json['secTotal'] = round($newTotal,2);
-                //$json['secDiff'] = round($newTotal - $posTotal,2);
-                $grandTotalID = $obj[0]->totalRow();
-        
-                $totalModel = new DailySettlementModel($dbc);
-                $totalModel->id($totalID);
-                $totalModel->total($newTotal);
-                $totalModel->diff($newTotal - $posTotal);
-                $totalModel->save();
+                $totalRow = $obj->totalRow();
+                $totals[$totalRow] += $obj->count();
+                if (key_exists($totals, $rowID)) {
+                    $saveModel->total($totals[$rowID]);
+                } else {
+                    $saveModel->total($obj->count());
+                }
+                // deal with diffs
+                $diffShow = $obj->diffShow();
+                $diffWith = $obj->diffWith();
+                $diffModel = new DailySettlementModel($dbc);
+                $diffModel->id($diffWith);
+                $diffObj = $diffModel->find();
+                $diffs[$diffShow] = $diffObj->count() - $newAmt;
+                if (key_exists($diffs, $cellID)) {
+                    $newDiff = $diffs[$cellID];
+                    $saveModel->diff($newDiff);
+                }
 
-                //update grand total
+                $saveModel->amt($newAmt);
+                $line['msg'] = $saveModel->save();
 
+                // save line for updating
+                $line['lineNo'] = $cellID;
+                $line['amt'] = $newAmt;
+                $line['total'] =0;
+                $line['diff'] =$newDiff;
+                $json[$lineNo] = $line;
             }
-            
+            return $json;
         }
+            return array('msg' => 'ERROR');
 
-        $this->rowData = $model;
+        //$this->rowData = $model;
 
     }
 

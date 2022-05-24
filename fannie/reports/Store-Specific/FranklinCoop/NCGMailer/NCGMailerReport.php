@@ -31,7 +31,7 @@ class NCGMailerReport extends FannieReportPage
 
     protected $title = "Fannie : Item Purchases";
     protected $header = "Item Purchases Report";
-    protected $report_headers = array('Date','Receipt#','Total ($)','Owner#','Name');
+    protected $report_headers = array('Date','Receipt#','Owner#','Name','Qty','Total ($)');
     protected $required_fields = array('date1', 'date2');
     protected $report_cache = 'day';
 
@@ -107,6 +107,7 @@ class NCGMailerReport extends FannieReportPage
                 $trans_num,
                 $info['card_no'],
                 $info['ln'] . ', ' . $info['fn'],
+                1,
                 sprintf('%.2f', $info['ttl']),
             );
             $data[] = $record;
@@ -130,16 +131,16 @@ class NCGMailerReport extends FannieReportPage
             $qty++;
             if ($row[2] == 99999) {
                 $nonQty++;
-                $sumNonSales = $row[4];
+                $sumNonSales = $row[5];
             } else {
                 $memQty++;
-                $sumMemSales = $row[4];
+                $sumMemSales = $row[5];
             }
         }
         $divisor = count($data) > 0 ? count($data) : 1;
         return array(
-            array('Member Sales Total',null,null,$memQty,$memSales),
-            array('Non-Member Sales Total',null,null,$nonQty,$memSales),
+            array('Member Sales Total',null,null,null,$memQty,$sumMemSales),
+            array('Non-Member Sales Total',null,null,null,$nonQty,$sumNonSales),
             array('Total',null,null,$qty,$sumSales)
         );
     }

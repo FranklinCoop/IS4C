@@ -89,6 +89,13 @@ class DiscountModule
             }
 
             /**
+              Check if there is a max %discount and do not go over that amount.
+            */
+            if ($newEffectiveDiscount > CoreLocal::Get('discountMax') && CoreLocal::Get('discountMax') != 0) {
+                $newEffectiveDiscount = CoreLocal::Get('discountMax');
+            }
+
+            /**
               When discount changes:
               1. Update the session value
               2. Update the localtemptrans.percentDiscount value

@@ -127,21 +127,21 @@ class NCGMailerReport extends FannieReportPage
         $nonQty = 0;
         $sumNonSales = 0.0;
         foreach($data as $row){
-            $sumSales += $row[2];
+            $sumSales += $row[5];
             $qty++;
             if ($row[2] == 99999) {
                 $nonQty++;
-                $sumNonSales = $row[5];
+                $sumNonSales += $row[5];
             } else {
                 $memQty++;
-                $sumMemSales = $row[5];
+                $sumMemSales += $row[5];
             }
         }
         $divisor = count($data) > 0 ? count($data) : 1;
         return array(
             array('Member Sales Total',null,null,null,$memQty,$sumMemSales),
             array('Non-Member Sales Total',null,null,null,$nonQty,$sumNonSales),
-            array('Total',null,null,$qty,$sumSales)
+            array('Total',null,null,null,$divisor,$sumSales)
         );
     }
     

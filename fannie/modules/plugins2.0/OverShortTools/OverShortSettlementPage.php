@@ -91,8 +91,9 @@ class OverShortSettlementPage extends FannieRESTfulPage
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
         $dlog = DTransactionsModel::selectDTrans($this->date);
         $controller = new FCCSettlementModule($dbc,$dlog,$this->date,$this->store);
-        $controller->recalculatePosTotals($dbc,$dlog,$this->date,1);
-        echo $this->getTable($dbc,$this->date,$this->store);
+        $json = $controller->recalculatePosTotals($dbc,$dlog,$this->date,1);
+        echo json_encode($json);
+        //echo $this->getTable($dbc,$this->date,$this->store);
 
         return false;
     }
@@ -232,16 +233,32 @@ class OverShortSettlementPage extends FannieRESTfulPage
             var store = $('#storeID').val();
             var action = $('#recalc').val();
             var data = 'recalc='+action+'&date='+setdate+'&store='+store;
-            $('#loading-bar').show();
-            $('#displayarea').html('');
             $.ajax({
                 url: 'OverShortSettlementPage.php',
                 type: 'post',
-                data: data,
-            success: function(resp){
-                $('#loading-bar').hide();
-                $('#displayarea').html(resp);
-            }
+                dataType: 'json',
+                data: data
+            }).done(function(data) {
+                console.log('RECALC Return');
+                if(data.msg != '') {
+                    console.log('RECALC Error');
+                    showBootstrapPopover(elem, orig, data.msg);
+                } else {
+                    console.log('RECALC save');
+                    for(var i = 0; i < data.length; i++) {
+                        var obj = data[i];
+
+                        var lineNo = obj.lineNo;
+                        $("#diff"+lineNo).attr("data-value",obj.diff);
+                        $("#count"+lineNo).attr("obj-value",value);
+                        $("#total"+lineNo).empty().append(obj.total);
+                        showBootstrapPopover(elem, orig, obj.msg);
+                        //console.log(obj.id);
+                    }
+                }
+
+
+                
             });
         }
 
@@ -310,7 +327,9 @@ class OverShortSettlementPage extends FannieRESTfulPage
         $ret .= '<form method="post">';
         $ret .= '<button type="button" onclick="selectDay();"  class="btn btn-default">Set</button>';
         $ret .= '<button type="submit" name="pdf" value="print" class="btn btn-default">Report</button>';
-        //$ret .= '<button type="button" name="recalc" value="1" onclick="reCalc();" class="btn btn-default">Recalculate POS Totals</buttons>';
+        if (FannieAuth::validateUserQuiet('admin')) {
+            $ret .= '<button type="button" name="recalc" value="1" onclick="reCalc();" class="btn btn-default">Recalculate POS Totals</buttons>';
+        }
         $ret .= '</div></div>';
 
         $ret .= '<hr />';
@@ -329,7 +348,14 @@ class OverShortSettlementPage extends FannieRESTfulPage
         
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
         $dlog = DTransactionsModel::selectDTrans($date);
-
+        /***** 
+         * This if gets the cell format from the settlement module and fills it with data.
+         * looking back at this now I was a little confused because the java script functions for saveValue
+         * and saveTotal are never called in this file. It is because they are in the cell defintion in the
+         * settlement module. Leaveign this comment incase I or anyone else is ever looking at it.
+         * 
+         *  ~RO
+        */
         if($date != '') {
             $tableData = new FCCSettlementModule($dbc,$dlog,$date,$store);
             $model = $tableData->getTable($dbc,$dlog,$date,$store);

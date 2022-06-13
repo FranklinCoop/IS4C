@@ -149,6 +149,7 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
             //$saveModel = new DailySettlementModel($dbc);
             //$totals = array();
             $diffs = array();
+            $diffPrint = 0;
             foreach ($tableData as $lineNo => $rowArr) {
                 $line = array('msg'=>'','lineNo'=>0, 'amt' => 0, 'diff'=>0);
                 $newAmt = $rowArr[2];
@@ -171,12 +172,18 @@ private function populateAccountTable($dbc,$dlog,$store,$date){
                     $saveModel->total($obj->count());
                 }
                 // deal with diffs
-                $diffShow = $obj->diffShow();
-                $diffWith = $obj->diffWith();
-                $diffModel = new DailySettlementModel($dbc);
-                $diffModel->id($diffWith);
-                $diffObj = $diffModel->find();
-                $diffs[$diffShow] = $diffObj->count() - $newAmt;
+
+                $newDiff = $obj->count() - $newAmt;
+                if ($diffWith != $diffShow){
+                    $diffs[$diffShow] = $obj->count() - $newAmt;
+                } else {
+                    $diffShow = $obj->diffShow();
+                    $diffWith = $obj->diffWith();
+                    $diffModel = new DailySettlementModel($dbc);
+                    $diffModel->id($diffWith);
+                    $diffObj = $diffModel->find();
+                    $diffs[$diffShow] = $diffObj->count() - $newAmt;
+                }
                 if (key_exists($diffs, $cellID)) {
                     $newDiff = $diffs[$cellID];
                     $saveModel->diff($newDiff);

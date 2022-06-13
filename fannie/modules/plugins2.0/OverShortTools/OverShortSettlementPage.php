@@ -91,8 +91,9 @@ class OverShortSettlementPage extends FannieRESTfulPage
         $dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
         $dlog = DTransactionsModel::selectDTrans($this->date);
         $controller = new FCCSettlementModule($dbc,$dlog,$this->date,$this->store);
-        $controller->recalculatePosTotals($dbc,$dlog,$this->date,1);
-        echo $this->getTable($dbc,$this->date,$this->store);
+        $json = $controller->recalculatePosTotals($dbc,$dlog,$this->date,1);
+        echo json_encode($json);
+        //echo $this->getTable($dbc,$this->date,$this->store);
 
         return false;
     }
@@ -238,9 +239,12 @@ class OverShortSettlementPage extends FannieRESTfulPage
                 dataType: 'json',
                 data: data
             }).done(function(data) {
-                if(data.msg) {
+                console.log('RECALC Return');
+                if(data.msg != '') {
+                    console.log('RECALC Error');
                     showBootstrapPopover(elem, orig, data.msg);
                 } else {
+                    console.log('RECALC save');
                     for(var i = 0; i < data.length; i++) {
                         var obj = data[i];
 

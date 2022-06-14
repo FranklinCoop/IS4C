@@ -568,7 +568,7 @@ static public function discountnotify($strl)
       ));
       $delta -=$seniorDisc;
     }
-    if ($delta > 0) {
+    if ($delta > 0 && CoreLocal::get("isStaff") !=1) {
           self::addRecord(array(
         'description' => '** ' . $delta  . '% Member Discount **',
         'trans_type' => '0',

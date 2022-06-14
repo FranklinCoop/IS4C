@@ -32,14 +32,6 @@ class SeniorDiscountParser extends Parser
     {
         if (substr($str,-2) == "OD" || $str==="OD"){
             $strl = substr($str,0,strlen($str)-2);
-            if (CoreLocal::get("isStaff") == "1") {
-                $this->ret['output'] = DisplayLib::boxMsg(
-                    _("Does not stack over 25%"),
-                    '',
-                    false,
-                    DisplayLib::standardClearButton()
-                );
-            }
             if (substr($str,0,2) == "VD") {
                 return true;
             } elseif (!is_numeric($strl)) {
@@ -47,6 +39,13 @@ class SeniorDiscountParser extends Parser
             } elseif ($this->session->get("tenderTotal") != 0) {
                 $this->ret['output'] = DisplayLib::boxMsg(
                     _("discount not applicable after tender"),
+                    '',
+                    false,
+                    DisplayLib::standardClearButton()
+                );
+            } elseif ($this->session->get("isStaff") == 1) {
+                $this->ret['output'] = DisplayLib::boxMsg(
+                    _("Does not stack over 25%"),
                     '',
                     false,
                     DisplayLib::standardClearButton()

@@ -43,13 +43,6 @@ class SeniorDiscountParser extends Parser
                     false,
                     DisplayLib::standardClearButton()
                 );
-            } elseif ($this->session->get("isStaff") == 1) {
-                $this->ret['output'] = DisplayLib::boxMsg(
-                    _("Does not stack over 25%"),
-                    '',
-                    false,
-                    DisplayLib::standardClearButton()
-                );
             } elseif ($strl > 50) {
                 $this->ret['output'] = DisplayLib::boxMsg(
                     _("discount exceeds maximum"),
@@ -84,6 +77,17 @@ class SeniorDiscountParser extends Parser
             Then returns to the last page.
         */
         $ret = $this->default_json();
+        if (CoreLocal::get("isStaff") == 1) {
+            $ret['output'] = DisplayLib::boxMsg(
+                _("Does not stack over 25%"),
+                '',
+                false,
+                DisplayLib::standardClearButton()
+            );
+            return $ret;
+        }
+
+        
         $discount = substr($str,0,strlen($str)-2);
         $description = $discount.'% Seinor Discount Applied';
         if (CoreLocal::get('SeniorDiscountFlag')==1) {

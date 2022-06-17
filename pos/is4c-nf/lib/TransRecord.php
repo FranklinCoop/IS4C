@@ -552,12 +552,11 @@ static public function discountnotify($strl)
     $delta = $strl;
     if (CoreLocal::get("isStaff") == "1") {
       self::addRecord(array(
-        'description' => '** ' . 15 . '% Staff Discount **',
+        'description' => '** ' . 25 . '% Staff Discount **',
         'trans_type' => '0',
         'trans_status' => 'D',
         'voided' => 4,
       ));
-      $delta -=15;
     }
     if (CoreLocal::get("SeniorDiscountFlag") == "1") {
       $seniorDisc =CoreLocal::get('SeniorDiscountAmt');
@@ -569,7 +568,7 @@ static public function discountnotify($strl)
       ));
       $delta -=$seniorDisc;
     }
-    if ($delta > 0) {
+    if ($delta > 0 && CoreLocal::get("isStaff") !=1) {
           self::addRecord(array(
         'description' => '** ' . $delta  . '% Member Discount **',
         'trans_type' => '0',

@@ -49,7 +49,7 @@ $form = new FormFactory(InstallUtilities::dbOrFail(CoreLocal::get('pDatabase')))
 <tr>
     <td><b><?php echo _('Maximum Transaction Discount'); ?></b>: </td>
     <td>
-    <?php echo $form->textField('discountMax', 0.25); ?>
+    <?php echo $form->textField('discountMax', 0); ?>
     <span class='noteTxt'><?php echo _('(Maximum discount percentage; 0.05 => 5%)'); ?></span>
     </td>
 </tr>

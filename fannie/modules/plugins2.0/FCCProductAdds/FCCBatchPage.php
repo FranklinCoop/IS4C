@@ -399,7 +399,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 $line[$indexes['vegan']] !='' ||
                 $line[$indexes['bipoc']] !='' ||
                 $line[$indexes['women_owned']] !='' ||
-                $line[$indexes['lgbtq']]
+                $line[$indexes['lgbtq']] != ''
             ) {
                     $flags = array($line[$indexes['local']]*1,
                     $line[$indexes['organic']]*2,

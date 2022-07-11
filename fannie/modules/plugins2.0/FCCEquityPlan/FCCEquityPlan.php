@@ -32,6 +32,30 @@ class FCCEquityPlan extends \COREPOS\Fannie\API\FanniePlugin
 {
     public $plugin_settings = array();
 
-    public $plugin_description = 'Franklin Community Co-op\'s bizzaro equity payment system.';
+    public $plugin_description = 'Franklin Community Co-op\'s bizzaro equity payment system. It had become less bizzar
+                                  but this plugin had evolved to do a bunch of member and equity related stuff, manages
+                                  account equity due messages, archives member data for bod reports, has tools for monthly
+                                  changes for working members.';
+
+    public function settingChange(){
+        global $FANNIE_OP_DB;
+
+        // Creates the database if it doesn't already exist.
+        $dbc = FannieDB::get($FANNIE_OP_DB);
+        
+        $tables = array(
+            'FCC_MonthlyDiscountChangesModel',
+            'FCC_MonthlyDiscountChangesViewModel',
+            'FCC_MemberReportArchiveModel'
+        );
+
+        foreach($tables as $t){
+            $model_class = $t.'Model';
+            if (!class_exists($model_class))
+                include_once(dirname(__FILE__).'/models/'.$model_class.'.php');
+            $instance = new $model_class($dbc);
+            $instance->create();        
+        }
+    }
 }
 

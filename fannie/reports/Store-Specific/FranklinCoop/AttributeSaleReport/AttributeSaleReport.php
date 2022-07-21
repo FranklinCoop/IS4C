@@ -41,7 +41,8 @@ class AttributeSaleReport extends FannieReportPage
     protected $sortable = false;
     protected $no_sort_but_style = true;
 
-    protected $report_headers = array('Department','Total','Local Total', 'Organic Total','Non GMO Total', 'Gluten Free Total', 'Traitor Brands Total');
+    //protected $report_headers = array('Department','Total','Local Total', 'Organic Total','Non GMO Total', 'Gluten Free Total', 'Traitor Brands Total');
+    protected $report_headers = array('Attribute', 'Total Sales', '% Sales');
     protected $required_fields = array('date1','date2');
 
     public function preprocess()
@@ -69,37 +70,59 @@ class AttributeSaleReport extends FannieReportPage
         $dates[] = $date2 . ' 23:59:59';
         $store = FormLib::get('store');
         $dates[] = $store;
-        $data = array();
-
         $dlog = DTransactionsModel::selectDlog($date1,$date2);
-        $salesQ = $dbc->prepare("SELECT 
-            n.super_name,
-            sum(d.total) as Dept_Total,
-            sum(case when (1<<(f.bit_number-1)) & p.numflag AND f.description=\"Local\" then d.total else 0 end) as Local_Total,
-            sum(case when (1<<(f.bit_number-1)) & p.numflag AND f.description=\"Organic\"  then d.total else 0 end) as Organic_Total,
-            sum(case when (1<<(f.bit_number-1)) & p.numflag AND f.description=\"Non-GMO\" then d.total else 0 end) as NonGMO_Total,
-            sum(case when (1<<(f.bit_number-1)) & p.numflag AND f.description=\"Gluten Free\" then d.total else 0 end) as Gluten_Free_Total,
-            sum(case when (1<<(f.bit_number-1)) & p.numflag AND f.description=\"Traitor Brands\" then d.total else 0 end) as Traitor_Brand_Total
-            FROM $dlog as d
-            LEFT JOIN {$FANNIE_OP_DB}.superdepts s on s.dept_ID = d.department
-            LEFT JOIN {$FANNIE_OP_DB}.superDeptNames n on n.superID = s.superID
-            LEFT JOIN {$FANNIE_OP_DB}.products p on p.upc = d.upc,
-            {$FANNIE_OP_DB}.prodFlags f
-            WHERE d.tdate BETWEEN ? AND ?
-                AND " . DTrans::isStoreID($store, 'd') . "
-                AND d.trans_type = 'I'
-            GROUP BY n.super_name ORDER BY n.super_name");
-        $salesR = $dbc->execute($salesQ,$dates);
-        $report = array();
-        $storeTotals = array();
-        while($salesW = $dbc->fetch_row($salesR)){
-            $record = array($salesW['super_name'],$salesW['Local_Total'],$salesW['Organic_Total'],$salesW['NonGMO_Total'],$salesW['Gluten_Free_Total'],$salesW['Traitor_Brand_Total']);
-            $storeTotals['Total'] += $salesW['Local_Total'];
-            $report[] = $record;
-        }
-        $data[] = $report;
+        //Get Atribute Lables
+        //SELECT description FROM core_op.prodFlags;
+        $query = $dbc->prepare("SELECT description FROM core_op.prodFlags");
+        $results = $dbc->execute($query,array());
+        //$flags = $dbc->fetch_row($result);
 
-        return $data;
+        //get store total.
+        $salesQ = $dbc->prepare("SELECT sum(t.total) AS Dept_Total
+                                 FROM trans_archive.bigArchive t
+                                 WHERE trans_type IN ('I','D') AND t.`datetime` BETWEEN ? AND ?
+                                 AND t.store_id =? AND trans_status != 'X'");
+        $salesR = $dbc->execute($salesQ,$dates);
+        $totalSales = 0;
+        while($salesW = $dbc->fetch_row($salesR)){
+            $row = array('Total', $salesW[0]);
+            $totalSales = $salesW[0];
+        }
+        //get atributes
+        $salesSQL = "SELECT ";
+        $flags = array();
+        while($flag = $dbc->fetch_row($results)){
+            $flags[] = $flag[0];
+            $f = $flag[0];
+            $n = $flag[0];
+            if (preg_match('/\s/',$f)) {
+                $n = str_replace($f, ' ', '_');
+                $f = '"'.$f.'"';
+            }
+            $salesSQL .= "SUM(case when JSON_EXTRACT(a.attributes, '$.".$f."') is true then t.total else 0 end) as ".$n."_total,";
+        }
+        $flags[] = "Orgaing & Local";
+        $salesSQL .= "SUM(case when JSON_EXTRACT(a.attributes, '$.Local') is true and JSON_EXTRACT(a.attributes, '$.Organic') is true then t.total else 0 end) as LocalOG
+                    from trans_archive.bigArchive t
+                    left join (
+                    select upc, attributes from core_op.ProductAttributes where productAttributeID in (
+                    select MAX(productAttributeID) from core_op.ProductAttributes GROUP BY upc)
+                    ) a on t.upc = a.upc
+                    where trans_type IN ('I','D') and t.`datetime` between ? and ? and t.store_id =? AND trans_status != 'X' and t.numflag != 0";
+
+        $salesQ = $dbc->prepare($salesSQL);
+        $salesR = $dbc->execute($salesQ,$dates);
+        $salesW = $dbc->fetch_row($salesR);
+                        
+        if ($salesW) {
+            foreach ($flags as $i => $flag) {
+                $row = array($flag, $salesW[$i], $salesW[$i]/$totalSales);
+                $data[] = $row;
+                $i++;
+            }
+        }
+        $data[] = array('Total Sales',$totalSales, '100%');
+        return array($data);
     }
 
     function calculate_footers($data)
@@ -131,14 +154,6 @@ class AttributeSaleReport extends FannieReportPage
             {$store['html']}
         </div>
         <div class="form-group">
-            <label>List Sales By</label>
-            <select name="sales-by" class="form-control">
-                <option>Super Department</option>
-                <option>Department</option>
-                <option>Sales Code</option>
-            </select>
-        </div>
-        <div class="form-group">
             <label>Excel <input type=checkbox name=excel /></label>
         </div>
         <p>
@@ -148,6 +163,18 @@ class AttributeSaleReport extends FannieReportPage
         </form>
 HTML;
     }
+
+    /*
+
+        <div class="form-group">
+            <label>List Sales By</label>
+            <select name="sales-by" class="form-control">
+                <option>Super Department</option>
+                <option>Department</option>
+                <option>Sales Code</option>
+            </select>
+        </div>
+    */
 
     public function helpContent()
     {

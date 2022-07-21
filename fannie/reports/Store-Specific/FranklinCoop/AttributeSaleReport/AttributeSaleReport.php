@@ -71,17 +71,24 @@ class AttributeSaleReport extends FannieReportPage
         $store = FormLib::get('store');
         $dates[] = $store;
         $dlog = DTransactionsModel::selectDlog($date1,$date2);
+        // get store name
+        $storeName = 'FCC';
+        if ($store !=0) {
+            $storeQ = "SELECT `description` FROM core_op.Stores WHERE storeID = ?";
+            $storeR = $dbc->execute($storeQ, array($store));
+            $storeName = $dbc->fetch_row($storeR)[0];
+        }
+        $this->report_headers[0] = $storeName.' Attribute';
+        
         //Get Atribute Lables
-        //SELECT description FROM core_op.prodFlags;
         $query = $dbc->prepare("SELECT description FROM core_op.prodFlags");
         $results = $dbc->execute($query,array());
-        //$flags = $dbc->fetch_row($result);
 
-        //get store total.
+        //get store total. Done before Attirbutes so that we can do division.
         $salesQ = $dbc->prepare("SELECT sum(t.total) AS Dept_Total
                                  FROM trans_archive.bigArchive t
                                  WHERE trans_type IN ('I','D') AND t.`datetime` BETWEEN ? AND ?
-                                 AND t.store_id =? AND trans_status != 'X'");
+                                 AND ".DTrans::isStoreID($store, 't')." AND trans_status != 'X'");
         $salesR = $dbc->execute($salesQ,$dates);
         $totalSales = 0;
         while($salesW = $dbc->fetch_row($salesR)){
@@ -91,6 +98,7 @@ class AttributeSaleReport extends FannieReportPage
         //get atributes
         $salesSQL = "SELECT ";
         $flags = array();
+        // using the atribute names to create sql for all atributes aviable.
         while($flag = $dbc->fetch_row($results)){
             $flags[] = $flag[0];
             $f = $flag[0];
@@ -108,7 +116,7 @@ class AttributeSaleReport extends FannieReportPage
                     select upc, attributes from core_op.ProductAttributes where productAttributeID in (
                     select MAX(productAttributeID) from core_op.ProductAttributes GROUP BY upc)
                     ) a on t.upc = a.upc
-                    where trans_type IN ('I','D') and t.`datetime` between ? and ? and t.store_id =? AND trans_status != 'X' and t.numflag != 0";
+                    where trans_type IN ('I','D') and t.`datetime` between ? and ? and ".DTrans::isStoreID($store, 't')." AND trans_status != 'X' and t.numflag != 0";
 
         $salesQ = $dbc->prepare($salesSQL);
         $salesR = $dbc->execute($salesQ,$dates);

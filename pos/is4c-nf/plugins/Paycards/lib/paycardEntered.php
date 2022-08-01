@@ -51,7 +51,7 @@ class paycardEntered extends Parser
         } elseif ($this->isE2E($str) || $this->isE2E(substr($str, 2))) {
             $this->swipetype = PaycardLib::PAYCARD_TYPE_ENCRYPTED;
             return true;
-        } elseif ((is_numeric($str) && strlen($str) >= 16 && substr($str, 0, 4) != '8110') || (is_numeric(substr($str,2)) && strlen($str) >= 18) && substr($str, 0, 2) != 'CP') {
+        } elseif ((is_numeric($str) && strlen($str) >= 16 && substr($str, 0, 4) != '8110') || (is_numeric(substr($str,2)) && strlen($str) >= 18 && substr($str, 0, 4) != '8110') && substr($str, 0, 2) != 'CP') {
             $this->manual = true;
             return true;
         } elseif ($str === 'VD') {
@@ -191,14 +191,16 @@ class paycardEntered extends Parser
             if ($this->conf->get("paycard_manual")) {
                 // make sure it's numeric
                 if (!ctype_digit($card) || strlen($card) < 18) { // shortest known card # is 14 digits, plus MMYY
-                    throw new Exception(PaycardLib::paycardMsgBox("Manual Entry Unknown",
-                        "Please enter card data like:<br>CCCCCCCCCCCCCCCCMMYY","[clear] to cancel"));
+                    if (substr($card, 0, 4) != '7777') {
+                        throw new Exception(PaycardLib::paycardMsgBox("Manual Entry Unknown",
+                            "Please enter card data like:<br>CCCCCCCCCCCCCCCCMMYY","[clear] to cancel"));
+                    }
                 }
                 // split up input (and check for the Concord test card)
                 if ($type == PaycardLib::PAYCARD_TYPE_UNKNOWN){
                     $type = $reader->type($card);
                 }
-                if( $type == PaycardLib::PAYCARD_TYPE_GIFT) {
+                if( $type == PaycardLib::PAYCARD_TYPE_GIFT || $type == PaycardLib::PAYCARD_TYPE_VALUELINK) {
                     $this->conf->set("paycard_PAN",$card); // our gift cards have no expiration date or conf code
                 } else {
                     $this->conf->set("paycard_PAN",substr($card,0,-4));

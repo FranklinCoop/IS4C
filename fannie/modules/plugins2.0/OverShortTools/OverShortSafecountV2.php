@@ -35,6 +35,8 @@ class OverShortSafecountV2 extends FanniePage {
     public $description = '[Safe Count] stores information about cash on hand and change buys.';
 
     function preprocess(){
+        header('Location: OverShortSafecountV3.php');
+        return false;
         $action = FormLib::get_form_value('action',False);
         if ($action !== False){
             $this->ajaxRequest($action);

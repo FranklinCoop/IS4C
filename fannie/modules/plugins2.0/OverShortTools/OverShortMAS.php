@@ -438,6 +438,9 @@ class OverShortMAS extends FannieRESTfulPage {
         $salesR = $dbc->execute($salesP, $args);
         while($w = $dbc->fetch_row($salesR)){
             $coding = isset($codes[$w['salesCode']]) ? $codes[$w['salesCode']] : $w['salesCode'];
+            if ($coding == 67730 && $dateID >= 20220701) {
+                $coding = 67735;
+            }
             $name = isset($names[$w['salesCode']]) ? $names[$w['salesCode']] : $w['name'];
             $credit = $w['amount'] < 0 ? -1*$w['amount'] : 0;
             $debit = $w['amount'] > 0 ? $w['amount'] : 0;
@@ -474,6 +477,8 @@ class OverShortMAS extends FannieRESTfulPage {
             trans_num, tdate FROM $dlog AS d WHERE department=703
             AND " . DTrans::isStoreID($store, 'd') . "
             AND trans_subtype <> 'IC'
+            " . ($mc == 2 ? ' AND register_no <> 40 ' : '') . "
+            " . ($mc == 3 ? ' AND register_no = 40 ' : '') . "
             AND tdate BETWEEN ? AND ? ORDER BY tdate";
         $miscP = $dbc->prepare($miscQ);
         $miscR = $dbc->execute($miscP, $args);
@@ -552,8 +557,9 @@ class OverShortMAS extends FannieRESTfulPage {
         $debit = $credit = 0.0;
         if (FormLib::get_form_value('excel','') === ''){
             $store = FormLib::get('store', 0);
-            $ret .= sprintf('<a href="OverShortMAS.php?startDate=%s&endDate=%s&store=%s&excel=yes">Download</a>',
-                    $this->startDate, $this->endDate, $store);
+            $mc = FormLib::get('mercato', 1);
+            $ret .= sprintf('<a href="OverShortMAS.php?startDate=%s&endDate=%s&store=%s&excel=yes&mercato=%d">Download</a>',
+                    $this->startDate, $this->endDate, $store, $mc);
             $ret .= '<table class="table table-bordered small">';
             foreach($records as $r){
                 if (preg_match('/\(\d+-\d+-\d+ \d+-\d+-\d+\)/',$r[5])){

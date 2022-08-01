@@ -34,9 +34,10 @@ class AjaxTest extends PHPUnit_Framework_TestCase
         $ajax->enablePageDrawing(true);
         CoreLocal::set('strRemembered', 'invalidInput');
         CoreLocal::set('msgrepeat', 1);    
+        CoreLocal::set('CashierNo', '');
         $json = $ajax->ajax();
         $this->assertInternalType('array', $json);
-        $this->assertEquals(true, substr($json['main_frame'], -9) == 'login.php');
+        $this->assertEquals(true, substr($json['main_frame'], -9) == 'login.php', 'returned ' . print_r($json, true));
 
         CoreLocal::set('strRemembered', 'invalidInput');
         CoreLocal::set('msgrepeat', 1);    
@@ -138,8 +139,9 @@ class AjaxTest extends PHPUnit_Framework_TestCase
 
     public function testScale()
     {
+        CoreLocal::set('weight', 0);
         $ajax = new COREPOS\pos\ajax\AjaxScale(new WrappedStorage(), new ValueContainer());
-        $this->assertEquals('0.00 lb', $ajax->ajax());
+        $this->assertEquals('0.00 lb', $ajax->ajax(), 'Weight var: ' . CoreLocal::get('weight'));
         $ajax = new COREPOS\pos\ajax\AjaxScale(new WrappedStorage(), new ValueContainer());
         $this->assertInternalType('string', $ajax->ajax());
     }

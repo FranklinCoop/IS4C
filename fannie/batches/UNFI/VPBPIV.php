@@ -865,9 +865,15 @@ JAVASCRIPT;
             $date = new DateTime();
             $date = $date->format('Y-m-d');
             $changeClassA = ($date == substr($row['date'], -10)) ? 'highlight' : '';
-            //$changeClassA = ('2021-09-03' == substr($row['date'], -10)) ? 'highlight' : '';
+            /* 
+            $changeClassA = ('2022-07-06' == substr($row['date'], -10)) ? 'highlight' : '';
+            */
+
             $changeClassB = ($date == $row['reviewed']) ? 'highlight' : '';
-            //$changeClassB = ('2021-09-03' == $row['reviewed']) ? 'highlight' : '';
+            /*
+            $changeClassB = ('2022-07-06' == $row['reviewed']) ? 'highlight' : '';
+            */
+
             $srpClassA = ($row['srp'] > $row['normal_price']) ? 'red' : 'yellow';
             $direction = ($row['srp'] > $row['normal_price']) ? '&#x2191;' : '&#x2193;';
             $td .= sprintf("<tr id=row%s class='%s %s item'>

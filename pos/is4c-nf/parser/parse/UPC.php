@@ -35,6 +35,9 @@ use COREPOS\pos\lib\Scanning\SpecialUPC;
 use COREPOS\pos\parser\Parser;
 use COREPOS\pos\plugins\Plugin;
 use \CoreLocal;
+use \DateTime;
+use \DateInterval;
+use \Exception;
 
 class UPC extends Parser 
 {
@@ -581,6 +584,9 @@ class UPC extends Parser
         if ($this->source == self::GS1_PREFIX || (substr($entered,0,4) == "8110" && strlen($entered) > 13)) {
             return $entered;
         }
+        if (substr($entered, 0, 4) == '8110' && strlen($entered) > 16) {
+            return $entered;
+        }
 
         /* exapnd UPC-E */
         if (substr($entered, 0, 1) == 0 && strlen($entered) == 7) {
@@ -666,6 +672,22 @@ class UPC extends Parser
             return MiscLib::baseURL() . 'gui-modules/pos2.php?reginput=' . $inp . '&repeat=1';
         }
         return False;
+    }
+    public static function requestInfoErrorMsg()
+    {
+        try {
+            $birthDateYMD = CoreLocal::get('memAge');
+            if (CoreLocal::get('AgeMode') == 'mdY') {
+                $birthDateYMD = substr(CoreLocal::get('memAge'), -4) . substr(CoreLocal::get('memAge'), 0, 4);
+            }
+            $ofAgeOnDay = new DateTime($birthDateYMD);
+            $ofAgeOnDay->add(new DateInterval("P21Y"));
+        } catch (Exception $ex) {
+            $ofAgeOnDay = new DateTime(date('Y-m-d', strtotime('tomorrow')));
+            return 'Invalid entry';
+        }
+
+        return 'Of age on ' . $ofAgeOnDay->format('m/d/y');
     }
 
     private function genericSecurity($ret)
@@ -873,7 +895,8 @@ class UPC extends Parser
                     AND (
                         upc='{$row['upc']}'
                         OR (mixMatch='{$row['mixmatchcode']}' AND mixMatch<>''
-                            AND mixMatch<>'0' AND mixMatch IS NOT NULL)
+                            AND mixMatch<>'0' AND mixMatch IS NOT NULL
+                            AND upc <> 'ITEMDISCOUNT')
                     )";
             $appliedR = $dbc->query($appliedQ);
             if ($appliedR && $dbc->num_rows($appliedR)) {

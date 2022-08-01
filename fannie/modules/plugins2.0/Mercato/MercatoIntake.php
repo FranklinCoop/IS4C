@@ -176,8 +176,8 @@ class MercatoIntake
                 case 'SALE ITEM':
                     $upc = BarcodeLib::padUPC($data[$this->COL_UPC]);
                     if (strstr($upc, ",")) {
-                        list($first,) = explode(",", $upc, 2);
-                        $upc = BarcodeLib::padUPC(trim($first));
+                        list($first,$second) = explode(",", $upc, 2);
+                        $upc = BarcodeLib::padUPC(trim($second));
                     }
                     if ($upc == '0000000000000' && is_numeric($data[$this->COL_UPC - 1])) {
                         $upc = BarcodeLib::padUPC($data[$this->COL_UPC - 1]);
@@ -192,20 +192,20 @@ class MercatoIntake
                         $upc = '0' . substr($upc, 0, 12);
                         $item = $this->dbc->getRow($itemP, array($upc));
                     }
-                    if ($item['tax']) {
+                    if (isset($item['tax']) && $item['tax']) {
                         $taxable[$item['tax']] += $total;
                     }
                     $dtrans['upc'] = $upc;
-                    $dtrans['description'] = $item['description'];
+                    $dtrans['description'] = isset($item['description']) ? $item['description'] : '';
                     $dtrans['trans_type'] = 'I';
                     $dtrans['department'] = isset($item['department']) ? $item['department'] : 0;
                     $dtrans['quantity'] = $qty;
-                    $dtrans['scale'] = $item['scale'];
-                    $dtrans['cost'] = $item['cost'] * $qty;
+                    $dtrans['scale'] = isset($item['scale']) ? $item['scale'] : 0;
+                    $dtrans['cost'] = (isset($item['cost']) ? $item['cost'] : 0) * $qty;
                     $dtrans['unitPrice'] = $total / $qty;
                     $dtrans['total'] = $total;
                     $dtrans['regPrice'] = $total / $qty;
-                    $dtrans['tax'] = $item['tax'];
+                    $dtrans['tax'] = isset($item['tax']) ? $item['tax'] : 0;
                     $dtrans['ItemQtty'] = $qty;
                     $prep = DTrans::parameterize($dtrans, 'datetime', $local->format("'Y-m-d H:i:s'"));
                     $insP = $this->dbc->prepare("INSERT INTO " . FannieDB::fqn('dtransactions', 'trans') . " ({$prep['columnString']}) VALUES ({$prep['valueString']})");

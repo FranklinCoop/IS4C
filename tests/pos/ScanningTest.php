@@ -44,6 +44,9 @@ class ScanningTest extends PHPUnit_Framework_TestCase
 {
     public function testDiscountType()
     {
+        CoreLocal::set('CashierNo', 0);
+        CoreLocal::set('memberID', 0);
+
         $session = new WrappedStorage();
         $defaults = array(
             'COREPOS\\pos\\lib\\Scanning\\DiscountTypes\\NormalPricing',

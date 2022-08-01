@@ -88,6 +88,7 @@ class EditLocations extends FannieRESTfulPage
     {
         $upc = FormLib::get('upc');
         $storeID = COREPOS\Fannie\API\lib\Store::getIdByIp();
+        $storeID = 2;
         $floorSectionID = FormLib::get('floorSectionID');
         $newSection = FormLib::get('newSection');
         $json = array();
@@ -167,7 +168,7 @@ class EditLocations extends FannieRESTfulPage
         $curSub = $row['subSection'];
 
         $options = '<option value=\"0\">&nbsp;</option>';
-        $letters = range('a', 'h');
+        $letters = range('a', 'k');
         foreach ($letters as $letter) {
             $sel = ($curSub == $letter) ? ' selected' : '';
             $options .= "<option value=\"$letter\" $sel>$letter</option>";
@@ -186,6 +187,7 @@ class EditLocations extends FannieRESTfulPage
 
         //$STORE_ID = 2;
         $storeID = COREPOS\Fannie\API\lib\Store::getIdByIp();
+        $storeID = 2;
 
         $upc = FormLib::get('upc', false);
         $upc = BarcodeLib::padUpc($upc);
@@ -355,6 +357,7 @@ HTML;
 
         //$STORE_ID = 2;
         $storeID = COREPOS\Fannie\API\lib\Store::getIdByIp();
+        $storeID = 2;
 
         $upcs = FormLib::get('upcs', false);
         $upcs = explode("\r\n",$upcs);
@@ -420,7 +423,7 @@ HTML;
                 $description,
                 $this->floorSectionSelect($sections, $floorSectionID)
                     ." <span class=\"form-control btn btn-default fas fa-trash btn-remove-section\"></span>",
-                "<select class=\"form-control edit-subsection\" style=\"width: 50px;\">$subSectionOpts</select>"
+                "<select class=\"form-control edit-subsection\" style=\"width: 75px;\">$subSectionOpts</select>"
                     ." <span class=\"form-control btn btn-default btn-add-subsection\">+</span>",
                 $department,
                 $superName,
@@ -451,6 +454,7 @@ HTML;
 
 <div class="row">
     <div class="col-lg-4">
+        <div class="alert alert-warning">This page hard coded to storeID: 2 (WFC Duluth, Denfeld)</div>
         <form name="upcs">
             <div class="form-group">
                 <label for="upcs">Paste a list of UPCs</label>
@@ -625,6 +629,11 @@ function fadeAlerts()
 {
     $('#ajax-resp').fadeOut(1500);
 }
+
+$('#upc').focusout(function(){
+    let newval = $(this).val().replace(/\s/g, "");
+    $(this).val(newval);
+});
 JAVASCRIPT;
     }
 

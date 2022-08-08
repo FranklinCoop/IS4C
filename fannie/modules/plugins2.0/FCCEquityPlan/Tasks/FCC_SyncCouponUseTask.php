@@ -37,8 +37,8 @@ class FCC_SyncCouponUseTask extends FannieTask
         $truncateData = $dbc->execute($prep,array());
 
 
-        $queryCoupons = 'INSERT INTO mcc_trans.transarchive SELECT * FROM {$TransDB}.transarchive 
-                  WHERE upc IN ("0049999900246","0049999900249","0049999900261","0049999900245")';
+        $queryCoupons = 'INSERT INTO mcc_trans.transarchive (SELECT * FROM {$TransDB}.transarchive 
+                  WHERE upc IN ("0049999900246","0049999900249","0049999900261","0049999900245"))';
         $prep = $dbc->prepare($queryCoupons);
         $insertData = $dbc->execute($prep,array());
         

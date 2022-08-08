@@ -31,8 +31,8 @@ class OncueKioskSync extends SyncKiosk {
 
 	}
 
-	public function syncKiosk {
-				global $FANNIE_ROOT, $FANNIE_PLUGIN_SETTINGS;
+	public function syncKiosk() {
+		global $FANNIE_ROOT, $FANNIE_PLUGIN_SETTINGS;
 		
 		$sucess = 1;
 		try {

@@ -31,7 +31,7 @@ class SyncKiosk {
 
 	}
 
-    public function syncKiosk {
+    public function syncKiosk() {
         $retString = 'Default Sync Module used. Plese overide this function or select another module.';
 
         return $retString;

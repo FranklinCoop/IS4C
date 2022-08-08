@@ -33,7 +33,7 @@ class FCC_SyncCouponUseTask extends FannieTask
         $dbc = FannieDB::get($OpDB);
 
         $turncateQuery = "TRUNCATE TABLE mcc_trans.transarchive";
-        $prep = $dbc->prepare($queryCoupons);
+        $prep = $dbc->prepare($turncateQuery);
         $truncateData = $dbc->execute($prep,array());
 
         $queryCoupons = "INSERT INTO mcc_trans.transarchive (SELECT * FROM {$TransDB}.transarchive 

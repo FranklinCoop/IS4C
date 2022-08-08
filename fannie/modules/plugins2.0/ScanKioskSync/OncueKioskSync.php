@@ -28,7 +28,11 @@ include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 class OncueKioskSync extends SyncKiosk {
 	
 	public function __construct() {
-		global $FANNIE_ROOT, $FANNIE_PLUGIN_SETTINGS;
+
+	}
+
+	public function syncKiosk {
+				global $FANNIE_ROOT, $FANNIE_PLUGIN_SETTINGS;
 		
 		$sucess = 1;
 		try {
@@ -76,6 +80,7 @@ class OncueKioskSync extends SyncKiosk {
 		if (!$sucess) {$this->sendEmail($retString);}
 		
 		return $retString;
+
 	}
 
 	function insertTableData($pdoLi) {

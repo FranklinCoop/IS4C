@@ -28,9 +28,13 @@ include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 class SyncKiosk {
 	
 	public function __construct() {
-		$retString = 'Default Sync Module used. Plese overide this function or select another module.';
-		
-		return $retString;
+
 	}
+
+    public function syncKiosk {
+        $retString = 'Default Sync Module used. Plese overide this function or select another module.';
+
+        return $retString;
+    }
 
 }

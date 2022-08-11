@@ -337,6 +337,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $tax = 0;
         $fstamp = 0;
         $discount = 1;
+        $idEnforced = 0;
         if ($dept && isset($defaults_table[$dept])) {
             if (isset($defaults_table[$dept]['tax']))
                 $tax = $defaults_table[$dept]['tax'];
@@ -345,8 +346,12 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             if (isset($defaults_table[$dept]['fs']))
                 $fstamp = $defaults_table[$dept]['fs'];
         }
+        $restrictDepts = array(370,371,372,373,374,379);
+        if (in_array($dept, $restrictDepts)) {
+            $idEnforced = 21;
+        }
 
-        return array($tax, $fstamp, $discount);
+        return array($tax, $fstamp, $discount, $idEnforced);
     }
 
     public function updateProducts($linedata, $indexes)
@@ -380,7 +385,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $cost = str_replace('$', '', $cost);
             $cost = trim($cost);
             $dept = ($indexes['dept'] !== false) ? $line[$indexes['dept']] : 0;
-            list($tax, $fstamp, $discount) = $this->getDefaultableSettings($dept, $defaults_table);
+            list($tax, $fstamp, $discount, $idEnforced) = $this->getDefaultableSettings($dept, $defaults_table);
             $brand = $line[$indexes['brand']];
             $vendor = $line[$indexes['vendor']];
             $pack_size = $line[$indexes['pack_size']];
@@ -453,6 +458,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             if ($tax !='') $model->tax($tax);
             if ($fstamp !='') $model->foodstamp($fstamp);
             if ($discount !='') $model->discount($discount);
+            if ($idEnforced != '') $model->idEnforced($idEnforced);
             if ($cost !='') $model->cost($cost);
             if ($brand !='') $model->brand($brand);
             if ($numflag !='') $model->numflag($numflag);

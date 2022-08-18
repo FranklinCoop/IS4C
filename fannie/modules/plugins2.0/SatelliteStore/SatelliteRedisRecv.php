@@ -43,6 +43,7 @@ class SatelliteRedisRecv extends FannieTask
             echo $this->cronMsg("Locked");
             return false;
         }
+        echo $this->cronMsg('Task Lock Enganged');
         $this->lock();
 
         $conf = $this->config->get('PLUGIN_SETTINGS');
@@ -51,21 +52,22 @@ class SatelliteRedisRecv extends FannieTask
         $dbc = FannieDB::get($this->config->get('TRANS_DB'));
         if (!$dbc->isConnected()) {
             echo $this->cronMsg("No connection");
+            echo $this->cronMsg('Task Unlock Enganged');
             $this->unlock();
             return false;
         }
 
         try {
             $redis = new Predis\Client($redis_host);
-
             $this->getTrans($dbc, $redis, new DTransactionsModel(null));
             $this->getTrans($dbc, $redis, new PaycardTransactionsModel(null));
             $this->getTrans($dbc, $redis, new CapturedSignatureModel(null), array('capturedSignatureID'));
         } catch (Exception $ex) {
+            echo $this->cronMsg('Task Unlock Enganged');
             $this->unlock();
             $this->cronMsg("Exception: ".$ex);
         }
-
+        echo $this->cronMsg('Task Unlock Enganged');
         $this->unlock();
     }
 

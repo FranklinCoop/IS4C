@@ -58,6 +58,7 @@ class SatelliteRedisSend extends FannieTask
             echo $this->cronMsg('Task Unlock Enganged');
             $this->unlock();
             echo $this->cronMsg("Connection Error ".$e);
+            return false;
         }
         
         

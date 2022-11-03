@@ -52,6 +52,7 @@ Replaces nightly.lanesync.php and/or lanesync.api.php';
         'houseVirtualCoupons',
         'custPreferences',
         'taxrates',
+        'StoreEmployeeMap',
     );
 
     public function run()

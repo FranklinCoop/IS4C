@@ -24,6 +24,9 @@
 /**
   @class StoreEmployeeMapModel
 */
+namespace COREPOS\pos\lib\models\op;
+use COREPOS\pos\lib\models\BasicModel;
+
 class StoreEmployeeMapModel extends BasicModel
 {
     protected $name = "StoreEmployeeMap";

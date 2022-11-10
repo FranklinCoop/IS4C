@@ -24,6 +24,7 @@
 namespace COREPOS\pos\lib;
 use COREPOS\pos\lib\Database;
 use COREPOS\pos\lib\CoreState;
+use \CoreLocal;
 
 /**
   @class Authenticate
@@ -58,21 +59,21 @@ static public function checkPassword($password)
     $dbg = Database::pDataConnect();
     $result = $dbg->query($query);
     $row = $dbg->fetchRow($result);
-    $store_id = (CoreLocal::get('store_id'); 
+    $store_id = CoreLocal::get('store_id'); 
 
     if ($row["LoggedIn"] == 0) {
         $queryq = '
             SELECT e.emp_no, 
                 e.FirstName, 
                 e.LastName, '
-                . $dbg->yeardiff($dbg->now(),'e.birthdate') . ' AS e.age
+                . $dbg->yeardiff($dbg->now(),'e.birthdate') . ' AS age
             FROM employees e
             JOIN StoreEmployeeMap m on e.emp_no = m.empNo
             WHERE e.EmpActive = 1 
                 AND e.CashierPassword = ?
                 AND m.storeID = ?';
         $prepq = $dbg->prepare($queryq);
-        $resultq = $dbg->execute($prepq, array($password,$store));
+        $resultq = $dbg->execute($prepq, array($password,$store_id));
         $numRows = $dbg->num_rows($resultq);
 
         if ($numRows > 0) {
@@ -157,7 +158,7 @@ static public function checkPermission($password, $level)
 static public function getEmployeeByPassword($password)
 {
     $dbc = Database::pDataConnect();
-    $store_id = (CoreLocal::get('store_id');
+    $store_id = CoreLocal::get('store_id');
     $prep = $dbc->prepare('
         SELECT *
         FROM employees e
@@ -165,7 +166,7 @@ static public function getEmployeeByPassword($password)
         WHERE e.EmpActive=1 
             AND (e.CashierPassword=? OR e.AdminPassword=?)
             AND m.storeID = ?');
-    return $dbc->getRow($prep, array($password, $password,$store));
+    return $dbc->getRow($prep, array($password, $password, $store_id));
 }
 
 static public function getEmployeeByNumber($emp_no)

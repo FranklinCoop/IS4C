@@ -79,13 +79,6 @@ class StoreChargeTender extends TenderModule
         return true;
     }
 
-    public function defaultPrompt()
-    {
-        // don't prompt at all. just apply the tender
-        $amt = $this->DefaultTotal();
-        CoreLocal::set('strEntered', (100*$amt).$this->tender_code);
-        return MiscLib::base_url().'gui-modules/boxMsg2.php?autoconfirm=1';
-    }
     
     /**
       Set up state and redirect if needed
@@ -95,6 +88,17 @@ class StoreChargeTender extends TenderModule
     {
         $pref = CoreState::getCustomerPref('store_charge_see_id');
         if ($pref == 'yes') {
+            if (CoreLocal::get('msgrepeat') == 0) {
+                CoreLocal::set("boxMsg",_("<BR>please verify member ID</B><BR>press [enter] to continue<P><FONT size='-1'>[clear] to cancel</FONT>"));
+                CoreLocal::set('lastRepeat', 'storeChargeSeeID');
+
+                return MiscLib::base_url().'gui-modules/boxMsg2.php?quiet=1';
+            } else if (CoreLocal::get('msgrepeat') == 1 && CoreLocal::get('lastRepeat') == 'storeChargeSeeID') {
+                CoreLocal::set('msgrepeat', 0);
+                CoreLocal::set('lastRepeat', '');
+            }
+        }
+        if (CoreLocal::get('store') == 'FranklinCoop') {
             if (CoreLocal::get('msgrepeat') == 0) {
                 CoreLocal::set("boxMsg",_("<BR>please verify member ID</B><BR>press [enter] to continue<P><FONT size='-1'>[clear] to cancel</FONT>"));
                 CoreLocal::set('lastRepeat', 'storeChargeSeeID');

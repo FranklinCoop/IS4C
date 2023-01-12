@@ -104,6 +104,8 @@ class SatelliteRedisRecv extends FannieTask
         } catch (Exception $ex) {
             // connection to redis failed. 
             // no cleanup required
+            $this->unlock();
+            $this->cronMsg("Exception: ".$ex);
         }
     }
 }

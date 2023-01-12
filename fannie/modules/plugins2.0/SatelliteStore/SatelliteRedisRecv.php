@@ -48,7 +48,14 @@ class SatelliteRedisRecv extends FannieTask
         $conf = $this->config->get('PLUGIN_SETTINGS');
         $redis_host = $conf['SatelliteRedis'];
 
-        $dbc = FannieDB::get($this->config->get('TRANS_DB'));
+        try {// gotta catch them all...
+            $dbc = FannieDB::get($this->config->get('TRANS_DB'));
+        } catch (Exception $e) {
+            echo $this->cronMsg('Task Unlock Enganged');
+            $this->unlock();
+            echo $this->cronMsg("Connection Error ".$e);
+        }
+        
         if (!$dbc->isConnected()) {
             echo $this->cronMsg("No connection");
             $this->unlock();

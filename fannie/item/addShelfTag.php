@@ -149,7 +149,7 @@ HTML;
           $shelftag->sku(FormLib::get('sku'));
           $shelftag->size(FormLib::get('size'));
           $units = FormLib::get('units');
-          if (empty($units)) {
+          if (empty($units) || $units == 'err') {
               $units = 1;
           }
           $shelftag->units($units);

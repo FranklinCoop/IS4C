@@ -34,7 +34,6 @@ class ProduceSearchListModel extends BasicModel
     'upc' => array('type'=>'VARCHAR(13)', 'primary_key'=>true),
     'store_id' => array('type'=>'INT', 'primary_key'=>true),
     'searchable' => array('type'=>'TINYINT', 'default'=>1),
-    'superID' => array('type'=>'SMALLINT','index'=>true),
 
     );
 

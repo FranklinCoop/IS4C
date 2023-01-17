@@ -401,16 +401,16 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 $line[$indexes['women_owned']] !='' ||
                 $line[$indexes['lgbtq']] != ''
             ) {
-                    $flags = array($line[$indexes['local']]*1,
-                    $line[$indexes['organic']]*2,
-                    $line[$indexes['coopbasic']]*3,
-                    $line[$indexes['nongmo']]*4,
-                    $line[$indexes['bipoc']]*5,
-                    $line[$indexes['glutenfree']]*6,
-                    $line[$indexes['women_owned']]*7,
-                    $line[$indexes['traitor']]*8,
-                    $line[$indexes['lgbtq']]*9,
-                    $line[$indexes['vegan']]*10,);
+                    $flags = array(intval($line[$indexes['local']])*1,
+                    intval($line[$indexes['organic']])*2,
+                    intval($line[$indexes['coopbasic']])*3,
+                    intval($line[$indexes['nongmo']])*4,
+                    intval($line[$indexes['bipoc']])*5,
+                    intval($line[$indexes['glutenfree']])*6,
+                    intval($line[$indexes['women_owned']])*7,
+                    intval($line[$indexes['traitor']])*8,
+                    intval($line[$indexes['lgbtq']])*9,
+                    intval($line[$indexes['vegan']])*10,);
                     $numflag = $this->proc_flags($upc, '', $flags);
                 } 
 

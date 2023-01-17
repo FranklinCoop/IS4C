@@ -179,11 +179,11 @@ class ProduceSearchModule extends ItemModule implements ItemRow
         }
         $serach = FormLib::get($fName, array());
         $serachable = in_array($suffix, $flags) ? 1 : 0;
-        echo "<p>INSIDE saveFormDatat <br> UPC: ".$upc." - Store: ".$suffix." - Search Value:".var_dump($serach)."<br></p>";
+        //echo "<p>INSIDE saveFormDatat <br> UPC: ".$upc." - Store: ".$suffix." - Search Value:".var_dump($serach)."<br></p>";
 
         $dbc = $this->connection;
         
-        $checked = ( $flags[$suffix] === 0) ? 0 : 1 ;
+        //$checked = ( $flags[$suffix] === 0) ? 0 : 1 ;
         //$superID = $bits[$suffix];
 
         $model = new ProduceSearchListModel($dbc);

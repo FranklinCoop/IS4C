@@ -22,7 +22,10 @@
 *********************************************************************************/
 
 namespace COREPOS\pos\lib\TotalActions;
-
+use \CoreLocal;
+use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\TransRecord;
+use COREPOS\pos\lib\MiscLib;
 /**
   @class MemTotalAction
   Define an action that is called when a member

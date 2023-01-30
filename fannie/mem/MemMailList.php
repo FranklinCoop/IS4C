@@ -64,8 +64,7 @@ class MemMailList extends FannieReportPage
              default:
                 $ret .= "c.Type='PC'
                   AND m.street >'' and m.street not in ('*','.') and m.city > '' and m.state >'' and m.zip > ''
-                  AND (end_date > ".$dbc->now()." 
-                    or end_date = '' 
+                  AND (end_date > ".$dbc->now()."  
                     or end_date is null
                     or end_date='1900-01-01 00:00:00'
                     or end_date='0000-00-00 00:00:00')
@@ -77,8 +76,7 @@ class MemMailList extends FannieReportPage
                 break;
              case 'Members (All)':
                 $ret .= "c.Type='PC'
-                  AND (end_date > ".$dbc->now()." 
-                    or end_date = '' 
+                  AND (end_date > ".$dbc->now()."  
                     or end_date is null
                     or end_date='1900-01-01 00:00:00'
                     or end_date='0000-00-00 00:00:00')

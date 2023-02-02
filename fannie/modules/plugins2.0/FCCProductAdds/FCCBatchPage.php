@@ -561,7 +561,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 /**
           Only add attributes entry if it changed
         */
-        if ($suffix === '' || $suffix == FannieConfig::config('STORE_ID')) {
+        if ($store === '' || $store == FannieConfig::config('STORE_ID')) {
             $curQ = 'SELECT attributes FROM ProductAttributes WHERE upc=? ORDER BY modified DESC';
             $curQ = $dbc->addSelectLimit($curQ, 1);
             $curP = $dbc->prepare($curQ);

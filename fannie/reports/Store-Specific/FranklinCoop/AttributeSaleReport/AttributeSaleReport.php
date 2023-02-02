@@ -113,7 +113,6 @@ class AttributeSaleReport extends FannieReportPage
         $flags[] = "Orgaing & Local";
         $salesSQL .= "SUM(CASE WHEN STRCMP(JSON_EXTRACT(a.attributes, '$.Local'), 'true') = 0 and STRCMP(JSON_EXTRACT(a.attributes, '$.Organic'), 'true') = 0 is true then t.total else 0 end) as LocalOG
                     FROM trans_archive.bigArchive t
-                    LEFT JOIN (
                     LEFT JOIN core_op.ProductAttributes a on t.upc = a.upc AND a.modified < t.`datetime`
                     WHERE t.`datetime` BETWEEN ? AND ? AND t.trans_type IN ('I','D') AND ".DTrans::isStoreID($store, 't')." AND trans_status != 'X'
                     AND (a.modified = (SELECT MAX(modified) FROM core_op.ProductAttributes where modified < t.`datetime` AND upc = t.upc) OR a.modified is NULL)";

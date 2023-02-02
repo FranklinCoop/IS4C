@@ -387,36 +387,6 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $unitOfMesure = $line[$indexes['unitOfMesure']];
             $sku = $line[$indexes['sku']];
 
-            //item flags 1 or 0 multiplied by only if flags are present
-            $numflag = '';
-            if (
-                $line[$indexes['local']] != '' ||
-                $line[$indexes['organic']] !='' ||
-                $line[$indexes['coopbasic']] !='' ||
-                $line[$indexes['nongmo']] !='' ||
-                $line[$indexes['glutenfree']] !='' ||
-                $line[$indexes['traitor']] !='' ||
-                $line[$indexes['vegan']] !='' ||
-                $line[$indexes['bipoc']] !='' ||
-                $line[$indexes['women_owned']] !='' ||
-                $line[$indexes['lgbtq']] != ''
-            ) {
-                    $flags = array(intval($line[$indexes['local']])*1,
-                    intval($line[$indexes['organic']])*2,
-                    intval($line[$indexes['coopbasic']])*3,
-                    intval($line[$indexes['nongmo']])*4,
-                    intval($line[$indexes['bipoc']])*5,
-                    intval($line[$indexes['glutenfree']])*6,
-                    intval($line[$indexes['women_owned']])*7,
-                    intval($line[$indexes['traitor']])*8,
-                    intval($line[$indexes['lgbtq']])*9,
-                    intval($line[$indexes['vegan']])*10,);
-                    $numflag = $this->proc_flags($upc, '', $flags);
-                } 
-
-
-
-
             // upc cleanup
             $upc = str_replace(" ","",$upc);
             $upc = str_replace("-","",$upc);
@@ -435,7 +405,6 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 continue;
             }
 
-
             $upc = BarcodeLib::padUPC($upc);
 
             if (strlen($desc) > 35) $desc = substr($desc,0,35);     
@@ -447,6 +416,35 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             if ($upc == 'upc') {
                 continue; //skip first line
             }
+
+
+            //item flags 1 or 0 multiplied by only if flags are present
+            $numflag = '';
+            if (
+            $line[$indexes['local']] != '' ||
+            $line[$indexes['organic']] !='' ||
+            $line[$indexes['coopbasic']] !='' ||
+            $line[$indexes['nongmo']] !='' ||
+            $line[$indexes['glutenfree']] !='' ||
+            $line[$indexes['traitor']] !='' ||
+            $line[$indexes['vegan']] !='' ||
+            $line[$indexes['bipoc']] !='' ||
+            $line[$indexes['women_owned']] !='' ||
+            $line[$indexes['lgbtq']] != ''
+            ) {
+                $flags = array(intval($line[$indexes['local']])*1,
+                intval($line[$indexes['organic']])*2,
+                intval($line[$indexes['coopbasic']])*3,
+                intval($line[$indexes['nongmo']])*4,
+                intval($line[$indexes['bipoc']])*5,
+                intval($line[$indexes['glutenfree']])*6,
+                intval($line[$indexes['women_owned']])*7,
+                intval($line[$indexes['traitor']])*8,
+                intval($line[$indexes['lgbtq']])*9,
+                intval($line[$indexes['vegan']])*10,);
+                $numflag = $this->proc_flags($upc, '', $flags);
+            } 
+
             if ($desc !='') $model->description($desc);
             //$model->normal_price($price);
             if ($dept !='') $model->department($dept);

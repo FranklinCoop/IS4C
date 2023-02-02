@@ -558,6 +558,24 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $bitStatus[$f] = true;
         }
 
+                /**
+          Only add attributes entry if it changed
+        */
+        if ($suffix === '' || $suffix == FannieConfig::config('STORE_ID')) {
+            $curQ = 'SELECT attributes FROM ProductAttributes WHERE upc=? ORDER BY modified DESC';
+            $curQ = $dbc->addSelectLimit($curQ, 1);
+            $curP = $dbc->prepare($curQ);
+            $current = $dbc->getValue($curP, array($upc));
+            $curJSON = json_decode($current, true);
+            if ($current === false || $curJSON != $json) {
+                $model = new ProductAttributesModel($dbc);
+                $model->upc($upc);
+                $model->modified(date('Y-m-d H:i:s'));
+                $model->attributes(json_encode($json));
+                $model->save();
+            }
+        }
+
         return $numflag;
     }
 

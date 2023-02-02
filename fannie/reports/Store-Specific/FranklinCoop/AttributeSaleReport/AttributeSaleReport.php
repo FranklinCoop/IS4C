@@ -107,16 +107,16 @@ class AttributeSaleReport extends FannieReportPage
                 $n = str_replace($f, ' ', '_');
                 $f = '"'.$f.'"';
             }
-            $salesSQL .= "SUM(case when JSON_EXTRACT(a.attributes, '$.".$f."') is true then t.total else 0 end) as ".$n."_total,";
+            $salesSQL .= "SUM(CASE WHEN STRCMP(JSON_EXTRACT(a.attributes, '$.".$f."'), 'true') = 0 then t.total else 0 end) as ".$n."_total,";
         }
+
         $flags[] = "Orgaing & Local";
-        $salesSQL .= "SUM(case when JSON_EXTRACT(a.attributes, '$.Local') is true and JSON_EXTRACT(a.attributes, '$.Organic') is true then t.total else 0 end) as LocalOG
-                    from trans_archive.bigArchive t
-                    left join (
-                    select upc, attributes from core_op.ProductAttributes where productAttributeID in (
-                    select MAX(productAttributeID) from core_op.ProductAttributes GROUP BY upc)
-                    ) a on t.upc = a.upc
-                    where trans_type IN ('I','D') and t.`datetime` between ? and ? and ".DTrans::isStoreID($store, 't')." AND trans_status != 'X' and t.numflag != 0";
+        $salesSQL .= "SUM(CASE WHEN STRCMP(JSON_EXTRACT(a.attributes, '$.Local'), 'true') = 0 and STRCMP(JSON_EXTRACT(a.attributes, '$.Organic'), 'true') = 0 is true then t.total else 0 end) as LocalOG
+                    FROM trans_archive.bigArchive t
+                    LEFT JOIN (
+                    LEFT JOIN core_op.ProductAttributes a on t.upc = a.upc AND a.modified < t.`datetime`
+                    WHERE t.`datetime` BETWEEN ? AND ? AND t.trans_type IN ('I','D') AND ".DTrans::isStoreID($store, 't')." AND trans_status != 'X'
+                    AND (a.modified = (SELECT MAX(modified) FROM core_op.ProductAttributes where modified < t.`datetime` AND upc = t.upc) OR a.modified is NULL)";
 
         $salesQ = $dbc->prepare($salesSQL);
         $salesR = $dbc->execute($salesQ,$dates);

@@ -55,7 +55,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 					WHERE a.card_no = b.card_no
     				AND a.tdate = b.max_tdate
     				GROUP BY a.card_no) s on c.cardNo = s.card_no
-				where e.card_no between 10 and 8000 AND (e.payments < 175 OR c.blueLine LIKE '%/%')";
+				where e.card_no between 10 and 99998 AND (e.payments < 175 OR c.blueLine LIKE '%/%') and c.memType NOT IN (11) and c.cardNo != 8001";
 		$prep = $dbc->prepare($query);
 		$results = $dbc->execute($prep,array());
 		$blueLines = array();

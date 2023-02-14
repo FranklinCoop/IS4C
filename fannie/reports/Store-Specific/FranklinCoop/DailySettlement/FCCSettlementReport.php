@@ -61,6 +61,7 @@ class FCCSettlementReport extends FannieReportPage
 			$shrinkageUsers = "";
 
 		$dlog = DTransactionsModel::selectDTrans($d1);
+		echo $dlog;
 
 		$total_tax = "SELECT
 		sum(case when upc='TAXLINEITEM' and numflag =1  then regPrice else 0 end) as sales_tax_total,
@@ -134,25 +135,22 @@ class FCCSettlementReport extends FannieReportPage
 		$discQ =$dbc->prepare("	
 			SELECT 
 			sum(case 
-					when upc='DISCOUNT'  and percentDiscount >=10 and memType =3 then -unitPrice* (10/percentDiscount)
-    				when upc='DISCOUNT'  and percentDiscount >= 15 and memType =5 then -unitPrice* (15/percentDiscount)
-    				when upc='DISCOUNT'  and percentDiscount >= 23 and memType =9 then -unitPrice* (8/percentDiscount)
-    				when upc='DISCOUNT'  and percentDiscount = 21 and memType =9 then -unitPrice* (6/percentDiscount)
-    			else 0 end) as working_disc,
+				when upc='DISCOUNT'  and percentDiscount >= 10 and memType =3 then -unitPrice* (10/percentDiscount)
+				when upc='DISCOUNT'  and percentDiscount >= 15 and memType =5 then -unitPrice* (15/percentDiscount)
+				else 0 end) as working_disc,
 			sum(case
-					when upc='DISCOUNT' and percentDiscount != 0 and memType in (7,8,9,10) then -unitPrice*(15/percentDiscount)
+				when upc='DISCOUNT' and percentDiscount != 0 and memType in (7,8,9,10) then -unitPrice*(25/percentDiscount)
 				else 0 end) as staff_disc,
 			sum(case
-					when upc='DISCOUNT' and percentDiscount != 0 and memType =6 then -unitPrice* (10/percentDiscount)
-    				when upc='DISCOUNT' and percentDiscount != 0 and memType =10 then -unitPrice* (8/percentDiscount )
-    			else 0 end) as food_for_all_disc,
+				when upc='DISCOUNT' and percentDiscount != 0 and memType =6 then -unitPrice* (10/percentDiscount)
+				else 0 end) as food_for_all_disc,
 			sum(case
-					when upc='DISCOUNT' and percentDiscount >0 and memType in (0,1) then -unitPrice
-    				when upc='DISCOUNT' and (percentDiscount-10)/percentDiscount >0 and memType in (3,6) then -unitPrice*((percentDiscount-10)/percentDiscount)
-    				when upc='DISCOUNT' and (percentDiscount-15)/percentDiscount >0 and memType in (5,7,8) then -unitPrice*((percentDiscount-15)/percentDiscount)
-    				when upc='DISCOUNT' and (percentDiscount-23)/percentDiscount >0 and memType in (9,10) then -unitPrice*((percentDiscount-23)/percentDiscount)
-					when upc='DISCOUNT' and percentDiscount = 0 then -unitPrice
-    			else 0 end) as seinorDisc,
+				when upc='DISCOUNT' and percentDiscount >0 and memType in (0,1,2,4,11,12,13) then -unitPrice
+				when upc='DISCOUNT' and (percentDiscount-10)/percentDiscount >0 and memType in (3,6) then -unitPrice*((percentDiscount-10)/percentDiscount)
+				when upc='DISCOUNT' and (percentDiscount-15)/percentDiscount >0 and memType in (5) then -unitPrice*((percentDiscount-15)/percentDiscount)
+				when upc='DISCOUNT' and (percentDiscount-25)/percentDiscount >0 and memType in (7,8,9,10) then -unitPrice*((percentDiscount-25)/percentDiscount)
+				when upc='DISCOUNT' and percentDiscount = 0 then -unitPrice
+			else 0 end) as seinorDisc,
 			sum(case when upc='DISCOUNT' then -unitPrice else 0 end) as total_disc
 			FROM ".$dlog."
 			WHERE `datetime` BETWEEN ? AND ? AND store_id=2 and trans_status !='X'");

@@ -43,6 +43,7 @@ class DiscountsReport extends FannieReportPage {
         foreach($data as $row) {
             $sum += $row[1];
         }
+        //rounding error check
 
         return array('Total', sprintf('%.2f', $sum));
     }
@@ -54,23 +55,83 @@ class DiscountsReport extends FannieReportPage {
 
         $d1 = FormLib::get('date1', date('Y-m-d'));
         $d2 = FormLib::get('date2', date('Y-m-d'));
+        $store = FormLib::get('store');
 
         $dlog = DTransactionsModel::selectDlog($d1,$d2);
+        $store_id = DTrans::isStoreID($store, 'd');
 
-        $query = $dbc->prepare("
-            SELECT m.memDesc,
-                SUM(total) AS total 
+        if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
+            $startDate = $d1.' 00:00:00';
+            $endDate = $d2.' 23:59:59 ';
+            $store_id_fill = str_replace('?',$store,$store_id);
+            $sqlQ = "SELECT 'Working Member' as memDesc,
+            sum(case when d.upc='DISCOUNT'  and d.percentDiscount >= m.discount and m.staff = 0 and m.ssi = 0 and m.discount >1
+                then -d.unitPrice* (m.discount/d.percentDiscount) else 0 end) as total
+            FROM core_trans.dlog_90_view d
+            LEFT JOIN core_op.memtype m on d.memType = m.memtype
+            WHERE d.`tdate` BETWEEN '{$startDate}' AND '{$endDate}' AND {$store_id_fill}
+            UNION ALL
+            SELECT 'Staff' as memDesc,
+            sum(case when d.upc='DISCOUNT' and m.staff = 1 then -d.unitPrice*(m.discount/d.percentDiscount) else 0 end) as total
+            FROM core_trans.dlog_90_view d
+            LEFT JOIN core_op.memtype m on d.memType = m.memtype
+            WHERE d.`tdate` BETWEEN '{$startDate}' AND '{$endDate}'	AND {$store_id_fill}
+            UNION ALL
+            SELECT 'Food for All' as memDesc, 
+                sum(case when d.upc='DISCOUNT' and m.ssi = 1 then -d.unitPrice* (m.discount/d.percentDiscount) else 0 end) as total
+            FROM core_trans.dlog_90_view d
+            LEFT JOIN core_op.memtype m on d.memType = m.memtype
+            WHERE d.`tdate` BETWEEN '{$startDate}' AND '{$endDate}' AND {$store_id_fill}
+            UNION ALL
+            SELECT 'Senior' as memDesc,
+                sum(case when d.upc='DISCOUNT' and d.percentDiscount >0  then -d.unitPrice*((d.percentDiscount-m.discount)/d.percentDiscount) else 0 end) as total
+            FROM core_trans.dlog_90_view d
+            LEFT JOIN core_op.memtype m on d.memType = m.memtype
+            WHERE d.`tdate` BETWEEN ? AND ? AND {$store_id}
+            UNION ALL
+            SELECT 'Total' as memDesc,
+            sum(case when d.upc='DISCOUNT' then -d.unitPrice else 0 end) as total
+            FROM core_trans.dlog_90_view d
+            LEFT JOIN core_op.memtype m on d.memType = m.memtype
+            WHERE d.`tdate` BETWEEN '{$startDate}' AND '{$endDate}' AND {$store_id_fill}";
+        } else {
+            $sqlQ = "SELECT m.memDesc,
+                    SUM(total) AS total 
             FROM $dlog AS d
-                LEFT JOIN memtype AS m ON d.memType=m.memtype
+            LEFT JOIN memtype AS m ON d.memType=m.memtype
             WHERE d.upc='DISCOUNT'
-                AND tdate BETWEEN ? AND ?
+            AND tdate BETWEEN ? AND ? AND $store_id
             GROUP BY m.memDesc
-            ORDER BY m.memDesc");
-        $result = $dbc->execute($query, array($d1.' 00:00:00', $d2.' 23:59:59'));
+            ORDER BY m.memDesc";
+        }
+
+
+        $query = $dbc->prepare($sqlQ);
+        $result = $dbc->execute($query, array($d1.' 00:00:00', $d2.' 23:59:59',$store));
 
         $data = array();
-        while ($row = $dbc->fetchRow($result)) {
-            $data[] = $this->rowToRecord($row);
+        
+        if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
+            $total = 0;
+            $sumTotal =0;
+            while ($row = $dbc->fetchRow($result)) {
+                if($row['memDesc'] === 'Total') {
+                    $total = $row['total'];
+                } else {
+                    $data[] = $this->rowToRecord($row);
+                    $sumTotal += number_format($row['total'], 2, '.', '');
+                }
+            }
+            //check for rounding errors in total
+            $diff = $total - $sumTotal;
+            if ($diff !=0) { //this will remove the extra cent from the senior discount.
+                $data[3][1] += $diff;
+                $data[3][1] = sprintf('%.2f', $data[3][1]);
+            }
+        } else {
+            while ($row = $dbc->fetchRow($result)) {
+                $data[] = $this->rowToRecord($row);
+            }
         }
 
         return $data;
@@ -88,7 +149,7 @@ class DiscountsReport extends FannieReportPage {
     {
         $lastMonday = "";
         $lastSunday = "";
-
+        $store = FormLib::storePicker();
         $ts = mktime(0,0,0,date("n"),date("j")-1,date("Y"));
         while($lastMonday == "" || $lastSunday == "") {
             if (date("w",$ts) == 1 && $lastSunday != "") {
@@ -101,28 +162,32 @@ class DiscountsReport extends FannieReportPage {
 
         ob_start();
         ?>
-<form action=DiscountsReport.php method=get>
-<div class="col-sm-4">
-    <div class="form-group">
-    <label>Date Start</label>
-    <input type=text id=date1 name=date1 class="form-control date-field" />
-    </div>
-    <div class="form-group">
-    <label>Date End</label>
-    <input type=text id=date2 name=date2 class="form-control date-field" />
-    </div>
-    <p>
-    <label>Excel <input type=checkbox name=excel value="xls" /></label>
-    </p>
-    <p>
-    <button type=submit name=submit class="btn btn-default btn-core">Submit</button>
-    <button type=reset name=reset class="btn btn-default btn-reset">Start Over</button>
-    </p>
-</div>
-<div class="col-sm-4">
-    <?php echo FormLib::date_range_picker(); ?>
-</div>
-</form>
+        <form action=DiscountsReport.php method=get>
+            <div class="col-sm-4">
+                <div class="form-group">
+                    <label>Date Start</label>
+                    <input type=text id=date1 name=date1 class="form-control date-field" />
+                </div>
+                <div class="form-group">
+                    <label>Date End</label>
+                    <input type=text id=date2 name=date2 class="form-control date-field" />
+                </div>
+                <div class="form-group">
+                    <label>Store</label>
+                    <?php echo $store['html'] ?>
+                </div>
+                <p>
+                    <label>Excel <input type=checkbox name=excel value="xls" /></label>
+                </p>
+                <p>
+                    <button type=submit name=submit class="btn btn-default btn-core">Submit</button>
+                    <button type=reset name=reset class="btn btn-default btn-reset">Start Over</button>
+                </p>
+            </div>
+            <div class="col-sm-4">
+                <?php echo FormLib::date_range_picker(); ?>
+            </div>
+        </form>
         <?php
 
         return ob_get_clean();

@@ -132,28 +132,23 @@ class FCCSettlementReport extends FannieReportPage
 	}
 
 	private function calculateDiscounts($dbc,$dlog,$args=array()){
-		$discQ =$dbc->prepare("	
-			SELECT 
-			sum(case 
-				when upc='DISCOUNT'  and percentDiscount >= 10 and memType =3 then -unitPrice* (10/percentDiscount)
-				when upc='DISCOUNT'  and percentDiscount >= 15 and memType =5 then -unitPrice* (15/percentDiscount)
-				else 0 end) as working_disc,
-			sum(case
-				when upc='DISCOUNT' and percentDiscount != 0 and memType in (7,8,9,10) then -unitPrice*(25/percentDiscount)
-				else 0 end) as staff_disc,
-			sum(case
-				when upc='DISCOUNT' and percentDiscount != 0 and memType =6 then -unitPrice* (10/percentDiscount)
-				else 0 end) as food_for_all_disc,
-			sum(case
-				when upc='DISCOUNT' and percentDiscount >0 and memType in (0,1,2,4,11,12,13) then -unitPrice
-				when upc='DISCOUNT' and (percentDiscount-10)/percentDiscount >0 and memType in (3,6) then -unitPrice*((percentDiscount-10)/percentDiscount)
-				when upc='DISCOUNT' and (percentDiscount-15)/percentDiscount >0 and memType in (5) then -unitPrice*((percentDiscount-15)/percentDiscount)
-				when upc='DISCOUNT' and (percentDiscount-25)/percentDiscount >0 and memType in (7,8,9,10) then -unitPrice*((percentDiscount-25)/percentDiscount)
-				when upc='DISCOUNT' and percentDiscount = 0 then -unitPrice
+		$discQ =$dbc->prepare("SELECT
+		sum(case 
+			when t.upc='DISCOUNT'  and t.percentDiscount >= m.discount and m.staff = 0 and m.ssi = 0 and m.discount >1 then -t.unitPrice* (m.discount/t.percentDiscount)
+			else 0 end) as working_disc,
+		sum(case
+			when t.upc='DISCOUNT' and m.staff = 1 then -t.unitPrice*(m.discount/t.percentDiscount)
+			else 0 end) as staff_disc,
+		sum(case
+			when t.upc='DISCOUNT' and t.percentDiscount >0  then -t.unitPrice*((t.percentDiscount-m.discount)/t.percentDiscount)
 			else 0 end) as seinorDisc,
-			sum(case when upc='DISCOUNT' then -unitPrice else 0 end) as total_disc
-			FROM ".$dlog."
-			WHERE `datetime` BETWEEN ? AND ? AND store_id=2 and trans_status !='X'");
+		sum(case
+			when t.upc='DISCOUNT' and m.ssi = 1 then -t.unitPrice* (m.discount/t.percentDiscount)
+			else 0 end) as food_for_all_disc,
+		sum(case when t.upc='DISCOUNT' then -t.unitPrice else 0 end) as total_disc
+		FROM {$dlog} t
+		LEFT JOIN core_op.memtype m on t.memType = m.memtype
+		WHERE t.`datetime` BETWEEN ? AND ? AND t.store_id=2 and t.trans_status !='X'");
 		$discR = $dbc->execute($discQ, $args);
 		
 		$return = array();

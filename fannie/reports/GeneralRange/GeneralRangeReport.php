@@ -50,7 +50,8 @@ class GeneralRangeReport extends FannieReportPage
         $dbc->setDefaultDB($this->config->get('OP_DB'));
         $d1 = $this->form->date1;
         $d2 = $this->form->date2;
-        $dates = array($d1.' 00:00:00', $d2.' 23:59:59');
+        $store = FormLib::get('store');
+        $dates = array($d1.' 00:00:00', $d2.' 23:59:59',$store);
         $data = array();
 
         $reconciliation = array(
@@ -70,6 +71,7 @@ class GeneralRangeReport extends FannieReportPage
             WHERE d.tdate BETWEEN ? AND ?
                 AND d.trans_type = 'T'
                 AND d.total <> 0
+                AND " . DTrans::isStoreID($store, 'd') . "
             GROUP BY t.TenderName ORDER BY TenderName");
         $tenderR = $dbc->execute($tenderQ,$dates);
         $report = array();
@@ -93,6 +95,7 @@ class GeneralRangeReport extends FannieReportPage
                     WHERE d.department <> 0
                         AND d.trans_type <> \'T\'
                         AND d.tdate BETWEEN ? AND ?
+                        AND ' . DTrans::isStoreID($store, 'd') . '
                     GROUP BY t.dept_name
                     ORDER BY t.dept_name'; 
                 break;
@@ -106,6 +109,7 @@ class GeneralRangeReport extends FannieReportPage
                     WHERE d.department <> 0
                         AND d.trans_type <> \'T\'
                         AND d.tdate BETWEEN ? AND ?
+                        AND ' . DTrans::isStoreID($store, 'd') . '
                     GROUP BY t.salesCode
                     ORDER BY t.salesCode'; 
                 break;
@@ -120,6 +124,7 @@ class GeneralRangeReport extends FannieReportPage
                     WHERE d.department <> 0
                         AND d.trans_type <> \'T\'
                         AND d.tdate BETWEEN ? AND ?
+                        AND ' . DTrans::isStoreID($store, 'd') . '
                     GROUP BY m.super_name
                     ORDER BY m.super_name';
                 break;
@@ -135,24 +140,30 @@ class GeneralRangeReport extends FannieReportPage
             $reconciliation['Sales'] += $salesW['total'];
         }
         $data[] = $report;
-
-        $discQ = $dbc->prepare("
-                SELECT m.memDesc, 
-                    SUM(d.total) AS Discount,
-                    count(*) AS num
+        // member type hack added for weird istuation at fcc.
+        $report = array();
+        if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
+            $discounts = $this->calculateDiscounts($dbc,$dlog,$dates);
+            for ($key=0;$key<sizeof($discounts);$key++) {
+                $report[] = $discounts[$key];
+                $reconciliation['Discounts'] += $discounts[$key][2];
+            }
+        } else {
+            $discQ = $dbc->prepare("SELECT m.memDesc, SUM(d.total) AS Discount,count(*)
                 FROM $dlog d 
                     INNER JOIN memtype m ON d.memType = m.memtype
                 WHERE d.tdate BETWEEN ? AND ?
-                   AND d.upc = 'DISCOUNT'
-                    AND total <> 0
-                GROUP BY m.memDesc 
-                ORDER BY m.memDesc");
-        $discR = $dbc->execute($discQ,$dates);
-        $report = array();
-        while ($discW = $dbc->fetch_row($discR)) {
-            $record = array($discW['memDesc'],$discW[2],$discW[1]);
-            $report[] = $record;
-            $reconciliation['Discounts'] += $discW['Discount'];
+                    AND " . DTrans::isStoreID($store, 'd') . "
+                   AND d.upc = 'DISCOUNT'{$shrinkageUsers}
+                AND total <> 0
+                GROUP BY m.memDesc ORDER BY m.memDesc");
+            $discR = $dbc->execute($discQ,$dates);
+            //$report = array();
+            while($discW = $dbc->fetch_row($discR)){
+                $record = array($discW['memDesc'],$discW[2],sprintf('%.2f', $discW[1]));
+                $report[] = $record;
+                $reconciliation['Discounts'] += $discW['Discount'];
+            }
         }
         $data[] = $report;
 
@@ -165,6 +176,7 @@ class GeneralRangeReport extends FannieReportPage
             WHERE datetime BETWEEN ? AND ?
                 AND d.upc='TAXLINEITEM'
                 AND " . DTrans::isNotTesting('d') . "
+                AND " . DTrans::isStoreID($store, 'd') . "
             GROUP BY d.description
         ");
         $lineItemR = $dbc->execute($lineItemQ, $dates);
@@ -178,6 +190,7 @@ class GeneralRangeReport extends FannieReportPage
             FROM $dlog as d 
             WHERE d.tdate BETWEEN ? AND ?
                 AND (d.upc = 'tax')
+                AND " . DTrans::isStoreID($store, 'd') . "
             GROUP BY d.upc");
         $taxR = $dbc->execute($taxSumQ,$dates);
         while ($taxW = $dbc->fetch_row($taxR)) {
@@ -278,6 +291,7 @@ class GeneralRangeReport extends FannieReportPage
     function form_content()
     {
         $start = date('Y-m-d',strtotime('yesterday'));
+        $store = FormLib::storePicker();
         ob_start();
         ?>
         <form method=get>
@@ -289,6 +303,10 @@ class GeneralRangeReport extends FannieReportPage
                     <option>Department</option>
                     <option>Sales Code</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label>Store</label>
+                <?php echo $store['html'] ?>
             </div>
             <div class="form-group">
                 <label>Excel <input type=checkbox name=excel /></label>
@@ -303,6 +321,70 @@ class GeneralRangeReport extends FannieReportPage
         <?php
 
         return ob_get_clean();
+    }
+
+    private function calculateDiscounts($dbc,$dlog,$args=array()){
+        $discQ =$dbc->prepare("SELECT 
+        sum(case 
+            when t.upc='DISCOUNT'  and t.percentDiscount >= m.discount and m.staff = 0 and m.ssi = 0 and m.discount >1 then t.unitPrice* (m.discount/t.percentDiscount)
+            else 0 end) as working_disc,
+        sum(case 
+            when t.upc='DISCOUNT'  and t.percentDiscount >= m.discount and m.staff = 0 and m.ssi = 0 and m.discount >1 then 1
+            else 0 end) as working_ct,
+        sum(case
+            when t.upc='DISCOUNT' and m.staff = 1 then t.unitPrice*(m.discount/t.percentDiscount)
+            else 0 end) as staff_disc,
+        sum(case when t.upc='DISCOUNT' and m.staff = 1 then 1 else 0 end) as staff_ct,
+        sum(case
+            when t.upc='DISCOUNT' and m.ssi = 1 then t.unitPrice* (m.discount/t.percentDiscount)
+            else 0 end) as food_for_all_disc,
+        sum(case when t.upc='DISCOUNT' and m.ssi = 1 then 1 else 0 end) as food_for_all_ct,
+        sum(case
+            when t.upc='DISCOUNT' and t.percentDiscount-m.discount != 0  then t.unitPrice*((t.percentDiscount-m.discount)/t.percentDiscount)
+            else 0 end) as seinorDisc,
+        sum(case
+            when t.upc='DISCOUNT' and t.percentDiscount-m.discount != 0  then 1 else 0 end) as seinorCT,
+        sum(case when t.upc='DISCOUNT' then t.unitPrice else 0 end) as total_disc
+            FROM $dlog t
+            LEFT JOIN core_op.memtype m on t.memType = m.memtype
+            WHERE t.`tdate` BETWEEN ? AND ? AND t.store_id=?");
+        $discR = $dbc->execute($discQ, $args);
+        
+        $return = array();
+        $row = $dbc->fetch_row($discR);
+        
+        $names = array("Working Member","Staff","Food for All","Senior Discount");
+
+        $report = array();
+        //correct rounding errors
+        $newKey = 0;
+        $info = 0;
+        $discSum = 0; //sum of the calculated values
+        $total = 0; //clean total to compare with callulated sum to check for diff errors.
+        for($key=0;$key<=8;$key++) {
+            if ($key != 8 && $key %2 === 0) {
+                $info = number_format($row[$key], 2, '.', '');
+                $discSum += $info;
+            } elseif($key %2 != 0){
+                $countTotal += $row[$key];
+                $return[$newKey] = array($names[$newKey],$row[$key],$info);
+                $newKey ++;
+            } elseif ($key==8) {
+                $total = number_format($row[$key], 2, '.', '');
+                $diff = $total-$discSum;
+                if ($diff != 0) { 
+                    $correction = $return[3][2] + $diff;
+                    $return[3][2] = number_format($correction, 2, '.', '');
+                    $discSum += $diff;
+                }
+            }
+        }
+        //final error check returns values for troubleshooting.
+        if ($discSum - $total !=0) {
+            $return = array('Math ERR',$discSum,$return[4],'Math ERR','Math ERR');
+        }
+
+        return $return;
     }
 
     public function helpContent()

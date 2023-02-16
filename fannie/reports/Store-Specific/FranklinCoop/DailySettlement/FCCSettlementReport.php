@@ -165,7 +165,7 @@ class FCCSettlementReport extends FannieReportPage
 				$diff = $info-$discSum;
 				$return[$key] = $info;
 				if ($diff != 0) { 
-					$return[2] += $diff;
+					$reutrn[2] = number_format($return[2] + $diff,2, '.','');
 					$discSum += $diff;
 				}
 			}

@@ -32,7 +32,7 @@ class ProduceSearchModule extends ItemModule implements ItemRow
         return self::META_WIDTH_FULL;
     }
 
-    private function getFlags($upc, $storeID=false)
+    private function getDepts($upc, $storeID=false)
     {
         $dbc = $this->db();
         $query = "
@@ -60,15 +60,15 @@ class ProduceSearchModule extends ItemModule implements ItemRow
         $ret = '<div id="prodSerachFieldset" class="panel panel-default">';
         $ret .=  "<div class=\"panel-heading\">
                 <a href=\"\" onclick=\"\$('#produceSearchContents').toggle();return false;\">
-                Flags
+                search_depts
                 </a></div>";
         $css = ($expand_mode == 1) ? '' : ' collapse';
         $ret .= '<div id="produceSearchContents" class="panel-body' . $css . '">';
         // class="col-lg-1" works pretty well with META_WIDTH_HALF
-        $ret .= '<div id="ItemFlagsTable" class="col-sm-5">';
+        $ret .= '<div id="ItemSearch_deptsTable" class="col-sm-5">';
 
         $dbc = $this->db();
-        $res = $this->getFlags($upc);
+        $res = $this->getDepts($upc);
 
         $tableStyle = " style='border-spacing:5px; border-collapse: separate;'";
         $ret .= "<table{$tableStyle}>";
@@ -76,21 +76,21 @@ class ProduceSearchModule extends ItemModule implements ItemRow
         while($row = $dbc->fetchRow($res)){
             if ($i==0) $ret .= '<tr>';
             if ($i != 0 && $i % 2 == 0) $ret .= '</tr><tr>';
-            $ret .= sprintf('<td><input type="checkbox" id="item-flag-%d" name="flags[]" value="%d" %s /></td>
-                <td><label for="item-flag-%d">%s</label></td>',$i, $row['superID'],
+            $ret .= sprintf('<td><input type="checkbox" id="item-search-dept-%d" name="search_depts[]" value="%d" %s /></td>
+                <td><label for="item-search-dept-%d">%s</label></td>',$i, $row['superID'],
                 ($row['searchable']==0 ? '' : 'checked'),
                 $i,
                 $row['super_name']
             );
-            //embed flag info to avoid re-querying it on save
-            $ret .= sprintf('<input type="hidden" name="pf_attrs[]" value="%s" />
-                            <input type="hidden" name="pf_bits[]" value="%d" />',
+            //embed dept serach info to avoid re-querying it on save
+            $ret .= sprintf('<input type="hidden" name="ds_attrs[]" value="%s" />
+                            <input type="hidden" name="ds_bits[]" value="%d" />',
                             $row['super_name'], $row['superID']);
             $i++;
         }
         $ret .= '</tr></table>';
 
-        $ret .= '</div>' . '<!-- /#ItemFlagsTable -->';
+        $ret .= '</div>' . '<!-- /#ItemSearch_deptsTable -->';
         $ret .= '</div>' . '<!-- /#produceSearchContents -->';
         $ret .= '</div>' . '<!-- /#prodSerachFieldset -->';
 
@@ -100,26 +100,26 @@ class ProduceSearchModule extends ItemModule implements ItemRow
     public function formRow($upc, $activeTab, $storeID)
     {
         if (FannieConfig::config('STORE_MODE') == 'HQ') {
-            return $this->rowOfFlags($upc, $storeID);
+            return $this->rowOfDepts($upc, $storeID);
         }
 
-        return $activeTab ? $this->rowOfFlags($upc) : '';
+        return $activeTab ? $this->rowOfDepts($upc) : '';
     }
 
-    private function rowOfFlags($upc, $storeID=false)
+    private function rowOfDepts($upc, $storeID=false)
     {
         $upc = BarcodeLib::padUPC($upc);
         $dbc = $this->db();
-        $res = $this->getFlags($upc, $storeID);
+        $res = $this->getDepts($upc, $storeID);
         $ret = '<tr class="small"><th class="text-right">Searchable</th><td colspan="9">';
         while ($row = $dbc->fetchRow($res)) {
-            $ret .= sprintf('<label><input type="checkbox" name="flags%s[]" value="%d" %s />
+            $ret .= sprintf('<label><input type="checkbox" name="search_depts%s[]" value="%d" %s />
                     %s</label>&nbsp;&nbsp;&nbsp;',
                     ($storeID ? $storeID : ''),
                     $row['store_id']+100, ($row['searchable'] ? 'checked' : ''), $row['super_name']);
-            // embed flag info to avoid re-querying it on save
-            $ret .= sprintf('<input type="hidden" name="pf_attrs%s[]" value="%s" />
-                            <input type="hidden" name="pf_bits%s[]" value="%d" />',
+            // embed dept serach info to avoid re-querying it on save
+            $ret .= sprintf('<input type="hidden" name="ds_attrs%s[]" value="%s" />
+                            <input type="hidden" name="ds_bits%s[]" value="%d" />',
                             ($storeID ? $storeID : ''), $row['super_name'],
                             ($storeID ? $storeID : ''), $row['super_id']);
         }
@@ -147,43 +147,31 @@ class ProduceSearchModule extends ItemModule implements ItemRow
         return $this->realSave($upc, '');
     }
 
-/*
-    private function actionMap($dbc)
-    {
-        $res = $dbc->query("SELECT bit_number, action FROM prodFlags WHERE action IS NOT NULL AND action <> ''");
-        $ret = array();
-        while ($row = $dbc->fetchRow($res)) {
-            $ret[$row['bit_number']] = $row['action'];
-        }
-
-        return $ret;
-    }
-*/
     private function realSave($upc, $suffix)
     {
 
         try {
-            $fName = 'flags' . $suffix;
-            $flags = $this->form->{$fName};
-            $aName = 'pf_attrs' . $suffix;
+            $fName = 'search_depts' . $suffix;
+            $searchDepts = $this->form->{$fName};
+            $aName = 'ds_attrs' . $suffix;
             $attrs = $this->form->{$aName};
-            $bName = 'pf_bits' . $suffix;
+            $bName = 'ds_bits' . $suffix;
             $bits = $this->form->{$bName};
         } catch (Exception $ex) {
-            $flags = array();
+            $searchDepts = array();
             $attrs = array();
             $bits = array();
         }
-        if (!is_array($flags)) {
+        if (!is_array($searchDepts)) {
             return false;
         }
         $serach = FormLib::get($fName, array());
-        $serachable = in_array($suffix, $flags) ? 1 : 0;
+        $serachable = in_array($suffix, $searchDepts) ? 1 : 0;
         //echo "<p>INSIDE saveFormDatat <br> UPC: ".$upc." - Store: ".$suffix." - Search Value:".var_dump($serach)."<br></p>";
 
         $dbc = $this->connection;
         
-        //$checked = ( $flags[$suffix] === 0) ? 0 : 1 ;
+        //$checked = ( $searchDepts[$suffix] === 0) ? 0 : 1 ;
         //$superID = $bits[$suffix];
 
         $model = new ProduceSearchListModel($dbc);

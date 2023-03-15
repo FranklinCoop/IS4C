@@ -106,12 +106,15 @@ class SpinsSubmitLoopTask extends FannieTask
                     AND tdate BETWEEN ? AND ? AND d.store_id=?
                   GROUP BY d.upc, p.description";
 
-            $filenameprefix = '';
-            if (isset($FANNIE_PLUGIN_SETTINGS['SpinsPrefix'])) {
-                $filenameprefix = $FANNIE_PLUGIN_SETTINGS['SpinsPrefix'];
+            $filename = $FANNIE_PLUGIN_SETTINGS['SpinsPrefix'];
+            if ($this->config->get('STORE_MODE') == 'HQ') {
+                $filename .= sprintf('%02d', $this->config->get('STORE_ID'));
             }
+            if (!empty($filename)) {
+                $filename .= '_';
+            }
+            $filename .= date('mdY', $dateObj->endTimeStamp()) . '.csv';
 
-            $filename = $filenameprefix . date('mdY', $end) . '.csv';
             $outfile = sys_get_temp_dir()."/".$filename;
             $fp = fopen($outfile,"w");
 
@@ -130,12 +133,14 @@ class SpinsSubmitLoopTask extends FannieTask
             fclose($fp);
 
             if ($upload) {
-                $conn_id = ftp_connect('ftp.spins.com');
+                $server = isset($FANNIE_PLUGIN_SETTINGS['SpinsFtpServer']) ? $FANNIE_PLUGIN_SETTINGS['SpinsFtpServer'] : 'ftp.spins.com';
+                $conn_id = ftp_connect($server);
                 $login_id = ftp_login($conn_id, $FANNIE_PLUGIN_SETTINGS['SpinsFtpUser'], $FANNIE_PLUGIN_SETTINGS['SpinsFtpPw']);
                 if (!$conn_id || !$login_id) {
                     $this->cronMsg('FTP Connection failed', FannieLogger::ERROR);
                 } else {
-                    ftp_chdir($conn_id, "data");
+                    $remoteDir = isset($FANNIE_PLUGIN_SETTINGS['SpinsFtpDir']) ? $FANNIE_PLUGIN_SETTINGS['SpinsFtpDir'] : 'data';
+                    ftp_chdir($conn_id, $remoteDir);
                     ftp_pasv($conn_id, true);
                     $uploaded = ftp_put($conn_id, $filename, $outfile, FTP_ASCII);
                     if (!$uploaded) {

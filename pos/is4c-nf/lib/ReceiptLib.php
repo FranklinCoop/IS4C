@@ -779,7 +779,8 @@ static private function memberFooter($receipt, $ref)
 static private function receiptFooters($receipt, $ref)
 {
     for ($i = 1; $i <= CoreLocal::get("receiptFooterCount"); $i++){
-        if(CoreLocal::get("store")=="Green Fields Market" && $i == 2) {
+        //'GreenFieldsMarket' || CoreLocal::get('store') == 'FranklinCoop
+        if( (CoreLocal::get("store")=="GreenFieldsMarket" || CoreLocal::get('store') == 'FranklinCoop') && $i == 2) {
             $receipt['any'] .= self::biggerFont(self::centerBig(CoreLocal::get("receiptFooter$i").$i))."\n\n";
             $receipt['any'] .= "\n";
         } else {

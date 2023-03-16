@@ -98,7 +98,7 @@ class StoreChargeTender extends TenderModule
                 CoreLocal::set('lastRepeat', '');
             }
         }
-        if (CoreLocal::get('store') == 'FranklinCoop') {
+        if (CoreLocal::get('store') == 'McCuskers' || CoreLocal::get('store')=='GreenFieldsMarket' || CoreLocal::get('store') == 'FranklinCoop') {
             if (CoreLocal::get('msgrepeat') == 0) {
                 CoreLocal::set("boxMsg",_("<BR>please verify member ID</B><BR>press [enter] to continue<P><FONT size='-1'>[clear] to cancel</FONT>"));
                 CoreLocal::set('lastRepeat', 'storeChargeSeeID');

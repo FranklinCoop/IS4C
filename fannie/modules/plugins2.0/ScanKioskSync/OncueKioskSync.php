@@ -27,7 +27,9 @@ include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
 
 class OncueKioskSync extends SyncKiosk {
 	
-	public function __construct() {
+	public function __construct() {}
+
+	public function syncKiosk() {
 		global $FANNIE_ROOT, $FANNIE_PLUGIN_SETTINGS;
 		
 		$sucess = 1;

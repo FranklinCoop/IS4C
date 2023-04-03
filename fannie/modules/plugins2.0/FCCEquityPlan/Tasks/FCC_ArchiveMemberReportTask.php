@@ -110,7 +110,7 @@ class FCC_ArchiveMemberReportTask extends FannieTask
         $data[] = $row[0];
 
         //load load snapshop into table
-        $query = "INSERT INTO core_op.FCC_MonthlyMemberReportModel (`month`,members_good_standing,members_not_good_standing,members_total,
+        $query = "INSERT INTO core_op.FCC_MemberReportArchive (`month`,members_good_standing,members_not_good_standing,members_total,
                   reachable_good_standing,reachable_not_good_standing,reachable_total,unreachable_good_standing,unreachable_not_good_standing,unreachable_total)
                   VALUES(NOW(),?,?,?,?,?,?,?,?,?);";
         $prep = $dbc->prepare($query);

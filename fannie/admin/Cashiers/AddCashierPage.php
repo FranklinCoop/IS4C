@@ -86,7 +86,7 @@ class AddCashierPage extends FannieRESTfulPage
         $idQ = $dbc->prepare("
             SELECT MAX(emp_no) AS max
             FROM " . FannieDB::fqn('employees', 'op') . "
-            WHERE emp_no < 1000
+            WHERE emp_no < 1500
         ");
         $idR = $dbc->execute($idQ);
         $idW = $dbc->fetchRow($idR);

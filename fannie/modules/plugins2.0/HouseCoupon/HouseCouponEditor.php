@@ -519,6 +519,7 @@ class HouseCouponEditor extends FanniePage
             '%I'=>'Percent Discount (Specific Items)',
             '%D'=>'Percent Discount (Department)',
             '%S'=>'Percent Discount (Department excludes sale items)',
+            '%E'=>'Precent Discount (Department excludes other discounts',
             'PD'=>'Percent Discount (Anytime)',
             'AD'=>'All Discount (Department)',
             'SC'=>'Store Credit (WFC; maybe temporary)',

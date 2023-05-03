@@ -201,7 +201,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $saveCost = false;
         if (isset($batchList['cost'])) {
             $insP = $dbc->prepare("INSERT INTO batchList 
-                (batchID, pricemethod, quantity, active, upc, salePrice, groupSalePrice, cost, signMultiplier)
+                (batchID, pricemethod, quantity, active, upc, salePrice, groupSalePrice, signMultiplier, cost)
                 VALUES
                 (?, 0, 0, 0, ?, ?, ?, ?, ?)");
             $saveCost = true;
@@ -359,6 +359,13 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $stores = new StoresModel($dbc);
         $stores->hasOwnItems(1);
         $stores = $stores->find();
+        //find the discount type so we know if we should update cost or put in special cost.
+        $btype = FormLib::get('btype',0);
+        $dtQ = $dbc->prepare("SELECT discType FROM batchType WHERE batchTypeID=?");
+        $discountType = $dbc->getValue($dtQ, array($btype));
+        if ($discountType === false || !is_numeric($discountType)) {
+            $discountType = 0;
+        }
 
         $ret = true;
         $linecount = 0;
@@ -451,7 +458,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             if ($tax !='') $model->tax($tax);
             if ($fstamp !='') $model->foodstamp($fstamp);
             if ($discount !='') $model->discount($discount);
-            if ($cost !='') $model->cost($cost);
+            if ($cost !='' && $discountType < 1) $model->cost($cost);
             if ($brand !='') $model->brand($brand);
             if ($numflag !='') $model->numflag($numflag);
             //takes the currently set vendor if there is none to use for vendor cost updates.

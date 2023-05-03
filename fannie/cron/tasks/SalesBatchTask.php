@@ -51,6 +51,7 @@ class SalesBatchTask extends FannieTask
                     l.salePrice, 
                     l.groupSalePrice,
                     l.quantity,
+                    l.cost,
                     b.startDate, 
                     b.endDate, 
                     b.discounttype
@@ -118,6 +119,7 @@ class SalesBatchTask extends FannieTask
 
             // use products column names for readability below
             $special_price = $row['salePrice'];
+            $special_cost = $row['cost'];
             $specialpricemethod = $row['pricemethod'];
             if ($row['groupSalePrice'] != null) {
                 $specialgroupprice = $row['groupSalePrice'];
@@ -197,6 +199,10 @@ class SalesBatchTask extends FannieTask
                     $changed = true;
                     $product->special_price($special_price);
                 }
+                if ($product->special_cost() != $special_cost) {
+                    $changed = true;
+                    $product->special_cost($special_cost);
+                }
                 if ($product->specialpricemethod() != $specialpricemethod) {
                     $changed = true;
                     $product->specialpricemethod($specialpricemethod);
@@ -269,6 +275,7 @@ class SalesBatchTask extends FannieTask
             $product->upc($lookupW['upc']);
             $product->discounttype(0);
             $product->special_price(0);
+            $product->special_cost(0);
             $product->specialgroupprice(0);
             $product->specialquantity(0);
             $product->start_date('1900-01-01');

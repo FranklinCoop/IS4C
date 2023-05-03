@@ -88,8 +88,10 @@ those same items revert to normal pricing.
         $p_def = $this->connection->tableDefinition('products');
         $bl_def = $this->connection->tableDefinition('batchList');
         $costChange = '';
-        if (isset($batchList['cost'])) {
+        if (isset($batchList['cost']) && $batchInfoW['discountType'] < 1) {
             $costChange = ", p.cost = CASE WHEN l.cost IS NOT NULL AND l.cost > 0 THEN l.cost ELSE p.cost END";
+        } else {
+            $costChange = ", p.special_cost = CASE WHEN l.cost IS NOT NULL AND l.cost > 0 THEN l.cost ELSE 0 END";
         }
         $has_limit = (isset($b_def['transLimit']) && isset($p_def['special_limit'])) ? true : false;
         $isHQ = FannieConfig::config('STORE_MODE') == 'HQ' ? true : false;
@@ -114,6 +116,7 @@ those same items revert to normal pricing.
                         ELSE p.mixmatchcode 
                     END ,
                     p.modified = NOW()
+                    {$costChange}
                 WHERE l.upc not like 'LC%'
                     and l.batchID = ?";
             if (isset($p_def['batchID'])) {
@@ -141,6 +144,7 @@ those same items revert to normal pricing.
                         ELSE p.mixmatchcode 
                     END,
                     p.modified = NOW()
+                    {$costChange}
                 WHERE l.upc LIKE 'LC%'
                     AND l.batchID = ?";
             if (isset($p_def['batchID'])) {
@@ -164,6 +168,7 @@ those same items revert to normal pricing.
                     ELSE p.mixmatchcode 
                     END ,
                     p.modified = getdate()
+                    {$costChange}
                     FROM products as p, 
                     batches as b, 
                     batchList as l 
@@ -186,6 +191,7 @@ those same items revert to normal pricing.
                         ELSE p.mixmatchcode 
                     END ,
                     p.modified = getdate()
+                    {$costChange}
                     from products as p left join
                     upcLike as v on v.upc=p.upc left join
                     batchList as l on l.upc='LC'+convert(varchar,v.likecode)

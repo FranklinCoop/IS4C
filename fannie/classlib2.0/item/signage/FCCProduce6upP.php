@@ -227,14 +227,25 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
             $pdf->Cell($w, $h, $brand, 0, 0, 'C');           
 
             //price
-            $price ='';
+            //$price ='';
             //if($item['normal_price'] > 1) {
-                $price = sprintf('$%.2f', $item['normal_price']);
+            //    $price = sprintf('$%.2f', $item['normal_price']);
             //} else  {
              //   $price = ltrim(sprintf('¢%d', $item['normal_price']*100),'A');
             //}
+
+            $price = $item['normal_price'];
+            if ($item['scale']) {
+                if (substr($price, 0, 1) != '$') {
+                    $price = sprintf('$%.2f', $price);
+                }
+                $price .= ' /lb.';
+            } elseif (isset($item['signMultiplier'])) {
+                $price = $this->formatPrice($item['normal_price'], $item['signMultiplier']);
+            } else {
+                $price = $this->formatPrice($item['normal_price']);
+            }
             
-            //$x -= 10;
             $y += $fontSize + 10; //space bewtten top and start of first element.
             $fontSize = 46;
             $h = $fontSize;

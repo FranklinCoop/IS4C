@@ -239,7 +239,7 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
                 if (substr($price, 0, 1) != '$') {
                     $price = sprintf('$%.2f', $price);
                 }
-                $price .= ' /lb.';
+                //$price .= ' /lb.';
             } elseif (isset($item['signMultiplier'])) {
                 $price = $this->formatPrice($item['normal_price'], $item['signMultiplier']);
             } else {
@@ -257,7 +257,7 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
             $units = '';
             if ($info['scale'] == 1) {
                 $units = 'per Pound';
-            } else if(substr($price, 1) == '$') {
+            } else if(str_contains($price, '/')) {
                 $units = 'per Each';
             }
             //$x += 10;

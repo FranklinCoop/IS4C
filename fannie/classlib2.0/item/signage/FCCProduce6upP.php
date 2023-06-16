@@ -257,7 +257,7 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
             $units = '';
             if ($info['scale'] == 1) {
                 $units = 'per Pound';
-            } else {
+            } else if(substr($price, 1) == '$') {
                 $units = 'per Each';
             }
             //$x += 10;

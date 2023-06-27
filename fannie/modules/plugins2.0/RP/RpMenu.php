@@ -16,11 +16,15 @@ class RpMenu extends FannieRESTfulPage
 <ul>
     <li>Daily Tools
     <ul>
-        <li><a href="RpOrderPage.php">Regular Ordering</a> - Alberts, CPW, RDW, and year-round direct</li>
+        <li><a href="RpDualPage.php">Regular Ordering</a> - Alberts, CPW, RDW, and year-round direct</li>
         <li><a href="RpDirectPage.php">Direct Ordering</a> - local & seasonal</li>
         <li><a href="RpArchivePage.php">Direct Orders Archive</a> - local & seasonal</li>
         <li><a href="RpDailyPage.php">Daily Sheet Info</a> - sales info & item lists</li>
         <li><a href="RpPrintOrders.php">Reprint Order</a> - reprint an archived order</li>
+    </ul>
+    <li>Beta Tools
+    <ul>
+        <li><a href="RpLocalSummary.php">Direct Orders Summary</a> - displays the percentage of product orders from different farms over time.
     </ul>
 </ul>
 <hr />
@@ -57,6 +61,7 @@ class RpMenu extends FannieRESTfulPage
         <li><a href="RpMarginEst.php">Estimate Margin</a> - drop in pricing from RP and preview applied margin</li>
         <li><a href="RpPreBookPage.php">Enter Pre-Books</a> - input pre-books so they appear in the order guide.</a></li>
         <li><a href="RpManualEntries.php">View Added Items</a> - report of items manually added to the order guide</a></li>
+        <li><a href="RpForecast.php">Project Order Quantities</a> - view anticipated order quantities based on segmentation and pars</a></li>
     </ul>
 </ul>
 <hr />

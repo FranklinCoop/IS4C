@@ -13,6 +13,9 @@ if (!class_exists('RpOrderItemsModel')) {
 if (!class_exists('RpSessionsModel')) {
     include(__DIR__ . '/models/RpSessionsModel.php');
 }
+if (!class_exists('RpSnapshotsModel')) {
+    include(__DIR__ . '/models/RpSnapshotsModel.php');
+}
 
 class RpOrderPage extends FannieRESTfulPage
 {
@@ -34,6 +37,15 @@ class RpOrderPage extends FannieRESTfulPage
         $model = new RpSessionsModel($this->connection);
         $model->userID($this->userID);
         $model->dataType('RP');
+        $model->load();
+
+        $snap = new RpSnapshotsModel($this->connection);
+        $snap->userID($model->userID());
+        $snap->tdate(date('Y-m-d H:i:s'));
+        $snap->data($model->data());
+        $snap->dataType($model->dataType());
+        $snap->save();
+
         $model->delete();
 
         return 'RpOrderPage.php';
@@ -519,6 +531,9 @@ class RpOrderPage extends FannieRESTfulPage
             $par = $this->connection->getValue($parP, array($store, $row['upc']));
             if ($row['caseSize'] != 0 && ($par / $row['caseSize']) < 0.1) {
                 $par = 0.1 * $row['caseSize'];
+                if ($store == 2) {
+                    $par = 0.05 * $row['caseSize'];
+                }
             }
             $price = $this->connection->getValue($priceP, array(substr($row['upc'], 2)));
             $cost = array('cost' => $row['cost'], 'units' => $row['caseSize']);

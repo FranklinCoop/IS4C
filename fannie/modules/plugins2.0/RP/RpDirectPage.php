@@ -13,6 +13,9 @@ if (!class_exists('RpOrderItemsModel')) {
 if (!class_exists('RpSessionsModel')) {
     include(__DIR__ . '/models/RpSessionsModel.php');
 }
+if (!class_exists('RpSnapshotsModel')) {
+    include(__DIR__ . '/models/RpSnapshotsModel.php');
+}
 if (!class_exists('RpFarmsModel')) {
     include(__DIR__ . '/models/RpFarmsModel.php');
 }
@@ -122,6 +125,14 @@ class RpDirectPage extends FannieRESTfulPage
         $model = new RpSessionsModel($this->connection);
         $model->dataType('RP');
         $model->userID($this->userID);
+
+        $snap = new RpSnapshotsModel($this->connection);
+        $snap->userID($model->userID());
+        $snap->tdate(date('Y-m-d H:i:s'));
+        $snap->data($model->data());
+        $snap->dataType($model->dataType());
+        $snap->save();
+
         $model->delete();
 
         return 'RpDirectPage.php';
@@ -550,8 +561,10 @@ class RpDirectPage extends FannieRESTfulPage
             $lcName = $row['vendorItem'];
             if (is_numeric(str_replace('LC', '', $row['upc']))) {
                 $lcRow = $this->connection->getRow($lcP, array(str_replace('LC', '', $row['upc'])));
-                $lcName = $lcRow['likeCodeDesc'];
-                $organic = $lcRow['organic'] ? true : false;
+                if (is_array($lcRow)) {
+                    $lcName = $lcRow['likeCodeDesc'];
+                    $organic = $lcRow['organic'] ? true : false;
+                }
             }
             $par = $this->connection->getValue($parP, array($store, $row['upc']));
             if (($par / $row['caseSize']) < 0.1) {

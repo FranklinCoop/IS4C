@@ -169,7 +169,7 @@ class LikeCodeModule extends \COREPOS\Fannie\API\item\ItemModule
             $this->updateItem($dbc, $upcW['upc'], $likecode, $values);
             $upcs[] = $upcW['upc'];
         }
-        if (count($upcs) <= 10) {
+        if (count($upcs) > 0 && count($upcs) <= 10) {
             COREPOS\Fannie\API\data\ItemSync::sync($upcs);
         } else {
             $queue = new COREPOS\Fannie\API\jobs\QueueManager();
@@ -397,6 +397,12 @@ class LikeCodeModule extends \COREPOS\Fannie\API\item\ItemModule
                     $insR = $dbc->execute($insP, array($newLC, $newName));
                     $json['likeCode'] = $newLC;
                     $json['likeCodeDesc'] = $newName;
+
+                    $cbs = FannieConfig::config('LC_CALLBACKS');
+                    foreach ($cbs as $cb) {
+                        $obj = new $cb();
+                        $obj->run($newLC);
+                    }
                 }
             }
         /** lookup items associated w/ like code **/

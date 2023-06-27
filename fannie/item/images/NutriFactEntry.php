@@ -157,8 +157,8 @@ class NutriFactEntry extends FannieRESTfulPage
         $json = array();
 
         $args = array($upc);
-        $prep = $dbc->prepare("SELECT * FROM NutriFactOptItems WHERE upc = ?");
-        $res = $dbc->execute($prep, $args);
+        $optP = $dbc->prepare("SELECT * FROM NutriFactOptItems WHERE upc = ?");
+        $res = $dbc->execute($optP, $args);
         $numRows = $dbc->numRows($res);
         while ($row = $dbc->fetchRow($res)) {
             $json[$row['name']]['amount'] = $row['amount'];
@@ -176,8 +176,7 @@ class NutriFactEntry extends FannieRESTfulPage
             $dbc->execute($prep, $args);
 
             $args = array($upc);
-            $prep = $dbc->prepare("SELECT * FROM NutriFactOptItems WHERE upc = ?");
-            $res = $dbc->execute($prep, $args);
+            $res = $dbc->execute($optP, $args);
             $numRows = $dbc->numRows($res);
             while ($row = $dbc->fetchRow($res)) {
                 $json[$row['name']]['amount'] = $row['amount'];
@@ -257,6 +256,12 @@ AND (
 OR
     ((p.created > NOW() - INTERVAL 30 DAY) OR (p.modified > NOW() - INTERVAL 7 DAY))
 )
+OR p.upc IN (
+# NON BULK ITEMS TO INCLUDE (For bulk kombucha)
+'0086001000062','0086001000061','0086001000060','0086001000064','0086001000063',
+'0009103711780', '0001396446924','0083765483417','0009103711785','0009103711788','0000376548341'
+)
+
 GROUP BY p.upc
 ");
         $res = $dbc->execute($prep);
@@ -456,6 +461,7 @@ var dvChange = function(col, value, upc, name)
 }
 var ingredientChange = function(upc, value)
 {
+    value = encodeURI(value)
     $.ajax({
         type: 'post', 
         data: 'upc='+upc+'&ingredients='+value,

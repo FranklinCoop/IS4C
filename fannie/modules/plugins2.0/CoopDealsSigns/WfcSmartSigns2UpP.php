@@ -65,6 +65,12 @@ class WfcSmartSigns2UpP extends \COREPOS\Fannie\API\item\signage\Signage2UpP
             $pdf->Image($this->getTopImage($item), ($left-1), ($top-42) + ($row*$height), $width);
             $pdf->Image($this->getBottomImage($item), ($left-1), $top + ($height*$row) + ($height-$top-6), $width, 2);
 
+            // if sale is new NCG BOGO
+            if (strstr($item['batchName'], 'Co-op Deals') && $item['signMultiplier'] == -3) {
+                $bogoImg = __DIR__ . '/noauto/images/bogo-circle.png';
+                $pdf->Image($bogoImg,  ($left-1)+160, ($top-22) + ($row*$height), 26, 26);
+            }
+
             $count++;
             $sign++;
         }
@@ -75,9 +81,9 @@ class WfcSmartSigns2UpP extends \COREPOS\Fannie\API\item\signage\Signage2UpP
     private function getTopImage($item)
     {
         if (strstr($item['batchName'], 'Co-op Deals') && !strstr($item['batchName'], 'TPR')) {
-            return __DIR__ . '/noauto/images/codeals_top_12.png';
+            return __DIR__ . '/noauto/images/codeals_top_2.png';
         } elseif (!empty($item['batchName'])) {
-            return __DIR__ . '/noauto/images/chaching_top_12.png';
+            return __DIR__ . '/noauto/images/chaching_top_2.png';
         } elseif ($item['basic']) {
             return __DIR__ . '/noauto/images/basics_top_12.png';
         } elseif ($item['organicLocal']) {

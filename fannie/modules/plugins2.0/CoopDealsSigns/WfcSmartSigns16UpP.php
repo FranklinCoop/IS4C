@@ -11,13 +11,13 @@ use \FannieConfig;
 
 class WfcSmartSigns16UpP extends \COREPOS\Fannie\API\item\signage\Signage16UpP 
 {
-    protected $BIG_FONT = 40;
+    protected $BIG_FONT = 30;
     protected $MED_FONT = 14;
     protected $SMALL_FONT = 10;
     protected $SMALLER_FONT = 8;
     protected $SMALLEST_FONT = 5;
 
-    protected $width = 53.975;
+    protected $width = 53;
     protected $height = 68.96;
 
     public function drawPDF()

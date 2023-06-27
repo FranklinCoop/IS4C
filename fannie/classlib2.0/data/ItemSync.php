@@ -116,6 +116,11 @@ class ItemSync
             self::syncItem($u);
         }
         self::notifyStores($upc);
+        $callbacks = \FannieConfig::config('ITEM_CALLBACKS');
+        foreach ($callbacks as $cb) {
+            $obj = new $cb();
+            $obj->run($upc);
+        }
     }
 
     public static function remove($upc)

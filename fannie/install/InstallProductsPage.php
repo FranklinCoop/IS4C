@@ -253,6 +253,15 @@ class InstallProductsPage extends \COREPOS\Fannie\API\InstallPage {
         echo installSelectField('FANNIE_REPORT_DEPT_MODE', $FANNIE_REPORT_DEPT_MODE, $report_opts, 'range');
         ?>
         <hr />
+        <label>BOGO Price Method</label>
+        <?php
+        $bogo_opts = array(
+            '2' => 'Item w/ Volume Discount',
+            '7' => 'Separate BOGO Discount line',
+        ); 
+        echo installSelectField('FANNIE_BOGO_MODE', $FANNIE_BOGO_MODE, $bogo_opts, '2');
+        ?>
+        <hr />
         <label>Special Order Interface</label>
         <?php
         $so_opts = array(
@@ -383,6 +392,38 @@ class InstallProductsPage extends \COREPOS\Fannie\API\InstallPage {
         concatenating products.size and products.unitofmeasure will be appended:
         <br /> "EDEN | Marmalade, Orange, Seville, Rough-Cut | 500g"<br />
         </p>
+
+        <hr />
+        <label>Enabled Item Callbacks</label>
+        <?php
+        $mods = FannieAPI::listModules('\COREPOS\Fannie\API\item\ItemCallback');
+        echo installMultiSelectField('FANNIE_ITEM_CALLBACKS', $FANNIE_ITEM_CALLBACKS, $mods);
+        ?>
+        <label>Enabled Batch Callbacks</label>
+        <?php
+        $mods = FannieAPI::listModules('\COREPOS\Fannie\API\item\BatchCallback');
+        echo installMultiSelectField('FANNIE_BATCH_CALLBACKS', $FANNIE_BATCH_CALLBACKS, $mods);
+        ?>
+        <label>Enabled Vendor Callbacks</label>
+        <?php
+        $mods = FannieAPI::listModules('\COREPOS\Fannie\API\item\VendorCallback');
+        echo installMultiSelectField('FANNIE_VENDOR_CALLBACKS', $FANNIE_VENDOR_CALLBACKS, $mods);
+        ?>
+        <label>Enabled Likecode Callbacks</label>
+        <?php
+        $mods = FannieAPI::listModules('\COREPOS\Fannie\API\item\LikecodeCallback');
+        echo installMultiSelectField('FANNIE_LC_CALLBACKS', $FANNIE_LC_CALLBACKS, $mods);
+        ?>
+        <label>Enabled Special Order Callbacks</label>
+        <?php
+        $mods = FannieAPI::listModules('\COREPOS\Fannie\API\item\SpecialOrderCallback');
+        echo installMultiSelectField('FANNIE_SPO_CALLBACKS', $FANNIE_SPO_CALLBACKS, $mods);
+        ?>
+        <label>Enabled Employee Callbacks</label>
+        <?php
+        $mods = FannieAPI::listModules('\COREPOS\Fannie\API\lib\EmployeeCallback');
+        echo installMultiSelectField('FANNIE_EMP_CALLBACKS', $FANNIE_EMP_CALLBACKS, $mods);
+        ?>
 
         <hr />
         <p>

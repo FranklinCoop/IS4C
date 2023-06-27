@@ -927,19 +927,15 @@ class HouseCoupon extends SpecialUPC
                         and h.type in ('BOTH', 'DISCOUNT')";
                     $valR = $transDB->query($valQ);
                     $row = $transDB->fetch_row($valR);
-                    $couponDiscount = (int)($infoW['discountValue']*100);
-                    $value = 0;
-                    if ($couponDiscount > $this->session->get('percentDiscount')) {
-                        $value = $row[0] * $infoW["discountValue"];
-                        $discountable = 0;
-                        $clearQ = "
+                    $value = $row[0] * $infoW["discountValue"];                 
+
+                    $clearQ = "
                         UPDATE localtemptrans AS l 
                             INNER JOIN " . $this->session->get('pDatabase') . $transDB->sep() . "houseCouponItems AS h ON l.department = h.upc
                         SET l.discountable=0
                         WHERE h.coupID = " . $coupID . "
                             AND h.type IN ('BOTH', 'DISCOUNT')";
-                        $clearR = $transDB->query($clearQ);
-                    }
+                    $clearR = $transDB->query($clearQ);
                 }
                 break;
             case 'PD': // modify customer percent discount

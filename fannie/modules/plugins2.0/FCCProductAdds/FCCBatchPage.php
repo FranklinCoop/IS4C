@@ -269,12 +269,12 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                     $cost = $prodModel->cost();
                 }
             }
-
+            #(batchID, upc, salePrice, groupSalePrice, signMultiplier, cost)
             $insArgs = array($batchID, $upc, $price, $price);
+            $insArgs[] = $mult;
             if ($saveCost) {
                 $insArgs[] = $cost;
             }
-            $insArgs[] = $mult;
             $dbc->execute($insP, $insArgs);
             /** Worried about speed here. Log many?
             $bu = new BatchUpdateModel($dbc);

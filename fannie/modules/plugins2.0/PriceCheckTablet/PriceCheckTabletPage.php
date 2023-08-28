@@ -85,7 +85,7 @@ class PriceCheckTabletPage extends FannieRESTfulPage
         $items = $this->session->pctItems;
         
         $items[] = array(
-            'upc' => $upc,
+            //'upc' => $row['upc'],
             'price' => $price,
             'name' => $row['description'],
         );
@@ -122,8 +122,8 @@ class PriceCheckTabletPage extends FannieRESTfulPage
             //. 'Order #' . $orderNumber . "\n"
             . date('n j, Y g:i:a') . "\n";
         
-            
-            $item = array_pop($this->session->pctItems);
+            $i = sizeof($this->session->pctItems);
+            $item = $this->session->pctItems[$i-1];
             $receipt .= $item['name'] . "\n";
             $receipt .= str_pad($item['price'], 4) . ' ';
             $receipt .= "\n";

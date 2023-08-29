@@ -13,82 +13,15 @@ include(__DIR__ . '/../../../config.php');
 if (!class_exists('FannieAPI')) {
     include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
 }
-if (!class_exists('COREPOS\\pos\\lib\\PrintHandlers\\PrintHandler')) {
-    include(__DIR__ . '/../../../../pos/is4c-nf/lib/PrintHandlers/PrintHandler.php');
-}
-if (!class_exists('COREPOS\\pos\\lib\\PrintHandlers\\ESCPOSPrintHandler')) {
-    include(__DIR__ . '/../../../../pos/is4c-nf/lib/PrintHandlers/ESCPOSPrintHandler.php');
-}
-if (!class_exists('COREPOS\\pos\\lib\\PrintHandlers\\ESCNetRawHandler')) {
-    include(__DIR__ . '/../../../../pos/is4c-nf/lib/PrintHandlers/ESCNetRawHandler.php');
-}
 
-class PriceCheckTabletPage extends FannieRESTfulPage
+class PriceCheckPage extends FannieRESTfulPage
 {
     public function preprocess()
     {
-        $this->addRoute('get<done>', 'get<back>');
-        if (!isset($this->session->pctItems) || !is_array($this->session->pctItems)) {
-            $this->session->pctItems = array();
-        }
         $ret = parent::preprocess();
         $this->window_dressing = false;
 
         return $ret;
-    }
-
-            /**
-     * Finish transaction.
-     *
-     * Generates receipt and sends to printer, twice, via
-     * network.
-     *
-     * Adds items to dtransactions, copies them to suspended,
-     * and flips the dtransactions records to trans_status=X
-     */
-        /**
-     * Just clear session data to start over
-     */
-    protected function get_back_handler()
-    {
-        $this->session->pctItems = array();
-        return 'PriceCheckTabletPage.php';
-    }
-
-    protected function get_done_handler()
-    {
-
-
-        $ph = new COREPOS\pos\lib\PrintHandlers\ESCPOSPrintHandler();
-        $receipt = "\n"
-            . $ph->textStyle(true, false, true)
-            //. 'Order #' . $orderNumber . "\n"
-            . date('n j, Y g:i:a') . "\n";
-        
-        $i = sizeof($this->session->pctItems);
-        if ($i >= 0) {
-            $item = $this->session->pctItems[$i-1];
-            $receipt .= $item['name'] . "\n";
-            $receipt .= str_pad($item['price'], 4) . ' ';
-            $receipt .= "\n";
-    
-            $receipt .= str_repeat("\n", 4);
-            $receipt .= $ph->cutPaper();
-    
-    
-            GLOBAL $FANNIE_PLUGIN_SETTINGS;
-            $ipAdd = $FANNIE_PLUGIN_SETTINGS['T1PrintIP'];
-    
-            $net = new COREPOS\pos\lib\PrintHandlers\ESCNetRawHandler();
-            $net->setTarget('192.168.2.105:9100');
-            $net->writeLine($receipt);
-            //$net->writeLine($receipt);
-    
-            $this->session->pctItems = array();
-        }
-
-
-        return 'PriceCheckTabletPage.php';
     }
 
     protected function get_id_handler()
@@ -107,7 +40,7 @@ class PriceCheckTabletPage extends FannieRESTfulPage
             WHERE p.store_id=?
                 AND p.upc=?";
         $prep = $this->connection->prepare($query);
-        $store = 1;//Store::getIdByIp();
+        $store = 1;
         $row = $this->connection->getRow($prep, array($store, $upc1));
         if ($row === false) {
             $row = $this->connection->getRow($prep, array($store, $upc2));
@@ -128,29 +61,18 @@ class PriceCheckTabletPage extends FannieRESTfulPage
                 break;
         }
 
-
         echo "<div class=\"h2\">{$item}</div><div class=\"h2\">{$price}</div>";
-
-        $items = $this->session->pctItems;
-        
-        $items[] = array(
-            //'upc' => $row['upc'],
-            'price' => $price,
-            'name' => $row['description'],
-        );
-        $this->session->pctItems = $items;
 
         return false;
     }
-
     
     protected function get_view()
     {
         $this->addJQuery();
         $this->addBootstrap();
-        $this->addScript('priceCheckTablet.js');
+        $this->addScript('priceCheck.js');
         $this->addOnloadCommand("\$('#pc-upc').focus();");
-        $this->addOnloadCommand("priceCheckTablet.showDefault();");
+        $this->addOnloadCommand("priceCheck.showDefault();");
         if (file_exists(__DIR__ . '/../../../src/javascript/composer-components/bootstrap/css/bootstrap.min.css')) {
             $bootstrap = '../../../src/javascript/composer-components/bootstrap/css/';
         } elseif (file_exists(__DIR__ . '/../../src/javascript/bootstrap/css/bootstrap.min.css')) {
@@ -164,14 +86,13 @@ class PriceCheckTabletPage extends FannieRESTfulPage
     <link rel="stylesheet" type="text/css" href="{$bootstrap}bootstrap-theme.min.css">
 </head>
 <body class="container">
-<form method="get" id="pc-form" onsubmit="priceCheckTablet.search(); return false;">
+<form method="get" id="pc-form" onsubmit="priceCheck.search(); return false;">
     <div class="form-inline">
         <input type="text" class="form-control form" name="id" id="pc-upc" autocomplete="off" />
         <button type="submit" class="btn btn-default btn-success">Search</button>
     </div>
 </form>
 <div id="pc-results" class="well"></div>
-
 HTML;
     }
 }

@@ -37,6 +37,60 @@ class PriceCheckTabletPage extends FannieRESTfulPage
         return $ret;
     }
 
+            /**
+     * Finish transaction.
+     *
+     * Generates receipt and sends to printer, twice, via
+     * network.
+     *
+     * Adds items to dtransactions, copies them to suspended,
+     * and flips the dtransactions records to trans_status=X
+     */
+        /**
+     * Just clear session data to start over
+     */
+    protected function get_back_handler()
+    {
+        $this->session->pctItems = array();
+        return 'PriceCheckTabletPage.php';
+    }
+
+    protected function get_done_handler()
+    {
+
+
+        $ph = new COREPOS\pos\lib\PrintHandlers\ESCPOSPrintHandler();
+        $receipt = "\n"
+            . $ph->textStyle(true, false, true)
+            //. 'Order #' . $orderNumber . "\n"
+            . date('n j, Y g:i:a') . "\n";
+        
+        $i = sizeof($this->session->pctItems);
+        if ($i >= 0) {
+            $item = $this->session->pctItems[$i-1];
+            $receipt .= $item['name'] . "\n";
+            $receipt .= str_pad($item['price'], 4) . ' ';
+            $receipt .= "\n";
+    
+            $receipt .= str_repeat("\n", 4);
+            $receipt .= $ph->cutPaper();
+    
+    
+            GLOBAL $FANNIE_PLUGIN_SETTINGS;
+            $ipAdd = $FANNIE_PLUGIN_SETTINGS['T1PrintIP'];
+    
+            $net = new COREPOS\pos\lib\PrintHandlers\ESCNetRawHandler();
+            $net->setTarget('192.168.2.105:9100');
+            $net->writeLine($receipt);
+            //$net->writeLine($receipt);
+    
+            $this->session->pctItems = array();
+        }
+
+
+        return 'PriceCheckTabletPage.php';
+    }
+
     protected function get_id_handler()
     {
         $upc1 = BarcodeLib::padUPC($this->id);
@@ -94,64 +148,14 @@ class PriceCheckTabletPage extends FannieRESTfulPage
         return false;
     }
 
-        /**
-     * Finish transaction.
-     *
-     * Generates receipt and sends to printer, twice, via
-     * network.
-     *
-     * Adds items to dtransactions, copies them to suspended,
-     * and flips the dtransactions records to trans_status=X
-     */
-        /**
-     * Just clear session data to start over
-     */
-    protected function get_back_handler()
-    {
-        $this->session->pctItems = array();
-        return 'PriceCheckTabletPage.php';
-    }
-
-    protected function get_done_handler()
-    {
-
-
-        $ph = new COREPOS\pos\lib\PrintHandlers\ESCPOSPrintHandler();
-        $receipt = "\n"
-            . $ph->textStyle(true, false, true)
-            //. 'Order #' . $orderNumber . "\n"
-            . date('n j, Y g:i:a') . "\n";
-        
-            $i = sizeof($this->session->pctItems);
-            $item = $this->session->pctItems[$i-1];
-            $receipt .= $item['name'] . "\n";
-            $receipt .= str_pad($item['price'], 4) . ' ';
-            $receipt .= "\n";
-
-        $receipt .= str_repeat("\n", 4);
-        $receipt .= $ph->cutPaper();
-
-
-        GLOBAL $FANNIE_PLUGIN_SETTINGS;
-        $ipAdd = $FANNIE_PLUGIN_SETTINGS['T1PrintIP'];
-
-        $net = new COREPOS\pos\lib\PrintHandlers\ESCNetRawHandler();
-        $net->setTarget('192.168.2.105:9100');
-        $net->writeLine($receipt);
-        //$net->writeLine($receipt);
-
-        $this->session->pctItems = array();
-
-        return 'PriceCheckTabletPage.php';
-    }
     
     protected function get_view()
     {
         $this->addJQuery();
         $this->addBootstrap();
-        $this->addScript('priceCheckTablet.js');
+        $this->addScript('PriceCheckTablet.js');
         $this->addOnloadCommand("\$('#pc-upc').focus();");
-        $this->addOnloadCommand("priceCheckTablet.showDefault();");
+        $this->addOnloadCommand("PriceCheckTablet.showDefault();");
         if (file_exists(__DIR__ . '/../../../src/javascript/composer-components/bootstrap/css/bootstrap.min.css')) {
             $bootstrap = '../../../src/javascript/composer-components/bootstrap/css/';
         } elseif (file_exists(__DIR__ . '/../../src/javascript/bootstrap/css/bootstrap.min.css')) {

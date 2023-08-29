@@ -66,7 +66,7 @@ class PriceCheckTabletPage extends FannieRESTfulPage
             . date('n j, Y g:i:a') . "\n";
         
         $i = sizeof($this->session->pctItems);
-        if ($i >= 0) {
+        if ($i > 0) {
             $item = $this->session->pctItems[$i-1];
             $receipt .= $item['name'] . "\n";
             $receipt .= str_pad($item['price'], 4) . ' ';

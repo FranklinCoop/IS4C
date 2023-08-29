@@ -130,6 +130,11 @@ class PriceCheckTabletPage extends FannieRESTfulPage
 
 
         echo "<div class=\"h2\">{$item}</div><div class=\"h2\">{$price}</div>";
+        echo "<div class=\"col-sm-5\"><br /><a href=\"PriceCheckTabletPage.php?done=1\" class=\"btn btn-success btn-lg\">Print</a>
+        <br />
+        <br />
+        <a href=\"PriceCheckTabletPage.php?back=1\" class=\"btn btn-danger btn-lg\">Back</a>
+        </div>";
 
         $items = $this->session->pctItems;
         

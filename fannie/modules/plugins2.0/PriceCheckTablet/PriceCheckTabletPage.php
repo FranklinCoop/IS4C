@@ -68,6 +68,7 @@ class PriceCheckTabletPage extends FannieRESTfulPage
         $i = sizeof($this->session->pctItems);
         if ($i > 0) {
             $item = $this->session->pctItems[$i-1];
+            $receipt .= $item['upc'] . "\n";
             $receipt .= $item['name'] . "\n";
             $receipt .= str_pad($item['price'], 4) . ' ';
             $receipt .= "\n";
@@ -101,7 +102,8 @@ class PriceCheckTabletPage extends FannieRESTfulPage
                 p.special_price,
                 p.discounttype,
                 " . ItemText::longBrandSQL() . ",
-                " . ItemText::longDescriptionSQL() . "
+                " . ItemText::longDescriptionSQL() . ",
+                p.upc
             FROM products AS p
                 LEFT JOIN productUser AS u ON p.upc=u.upc
             WHERE p.store_id=?
@@ -114,9 +116,10 @@ class PriceCheckTabletPage extends FannieRESTfulPage
         }
 
         if ($row === false) {
-            echo '<div class="h2 alert alert-danger">Item not found</div>';
+            echo '<div class="h1 alert alert-danger">Item not found</div>';
             return false;
         }
+        $upc = 'UPC:'.$row['upc'];
 
         $item = ($row['brand'] != '' ? $row['brand'] . ' ' : '') . $row['description'];
         switch ($row['discounttype']) {
@@ -129,17 +132,17 @@ class PriceCheckTabletPage extends FannieRESTfulPage
         }
 
 
-        echo "<div class=\"h2\">{$item}</div><div class=\"h2\">{$price}</div>";
-        echo "<div class=\"col-sm-5\"><br /><a href=\"PriceCheckTabletPage.php?done=1\" class=\"btn btn-success btn-lg\">Print</a>
-        <br />
-        <br />
-        <a href=\"PriceCheckTabletPage.php?back=1\" class=\"btn btn-danger btn-lg\">Back</a>
+        echo "<div class=\"h1\">{$item}</div><div class=\"h1\">{$upc}</div><div class=\"h1\">{$price}</div>";
+        echo "<div class=\"col text-center\"><br /><br />
+           <a href=\"PriceCheckTabletPage.php?done=1\" class=\"btn btn-success btn-lg btn-block p-5\">Print</a>
+        
+        <a href=\"PriceCheckTabletPage.php?back=1\" class=\"btn btn-danger btn-lg btn-block p-5\">Back</a>
         </div>";
 
         $items = $this->session->pctItems;
         
         $items[] = array(
-            //'upc' => $row['upc'],
+            'upc' => $row['upc'],
             'price' => $price,
             'name' => $row['description'],
         );
@@ -169,13 +172,15 @@ class PriceCheckTabletPage extends FannieRESTfulPage
     <link rel="stylesheet" type="text/css" href="{$bootstrap}bootstrap-theme.min.css">
 </head>
 <body class="container">
+<br />
 <form method="get" id="pc-form" onsubmit="priceCheckTablet.search(); return false;">
-    <div class="form-inline">
+    <div class="form-inline text-center">
         <input type="text" class="form-control form" name="id" id="pc-upc" autocomplete="off" />
-        <button type="submit" class="btn btn-default btn-success">Search</button>
+        <button type="submit" id="pc-search" class="btn btn-default btn-success">Search</button>
     </div>
 </form>
-<div id="pc-results" class="well"></div>
+<br />
+<div id="pc-results" class="well well-lg text-center"></div>
 
 HTML;
     }

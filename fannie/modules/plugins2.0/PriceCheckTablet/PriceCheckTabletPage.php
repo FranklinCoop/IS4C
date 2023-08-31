@@ -36,33 +36,23 @@ class PriceCheckTabletPage extends FannieRESTfulPage
 
         return $ret;
     }
-
-            /**
-     * Finish transaction.
-     *
-     * Generates receipt and sends to printer, twice, via
-     * network.
-     *
-     * Adds items to dtransactions, copies them to suspended,
-     * and flips the dtransactions records to trans_status=X
-     */
-        /**
-     * Just clear session data to start over
-     */
+    /**
+     * handles back button click
+     **/
     protected function get_back_handler()
     {
         $this->session->pctItems = array();
         return 'PriceCheckTabletPage.php';
     }
-
+    /**
+     * Prints price and resets for next scan
+     **/
     protected function get_done_handler()
     {
-
-
+        //create receipt
         $ph = new COREPOS\pos\lib\PrintHandlers\ESCPOSPrintHandler();
         $receipt = "\n"
             . $ph->textStyle(true, false, true)
-            //. 'Order #' . $orderNumber . "\n"
             . date('n j, Y g:i:a') . "\n";
         
         $i = sizeof($this->session->pctItems);
@@ -77,20 +67,23 @@ class PriceCheckTabletPage extends FannieRESTfulPage
             $receipt .= $ph->cutPaper();
     
     
-            GLOBAL $FANNIE_PLUGIN_SETTINGS;
-            $ipAdd = $FANNIE_PLUGIN_SETTINGS['T1PrintIP'];
+            //GLOBAL $FANNIE_PLUGIN_SETTINGS;
+            //$ipAdd = $FANNIE_PLUGIN_SETTINGS['T1PrintIP'];
     
             $net = new COREPOS\pos\lib\PrintHandlers\ESCNetRawHandler();
-            $net->setTarget('192.168.2.105:9100');
+            $net->setTarget('192.168.3.156:9100');
             $net->writeLine($receipt);
             //$net->writeLine($receipt);
-    
+            //clear memory we don't need it anymore if because we printed the receipt
             $this->session->pctItems = array();
         }
 
 
         return 'PriceCheckTabletPage.php';
     }
+    /**
+     * Handles upcs 
+     **/
 
     protected function get_id_handler()
     {

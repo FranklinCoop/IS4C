@@ -782,8 +782,15 @@ static private function receiptFooters($receipt, $ref)
         if( (CoreLocal::get("store")=="GreenFieldsMarket" || CoreLocal::get('store') == 'FranklinCoop') && $i == 2) {
             $receipt['any'] .= self::biggerFont(self::centerBig(CoreLocal::get("receiptFooter$i")))."\n\n";
             $receipt['any'] .= "\n";
+        } else if ( substr(CoreLocal::get("receiptFooter$i"), -4) == '.bmp') {
+            //$graphicsPath = __DIR__ . '/../graphics';
+            $qrBMP =  __DIR__ . '/../graphics/'.CoreLocal::get("receiptFooter$i");
+            if (file_exists($qrBMP)) {
+                $img = self::$PRINT->RenderBitmapFromFile($qrBMP);
+                $receipt['any'] .= "\n" . $img . "\n\n";
+            }
         } else {
-            $receipt['any'] .= self::$PRINT->centerString(CoreLocal::get("receiptFooter"));
+            $receipt['any'] .= self::$PRINT->centerString(CoreLocal::get("receiptFooter$i"));
             $receipt['any'] .= "\n";
         }
     }

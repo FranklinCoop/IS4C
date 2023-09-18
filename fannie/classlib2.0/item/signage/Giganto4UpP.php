@@ -31,8 +31,8 @@ class Giganto4UpP extends \COREPOS\Fannie\API\item\FannieSignage
     protected $SMALL_FONT = 14;
     protected $SMALLER_FONT = 11;
     protected $SMALLEST_FONT = 8;
-    protected $BOGO_BIG_FONT = 100;
-    protected $BOGO_MED_FONT = 28;
+    protected $BOGO_BIG_FONT = 80;
+    protected $BOGO_MED_FONT = 23;
 
     protected $font = 'Arial';
     protected $alt_font = 'Arial';
@@ -55,6 +55,8 @@ class Giganto4UpP extends \COREPOS\Fannie\API\item\FannieSignage
 
     protected function drawItem($pdf, $item, $row, $column)
     {
+        $item['description'] = preg_replace("/[^\x01-\x7F]/"," ", $item['description']);
+        $item['description'] = str_replace("  ", " ", $item['description']);
         $effective_width = $this->width - (2*$this->left);
         $price = $this->printablePrice($item);
 
@@ -64,6 +66,8 @@ class Giganto4UpP extends \COREPOS\Fannie\API\item\FannieSignage
         $pdf->SetX($this->left + ($this->width*$column));
         $pdf->SetFont($this->font, '', $this->MED_FONT);
         $item['description'] = str_replace("\r", '', $item['description']);
+        $item['description'] = preg_replace("/[^\x01-\x7F]/"," ", $item['description']);
+        $item['description'] = str_replace("  ", " ", $item['description']);
         $pdf->Cell($effective_width, 6, str_replace("\n", '', $item['description']), 0, 1, 'C');
 
         $pdf->SetX($this->left + ($this->width*$column));
@@ -80,19 +84,43 @@ class Giganto4UpP extends \COREPOS\Fannie\API\item\FannieSignage
             } elseif (strstr($price, 'OFF/LB')) {
                 $pdf->SetFont($this->font, '', $this->BIG_FONT-45);
             } elseif (strstr($price, 'OFF')) {
-                $pdf->SetFont($this->font, '', $this->BIG_FONT-27);
+                if (strstr($price, '.')) {
+                    // price has decimal point in it
+                    $pdf->SetFont($this->font, '', $this->BIG_FONT-42);
+                } elseif (2) {
+                    $pdf->SetFont($this->font, '', $this->BIG_FONT-27);
+                }
             } 
             if (strstr($price, 'SAVE')) {
                 $pdf->SetFont($this->font, '', $this->BIG_FONT-55);
             }
             $pdf->Cell($effective_width, 20, $price, 0, 1, 'C');
         } else {
-            $pdf->SetXY($this->left + ($this->width*$column -15), $this->top + ($row*$this->height) + 33);
-            $pdf->SetFont($this->font, '', $this->BOGO_MED_FONT);
-            $pdf->MultiCell($effective_width/2, 8, "BUY ONE\nGET ONE", 0, 'R');
-            $pdf->SetXY($this->left + ($this->width*$column + 35), $this->top + ($row*$this->height) + 40);
-            $pdf->SetFont($this->font, '', $this->BOGO_BIG_FONT);
-            $pdf->Cell($effective_width/2, 6, 'FREE', 0, 1, 'L');
+            // Deal is BOGO
+            $pdf->SetTextColor(244, 116, 30);
+            $pdf->SetXY($this->left + ($this->width*$column) + 16, $this->top + ($row*$this->height) + 27);
+            $pdf->SetFont($this->font, 'B', $this->BOGO_MED_FONT);
+            $pdf->Cell($effective_width, 6, "Buy One, Get One", 0, 'C');
+
+            $pdf->SetXY($this->left + ($this->width*$column) + 1, $this->top + ($row*$this->height) + 45);
+            $pdf->SetFont($this->font, 'B', $this->BOGO_BIG_FONT);
+            $pdf->Cell($effective_width, 6, 'FREE', 0, 1, 'C');
+
+            $pdf->SetTextColor(0, 0, 0);
+
+            // BOGO limit
+            if ($item['transLimit'] > 0) {
+                $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 13));
+                $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
+                //$pdf->SetXY($this->left, $this->top + ($this->height*$row) + ($this->height - $this->top - 13));
+                $pdf->Cell($effective_width, 6, 'Limit ' . $item['transLimit'] / 2 . ' per customer', 0, 1, 'C');
+            }
+
+            // BOGO regular price
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 20));
+            $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
+            $text = sprintf('Regular Price: $%.2f', $item['nonSalePrice']);
+            $pdf->Cell($effective_width, 20, $text, 0, 1, 'L');
         }
 
         if ($this->validDate($item['startDate']) && $this->validDate($item['endDate'])) {

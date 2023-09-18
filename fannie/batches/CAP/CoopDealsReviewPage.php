@@ -168,7 +168,7 @@ class CoopDealsReviewPage extends FanniePage
             $args = array($row['upc'], $id, sprintf('%.2f', $row['price']));
             if ($row['multiplier'] == -3) {
                 $args[] = sprintf('%.2f', $row['price']);
-                $args[] = 2;
+                $args[] = $this->config->get('BOGO_MODE', 2);
                 $args[] = 2;
             } else {
                 $args[] = null;
@@ -191,6 +191,12 @@ class CoopDealsReviewPage extends FanniePage
 
         $ret = "<p>New sales batches have been created!</p>";
         $ret .= "<p><a href=\"../newbatch/\">View batches</a></p>";
+
+        $cbs = $this->config->get('BATCH_CALLBACKS');
+        foreach ($cbs as $cb) {
+            $obj = new $cb();
+            $obj->run(array_values($batchIDs));
+        }
 
         return $ret;
     }

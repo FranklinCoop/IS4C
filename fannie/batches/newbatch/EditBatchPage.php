@@ -71,6 +71,7 @@ class EditBatchPage extends FannieRESTfulPage
             'post<id><upc><price>',
             'post<id><autotag>',
             'post<id><force>',
+            'post<id><forceoneitem>',
             'post<id><unsale>',
             'post<id><limit>',
             'post<id><upc><uid><cut>',
@@ -81,8 +82,7 @@ class EditBatchPage extends FannieRESTfulPage
             'post<id><trim>',
             'post<id><storeID>',
             'post<noteID><batchNotes>',
-            'post<partialID>',
-            'post<editBatch>',
+            'post<partialID>', 'post<editBatch>',
             'post<editDate>'
         );
 
@@ -108,6 +108,8 @@ class EditBatchPage extends FannieRESTfulPage
         $model->save();
         echo 'Saved';
 
+        $this->runCallbacks($id);
+
         return false;
     }
 
@@ -121,6 +123,8 @@ class EditBatchPage extends FannieRESTfulPage
         $model->batchName($name);
         $model->save();
         echo 'Saved';
+
+        $this->runCallbacks($id);
 
         return false;
     }
@@ -183,6 +187,8 @@ class EditBatchPage extends FannieRESTfulPage
         $dbc->execute($delP,$uid);
 
         $this->addOnloadCommand("showBootstrapAlert('#inputarea', 'success', 'Pasted $count items');\n");
+
+        $this->runCallbacks($this->id);
 
         return true;
     }
@@ -403,6 +409,8 @@ class EditBatchPage extends FannieRESTfulPage
             }
             $json['added'] = 1;
             $json['display'] = $this->showBatchDisplay($this->id);
+
+            $this->runCallbacks($this->id);
         }
 
         echo $this->debugJSON($json);
@@ -472,6 +480,20 @@ class EditBatchPage extends FannieRESTfulPage
         $model = new BatchesModel($dbc);
         $model->forceStartBatch($this->id);
         $json = array('error'=>0, 'msg'=>'Batch #' . $this->id . ' has been applied');
+        echo $this->debugJSON($json);
+
+        return false;
+    }
+
+    protected function post_id_forceoneitem_handler()
+    {
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->get('OP_DB'));
+        $upc = FormLib::get('upc');
+        $batchID = FormLib::get('id');
+        $model = new BatchesModel($dbc);
+        $model->forceStartBatch($batchID, $upc);
+        $json = array('error'=>0, 'msg'=>'Batch #' . $batchID . ' upc #' . $upc . ' has been applied');
         echo $this->debugJSON($json);
 
         return false;
@@ -548,9 +570,9 @@ class EditBatchPage extends FannieRESTfulPage
             $this->qty = 1;
         }
 
-        $pmethod = ($this->qty >= 2)?2:0;
-        if ($this->config->get('COOP_ID') == 'WFC_Duluth' && $this->qty == 2) {
-            $pmethod = 7;
+        $pmethod = ($this->qty >= 2) ? 2 : 0;
+        if ($this->qty == 2) {
+            $pmethod = $this->config->get('BOGO_MODE', 2);
         }
 
         $model = new BatchListModel($dbc);
@@ -592,6 +614,8 @@ class EditBatchPage extends FannieRESTfulPage
                 \COREPOS\Fannie\API\lib\AuditLib::BATCH_EDIT,
                 (substr($this->upc,0,2)=='LC' ? true : false));
         }
+
+        $this->runCallbacks($this->id);
 
         echo $this->debugJSON($json);
 
@@ -714,6 +738,34 @@ class EditBatchPage extends FannieRESTfulPage
         $id = $this->id;
         $upc = $this->upc;
 
+        $bu = new BatchUpdateModel($dbc);
+        $bu->upc($upc);
+        $bu->batchID($id);
+        $bu->logUpdate($bu::UPDATE_REMOVED);
+
+        $delQ = $dbc->prepare("delete from batchList where batchID=? and upc=?");
+        $delR = $dbc->execute($delQ,array($id,$upc));
+        if ($delR === false) {
+            if ($json['error']) {
+                $json['msg'] .= '<br />Error deleting item ' . $upc . ' from batch';
+            } else {
+                $json['error'] = 1;
+                $json['msg'] = 'Error deleting item ' . $upc . ' from batch';
+             }
+        }
+
+        $delQ = $dbc->prepare("delete from batchBarcodes where upc=? and batchID=?");
+        $delR = $dbc->execute($delQ,array($upc,$id));
+
+        if (FormLib::get_form_value('audited') == '1') {
+            \COREPOS\Fannie\API\lib\AuditLib::batchNotification(
+                $id,
+                $upc,
+                \COREPOS\Fannie\API\lib\AuditLib::BATCH_DELETE,
+                (substr($upc,0,2)=='LC' ? true : false));
+        }
+
+
         $json = array('error'=>0, 'msg'=>'Item ' . $upc . ' removed from batch');
         $currentP = $dbc->prepare('SELECT batchID FROM batches WHERE ? BETWEEN startDate AND endDate AND batchID=?');
         $current = $dbc->getValue($currentP, array(date('Y-m-d 00:00:00'), $this->id));
@@ -764,32 +816,7 @@ class EditBatchPage extends FannieRESTfulPage
              */
         }
 
-        $bu = new BatchUpdateModel($dbc);
-        $bu->upc($upc);
-        $bu->batchID($id);
-        $bu->logUpdate($bu::UPDATE_REMOVED);
-
-        $delQ = $dbc->prepare("delete from batchList where batchID=? and upc=?");
-        $delR = $dbc->execute($delQ,array($id,$upc));
-        if ($delR === false) {
-            if ($json['error']) {
-                $json['msg'] .= '<br />Error deleting item ' . $upc . ' from batch';
-            } else {
-                $json['error'] = 1;
-                $json['msg'] = 'Error deleting item ' . $upc . ' from batch';
-             }
-        }
-
-        $delQ = $dbc->prepare("delete from batchBarcodes where upc=? and batchID=?");
-        $delR = $dbc->execute($delQ,array($upc,$id));
-
-        if (FormLib::get_form_value('audited') == '1') {
-            \COREPOS\Fannie\API\lib\AuditLib::batchNotification(
-                $id,
-                $upc,
-                \COREPOS\Fannie\API\lib\AuditLib::BATCH_DELETE,
-                (substr($upc,0,2)=='LC' ? true : false));
-        }
+        $this->runCallbacks($this->id);
 
         echo $this->debugJSON($json);
 
@@ -903,6 +930,8 @@ class EditBatchPage extends FannieRESTfulPage
         $ret['display'] = $this->showBatchDisplay($this->id);
         echo $this->debugJSON($ret);
 
+        $this->runCallbacks($this->id);
+
         return false;
     }
 
@@ -928,7 +957,20 @@ class EditBatchPage extends FannieRESTfulPage
         }
         echo $this->debugJSON($ret);
 
+        $this->runCallbacks($this->id);
+
         return false;
+    }
+
+    private function runCallbacks($batchID)
+    {
+        $cbs = $this->config->get('BATCH_CALLBACKS');
+        $this->logger->debug("Attempting batch callbacks");
+        foreach ($cbs as $cb) {
+            $obj = new $cb();
+            $obj->run($batchID);
+            $this->logger->debug("Running $cb for batch $batchID");
+        }
     }
 
     private function addItemUPCInput($newtags=false)

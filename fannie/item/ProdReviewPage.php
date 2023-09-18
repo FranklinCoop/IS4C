@@ -363,12 +363,14 @@ HTML;
             $vid  = "n/a";
         }
         $user = FannieAuth::getUID($this->current_user);
-        $setA = array($bid,$vid,$user);
-        $setP = $dbc->prepare("
-            INSERT INTO batchReviewLog (bid, vid, printed, user, created, forced)
-            VALUES (?, ?, 0, ?, NOW(), 0);
-        ");
-        $dbc->execute($setP,$setA);
+        $model = new BatchReviewLogModel($dbc);
+        $model->bid($bid);
+        $model->vid($vid);
+        $model->printed(0);
+        $model->user($user);
+        $model->created(date('Y-m-d H:i:s'));
+        $model->forced(0);
+        $model->save();
 
         return header('location: '.$_SERVER['PHP_SELF'].'?batchLog=1');
     }
@@ -413,6 +415,29 @@ HTML;
         return header('location: '.$_SERVER['PHP_SELF'].'?batchLog=1');
     }
 
+    private function getBatchItemDiscrep($dbc)
+    {
+        $found = array();
+        $tmp = array();
+        $prep = $dbc->prepare("SELECT * from batchReviewLog AS l
+            INNER JOIN batchList AS b ON b.batchID=l.bid WHERE forced = 0;");
+        $res = $dbc->execute($prep);
+        while ($row = $dbc->fetchRow($res)) {
+            $upc = $row['upc'];
+            $batchID = $row['batchID'];
+            $tmp[$upc][] = $batchID;
+        }
+        foreach ($tmp as $upc => $array) {
+            if (count($array) > 1) {
+                foreach ($array as $batchID) {
+                    $found[$batchID][] = $upc;
+                }
+            }
+        }
+
+        return $found;
+    }
+
     public function get_batchLog_view()
     {
         global $FANNIE_OP_DB;
@@ -424,11 +449,11 @@ HTML;
         $bids = "0";
         $pAllBtn = "<button class='btn btn-default btn-xs'
             onClick='printAll(); return false;'><span class='fas fa-print'></span></button>";
-        $tableA = "<div class='table-responsive'><table class='table table-condensed table-striped small'><thead><tr>
+        $tableA = "<div class='table-responsive'><table class='table table-condensed table-striped small'><thead><tr class=\"thead\">
             <th>{$pAllBtn}</th>
             <th>BatchID</th><th>Batch Name</th><th>Super Depts +</th><th>VID</th><th>Vendor</th><th>Uploaded</th>
             <th>Comments</th><th></th><th></th><tr></thead><tbody>";
-        $tableB = "<div class='table-responsive'><table class='table table-condensed table-striped small' id='forcedBatchesTable'><thead><tr>
+        $tableB = "<div class='table-responsive'><table class='table table-condensed table-striped small' id='forcedBatchesTable'><thead><tr class=\"thead\">
             <th>BatchID</th><th>Batch Name</th><th>Super Depts +</th><th>VID</th><th>Vendor</th><th>Forced On</th>
             <th>user</th><tr></thead><tbody>";
         $args = array();
@@ -459,6 +484,8 @@ HTML;
             }
         };
 
+        $discr = $this->getBatchItemDiscrep($dbc);
+        
         $res = $dbc->execute($prep,$args);
         $curBid = -999;
         while ($row = $dbc->fetchRow($res)) {
@@ -473,15 +500,25 @@ HTML;
             }
             if ($scale == '' && $row['plu'] != NULL)
                 $superDepts .= "<span class=\"\" style=\"border: 1px solid black; border-radius: 50%; padding-left: 3px; padding-right: 3px; cursor: default;\" title=\"Scale Items in batch\">S</span>";
+            $curDiscr = '';
+            if (array_key_exists($curBid, $discr)) {
+                $title = '';
+                foreach ($discr[$curBid] as $upc) {
+                    $title .= <<<HTML
+<div>$upc</div>
+HTML;
+                }
+                $curDiscr = ' <a href="#" class="btn btn-xs btn-danger showDiscrFound" title="'.$title.'"><span class="fas fa-exclamation-circle"></span></a>';
+            }
             $curBidLn = "../batches/newbatch/EditBatchPage.php?id=".$curBid;
             if ($row['forced'] == '0000-00-00 00:00:00') {
                 $bids .= ",".$curBid;
                 $tableA .= "<tr>";
                 $tableA .= "<td><input type='checkbox' id='check$curBid' class='upcCheckBox'></td>";
-                $tableA .= "<td class='biduf'><a href=\"{$curBidLn}\" target=\"_blank\">{$curBid}</a></td>";
+                $tableA .= "<td class='biduf'><a href=\"{$curBidLn}\" target=\"_blank\">{$curBid}</a>$curDiscr</td>";
                 $batchName = $row['batchName'];
                 $tableA .= "<td>{$batchName}</td>";
-                $tableA .= "<td>$superDepts</td>";
+                $tableA .= "<td class=\"super-depts\">$superDepts</td>";
                 if ($row['vid'] == 0) {
                     $vid = "n/a";
                 } else {
@@ -528,12 +565,17 @@ HTML;
                     <div id="alert"><div id="resp"></div></div>
                 </form>
             </div>
-            <div class="col-lg-1"></div>
-            <div class="col-lg-7">
+            <div class="col-lg-4"></div>
+            <div class="col-lg-4">
+                <label for="hide-deli-check">Hide Deli &nbsp;</label>
+                <input type="checkbox" id="hide-deli-check" /> | 
+                <label for="show-deli-check">Show Only Deli &nbsp;</label>
+                <input type="checkbox" id="show-deli-check" />
             </div>
         </div>
         <h4 align="center">Batches Staged for Price Changes</h4>
         <div class="batchTable">
+            <div id="discrFound" style="padding: 15px;"></div>
             {$tableA}
         </div>
         <h4 align="center">History of Price Change Batches</h4>
@@ -934,8 +976,6 @@ HTML;
                     <ul>
                         <li><a href="ProdLocationEditor.php">Product <strong>Location</strong> Editor</a></li>
                         <li><a href="ProdReviewPage.php?batchLog=1">Review <strong>Batch Log</strong></a></li>
-                        <li><a href="ProdReviewPage.php?schedule=1">Vendor <strong>Review Schedule</strong></a></li>
-                        <li><a href="ProdReviewPage.php?schedule=1&setup=1">Vendor Schedule <strong>Setup</strong></a></li>
                     </ul>
                 </div>
                 <div class="col-lg-4">
@@ -958,20 +998,24 @@ HTML;
 
    public function javascript_content()
    {
-       ob_start();
-       ?>
+    return <<<JAVASCRIPT
 var lastChecked = null;
 var i = 0;
 var indexCheckboxes = function(){
+    // 1. unset all data-index
     $('.upcCheckBox').each(function(){
-        $(this).attr('data-index', i);
-        i++;
+        $(this).attr('data-index', null);
+    });
+
+    // 2. set data-index if checkbox is visible
+    $('.upcCheckBox').each(function(){
+        if ($(this).is(":visible")) {
+            $(this).attr('data-index', i);
+            i++;
+        }
     });
 };
 indexCheckboxes();
-$('table').click(function(){
-    indexCheckboxes();
-});
 $('.upcCheckBox').on("click", function(e){
     if(lastChecked && e.shiftKey) {
         var i = parseInt(lastChecked.attr('data-index'));
@@ -1043,12 +1087,9 @@ function printAll()
 function checkAll()
 {
     if ( $('#checkAll').prop("checked", true) ) {
-        $c = confirm('Mark all as Reviewed?');
-        if ($c == true) {
-            $('.chk').each( function() {
-                this.checked = true;
-            });
-        }
+        $('.chk').each( function() {
+            this.checked = true;
+        });
     } else {
         $('.chk').each( function() {
             this.checked = false;
@@ -1135,8 +1176,57 @@ function fadeAlerts()
         $(this).fadeOut(1500);
     });
 }
-       <?php
-       return ob_get_clean();
+
+$('#hide-deli-check').change(function(){
+    let c = $(this).is(":checked");
+    if (c == true) {
+        $('tr').each(function(){
+            let depts = $(this).find('td.super-depts').text();
+            //if (depts.includes('DELI')) {
+            if (depts.indexOf('DELI') != -1) {
+                $(this).hide();
+            }
+        });
+    } else {
+        $('tr').each(function(){
+            let depts = $(this).find('td.super-depts').text();
+            console.log(depts);
+            if (depts.includes('DELI')) {
+                $(this).show();
+            }
+        });
+
+    }
+    indexCheckboxes();
+});
+
+$('#show-deli-check').change(function(){
+    let c = $(this).is(":checked");
+    if (c == true) {
+        $('tr').each(function(){
+            let depts = $(this).find('td.super-depts').text();
+            if (!depts.includes('DELI') && !$(this).hasClass("thead")) {
+                $(this).hide();
+            }
+        });
+    } else {
+        $('tr').each(function(){
+            let depts = $(this).find('td.super-depts').text();
+            if (!depts.includes('DELI')) {
+                $(this).show();
+            }
+        });
+
+    }
+    indexCheckboxes();
+});
+var showDiscrFound = $('.showDiscrFound').click(function(){
+    $('#discrFound').text('');
+    let text = $(this).attr('title');
+    $('#discrFound').append("<div>Item(s) found in multiple batches:</div>");
+    $('#discrFound').append(text);
+});
+JAVASCRIPT;
 
     }
 

@@ -135,8 +135,11 @@ class FannieSignage
             }
 
             $u_def = $dbc->tableDefinition('productUser');
-            if (isset($u_def['signCount'])) {
+            $s_def = $dbc->tableDefinition('SignProperties');
+            if (isset($u_def['signCount']) && !isset($s_def['signCount'])) {
                 $sql['query'] = str_replace('p.upc,', 'p.upc, u.signCount,', $sql['query']);
+            } elseif (isset($s_def['signCount'])) {
+                $sql['query'] = str_replace('p.upc,', 'p.upc, sp.signCount,', $sql['query']);
             } else {
                 $sql['query'] = str_replace('p.upc,', 'p.upc, 1 AS signCount,', $sql['query']);
             }
@@ -308,6 +311,14 @@ class FannieSignage
         }
         $ids = '';
         $args = array();
+        $s_def = $dbc->tableDefinition('SignProperties');
+        $fs_def = $dbc->tableDefinition('FloorSectionsListView');
+        if (isset($s_def['signCount'])) {
+            $args[] = Store::getIdByIp();
+        }
+        if (isset($fs_def['sections'])) {
+            $args[] = Store::getIdByIp();
+        }
         foreach ($this->source_id as $id) {
             $args[] = $id;
             $ids .= '?,';
@@ -347,10 +358,18 @@ class FannieSignage
         } else {
             $query .= '1 AS signMultiplier,';
         }
-        if (isset($u_def['signCount'])) {
+        if (isset($u_def['signCount']) && !isset($s_def['signCount'])) {
             $query .= 'u.signCount,';
+        } elseif (isset($s_def['signCount'])) {
+            $query .= 'sp.signCount,';
         } else {
             $query .= '1 AS signCount,';
+        }
+        if (isset($s_def['narrow'])) {
+            $query .= 'CASE WHEN sp.narrow = 1 THEN "Yes" ELSE "No" END AS narrow,';
+        }
+        if (isset($fs_def['sections'])) {
+            $query .= 'fs.sections,';
         }
         $query .= ' o.name AS originName,
                     o.originID,
@@ -358,7 +377,11 @@ class FannieSignage
                     p.unitofmeasure,
                     b.batchName,
                     b.discountType,
-                    b.batchType
+                    b.batchType,
+                    b.transLimit,
+                    CASE WHEN p.inUse = 1 THEN "Yes" ELSE "No" END AS inUse,
+                    SUBSTR(p.last_sold, 1, 10) AS last_sold,
+                    CONCAT(d.dept_no, " ", d.dept_name) AS dept_name
                  FROM batchList AS l
                     ' . DTrans::joinProducts('l', 'p', 'LEFT') . '
                     INNER JOIN batches AS b ON b.batchID=l.batchID
@@ -367,7 +390,15 @@ class FannieSignage
                     LEFT JOIN vendors AS n ON p.default_vendor_id=n.vendorID
                     LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
-                 WHERE l.batchID IN (' . $ids . ') ';
+                    LEFT JOIN departments AS d ON d.dept_no=p.department
+                    ';
+        if (isset($fs_def['sections'])) {
+            $query .= ' LEFT JOIN FloorSectionsListView AS fs ON fs.upc=p.upc AND fs.storeID= ? ';
+        }
+        if (isset($s_def['signCount'])) {
+            $query .= ' LEFT JOIN SignProperties AS sp ON sp.upc=l.upc AND sp.storeID = ? ';
+        }
+        $query .= ' WHERE l.batchID IN (' . $ids . ') ';
         $query .= ' ORDER BY l.batchID, brand, description';
 
         return array('query' => $query, 'args' => $args);
@@ -409,6 +440,10 @@ class FannieSignage
     {
         $ids = '';
         $args = array();
+        $s_def = $dbc->tableDefinition('SignProperties');
+        if (isset($s_def['signCount'])) {
+            $args[] = Store::getIdByIp();
+        }
         foreach ($this->items as $id) {
             $args[] = $id;
             $ids .= '?,';
@@ -437,8 +472,13 @@ class FannieSignage
                     LEFT JOIN productUser AS u ON p.upc=u.upc
                     LEFT JOIN vendors AS n ON p.default_vendor_id=n.vendorID
                     LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
-                    LEFT JOIN origins AS o ON p.current_origin_id=o.originID
-                 WHERE p.upc IN (' . $ids . ') ';
+                    LEFT JOIN origins AS o ON p.current_origin_id=o.originID ';
+
+        if (isset($s_def['signCount'])) {
+            $query .= ' LEFT JOIN SignProperties AS sp ON sp.upc=p.upc AND sp.storeID = ? ';
+        }
+
+        $query .= ' WHERE p.upc IN (' . $ids . ') ';
         if (FannieConfig::config('STORE_MODE') == 'HQ') {
             $query .= ' AND p.store_id=? ';
             $args[] = FannieConfig::config('STORE_ID');
@@ -452,6 +492,10 @@ class FannieSignage
     {
         $ids = '';
         $args = array();
+        $s_def = $dbc->tableDefinition('SignProperties');
+        if (isset($s_def['signCount'])) {
+            $args[] = Store::getIdByIp();
+        }
         foreach ($this->items as $id) {
             $args[] = $id;
             $ids .= '?,';
@@ -482,8 +526,13 @@ class FannieSignage
                     LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
                     LEFT JOIN batchList AS l ON p.upc=l.upc
-                    LEFT JOIN batches AS b ON l.batchID=b.batchID
-                 WHERE p.upc IN (' . $ids . ')
+                    LEFT JOIN batches AS b ON l.batchID=b.batchID';
+
+        if (isset($s_def['signCount'])) {
+            $query .= ' LEFT JOIN SignProperties AS sp ON sp.upc=p.upc AND sp.storeID = ? ';
+        }
+
+        $query .= ' WHERE p.upc IN (' . $ids . ')
                     AND b.discounttype = 0
                     AND b.startDate >= ' . $dbc->curdate() . ' ';
         if (FannieConfig::config('STORE_MODE') == 'HQ') {
@@ -499,6 +548,10 @@ class FannieSignage
     {
         $ids = '';
         $args = array();
+        $s_def = $dbc->tableDefinition('SignProperties');
+        if (isset($s_def['signCount'])) {
+            $args[] = Store::getIdByIp();
+        }
         foreach ($this->items as $id) {
             $args[] = $id;
             $ids .= '?,';
@@ -532,6 +585,7 @@ class FannieSignage
                     b.batchName,
                     o.name AS originName,
                     o.shortName AS originShortName,
+                    b.transLimit,
                     CASE WHEN l.signMultiplier IS NULL THEN 1 ELSE l.signMultiplier END AS signMultiplier
                  FROM products AS p
                     LEFT JOIN productUser AS u ON p.upc=u.upc
@@ -540,8 +594,13 @@ class FannieSignage
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
                     LEFT JOIN batchList AS l ON p.batchID=l.batchID AND p.upc=l.upc
                     LEFT JOIN batches AS b ON l.batchID=b.batchID
-                    LEFT JOIN batchType AS t ON b.batchType=t.batchTypeID
-                 WHERE p.upc IN (' . $ids . ') ';
+                    LEFT JOIN batchType AS t ON b.batchType=t.batchTypeID';
+
+        if (isset($s_def['signCount'])) {
+            $query .= ' LEFT JOIN SignProperties AS sp ON sp.upc=p.upc AND sp.storeID = ? ';
+        }
+
+        $query .= ' WHERE p.upc IN (' . $ids . ') ';
         if (FannieConfig::config('STORE_MODE') == 'HQ') {
             $query .= ' AND p.store_id=? ';
             $args[] = Store::getIdByIp();
@@ -555,6 +614,10 @@ class FannieSignage
     {
         $ids = '';
         $args = array();
+        $s_def = $dbc->tableDefinition('SignProperties');
+        if (isset($s_def['signCount'])) {
+            $args[] = Store::getIdByIp();
+        }
         foreach ($this->items as $id) {
             $args[] = $id;
             $ids .= '?,';
@@ -587,7 +650,9 @@ class FannieSignage
                     b.batchName,
                     o.originID,
                     o.name AS originName,
-                    o.shortName AS originShortName
+                    o.shortName AS originShortName,
+                    b.transLimit, 
+                    CASE WHEN l.signMultiplier IS NULL THEN 1 ELSE l.signMultiplier END AS signMultiplier
                  FROM products AS p
                     LEFT JOIN productUser AS u ON p.upc=u.upc
                     LEFT JOIN vendors AS n ON p.default_vendor_id=n.vendorID
@@ -595,8 +660,13 @@ class FannieSignage
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
                     LEFT JOIN batchList AS l ON p.upc=l.upc
                     LEFT JOIN batches AS b ON l.batchID=b.batchID
-                    LEFT JOIN batchType AS t ON b.batchType=t.batchTypeID
-                 WHERE p.upc IN (' . $ids . ')
+                    LEFT JOIN batchType AS t ON b.batchType=t.batchTypeID';
+
+        if (isset($s_def['signCount'])) {
+            $query .= ' LEFT JOIN SignProperties AS sp ON sp.upc=p.upc AND sp.storeID = ? ';
+        }
+
+        $query .= ' WHERE p.upc IN (' . $ids . ')
                     AND b.discounttype <> 0
                     AND b.startDate > ' . $dbc->now() . ' ';
         if (FannieConfig::config('STORE_MODE') == 'HQ') {
@@ -739,6 +809,8 @@ class FannieSignage
         $ret .= '<thead>';
         $ret .= '<tr>
             <th>UPC</th><th>Brand</th><th>Description</th><th>Price</th><th>Origin</th>
+                <th class="altView">Department</th class="altView"><th class="altView">Narrow</th class="altView">
+                <th class="altView">Floor Section(s)</th class="altView"><th class="altView">In Use</th class="altView"><th class="altView">Last Sold</th class="altView">
             <td><label>Exclude
                 <input type="checkbox" onchange="$(\'.exclude-checkbox\').prop(\'checked\', $(this).prop(\'checked\'));" />
                 </label>
@@ -776,13 +848,18 @@ class FannieSignage
                                 name="update_brand[]" value="%s" /></td>
                             <td>
                                 <span class="collapse">%s</span>
-                                <textarea class="FannieSignageField form-control small input-sm" rows="1" name="update_desc[]">%s</textarea>
+                                <textarea class="FannieSignageField form-control small input-sm" rows="2" name="update_desc[]">%s</textarea>
                             </td>
                             <td>%.2f</td>
                             <td class="form-inline">%s<input type="text" name="custom_origin[]" 
                                 class="form-control FannieSignageField originField" placeholder="Custom origin..." value="%s" />
                             </td>
-                            <td class="form-inline">
+                            <td class="altView">%s</td>
+                            <td class="altView">%s</td>
+                            <td class="altView">%s</td>
+                            <td class="altView">%s</td>
+                            <td class="altView">%s</td>
+                            <td class="form-inline" style="width: 7em !important;">
                                 <input type="number" size="2" style="width: 4em !important;" class="form-control input-sm"
                                     name="update_repeat[]" value="%d" title="Number of copies" />
                                 <input type="checkbox" name="exclude[]" class="exclude-checkbox" value="%s" %s />
@@ -798,6 +875,11 @@ class FannieSignage
                             $item['normal_price'],
                             $oselect,
                             $item['custOrigin'],
+                            isset($item['dept_name']) ? $item['dept_name'] : '',
+                            (isset($item['narrow'])) ? $item['narrow'] : 'No',
+                            isset($item['sections']) ? $item['sections'] : '',
+                            isset($item['inUse']) ? $item['inUse'] : '',
+                            isset($item['last_sold']) ? $item['last_sold'] : '',
                             (isset($overrides[$item['upc']]['repeat']) ? $overrides[$item['upc']]['repeat'] : $item['signCount']),
                             $item['upc'],
                             (in_array($item['upc'], $excludes) ? 'checked' : '')

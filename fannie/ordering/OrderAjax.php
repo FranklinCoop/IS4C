@@ -120,7 +120,7 @@ class OrderAjax extends FannieRESTfulPage
                 FROM " . FannieDB::fqn('PendingSpecialOrder', 'trans') . " AS p
                     LEFT JOIN " . FannieDB::fqn('SpecialOrders', 'trans') . " AS s ON p.order_id=s.specialOrderID
                 WHERE p.order_id=?
-                    AND p.trans_id > 0");
+                    AND p.trans_id > 0 AND p.deleted=0");
         $bridge = new SoPoBridge($dbc, $this->config);
         $itemR = $dbc->execute($itemP, array($this->id));
         while ($itemW = $dbc->fetchRow($itemR)) {
@@ -218,7 +218,7 @@ class OrderAjax extends FannieRESTfulPage
         $json = array('tdate'=> date('m/d/Y'));
         if ($this->status == 5) {
             // check necessity
-            $itemP = $dbc->prepare("SELECT COUNT(*) AS items FROM " . FannieDB::fqn('PendingSpecialOrder', 'trans') . " WHERE trans_id > 0 AND order_id=?");
+            $itemP = $dbc->prepare("SELECT COUNT(*) AS items FROM " . FannieDB::fqn('PendingSpecialOrder', 'trans') . " WHERE trans_id > 0 AND order_id=? AND deleted=0");
             $itemCount = $dbc->getValue($itemP, array($this->id));
             $sentP = $dbc->prepare("SELECT COUNT(*) FROM SpecialOrderCommLog WHERE specialOrderID = ? AND message LIKE '%arrived%'");
             $sentCount = $dbc->getValue($sentP, array($this->id));
@@ -231,6 +231,8 @@ class OrderAjax extends FannieRESTfulPage
         $audit = $dbc->prepare('INSERT INTO ' . FannieDB::fqn('SpecialOrderEdits', 'trans') . '
             (specialOrderID, userID, tdate, action, detail) VALUES (?, ?, ?, ?, ?)');
         $dbc->execute($audit, array($this->id, FannieAuth::getUID(), date('Y-m-d H:i:s'), 'Changed Status', 'Status #' . $this->status));
+
+        $this->runCallbacks($this->id);
 
         echo json_encode($json);
 
@@ -262,6 +264,20 @@ class OrderAjax extends FannieRESTfulPage
         echo 'Done';
 
         return false;
+    }
+
+    private function runCallbacks($orderID)
+    {
+        $callbacks = $this->config->get('SPO_CALLBACKS');
+        foreach ($callbacks as $cb) {
+            $obj = new $cb();
+            $dbc = $this->tdb();
+            $prep = $dbc->prepare("SELECT trans_id FROM " . FannieDB::fqn('PendingSpecialOrder', 'trans') . " WHERE order_id=? AND trans_id > 0 AND deleted=0");
+            $res = $dbc->execute($prep, array($orderID));
+            while ($row = $dbc->fetchRow($res)) {
+                $obj->run($orderID, $row['trans_id']);
+            }
+        }
     }
 
     public function unitTest($phpunit)

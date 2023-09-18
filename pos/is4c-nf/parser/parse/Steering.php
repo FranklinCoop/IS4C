@@ -258,7 +258,14 @@ class Steering extends Parser
                 if ($this->tenderApplied()) {
                     $this->ret['output'] = DisplayLib::boxMsg(
                         _("Tender Applied"),
-                        _('Cancel not allowed.'),
+                        _('Cancel not allowed. This transaction must be finished, if you need to reverse the payment already<br> Entered reenter this transaction as a return.'),
+                        true,
+                        DisplayLib::standardClearButton()
+                    );
+                } elseif($this->giftCardSold()) {
+                    $this->ret['output'] = DisplayLib::boxMsg(
+                        _("Gift Card in Transaction."),
+                        _('This transaction must be cashed out. If the giftcard is no longer wanted use the amount to pay off the transaction.'),
                         true,
                         DisplayLib::standardClearButton()
                     );
@@ -281,6 +288,18 @@ class Steering extends Parser
     }
 
     function tenderApplied() {
+        if (CoreLocal::get('store') == 'McCuskers' || CoreLocal::get('store')=='GreenFieldsMarket' || CoreLocal::get('store') == 'FranklinCoop') {
+            $dbc = Database::tDataConnect();
+            $query = "select * from localtemptrans where trans_type ='T' and trans_subtype IN('CC','DC','EF','EC','GD') group by trans_type;";
+            $result = $dbc->query($query);
+            if ($dbc->numRows($result) > 0){
+                return true;
+            }
+        }
+        return  false;
+    }
+
+    function giftCardSold() {
         if (CoreLocal::get('store') == 'McCuskers' || CoreLocal::get('store')=='GreenFieldsMarket' || CoreLocal::get('store') == 'FranklinCoop') {
             $dbc = Database::tDataConnect();
             $query = "select * from localtemptrans where trans_type ='T' and trans_subtype IN('CC','DC','EF','EC','GD') group by trans_type;";

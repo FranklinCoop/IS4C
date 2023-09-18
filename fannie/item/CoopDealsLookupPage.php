@@ -93,8 +93,8 @@ class CoopDealsLookupPage extends FannieRESTfulPage
                 $msg = "Item Added to Batch #$batchID";
                 $b = new BatchesModel($dbc);
                 if ($this->forceBatchOkay($batchID,$b)) {
-                    $b->forceStartBatch($batchID);
-                    $msg .= " & Batch #{$batchID} forced.";
+                    $b->forceStartBatch($batchID, $upc);
+                    $msg .= " & Pricing From Batch #{$batchID} For $upc Has Been Forced.";
                 }
             }
         }
@@ -203,6 +203,7 @@ HTML;
         $ret .=  "<div class='table-responsive'>
             <table class='table table-bordered'  align='center' width='100%'>";
         $check = '';
+        $srp = '';
         while ($row = $dbc->fetch_row($res)) {
             $upc = $row['upc'];
             $description = $row['description'];

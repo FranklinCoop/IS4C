@@ -237,6 +237,11 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
         );
         $ret = '';
 
+        if (class_exists('BrandAbbrFixModel')) {
+            $brandFix = new BrandAbbrFixModel($dbc);
+            $brandFixP = $dbc->prepare("SELECT goodName FROM BrandAbbrFix WHERE badName = ?");
+        }
+
         /**
           Check for entries in the vendorItems table to prepopulate
           fields for the new item
@@ -282,10 +287,23 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
             $rowItem['caseSize'] = $vrow['units'];
             $rowItem['sku'] = $vrow['sku'];
 
+            if (class_exists('BrandAbbrFixModel')) {
+                $brandFixR = $dbc->execute($brandFixP, array($rowItem['manufacturer']));
+                $brandFixW = $dbc->fetchRow($brandFixR);
+                if ($brandFixW) {
+                    $fixedBrand = $brandFixW['goodName'];
+                    if (strlen($fixedBrand) > 0) {
+                        $rowItem['manufacturer'] = $fixedBrand;
+                    }
+                }
+            }
+
             while ($vrow = $dbc->fetchRow($vendorR)) {
                 $ret .= sprintf('This product is also in <a href="?searchupc=%s&vid=%d">%s</a><br />',
                     $upc,$vrow['vendorID'],$vrow['distributor']);
             }
+
+
         }
 
         $rowItem['department'] = $this->guessDepartment($upc);
@@ -457,7 +475,7 @@ class BaseItemModule extends \COREPOS\Fannie\API\item\ItemModule
                 id="' . $tabID . '">';
 
             $ret .= '<input type="hidden" class="store-id" name="store_id[]" value="' . $store_id . '" />';
-            $ret .= '<div id="" class=""><table id="productTable" class="table table-bordered">';
+            $ret .= '<div id="" class=""><table id="productTable'.$store_id.'" class="table table-bordered">';
 
             $jsVendorID = $rowItem['default_vendor_id'] != 0 ? $rowItem['default_vendor_id'] : 'no-vendor';
             $vFieldsDisabled = $jsVendorID == 'no-vendor' || !$active_tab ? 'disabled' : '';
@@ -562,7 +580,8 @@ HTML;
                             LEFT JOIN StoreBatchMap AS m ON b.batchID=m.batchID
                         WHERE '" . date('Y-m-d') . "' BETWEEN b.startDate AND b.endDate 
                             AND (l.upc=? OR l.upc=?)
-                            AND m.storeID=?"
+                            AND m.storeID=?
+                            AND b.discountType > 0"
                     );
                     $batchR = $dbc->execute($batchP,array($upc,'LC'.$likeCode,$store_id));
                 } else {
@@ -573,6 +592,7 @@ HTML;
                             LEFT JOIN batchList as l on b.batchID=l.batchID 
                         WHERE '" . date('Y-m-d') . "' BETWEEN b.startDate AND b.endDate 
                             AND (l.upc=? OR l.upc=?)
+                            AND b.discountType > 0
                     ");
                     $batchR = $dbc->execute($batchP,array($upc,'LC'.$likeCode));
                 }
@@ -994,10 +1014,12 @@ HTML;
             }
             $desc = $this->formNoEx('descript', array());
             if (isset($desc[$i])) {
+                $desc[$i] = substr($desc[$i],0,30);
                 $model->description(strtoupper($desc[$i]));
             }
             $brand = $this->formNoEx('manufacturer', array());
             if (isset($brand[$i])) {
+                $brand[$i] = substr($brand[$i],0,30);
                 $model->brand(strtoupper($brand[$i]));
             }
             /**

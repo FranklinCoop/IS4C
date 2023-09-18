@@ -51,6 +51,7 @@ class SalesBatchTask extends FannieTask
                     l.salePrice, 
                     l.groupSalePrice,
                     l.quantity,
+                    l.cost,
                     b.startDate, 
                     b.endDate, 
                     b.discounttype
@@ -103,6 +104,7 @@ class SalesBatchTask extends FannieTask
         // lookup current batches
         $prep = $dbc->prepare($this->getSaleItems($dbc));
         $result = $dbc->execute($prep, array($now, $now));
+        $changedUPCs = array();
         while ($row = $dbc->fetchRow($result)) {
             // ignore partials. they have a separate task
             if ($dbc->getValue($isPartial, $row['batchID'])) {
@@ -118,6 +120,7 @@ class SalesBatchTask extends FannieTask
 
             // use products column names for readability below
             $special_price = $row['salePrice'];
+            $special_cost = $row['cost'];
             $specialpricemethod = $row['pricemethod'];
             if ($row['groupSalePrice'] != null) {
                 $specialgroupprice = $row['groupSalePrice'];
@@ -197,6 +200,10 @@ class SalesBatchTask extends FannieTask
                     $changed = true;
                     $product->special_price($special_price);
                 }
+                if ($product->special_cost() != $special_cost) {
+                    $changed = true;
+                    $product->special_cost($special_cost);
+                }
                 if ($product->specialpricemethod() != $specialpricemethod) {
                     $changed = true;
                     $product->specialpricemethod($specialpricemethod);
@@ -237,6 +244,7 @@ class SalesBatchTask extends FannieTask
                 if ($changed) {
                     $product->save();
                     $this->cronMsg("\tUpdated item", FannieLogger::INFO);
+                    $changedUPCs[] = $upc;
                 }
 
                 if ($this->test_mode) {
@@ -269,17 +277,28 @@ class SalesBatchTask extends FannieTask
             $product->upc($lookupW['upc']);
             $product->discounttype(0);
             $product->special_price(0);
+            $product->special_cost(0);
             $product->specialgroupprice(0);
             $product->specialquantity(0);
+            $product->special_limit(0);
             $product->start_date('1900-01-01');
             $product->end_date('1900-01-01');
             $product->batchID(0);
             $product->save();
+            $changedUPCs[] = $lookupW['upc'];
 
             if ($this->test_mode) {
                 break;
             }
         }
+
+        $queue = new COREPOS\Fannie\API\jobs\QueueManager();
+        $queue->add(array(
+            'class' => 'COREPOS\\Fannie\\API\\jobs\\SyncItem',
+            'data' => array(
+                'upc' => $changedUPCs,
+            ),
+        ));
 
         $this->discoItems($dbc, $disco_items);
     }

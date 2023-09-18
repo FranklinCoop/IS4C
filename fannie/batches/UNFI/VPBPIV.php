@@ -50,6 +50,29 @@ class VPBPIV extends FannieRESTfulPage
         return parent::preprocess();
     }
 
+    private function getBatchedItems()
+    {
+        $dbc = $this->connection;
+        $dbc->selectDB($this->config->OP_DB);
+        $upcs = array();
+        $args = array();
+        /*
+         * avoid using zero date
+         * some mysql versions dislike it
+         */
+        $prep = $dbc->prepare("SELECT b.*, l.upc, s.batchName
+            FROM batchReviewLog AS b
+            INNER JOIN batchList AS l ON l.batchID=b.bid 
+            INNER JOIN batches AS s ON s.batchID=l.batchID
+            WHERE forced < '1900-01-01 00:00:00';");
+        $res = $dbc->execute($prep, $args);
+        while ($row = $dbc->fetchRow($res)) {
+            $upcs[$row['upc']] = $row['batchName'];
+        }
+
+        return $upcs;
+    }
+
     public function post_cleanup_handler()
     {
         $dbc = $this->connection;
@@ -355,14 +378,21 @@ HTML;
                 <span id="cur-pricerule"></span></span>
             </div>
         </div>
-        <div class="col-lg-3"></div>
-        <div class="col-lg-4"></div>
-    </div>
-    <div style="padding-top: 24px;">
-        <a href="#" onclick="postActionBatchCleanup();">Cleanup & View Batches</a>
+        <div class="col-lg-4">
+            <div class="item-info-container">
+                </div>
+                <span id="cur-inbatch" style="font-weight: bold; color: darkgreen;"></span></span>
+            </div>
+        </div>
+        </div>
+        <div class="col-lg-5">
     </div>
 </div>
 <div class="container">
+    <div style="padding-top: 24px; padding-bottom: 5px; padding-left: 1px;">
+        <a href="#" onclick="postActionBatchCleanup();" style="background-color: #FFF4D6;
+            border: 1px solid black; padding: 5px; color: purple;">Cleanup & View Batches</a>
+    </div>
     <div class="table-responsive" style="overflow-x: hidden;">
         <table class="uniq-table table table-condensed small" id="uniq-table">$td</table>
     </div>
@@ -437,7 +467,7 @@ var btnChangeSelected = function(direction)
     changeSelectedRow(currentRow);
     document.getElementById('cur-upc').innerHTML = uniqTable.rows[currentRow].cells[0].dataset.upc;
     document.getElementById('cur-sku').innerHTML = uniqTable.rows[currentRow].cells[1].innerHTML;
-    document.getElementById('cur-cost').innerHTML = uniqTable.rows[currentRow].cells[0].dataset.cost;
+    document.getElementById('cur-cost').innerHTML = Math.round(uniqTable.rows[currentRow].cells[0].dataset.cost * 100) / 100;
     document.getElementById('cur-margin').innerHTML = uniqTable.rows[currentRow].cells[0].dataset.margin;
     document.getElementById('cur-target-margin').innerHTML = Number(uniqTable.rows[currentRow].cells[0].dataset.target).toFixed(1);
     document.getElementById('cur-diff').innerHTML = uniqTable.rows[currentRow].cells[0].dataset.diff;
@@ -451,6 +481,7 @@ var btnChangeSelected = function(direction)
     document.getElementById('cur-srp').innerHTML = uniqTable.rows[currentRow].cells[0].dataset.srp;
     document.getElementById('cur-srp-visual').innerHTML = uniqTable.rows[currentRow].cells[0].dataset.srpvisual;
     document.getElementById('cur-pricerule').innerHTML = uniqTable.rows[currentRow].cells[0].dataset.pricerule;
+    document.getElementById('cur-inbatch').innerHTML = uniqTable.rows[currentRow].cells[0].dataset.inbatch;
     document.getElementById('cur-normalprice').innerHTML = uniqTable.rows[currentRow].cells[0].dataset.normalprice;
 
 }
@@ -576,6 +607,8 @@ JAVASCRIPT;
         $queueID = FormLib::get('queueID');
         $vendorID = $this->id;
         $filter = FormLib::get_form_value('filter') == 'Yes' ? True : False;
+
+        $batched = $this->getBatchedItems();
 
         /* lookup vendor and superdept names to build a batch name */
         $sname = "All";
@@ -739,8 +772,13 @@ JAVASCRIPT;
                 LEFT JOIN PriceRuleTypes AS prt ON pr.priceRuleTypeID=prt.priceRuleTypeID
                 LEFT JOIN MasterSuperDepts AS m ON p.department=m.dept_ID
             WHERE v.cost > 0
+            # AND v.srp > p.normal_price # comment me out to SHOW reduction suggestions
+            # AND v.srp < p.normal_price # un-comment me to show ONLY reductions
         ";
         // AND pr.priceRuleTypeID NOT IN (5, 6, 7, 8, 12)
+
+        //# TEMPORARILY DISABLING PRICE REDUCTIONS REDUX COMMENT comment
+        //AND v.srp > p.normal_price
 
         if ($vidsStart != false && $vidsEnd != false) {
             $ret .= "<h3 align=\"center\">Multiple Vendor View</h3>";
@@ -795,6 +833,10 @@ JAVASCRIPT;
             </thead><tbody><tr></tr>";
         $rounder = new PriceRounder();
         while ($row = $dbc->fetch_row($result)) {
+            /* UN-COMMENT THE FOLLOWING TO SHOW ONLY REDUX WITH OFF BY TARGET MARGIN BY > 5%
+                if ($row['current_margin'] - $row['desired_margin'] < 0.05) // only show redux. when margin off by > 10%
+                    continue;
+            */
             $vendorModel->reset();
             $vendorModel->upc($row['upc']);
             $vendorModel->vendorID($vendorID);
@@ -866,16 +908,18 @@ JAVASCRIPT;
             $date = $date->format('Y-m-d');
             $changeClassA = ($date == substr($row['date'], -10)) ? 'highlight' : '';
             /* 
-            $changeClassA = ('2022-07-06' == substr($row['date'], -10)) ? 'highlight' : '';
+            $changeClassA = ('2023-05-08' == substr($row['date'], -10)) ? 'highlight' : '';
             */
 
             $changeClassB = ($date == $row['reviewed']) ? 'highlight' : '';
             /*
-            $changeClassB = ('2022-07-06' == $row['reviewed']) ? 'highlight' : '';
+            $changeClassB = ('2023-05-08' == $row['reviewed']) ? 'highlight' : '';
             */
 
             $srpClassA = ($row['srp'] > $row['normal_price']) ? 'red' : 'yellow';
             $direction = ($row['srp'] > $row['normal_price']) ? '&#x2191;' : '&#x2193;';
+
+            $row['inbatch'] = isset($batched[$row['upc']]) ? $batched[$row['upc']] : '';
             $td .= sprintf("<tr id=row%s class='%s %s item'>
                 <td class=\"sub\" 
                     data-upc=\"%s\"
@@ -893,6 +937,7 @@ JAVASCRIPT;
                     data-srp=\"%s\"
                     data-srpvisual=\"<span class='$srpClassA'>%s</span>\"
                     data-pricerule=\"<span class='white'>%s</span>\"
+                    data-inbatch=\"<span class='white'>%s</span>\"
                     data-normalprice=\"%s\"
                     id=\"id%s\"
                     ><a href=\"%sitem/ItemEditorPage.php?searchupc=%s\" target=\"_blank\">%s</a></td>
@@ -913,7 +958,7 @@ JAVASCRIPT;
                     $symb, $row['difference'], $cleanDate,
                     $row['description'], $brand, $row['reviewed'], $row['cost'],
                     $rounder->round($row['rawSRP']),
-                    round($row['rawSRP'],3), $row['srp'], $direction, $row['prtDesc'], $row['normal_price'], $row['upc'],
+                    round($row['rawSRP'],3), $row['srp'], $direction, $row['prtDesc'], $row['inbatch'], $row['normal_price'], $row['upc'],
                     /*
                         My work area end's here
                     */

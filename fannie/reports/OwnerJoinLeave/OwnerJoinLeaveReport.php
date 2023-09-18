@@ -94,6 +94,10 @@ class OwnerJoinLeaveReport extends FannieReportPage
             WHERE card_no=?
                 AND tdate <= ?
             ORDER BY tdate');
+        $storeP = $dbc->prepare("SELECT store_id
+            FROM " . FannieDB::fqn('dlogBig', 'arch') . "
+            WHERE tdate BETWEEN ? AND ?
+                AND trans_num=?");
 
 
         $franReqP = false;
@@ -121,13 +125,14 @@ class OwnerJoinLeaveReport extends FannieReportPage
         while ($row = $dbc->fetch_row($joinR)) {
             $actual = $dbc->getValue($stockP, array($row['card_no'], $this->form->date2 . ' 23:59:59'));
             $initial = $dbc->getValue($initialP, array($row['card_no'], $this->form->date2 . ' 23:59:59'));
-            list($emp, $reg, $trans) = explode('-', $initial);
+            list($start,) = explode(' ', $row['start_date'], 2);
+            $initial = $dbc->getValue($storeP, array($start, $start . ' 23:59:59', $initial));
             $store = '?';
-            if ($reg > 0 && $reg < 10) {
+            if ($initial == 1) {
                 $store = 'Hillside';
-            } elseif ($reg > 10 && $reg < 20) {
+            } elseif ($initial == 2) {
                 $store = 'Denfeld';
-            } elseif ($reg == 50) {
+            } elseif ($initial == 50) {
                 $store = 'Website';
             }
             if ($franReqP && (!$row['name'] || strpos($row['name'], 'FRAN'))) {
@@ -208,7 +213,7 @@ class OwnerJoinLeaveReport extends FannieReportPage
                 LEFT JOIN ' . $FANNIE_TRANS_DB . $dbc->sep() . 'equity_live_balance AS e ON n.cardno=e.memnum
                 LEFT JOIN memDates AS d ON n.cardno=d.card_no
                     LEFT JOIN custdata AS c ON n.cardno=c.CardNo AND c.personNum=1
-            WHERE note LIKE \'%FUNDS REQ%\'
+            WHERE (note LIKE \'%FUNDS REQ%\' OR note like \'%0 requested%\')
                 AND d.start_date BETWEEN ? AND ?
                 AND c.Type <> \'TERM\'
                 AND c.Type <> \'INACT2\'
@@ -238,9 +243,17 @@ class OwnerJoinLeaveReport extends FannieReportPage
 
         if ($this->config->COOP_ID == 'WFC_Duluth') {
             array_unshift($data, array(
+                'Monthly New Owner Goal',
+                null,
+                '58',
+                '',
+                null,
+                null,
+            ));
+            array_unshift($data, array(
                 'Annual New Owner Goal',
                 null,
-                '650',
+                '700',
                 '',
                 null,
                 null,
@@ -344,7 +357,7 @@ class OwnerJoinLeaveReport extends FannieReportPage
                     LEFT JOIN ' . $FANNIE_TRANS_DB . $dbc->sep() . 'equity_live_balance AS e ON n.cardno=e.memnum
                     LEFT JOIN memDates AS d ON n.cardno=d.card_no
                     LEFT JOIN custdata AS c ON n.cardno=c.CardNo AND c.personNum=1
-                WHERE note LIKE \'%FUNDS REQ%\'
+                WHERE (note LIKE \'%FUNDS REQ%\' OR note LIKE \'%0 requested%\')
                     AND n.stamp >= ?
                     AND d.start_date < ?
                     AND e.payments <= 100
@@ -366,7 +379,7 @@ class OwnerJoinLeaveReport extends FannieReportPage
                     AND c.personNum=1
                 ORDER BY n.stamp DESC');
             $franR = $dbc->execute($franP, $args);
-            $minDateP = $dbc->prepare("SELECT MIN(stamp) FROM memberNotes WHERE note LIKE '%FUNDS REQ%' AND cardno=?");
+            $minDateP = $dbc->prepare("SELECT MIN(stamp) FROM memberNotes WHERE (note LIKE '%FUNDS REQ%' OR note LIKE '%0 requested%') AND cardno=?");
             $startDT = new DateTime($this->form->date1);
             $endDT = new DateTime($this->form->date2);
             $franCount = 0;

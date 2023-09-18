@@ -24,10 +24,10 @@
 use COREPOS\pos\plugins\Plugin;
 use COREPOS\pos\lib\Database;
 
-class FCCProduceSearch extends Plugin 
+class FCCDepartmentSearch extends Plugin 
 {
 
-    public $plugin_description = 'Franklin Community Coop Plugin for alerting members';
+    public $plugin_description = 'Franklin Community Coop Plugin for limiting seraches using a produceProductSearchList table.';
 
 
     public $plugin_settings = array(

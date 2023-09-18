@@ -47,11 +47,70 @@ class ProdLocationEditor extends FannieRESTfulPage
         $this->__routes[] = 'post<list><save>';
         $this->__routes[] = 'post<upc><save>';
         $this->__routes[] = 'get<start>';
-        $this->__routes[] = 'get<searchupc>';
         $this->__routes[] = 'post<newLocation>';
         $this->__routes[] = 'get<list>';
         $this->__routes[] = 'post<delete_location>';
+        $this->__routes[] = 'get<remove>';
+        $this->__routes[] = 'post<remove_list>';
         return parent::preprocess();
+    }
+
+    function post_remove_list_handler()
+    {
+        global $FANNIE_OP_DB;
+        $dbc = FannieDB::get($FANNIE_OP_DB);
+        $storeA = FormLib::get('storeA', 999);
+        $storeB = FormLib::get('storeB', 999);
+        $removeList = FormLib::get('remove_list', array());
+        $upcs = explode("\r\n", $removeList);
+        $fspmIDs = array();
+
+        list($inStr, $args) = $dbc->safeInClause($upcs);
+        $args[] = $storeA;
+        $args[] = $storeB;
+        $prep = $dbc->prepare("SELECT floorSectionProductMapID FROM FloorSectionProductMap AS m INNER JOIN FloorSections AS s 
+            ON s.floorSectionID=m.floorSectionID WHERE upc IN ($inStr) AND s.storeID IN (?, ?)");
+        $res = $dbc->execute($prep, $args); 
+        while ($row = $dbc->fetchRow($res)) {
+            $fspmIDs[] = $row['floorSectionProductMapID'];
+        }
+
+        list($removeInStr, $removeA) = $dbc->safeInClause($fspmIDs);
+        $removeP = $dbc->prepare("DELETE FROM FloorSectionProductMap WHERE floorSectionProductMapID IN ($removeInStr)");
+        $removeR = $dbc->execute($removeP, $removeA);
+
+        return 'ProdLocationEditor.php';
+    }
+    
+    function get_remove_view()
+    {
+        return <<<HTML
+<div class="row">
+    <div class="col-lg-4">
+        <button onClick="location.href = 'ProdLocationEditor.php'" class="btn btn-default">Back</button>
+    </div>
+    <div class="col-lg-4">
+        <h5>Remove Floor Locations</h5>
+        <form action="ProdLocationEditor.php" method="post">
+            <div class="form-group">
+                <textarea class="form-control" name="remove_list" rows=10></textarea>
+            </div>
+        <label for="storeA">Store A</label>
+            <div class="form-group">
+                <input type="checkbox" class="form-control" name="storeA" value="1"/>
+            </div>
+        <label for="storeA">Store B</label>
+            <div class="form-group">
+                <input type="checkbox" class="form-control" name="storeB" value="2"/>
+            </div>
+            <div class="form-group">
+                <input type="submit" class="btn btn-default" />
+            </div>
+        </form>
+    </div>
+    <div class="col-lg-4"></div>
+</div>
+HTML;
     }
 
     function post_delete_location_handler()
@@ -95,7 +154,6 @@ class ProdLocationEditor extends FannieRESTfulPage
         } else {
             $ret .= '<div class="alert alert-success">Product Location Saved</div>';
         }
-        $ret .= '<a class="btn btn-default btn-back" href="ProdLocationEditor.php?searchupc=1&UPC&storeID='.$storeID.'">Back</a>&nbsp;&nbsp;';
         $ret .= '<a class="btn btn-default" href="ProdLocationEditor.php">Home</a><br><br>';
         if (FormLib::get('batchCheck', false)) {
             $ret .= '<br><a class="btn btn-default" href="../../../scancoord/ScannieV2/content/Scanning/BatchCheck/SCS.php">
@@ -156,7 +214,6 @@ class ProdLocationEditor extends FannieRESTfulPage
         } else {
             $ret .= '<div class="alert alert-success">Product Location Saved</div>';
         }
-        $ret .= '<a class="btn btn-default btn-back" href="ProdLocationEditor.php?searchupc=1">Back</a>&nbsp;&nbsp;';
         if (FormLib::get('batchCheck', false)) {
             $ret .= '<br><a class="btn btn-default" href="../../../scancoord/ScannieV2/content/Scanning/BatchCheck/SCS.php">
                 Back to Batch Check</a><br><br>';
@@ -351,8 +408,7 @@ class ProdLocationEditor extends FannieRESTfulPage
                 ';
             foreach ($item as $key => $row) {
                 $ret .= '
-                    <tr><td><a href="ProdLocationEditor.php?storeID='.$storeID.'&upc=' .
-                        $key . '&searchupc=1" target="_blank">' . $key . '</a></td>
+                    <tr><td><a href="ItemEditorPage.php?searchupc='.$upc.'&ntype=UPC&superFilter=" target="_blank">' . $key . '</a></td>
                     <td>' . $row['brand'] . '</td>
                     <td>' . $row['desc'] . '</td>
                     <td>' . $row['dept'] . '</td>
@@ -397,19 +453,36 @@ class ProdLocationEditor extends FannieRESTfulPage
         $upcs = FormLib::get('upcs', '');
         $selStoreOpts = '';
 
+        $suggestions = $this->getSuggestions();
+
         $ret = "";
         $ret .= '
-        <div class="row"><form method="get" action="ProdLocationEditor.php">
-            <div class="col-lg-2">
-                <textarea class="form-control" name="upcs" rows=6>'.$upcs.'</textarea>
+        <div class="row">
+            <form method="get" action="ProdLocationEditor.php">
+                <div class="col-lg-2" style="background: rgba(0,0,0,0.1); padding: 5px"">
+                    <textarea class="form-control" name="upcs" rows=6>'.$upcs.'</textarea>
+                </div>
+                <div class="col-lg-2" style="background: rgba(0,0,0,0.1); padding: 5px">
+                    <div>
+                    <input type="hidden" name="list" value="1">
+                    <div class="form-group"> '.$storePicker['html'].' </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-default form-control">Submit List</button>
+                    </div>
             </div>
-            <div class="col-lg-2">
-                <input type="hidden" name="list" value="1">
-                <div class="form-group"> '.$storePicker['html'].' </div>
-                <button type="submit" class="btn btn-default form-control">Submit</button>
+                <div class="col-lg-8"></div>
             </div>
+            </form>
+        </div>
+        <div class="row">
+            <div class="col-lg-2"></div>
             <div class="col-lg-8"></div>
-            </form></div>
+            <div class="col-lg-2">
+                <div class="form-group">
+                    <span href="#" class="btn btn-primary form-control" id="alt-update-form-btn">Update Locations</span>
+                </div>
+            </div>
+        </div>
         ';
 
         $plus = array();
@@ -511,7 +584,7 @@ class ProdLocationEditor extends FannieRESTfulPage
         }
 
         foreach ($item as $upc => $row) {
-            $item[$upc]['sugDept'] = $this->getLocation($item[$upc]['dept'],$dbc);
+            $item[$upc]['sugDept'] = $suggestions[$row['dept']];
         }
 
         $args = array($storeID);
@@ -554,13 +627,12 @@ class ProdLocationEditor extends FannieRESTfulPage
                     </select></div>
                 </th>
             </thead>
-            <form method="post">
+            <form method="post" name="update" id="update">
                 <input type="hidden" name="save" value="1">
             ';
         foreach ($item as $key => $row) {
             $ret .= '
-                <tr data-selected=""><td><a href="ProdLocationEditor.php?storeID='.$storeID.'&upc=' .
-                    $key . '&searchupc=1 target="">' . $key . '</a></td>
+                <tr data-selected=""><td><a href="ItemEditorPage.php?searchupc='.$key.'&ntype=UPC&superFilter=" target="_black">' . $key . '</a></td>
                 <td>' . $row['brand'] . '</td>
                 <td>' . $row['desc'] . '</td>
                 <td>' . $row['dept'] . '</td>
@@ -581,7 +653,7 @@ class ProdLocationEditor extends FannieRESTfulPage
                 $ret .= '</select></tr>';
         }
 
-        $ret .= '<tr><td><input type="submit" class="btn btn-default" value="Update Locations"></td>
+        $ret .= '<tr><td><input type="submit" class="class=btn btn-primary form-control" value="Update Locations"></td>
             <td><a class="btn btn-default btn-back" href="ProdLocationEditor.php">Back</a><br><br></td></table>
             </form>';
         // tablesorter scripts not included?
@@ -622,182 +694,6 @@ class ProdLocationEditor extends FannieRESTfulPage
         return $ret;
     }
 
-    function get_searchupc_view()
-    {
-        global $FANNIE_OP_DB;
-        $dbc = FannieDB::get($FANNIE_OP_DB);
-        $storeID = FormLib::get('storeID', 1);
-        $upc = FormLib::get('upc');
-        $batchCheck = FormLib::get('batchCheck', false);
-        $onChange = <<<HTML
-document.forms['myform'].submit();
-HTML;
-        $storePicker = FormLib::storePicker('storeID', true, $onChange);
-
-        $args = array($storeID);
-        $query = $dbc->prepare('SELECT
-                    floorSectionID,
-                    name
-                FROM FloorSections
-                WHERE storeID = ?
-                ORDER BY name;');
-            $result = $dbc->execute($query,$args);
-            $floor_section = array();
-            while($row = $dbc->fetch_row($result)) {
-                $floor_section[$row['floorSectionID']] = $row['name'];
-            }
-            $floor_section['none'] = 'none';
-
-        $ret = '';
-        $ret .= '<div class=""><div class="row"><div class="col-md-5">';
-        $ret .= '
-
-            <form method="get" action="ProdLocationEditor.php" name="myform">
-                <br><br>
-                <div class="form-group">'.$storePicker['html'].'</div>
-                <div class="input-group">
-                    <span class="input-group-addon">UPC</span>
-                    <input type="text" class="form-control" id="upc" name="upc" value="'.$upc.'" style="height: 50px;" autofocus required>
-                    <span class="input-group-addon">
-                        <button type="submit" class="btn btn-sm" value="Go">
-                            <span class="glyphicon glyphicon-chevron-right"></span>
-                        </button>
-                    </span>
-                    <input type="hidden" name="batchCheck" value="'.$batchCheck.'">
-                </div>
-                    <input type="hidden" class="btn btn-default" name="searchupc" value=1>
-                    <div class="spacer"></div>
-            </form><br>
-        ';
-
-        if ($upc = FormLib::get('upc')) {
-            $upc = str_pad($upc, 13, '0', STR_PAD_LEFT);
-            $storeID = FormLib::get('storeID');
-            $args = array($upc,$storeID);
-            $prep = $dbc->prepare('
-                SELECT
-                    p.upc,
-                    p.description,
-                    f.floorSectionID,
-                    p.department,
-                    d.dept_name,
-                    p.brand,
-                    f.floorSectionProductMapID
-                FROM products AS p
-                    left join FloorSectionProductMap as f on f.upc=p.upc
-                    left join FloorSections AS fs ON fs.floorSectionID=f.floorSectionID
-                    left join departments as d on d.dept_no=p.department
-                WHERE p.upc = ?
-                    AND fs.storeID = ?
-                GROUP BY floorSectionProductMapID
-            ');
-            $result = $dbc->execute($prep, $args);
-            $curLocation = array();
-            $numRows = $dbc->numRows($result);
-            if ($numRows < 1) {
-                $model = new ProductsModel($dbc);
-                $model->upc($upc);
-                $model->storeID($storeID);
-                $model->load();
-                $brand = $model->brand();
-                $description = $model->description();
-                $sugLocation = $this->getLocation($model->department(),$dbc);
-            } else {
-                while ($row = $dbc->fetch_row($result)) {
-                    $floorID = $row['floorSectionID'];
-                    $brand = $row['brand'];
-                    $department = $row['department'];
-                    $dept_name = $row['dept_name'];
-                    $description = $row['description'];
-                    if(isset($row['floorSectionID'])) $curLocation[] = $row['floorSectionID'];
-                    $sugLocation = $this->getLocation($row['department'],$dbc);
-                    $primaryKey[] = $row['floorSectionProductMapID'];
-                }
-            }
-
-            $ret .= '<div class="panel panel-default" style="max-width: 435px;">';
-                $ret .= '<div class="table-responsive"><table class="table table-striped">';
-                $ret .= '<tr><td>' . $upc . '</td></tr>';
-                $ret .= '<tr><td>' . $brand . ' - ' . $description . '</td></tr>';
-                $ret .= '<tr><td>' . $department . ' - ' . $dept_name . '</td></tr>';
-                $ret .= '<tr><td>Suggested: ' . $floor_section[$sugLocation] . '</td></tr>';
-                $ret .= '</table></div></div>';
-
-                $ret .= '
-                    <h4>Add a New Physical Location</h4>
-                    <form method="post">
-                        <div class="input-group">
-                            <span class="input-group-addon">Location</span>
-                            <select name="newLocation" class="form-control">';
-                foreach ($floor_section as $fs_key => $fs_value) {
-                    $ret .= '<option value="' . $fs_key . '" name="' . $fs_key . '">' . $fs_value . '</option>';
-                }
-                $ret .= '
-                    </select></div><br>
-                    <input type="submit" value="Add Location" class="btn btn-warning">
-                    </form>
-                ';
-
-                $ret .= '</div><div class="col-md-5">'; //end of column A
-
-                $ret .= '
-                    <br>
-                    <h4>Edit Current Physical Locations</h4>
-                    <form method="post">
-                    <input type="hidden" name="save" value="1">
-                    <input type="hidden" name="upc" value="' . $upc . '">
-                ';
-                $count = 0;
-                if (count($curLocation) == 0) $ret .= '<div class="alert alert-danger">
-                    No locations have been set for this product.</div>';
-                foreach ($curLocation as $value) {
-                    $count++;
-                    $name = 'section' . $primaryKey[$count-1];
-                    $oldName = 'mapID' . ($primaryKey[$count-1]);
-                    $ret .= '<input type="hidden" name="' . $oldName . '" value="' . $value . '">';
-                    $ret .= '<div class="location-container"><span style="float: right" class="btn btn-danger delete_location"
-                        data-upc="'.$upc.'" data-location="'.$value.'">
-                        <span class="glyphicon glyphicon-trash"></span></span>
-                        <div class="input-group">
-                            <span class="input-group-addon">Loc#' . $count . '</span>
-                            <select name="' . $name . '" class="form-control">';
-                        $i=0;
-                        foreach ($floor_section as $fs_key => $fs_value) {
-                            //echo $fs_key . ' :: ' . $fs_value . '<br>'; --keys and values are correct.
-                            $ret .= ($i==0) ? '<option value="999">Remove this location</option>' : "";
-                            $i++;
-                            $ret .= '<option value="' . $fs_key . '" name="' . $fs_key . '"';
-                            if ($value == $fs_key) {
-                                $ret .= ' selected';
-                            }
-                            $ret .= '>' . $fs_value . '</option>';
-                        }
-                        $ret .= '</select></div></div>
-                            <br>';
-
-                        if ($count == 0) $ret .= '<span class="alert-warning">There is currently no location set for this product.</span>';
-
-                }
-            $ret .= '
-                <input type="submit" class="btn btn-success" value="Update Locations"><br><br>
-                <input type="hidden" name="numolocations" value="' . $count . '">
-                </form>
-            ';
-
-
-        }
-
-        $ret .= '</div></div></div>'; //<column B><row><container>
-        if (FormLib::get('batchCheck', false)) {
-            $ret .= '<br><a class="btn btn-default" href="../../../scancoord/ScannieV2/content/Scanning/BatchCheck/SCS.php">
-                Back to Batch Check</a><br><br>';
-        } else {
-            $ret .= '<br><a class="btn btn-default btn-back" href="ProdLocationEditor.php">Back</a><br><br>';
-        }
-
-        return $ret;
-    }
-
     function get_view()
     {
         return <<<HTML
@@ -807,9 +703,6 @@ HTML;
     <div class="col-lg-4">
         <form method="get">
             <div class="form-group">
-                <button type="submit" class="btn btn-default" style="width: 300px" name="searchupc">Edit a single <strong>upc</strong></button>
-            </div>
-            <div class="form-group">
                 <button type="submit" class="btn btn-default" style="width: 300px" name="list">Edit a list of <strong>upcs</strong></button>
             </div>
             <div class="form-group">
@@ -817,6 +710,9 @@ HTML;
             </div>
             <div class="form-group">
                 <a class="btn btn-default" style="width: 300px" href="FloorSections/EditLocations.php">Edit Floor <strong>sub-locations</strong></a>
+            </div>
+            <div class="form-group">
+                <button  class="btn btn-default" style="width: 300px" name="remove"><strong>Remove</strong> Floor Sections</button>
             </div>
         </form>
     </div>
@@ -910,6 +806,10 @@ $('.checkboxx').on('change', function(){
         });
     }
 });
+
+$("#alt-update-form-btn").click(function(){
+    document.forms['update'].submit();
+});
 JAVASCRIPT;
    }
 
@@ -931,42 +831,39 @@ JAVASCRIPT;
             ';
     }
 
-    public function getLocation($dept,$dbc)
+    public function getSuggestions()
     {
+        global $FANNIE_OP_DB;
+        $dbc = FannieDB::get($FANNIE_OP_DB);
         $storeID = FormLib::get('storeID', 1);
+        $depts = array();
 
-        $args = array($dept,$storeID);
-        $prep = $dbc->prepare("
-            SELECT f.floorSectionID
+        $args = array($storeID);
+        $prep = $dbc->prepare("SELECT 
+            f.floorSectionID, 
+            count(f.floorSectionID) AS coung,
+            dept_no
             FROM FloorSectionProductMap AS f
-            LEFT JOIN products AS p ON f.upc=p.upc
-            LEFT JOIN departments AS d ON p.department=d.dept_no
+                LEFT JOIN products AS p ON f.upc=p.upc
+                LEFT JOIN departments AS d ON p.department=d.dept_no
             RIGHT JOIN FloorSections AS s ON f.floorSectionID=s.floorSectionID
-            WHERE p.department = ?
-                AND s.storeID = ?;
-        ");
-        $res = $dbc->execute($prep,$args);
-        $data = array();
+                WHERE s.storeID = ?
+            GROUP BY dept_no, f.floorSectionID
+            ORDER BY dept_no, count(f.floorSectionID) ASC;
+            ");
+        $res = $dbc->execute($prep, $args);;
         while ($row = $dbc->fetchRow($res)) {
-            if (!array_key_exists($row['floorSectionID'],$data)) {
-                $data[$row['floorSectionID']] = 0;
-            } else {
-                $data[$row['floorSectionID']]++;
-            }
-        }
-        if (empty($data)) {
-            return 'none';
-        } else {
-            $maxs = array_keys($data, max($data));
-            return $maxs[0];
+            $dept = $row['dept_no'];
+            $fsID = $row['floorSectionID'];
+            $depts[$dept] = $fsID;    
         }
 
+        return $depts;
     }
 
     public function unitTest($phpunit)
     {
         $phpunit->assertInternalType('string', $this->get_view());
-        $phpunit->assertInternalType('string', $this->get_searchupc_view());
         $phpunit->assertInternalType('string', $this->get_batch_view());
         $phpunit->assertInternalType('string', $this->get_list_view());
         $phpunit->assertInternalType('string', $this->get_start_view());

@@ -113,6 +113,9 @@ class SaItemList extends SaHandheldPage
         $uid = FannieAuth::getUID($this->current_user);
         if ($this->id !== '') {
             $upc = BarcodeLib::padUPC($this->id);
+            if (substr($upc, 0, 3) == '002') {
+                $upc = substr($upc, 0, 7) . '000000';
+            }
             $prep = $dbc->prepare('
                 SELECT p.description,
                     p.brand,
@@ -126,7 +129,7 @@ class SaItemList extends SaHandheldPage
             if ($row) {
                 $this->saveRowToList($dbc, $upc, $row, $settings);
                 if (FormLib::get('dates', false)) {
-                    return 'SaItemList.php?dateID=' . $upc;
+                    return 'SaItemList.php?dateID=' . $upc. '&section=' . $this->section;
                 }
             }
         }
@@ -139,6 +142,7 @@ class SaItemList extends SaHandheldPage
         $upc = BarcodeLib::padUPC($this->id);
         $uid = FannieAuth::getUID($this->current_user);
         $date = FormLib::get('setDate');
+        $section = FormLib::get('section');
         $upP = $this->connection->prepare("
             UPDATE " . FannieDB::fqn('SaList', 'plugin:ShelfAuditDB') . "
             SET tdate=?
@@ -146,7 +150,7 @@ class SaItemList extends SaHandheldPage
                 AND section=?
                 AND uid=?
                 AND clear=0");
-        $upR = $this->connection->execute($upP, array($date, $upc, $this->section, $uid));
+        $upR = $this->connection->execute($upP, array($date, $upc, $section, $uid));
 
         return 'SaItemList.php?datedMode=1';
     }
@@ -214,6 +218,7 @@ class SaItemList extends SaHandheldPage
         return <<<HTML
 <form method="post">
     <input type="hidden" name="id" value="{$this->dateID}" />
+    <input type="hidden" name="section" value="{FormLib::get('section', 1)}" />
     <div class="row form-group">
         <div class="col-xs-5"><button type="submit" class="btn btn-default btn-lg" name="setDate" value="{$opts[0]}">{$lbls[0]}</button></div>
         <div class="col-xs-5"><button type="submit" class="btn btn-default btn-lg" name="setDate" value="{$opts[1]}">{$lbls[1]}</button></div>

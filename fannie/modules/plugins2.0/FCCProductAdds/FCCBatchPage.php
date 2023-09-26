@@ -542,7 +542,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $bitStatus = array();
         $flagMap = array();
         for ($i=0; $i<count($attrs); $i++) {
-            $json[$attrs[$i]] = false;
+            $json[$fnames[$i]] = false;
             $flagMap[$bits[$i]] = $attrs[$i];
             $bitStatus[$bits[$i]] = false;
         }
@@ -559,7 +559,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
             // set flag in JSON representation
             $attr = $flagMap[$f];
-            $json[$attr] = true;
+            $json[$fnames[$attr-1]] = true;
             $bitStatus[$f] = true;
         }
 
@@ -582,6 +582,20 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         }
 
         return $numflag;
+    }
+
+    private function getFlags($dbc, $upc){
+        $query = "SELECT upc, JSON_EXTRACT(attributes, '$.Local') as `Local`,
+            JSON_EXTRACT(attributes, '$.Organic') as Organic,
+            JSON_EXTRACT(attributes, '$.Non_GMO') as Non_GMO,
+            JSON_EXTRACT(attributes, '$.\"Gluten Free\"') as Gluten_Free,
+            JSON_EXTRACT(attributes, '$.\"Traitor Brand\"') as traitor_brands,
+            JSON_EXTRACT(attributes, '$.BIPOC') as BIPOC,
+            JSON_EXTRACT(attributes, '$.\"Woman Owned\"') as Woman_Owned,
+            JSON_EXTRACT(attributes, '$.LGBTQ') as LGBTQ
+        from core_op.ProductAttributes where upc = ? having max(modified)";
+        
+        
     }
 
     private function queueUpdate($queue, $upc, $vendor, $name)

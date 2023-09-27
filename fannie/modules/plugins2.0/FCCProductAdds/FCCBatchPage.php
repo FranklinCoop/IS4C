@@ -439,17 +439,18 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $line[$indexes['women_owned']] !='' ||
             $line[$indexes['lgbtq']] != ''
             ) {
-                $flags = array(intval($line[$indexes['local']])*1,
-                intval($line[$indexes['organic']])*2,
-                intval($line[$indexes['coopbasic']])*3,
-                intval($line[$indexes['nongmo']])*4,
-                intval($line[$indexes['bipoc']])*5,
-                intval($line[$indexes['glutenfree']])*6,
-                intval($line[$indexes['women_owned']])*7,
-                intval($line[$indexes['traitor']])*8,
-                intval($line[$indexes['lgbtq']])*9,
-                intval($line[$indexes['vegan']])*10,);
-                $numflag = $this->proc_flags($upc, '', $flags);
+                $newJson = array('Local' => $line[$indexes['local']],
+                                 'Organic' => $line[$indexes['organic']],
+                                 'Coop Basic' => $line[$indexes['coopbasic']],
+                                 'Non_GMO' => $line[$indexes['nongmo']],
+                                 'bipoc' => $line[$indexes['bipoc']],
+                                 'Gluten Free' => $line[$indexes['glutenfree']],
+                                 'Woman Owned' => $line[$indexes['women_owned']],
+                                 'Traitor Brand' => $line[$indexes['traitor']],
+                                 'LGBTQ' => $line[$indexes['lgbtq']],
+                                 'Vegan' => $line[$indexes['vegan']]);              
+
+                $numflag = $this->proc_flags($upc, '', $newJson);
             } 
 
             if ($desc !='') $model->description($desc);
@@ -529,11 +530,35 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         return $ret;
     }
 
-    function proc_flags($upc, $store, $flags) {
+    function proc_flags($upc, $store, $newJSON) {
         $dbc = $this->connection;
         $attrs = array(1,2,3,4,5,6,7,8,9,10);
         $fnames = array('Local','Organic','Coop Basic','Non_GMO','bipoc','Gluten Free','Woman Owned','Traitor Brand','LGBTQ','Vegan');
         $bits = array(1,2,3,4,5,6,7,8,9,10);
+        
+        $curQ = 'SELECT attributes FROM ProductAttributes WHERE upc=? ORDER BY modified DESC';
+        $curQ = $dbc->addSelectLimit($curQ, 1);
+        $curP = $dbc->prepare($curQ);
+        $current = $dbc->getValue($curP, array($upc));
+        $curJSON = json_decode($current, true);
+        
+        $flags = array();
+        for ($i=0; $i<count($newJSON); $i++) {
+
+        }
+        /**
+        $flags = array(intval($line[$indexes['local']])*1,
+        intval($line[$indexes['organic']])*2,
+        intval($line[$indexes['coopbasic']])*3,
+        intval($line[$indexes['nongmo']])*4,
+        intval($line[$indexes['bipoc']])*5,
+        intval($line[$indexes['glutenfree']])*6,
+        intval($line[$indexes['women_owned']])*7,
+        intval($line[$indexes['traitor']])*8,
+        intval($line[$indexes['lgbtq']])*9,
+        intval($line[$indexes['vegan']])*10,);
+
+        */
         /**
           Collect known flags and initialize
           JSON object with all flags false
@@ -545,6 +570,14 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $json[$fnames[$i]] = false;
             $flagMap[$bits[$i]] = $attrs[$i];
             $bitStatus[$bits[$i]] = false;
+            if($newJSON[$fnames[$i]] === '' || is_null($newJSON[$fnames[$i]])) {
+                $flags[] = intval($curJSON[$fnames[$i]])*($i+1);
+                $json[$fnames[$i]] =  $curJSON[$fnames[$i]];
+                $bitStatus[$bits[$i]] = $curJSON[$fnames[$i]];
+            } else {
+                $flags[] = intval($newJSON[$fnames[$i]])*($i+1);
+            }
+            
         }
 
 

@@ -536,20 +536,23 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $curQ = $dbc->addSelectLimit($curQ, 1);
         $curP = $dbc->prepare($curQ);
         $current = $dbc->getValue($curP, array($upc));
+        $curJSON = false;
+        echo 'Current Fales'.$current.'<br>';
+    
         $curJSON = json_decode($current, true);
         
         $flags = array();
         
         //echo 'FLAGGING ITEM :'.$upc.'<br>';
-        //echo 'newJSON'.print_r($newJSON).'<br>'; //var_dump($flags);
-        //echo 'curJSON'.print_r($curJSON).'<br>'; //var_dump($flags);
+        echo 'newJSON'.print_r($newJSON).'<br>'; //var_dump($flags);
+        echo 'curJSON'.print_r($curJSON).'<br>'; //var_dump($flags);
         for ($j=0; $j<count($newJSON); $j++) {
-            if (($newJSON[$fnames[$j]] === '' || (is_null($newJSON[$fnames[$j]]))) && !is_null($curJSON[$fnames[$j]])) {
-                $flags[$j] = intval($curJSON[$fnames[$j]])*($j+1);
-                //echo $j." ".$fnames[$j].' curJson: '.intval($curJSON[$fnames[$j]])*($j+1).'<br>';
-            } else {
-                $flags[$j] = intval($newJSON[$fnames[$j]])*($j+1);
-                //echo $j." ".$fnames[$j].'newJson: '.intval($newJSON[$fnames[$j]])*($j+1).'<br>';
+            $flags[$j] = intval($newJSON[$fnames[$j]])*($j+1); // just set the flag to the new JSON value.
+            //check if the flag should actually stay the same.
+            if (($newJSON[$fnames[$j]] === '' || (is_null($newJSON[$fnames[$j]]))) && $curJSON != false) {
+                if(array_key_exists($fnames[$j], $curJSON)) {
+                    $flags[$j] = intval($curJSON[$fnames[$j]])*($j+1);
+                }
             }
         }
         //echo "flags first dump: ".print_r($flags).'<br>'; //var_dump($flags);

@@ -544,7 +544,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         //echo 'newJSON'.print_r($newJSON).'<br>'; //var_dump($flags);
         //echo 'curJSON'.print_r($curJSON).'<br>'; //var_dump($flags);
         for ($j=0; $j<count($newJSON); $j++) {
-            if ($newJSON[$fnames[$j]] === '' || (is_null($newJSON[$fnames[$j]]) && !is_null($curJSON[$fnames[$j]]))) {
+            if (($newJSON[$fnames[$j]] === '' || (is_null($newJSON[$fnames[$j]]))) && !is_null($curJSON[$fnames[$j]])) {
                 $flags[$j] = intval($curJSON[$fnames[$j]])*($j+1);
                 //echo $j." ".$fnames[$j].' curJson: '.intval($curJSON[$fnames[$j]])*($j+1).'<br>';
             } else {
@@ -580,7 +580,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             //if($newJSON[$fnames[$i]] === '' || is_null($newJSON[$fnames[$i]])) {
                 //$flags[$i] = intval($curJSON[$fnames[$i]])*($i+1);
                 $json[$fnames[$i]] = ($flags[$i]) ? true : false ;
-                $bitStatus[$bits[$i]] = $curJSON[$fnames[$i]];
+                //$bitStatus[$bits[$i]] = $curJSON[$fnames[$i]];
             //} else {
             //    $flags[$i] = intval($newJSON[$fnames[$i]])*($i+1);
             //}

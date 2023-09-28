@@ -511,10 +511,6 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 $vendModel->save();
             }
 
-
-
-            
-
             if ($try) {
                 if (!$exists){
                     $this->stats['imported']++;
@@ -543,9 +539,20 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $curJSON = json_decode($current, true);
         
         $flags = array();
-        for ($i=0; $i<count($newJSON); $i++) {
-
+        
+        //echo 'FLAGGING ITEM :'.$upc.'<br>';
+        //echo 'newJSON'.print_r($newJSON).'<br>'; //var_dump($flags);
+        //echo 'curJSON'.print_r($curJSON).'<br>'; //var_dump($flags);
+        for ($j=0; $j<count($newJSON); $j++) {
+            if ($newJSON[$fnames[$j]] === '' || (is_null($newJSON[$fnames[$j]]) && !is_null($curJSON[$fnames[$j]]))) {
+                $flags[$j] = intval($curJSON[$fnames[$j]])*($j+1);
+                //echo $j." ".$fnames[$j].' curJson: '.intval($curJSON[$fnames[$j]])*($j+1).'<br>';
+            } else {
+                $flags[$j] = intval($newJSON[$fnames[$j]])*($j+1);
+                //echo $j." ".$fnames[$j].'newJson: '.intval($newJSON[$fnames[$j]])*($j+1).'<br>';
+            }
         }
+        //echo "flags first dump: ".print_r($flags).'<br>'; //var_dump($flags);
         /**
         $flags = array(intval($line[$indexes['local']])*1,
         intval($line[$indexes['organic']])*2,
@@ -567,20 +574,21 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $bitStatus = array();
         $flagMap = array();
         for ($i=0; $i<count($attrs); $i++) {
-            $json[$fnames[$i]] = false;
+            //$json[$fnames[$i]] = false;
             $flagMap[$bits[$i]] = $attrs[$i];
             $bitStatus[$bits[$i]] = false;
-            if($newJSON[$fnames[$i]] === '' || is_null($newJSON[$fnames[$i]])) {
-                $flags[] = intval($curJSON[$fnames[$i]])*($i+1);
-                $json[$fnames[$i]] =  $curJSON[$fnames[$i]];
+            //if($newJSON[$fnames[$i]] === '' || is_null($newJSON[$fnames[$i]])) {
+                //$flags[$i] = intval($curJSON[$fnames[$i]])*($i+1);
+                $json[$fnames[$i]] = ($flags[$i]) ? true : false ;
                 $bitStatus[$bits[$i]] = $curJSON[$fnames[$i]];
-            } else {
-                $flags[] = intval($newJSON[$fnames[$i]])*($i+1);
-            }
+            //} else {
+            //    $flags[$i] = intval($newJSON[$fnames[$i]])*($i+1);
+            //}
             
         }
 
-
+        //echo 'flags end: '.print_r($flags).'<br>';
+        //echo 'json dump: '.print_r($json).'<br>';
 
         //flags needs to hold bit numbers.
         $numflag = 0;   
@@ -592,7 +600,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
             // set flag in JSON representation
             $attr = $flagMap[$f];
-            $json[$fnames[$attr-1]] = true;
+            //$json[$fnames[$attr]] = true;
             $bitStatus[$f] = true;
         }
 

@@ -537,15 +537,15 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $curP = $dbc->prepare($curQ);
         $current = $dbc->getValue($curP, array($upc));
         $curJSON = false;
-        echo 'Current Fales'.$current.'<br>';
+        //echo 'Current Fales'.$current.'<br>';
     
         $curJSON = json_decode($current, true);
         
         $flags = array();
         
         //echo 'FLAGGING ITEM :'.$upc.'<br>';
-        echo 'newJSON'.print_r($newJSON).'<br>'; //var_dump($flags);
-        echo 'curJSON'.print_r($curJSON).'<br>'; //var_dump($flags);
+        //echo 'newJSON'.print_r($newJSON).'<br>'; //var_dump($flags);
+        //echo 'curJSON'.print_r($curJSON).'<br>'; //var_dump($flags);
         for ($j=0; $j<count($newJSON); $j++) {
             $flags[$j] = intval($newJSON[$fnames[$j]])*($j+1); // just set the flag to the new JSON value.
             //check if the flag should actually stay the same.

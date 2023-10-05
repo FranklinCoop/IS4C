@@ -44,8 +44,9 @@ class SpinsSubmitLoopTask extends FannieTask
 
     public function run()
     {
-        global $argv, $FANNIE_OP_DB, $FANNIE_PLUGIN_SETTINGS;
+        global $argc, $argv, $FANNIE_OP_DB, $FANNIE_PLUGIN_SETTINGS;
         $dbc = FannieDB::get($FANNIE_OP_DB);
+        $dateObj = new SpinsDate($FANNIE_PLUGIN_SETTINGS['SpinsOffset']);
 
         $iso_week = date('W');
         $iso_week--;
@@ -55,16 +56,30 @@ class SpinsSubmitLoopTask extends FannieTask
             $year--;
         }
         $upload = true;
-
+        $today = strtotime("now");
+        $loopStart = strtotime("2023-08-26");
         /**
           Handle additional args
         */
+        //echo $argc;
+        //print(var_dump($argv));
+
         if (isset($argv) && is_array($argv)) {
             foreach($argv as $arg) {
+                //echo $arg."substr: \"".substr($arg, 0, 5)."\"\n";
                 if (is_numeric($arg)) {
-                    $iso_week = $arg;
+                    //$iso_week = $arg;
+                    $dateObj = new SpinsDate($FANNIE_PLUGIN_SETTINGS['SpinsOffset'], $arg);
                 } else if ($arg == '--file') {
                     $upload = false;
+                } else if (substr($arg, 0, 7) == '--start') {
+                    $parts = explode('=', $arg);
+                    echo var_dump($parts)."\n";
+                    $loopStart = strtotime($parts[1]);
+                } else if (substr($arg, 0, 5) == '--end') {
+                    $parts = explode('=', $arg);
+                    echo var_dump($parts)."\n";
+                    $today = strtotime($parts[1]);
                 }
             }
         }
@@ -72,13 +87,11 @@ class SpinsSubmitLoopTask extends FannieTask
         /**
           Keep SPINS week number separate for logging purposes
         */
-        $spins_week = $iso_week;
-        if (isset($FANNIE_PLUGIN_SETTINGS['SpinsOffset'])) {
-            $iso_week += $FANNIE_PLUGIN_SETTINGS['SpinsOffset'];
-        }
-
-        $today = strtotime("now");
-        $loopStart = strtotime("2018-02-26");
+        //$spins_week = $iso_week;
+        $spins_week = $dateObj->spinsWeek();
+        //if (isset($FANNIE_PLUGIN_SETTINGS['SpinsOffset'])) {
+        //    $iso_week += $FANNIE_PLUGIN_SETTINGS['SpinsOffset'];
+        //}
 
         while ($loopStart < $today) {
                     // walk forward to Sunday
@@ -87,6 +100,9 @@ class SpinsSubmitLoopTask extends FannieTask
             while (date('w', $end) != 0) {
                 $end = mktime(0,0,0,date('n',$end),date('j',$end)+1,date('Y',$end));
             }
+            $week = (int)date('W', $end);
+            $dateObj = new SpinsDate($FANNIE_PLUGIN_SETTINGS['SpinsOffset'], $week);
+            $spins_week = $dateObj->spinsWeek();
             $dlog = DTransactionsModel::selectDlog(date('Y-m-d', $start), date('Y-m-d',$end));
 
             $lastDay = date("M d, Y", $end) . ' 11:59PM'; 
@@ -134,23 +150,30 @@ class SpinsSubmitLoopTask extends FannieTask
 
             if ($upload) {
                 $server = isset($FANNIE_PLUGIN_SETTINGS['SpinsFtpServer']) ? $FANNIE_PLUGIN_SETTINGS['SpinsFtpServer'] : 'ftp.spins.com';
-                $conn_id = ftp_connect($server);
-                $login_id = ftp_login($conn_id, $FANNIE_PLUGIN_SETTINGS['SpinsFtpUser'], $FANNIE_PLUGIN_SETTINGS['SpinsFtpPw']);
-                if (!$conn_id || !$login_id) {
-                    $this->cronMsg('FTP Connection failed', FannieLogger::ERROR);
-                } else {
-                    $remoteDir = isset($FANNIE_PLUGIN_SETTINGS['SpinsFtpDir']) ? $FANNIE_PLUGIN_SETTINGS['SpinsFtpDir'] : 'data';
-                    ftp_chdir($conn_id, $remoteDir);
-                    ftp_pasv($conn_id, true);
-                    $uploaded = ftp_put($conn_id, $filename, $outfile, FTP_ASCII);
-                    if (!$uploaded) {
-                        $this->cronMsg('FTP upload failed', FannieLogger::ERROR);
-                    } else {
+                $this->cronMsg("will attempt FTP upload to: $server", FannieLogger::INFO);
+    
+                $attempts = 0;
+                $maxAttempts = isset($FANNIE_PLUGIN_SETTINGS['SpinsUploadAttempts']) ? $FANNIE_PLUGIN_SETTINGS['SpinsUploadAttempts'] : 1;
+                $delay = isset($FANNIE_PLUGIN_SETTINGS['SpinsRetryDelay']) ? $FANNIE_PLUGIN_SETTINGS['SpinsRetryDelay'] : 30;
+                while (true) {
+                    if ($FANNIE_PLUGIN_SETTINGS['SpinsSftp'] && $this->sftp_upload($server, $outfile, $filename)) {
+                        $this->cronMsg('SFTP upload successful', FannieLogger::INFO);
+                        break;
+                    } elseif (!$FANNIE_PLUGIN_SETTTINGS['SpinsSftp'] && $this->upload($server, $outfile, $filename)) {
                         $this->cronMsg('FTP upload successful', FannieLogger::INFO);
+                        break;
                     }
-                    ftp_close($conn_id);
+                    $attempts++;
+                    $this->cronMsg("FTP upload attempt #$attempts of $maxAttempts failed", FannieLogger::WARNING);
+                    if ($attempts >= $maxAttempts) {
+                        $this->cronMsg("Reached max of $maxAttempts attempts; giving up on FTP upoad", FannieLogger::ERROR);
+                        break;
+                    }
+                    sleep($delay);
                 }
+    
                 unlink($outfile);
+    
             } else {
                 rename($outfile, './' . $filename);    
                 $this->cronMsg('Generated file: ' . $filename, FannieLogger::INFO);
@@ -159,6 +182,41 @@ class SpinsSubmitLoopTask extends FannieTask
         }
 
     }
-}
+    public function upload($server, $localPath, $filename) {
+        global $FANNIE_PLUGIN_SETTINGS;
+    
+        $conn_id = ftp_connect($server);
+        $login_id = ftp_login($conn_id, $FANNIE_PLUGIN_SETTINGS['SpinsFtpUser'], $FANNIE_PLUGIN_SETTINGS['SpinsFtpPw']);
+        if (!$conn_id || !$login_id) {
+            $this->cronMsg('FTP Connection failed', FannieLogger::ERROR);
+            return false;
+        }
+    
+        $remoteDir = isset($FANNIE_PLUGIN_SETTINGS['SpinsFtpDir']) ? $FANNIE_PLUGIN_SETTINGS['SpinsFtpDir'] : 'data';
+        if ($remoteDir) {
+            ftp_chdir($conn_id, $remoteDir);
+        }
+        ftp_pasv($conn_id, true);
+        $uploaded = ftp_put($conn_id, $filename, $localPath, FTP_ASCII);
+        ftp_close($conn_id);
+        return $uploaded;
+    }
+    
+    public function sftp_upload($server, $localPath, $filename)
+    {
+        $settings = FannieConfig::config('PLUGIN_SETTINGS');
+        $adapter = new SftpAdapter(array(
+            'host' => $server,
+            'username' => $settings['SpinsFtpUser'],
+            'password' => $settings['SpinsFtpPw'],
+            'port' => 22,
+        ));
+    
+        $filesystem = new Filesystem($adapter);
+        $success = $filesystem->put($settings['SpinsFtpUser'] . '/' . $filename, file_get_contents($localPath));
+    
+        return $success;
+    }
 
+}
 

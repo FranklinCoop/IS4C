@@ -67,6 +67,7 @@ class SettlementReportPDF {
                     WHERE t.trans_type IN ('I','D') AND s.superID < 14
                     AND t.`datetime` BETWEEN ? AND ?
                     AND t.store_id = ? AND trans_status != 'X'
+                    AND t.emp_no != 9999
                     GROUP BY s.superID
                     UNION
                     SELECT d.dept_name, SUM(t.total) 
@@ -76,6 +77,7 @@ class SettlementReportPDF {
                     WHERE t.trans_type IN ('I','D') AND s.superID = 14
                     AND t.`datetime` BETWEEN ? AND ?
                     AND t.store_id = ? AND trans_status != 'X'
+                    AND emp_no != 9999
                     GROUP BY t.department");
         $startDate = $date.' 00:00:00';
         $endDate = $date.' 23:59:59';
@@ -99,6 +101,7 @@ class SettlementReportPDF {
                     WHERE t.trans_type IN ('I','D') AND s.superID > 14
                     AND t.`datetime` BETWEEN ? AND ?
                     AND t.store_id = ? AND trans_status != 'X'
+                    AND emp_no != 9999
                     GROUP BY t.department");
         $deptR2 = $dbc->execute($deptQ2,array($startDate,$endDate,$store));
         while ($deptW = $dbc->fetch_row($deptR2)){

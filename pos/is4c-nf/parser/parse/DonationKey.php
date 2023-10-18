@@ -27,6 +27,7 @@ use COREPOS\pos\lib\DeptLib;
 use COREPOS\pos\lib\DisplayLib;
 use COREPOS\pos\lib\PrehLib;
 use COREPOS\pos\parser\Parser;
+use COREPOS\pos\lib\TransRecord;
 
 class DonationKey extends Parser 
 {
@@ -41,6 +42,7 @@ class DonationKey extends Parser
 
     function parse($str)
     {
+        $plu = $this->session->get('roundUpPLU');
         $dept = $this->session->get('roundUpDept');
         if ($dept === '') {
             $dept = 701;
@@ -53,16 +55,60 @@ class DonationKey extends Parser
             $ttl = $this->session->get("amtdue");    
             $next = ceil($ttl);
             $amt = sprintf('%.2f',(($ttl == $next) ? 1.00 : ($next - $ttl)));
-            $ret = $lib->deptkey($amt*100, $dept.'0', $ret);
+            if ($plu != '') {
+                $upc = str_pad($plu, 13,'0000000000000', STR_PAD_LEFT);
+                $row = $this->lookupItem($upc);
+                TransRecord::addRecord(array(
+                    'upc' => $row['upc'],
+                    'description' => $row['description'],
+                    'trans_type' => 'I',
+                    'trans_subtype' => (isset($row['trans_subtype'])) ? $row['trans_subtype'] : '',
+                    'department' => $row['department'],
+                    'quantity' => 1,
+                    'unitPrice' => $amt,
+                    'total' => $amt,
+                    'regPrice' => $amt,
+                    'scale' => $row['scale'],
+                    'tax' => $row['tax'],
+                    'foodstamp' => $row['foodstamp'],
+                    'discount' => 0,
+                    'memDiscount' => 0,
+                    'discountable' => $row['discount'],
+                    'discounttype' => $row['discounttype'],
+                    'ItemQtty' => 1
+                ));
+            } else {
+                $ret = $lib->deptkey($amt*100, $dept.'0', $ret);
+            }
+            
+            
             PrehLib::ttl();
             $ret['output'] = DisplayLib::lastpage();
             $ret['redraw_footer'] = True;
+
+
         } else {
             $amt = substr($str,0,strlen($str)-2);
             $ret = $lib->deptkey($amt, $dept.'0', $ret);
         }
 
         return $ret;
+    }
+
+        
+    private function lookupItem($upc)
+    {
+        $dbc = Database::pDataConnect();
+        $query = "SELECT inUse,upc,description,normal_price,scale,deposit,
+            qttyEnforced,department,local,tax,foodstamp,discount,
+            discounttype,specialpricemethod,special_price,groupprice,
+            pricemethod,quantity,specialgroupprice,specialquantity,
+            mixmatchcode,idEnforced,tareweight,scaleprice";
+        $query .= " FROM products WHERE upc = '".$upc."'";
+        $result = $dbc->query($query);
+        $row = $dbc->fetchRow($result);
+
+        return $row;
     }
 
     function doc()

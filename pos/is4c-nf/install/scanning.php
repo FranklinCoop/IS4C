@@ -222,6 +222,23 @@ body {
     </td>
 </tr>
 <tr>
+    <td><b><?php echo _('Round up Donation PLU'); ?></b></td>
+    <td>
+    <?php
+    // try to find a sane default automatically
+    $default = '';
+    //$dbc = Database::pDataConnect();
+    //$lookup = $dbc->query("SELECT dept_no FROM departments WHERE dept_name LIKE '%DONAT%'");
+    //if ($lookup && $dbc->num_rows($lookup) > 0) {
+    //    $row = $dbc->fetch_row($lookup);
+    //    $default = $row['dept_no'];
+    //}
+    echo $form->textField('roundUpPLU', $default);
+    ?>
+    <span class='noteTxt'><?php echo _('Set a plu number to use instead of open rings for donations.'); ?></span>
+    </td>
+</tr>
+<tr>
     <td colspan="2">
     <hr />
     <p><?php echo _('Discount type modules control how sale discounts are calculated.'); ?></p>

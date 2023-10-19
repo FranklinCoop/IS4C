@@ -414,6 +414,12 @@ if (is_array(FormLib::get('SDEPT_MAP_LIST'))) {
                 $mapModel->specialDeptModuleName($class);
                 $mapModel->dept_no($id);
                 $mapModel->save();
+                //remove old records, stops an error where it's trying to run an update when there is no data in the set field.
+                foreach ($mapModel->find() as $obj) {
+                    if (!in_array($obj->dept_no(), $ids) || $id == '') {
+                        $obj->delete();
+                    }
+                }
             } else {
                 $obj = new $class();
                 $sconf = $obj->register($id,$sconf);
@@ -432,6 +438,7 @@ if ($specialDeptMapExists) {
 }
 $session = new WrappedStorage();
 foreach ($sdepts as $sd) {
+    //echo $sclass . '<br>';
     $sclass = str_replace('-', '\\', $sd);
     $obj = new $sclass($session);
     $list = '';

@@ -43,10 +43,11 @@ class PriceCheckPage extends NoInputCorePage
 
     function preprocess()
     {
-        if (strtoupper(FormLib::get('reginput') == 'CL')) {
+        $reginput = strtoupper(FormLib::get('reginput'));
+        if ($reginput == 'CL') {
             // cancel
             $this->change_page($this->page_url."gui-modules/pos2.php");
-
+            //$this->change_page($pos_home);
             return false;
         } elseif (FormLib::get('reginput') != '' || FormLib::get('upc') != '') {
             // use reginput as UPC unless it's empty

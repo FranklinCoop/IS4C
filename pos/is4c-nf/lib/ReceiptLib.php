@@ -1026,7 +1026,7 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
         } 
     }
 
-    $receipt .= self::transactionBarcode($ref);
+    //$receipt .= self::transactionBarcode($ref);
     
     /*
      Finds slips neede for each tender.

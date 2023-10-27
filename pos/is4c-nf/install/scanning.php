@@ -222,6 +222,23 @@ body {
     </td>
 </tr>
 <tr>
+    <td><b><?php echo _('Round up Donation PLU'); ?></b></td>
+    <td>
+    <?php
+    // try to find a sane default automatically
+    $default = '';
+    //$dbc = Database::pDataConnect();
+    //$lookup = $dbc->query("SELECT dept_no FROM departments WHERE dept_name LIKE '%DONAT%'");
+    //if ($lookup && $dbc->num_rows($lookup) > 0) {
+    //    $row = $dbc->fetch_row($lookup);
+    //    $default = $row['dept_no'];
+    //}
+    echo $form->textField('roundUpPLU', $default);
+    ?>
+    <span class='noteTxt'><?php echo _('Set a plu number to use instead of open rings for donations.'); ?></span>
+    </td>
+</tr>
+<tr>
     <td colspan="2">
     <hr />
     <p><?php echo _('Discount type modules control how sale discounts are calculated.'); ?></p>
@@ -397,6 +414,12 @@ if (is_array(FormLib::get('SDEPT_MAP_LIST'))) {
                 $mapModel->specialDeptModuleName($class);
                 $mapModel->dept_no($id);
                 $mapModel->save();
+                //remove old records, stops an error where it's trying to run an update when there is no data in the set field.
+                foreach ($mapModel->find() as $obj) {
+                    if (!in_array($obj->dept_no(), $ids) || $id == '') {
+                        $obj->delete();
+                    }
+                }
             } else {
                 $obj = new $class();
                 $sconf = $obj->register($id,$sconf);
@@ -415,6 +438,7 @@ if ($specialDeptMapExists) {
 }
 $session = new WrappedStorage();
 foreach ($sdepts as $sd) {
+    //echo $sclass . '<br>';
     $sclass = str_replace('-', '\\', $sd);
     $obj = new $sclass($session);
     $list = '';

@@ -354,7 +354,7 @@ private function genRowData($dbc,$dlog,$args, $store) {
     $row = array();
     //Sales Totals
     $value = $this->getSalesTotals($dbc,$dlog,$args);
-    $totalRow = 38;
+    $totalRow = 39;
     $row[] = 'DEPT SALES TOTALS';
     $row[] = '';
     $row[] = $value;
@@ -382,7 +382,7 @@ private function genRowData($dbc,$dlog,$args, $store) {
         $row[] = $values[$key];
         $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
-        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -407,7 +407,7 @@ private function genRowData($dbc,$dlog,$args, $store) {
         $row[] = $values[$key];
         $row[] = $values[$key];
         $row[] = 0;
-        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -430,7 +430,7 @@ private function genRowData($dbc,$dlog,$args, $store) {
         $row[] = $values[$key];
         $row[] = ($key == sizeof($values) -1) ? $values[$key] : 0;
         $row[] = 0;
-        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -452,7 +452,7 @@ private function genRowData($dbc,$dlog,$args, $store) {
         $row[] = 0;
         $row[] = 0;
         $row[] = -$values[$key];
-        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -460,13 +460,13 @@ private function genRowData($dbc,$dlog,$args, $store) {
     }
 
     // other tenders
-    $rowNames = array('LESS Paper GIFT CERT','LESS Staff GIFT CERT','LESS Greenfield $ GIFT CERT','BUZZ REWARDS','r CREDITS','PAYPAL','LESS STORE CHARGE','LESS PAID OUT','TOTAL Other Credits');
-    $gfmAcctNo = array('(2500A990)','(7800G990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');
-    $mccAcctNo = array('(2500A990)','(7800M990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','(1200A990)','additional entry','');
+    $rowNames = array('LESS Paper GIFT CERT','LESS Staff GIFT CERT','LESS Greenfield $ GIFT CERT','BUZZ REWARDS','r CREDITS','PAYPAL','Square','LESS STORE CHARGE','LESS PAID OUT','TOTAL Other Credits');
+    $gfmAcctNo = array('(2500A990)','(7800G990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','','(1200A990)','additional entry','');
+    $mccAcctNo = array('(2500A990)','(7800M990)','(1230A990)','(1065A990)','(1070A990)','(1075A990)','','(1200A990)','additional entry','');
     $accountNumbers = ($store == 1) ? $gfmAcctNo : $mccAcctNo ;
-    $reportOrder = array(23,24,25,26,27,28,29,30,31);
+    $reportOrder = array(23,24,25,26,27,28,29,30,31,32);
     $values = $this->getOtherTotals($dbc,$dlog,$args);
-    $totalRow = 32;
+    $totalRow = 33;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -475,7 +475,7 @@ private function genRowData($dbc,$dlog,$args, $store) {
         $row[] = 0;
         $row[] = 0;
         $row[] = -$values[$key];
-        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -487,9 +487,9 @@ private function genRowData($dbc,$dlog,$args, $store) {
     $gfmAcctNo = array('(4170G900)','(1210A990)','(1215A990)','');
     $mccAcctNo = array('(4170M900)','(1210A990)','(1215A990)','');
     $accountNumbers = ($store == 1) ? $gfmAcctNo : $mccAcctNo ;
-    $reportOrder = array(32,33,34,35);
+    $reportOrder = array(33,34,35,36);
     $values = $this->getCouponTotals($dbc,$dlog,$args);
-    $totalRow = 36;
+    $totalRow = 37;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
         $row[] = $rowNames[$key];
@@ -498,7 +498,7 @@ private function genRowData($dbc,$dlog,$args, $store) {
         $row[] = 0;
         $row[] = 0;
         $row[] = -$values[$key];
-        $row[] = ($key == sizeof($values) -1) ? 38 : $totalRow;
+        $row[] = ($key == sizeof($values) -1) ? 39 : $totalRow;
         $row[] = 0;
         $row[] = 0;
         $row[] = $reportOrder[$key];
@@ -510,17 +510,17 @@ private function genRowData($dbc,$dlog,$args, $store) {
     $gfmAcctNo = array('','','','(419G900)');
     $mccAcctNo = array('','','','(419M900)');
     $accountNumbers = ($store == 1) ? $gfmAcctNo : $mccAcctNo ;
-    $reportOrder = array(36,37,38,39);
-    $total = $ret[0][2] + $ret[3][2] + $ret[10][2] - $ret[15][2] - $ret[22][2]-$ret[31][2] - $ret[35][2];
-    $ctTotal = $ret[0][4] + $ret[3][4] + $ret[10][4] - $ret[15][4] - $ret[22][4]-$ret[31][4] - $ret[35][4];
+    $reportOrder = array(37,38,39,40);
+    $total = $ret[0][2] + $ret[3][2] + $ret[10][2] - $ret[15][2] - $ret[22][2]-$ret[32][2] - $ret[36][2];
+    $ctTotal = $ret[0][4] + $ret[3][4] + $ret[10][4] - $ret[15][4] - $ret[22][4]-$ret[32][4] - $ret[36][4];
     $deposit = $this->getDeposit($dbc,$dlog,$args);
     $rowBlank = array(0,0,0,0);
     $rowTotal = array($total,$ctTotal,$ctTotal,0);
     $rowDepost = array($deposit[0],$deposit[1],$deposit[1],0);
     $rowOS = array($deposit[0] - $total,0,$deposit[1] - $ctTotal,0);
     $values = array($rowBlank,$rowTotal,$rowDepost,$rowOS);
-    $diffShows = array(0,40,40,0);
-    $diffWiths = array(0,39,38,0);
+    $diffShows = array(0,41,41,0);
+    $diffWiths = array(0,40,39,0);
     $totalRow = 0;
     for ($key=0;$key<sizeof($values);$key++){
         $row = array();
@@ -720,6 +720,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
             0 as buzzRewards,
             sum(case when t.trans_subtype = 'RC' then -total else 0 end) as rCreditTotal,
             sum(case when t.trans_subtype = 'PY' then -total else 0 end) as PayPalTotal,
+            sum(case when t.trans_subtype = 'SQ' then -total else 0 end) as SquareTotal,
             sum(case when t.trans_subtype = 'MI' then -total else 0 end) as StoreCharge,
             sum(case when t.department = 994 then -total else 0 end) as PaidOut
             FROM {$dlog} t
@@ -930,7 +931,7 @@ private function getTaxTotals($dbc,$dlog,$args) {
                             'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
                             'entryRow','entryRow','entryRow','entryRow','totalRow',
                             'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
-                            'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
+                            'entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','entryRow','totalRow',
                             'entryRow','entryRow','entryRow','totalRow',
                             'blankRow','totalRow','totalEnteryRow','overshortRow'
                         );

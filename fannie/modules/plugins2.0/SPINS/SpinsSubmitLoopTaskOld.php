@@ -21,9 +21,6 @@
 
 *********************************************************************************/
 
-use League\Flysystem\Sftp\SftpAdapter;
-use League\Flysystem\Filesystem;
-
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
     include_once($FANNIE_ROOT.'classlib2.0/FannieAPI.php');
@@ -31,7 +28,7 @@ if (!class_exists('FannieAPI')) {
 
 /**
 */
-class SpinsSubmitLoopTask extends FannieTask 
+class SpinsSubmitLoopTaskOld extends FannieTask 
 {
     public $name = 'Spins Loop Command Line Only';
 
@@ -47,9 +44,8 @@ class SpinsSubmitLoopTask extends FannieTask
 
     public function run()
     {
-        global $argc, $argv, $FANNIE_OP_DB, $FANNIE_PLUGIN_SETTINGS;
+        global $argv, $FANNIE_OP_DB, $FANNIE_PLUGIN_SETTINGS;
         $dbc = FannieDB::get($FANNIE_OP_DB);
-        $dateObj = new SpinsDate($FANNIE_PLUGIN_SETTINGS['SpinsOffset']);
 
         $iso_week = date('W');
         $iso_week--;
@@ -59,29 +55,25 @@ class SpinsSubmitLoopTask extends FannieTask
             $year--;
         }
         $upload = true;
-        $today = strtotime("now");
-        $loopStart = strtotime("2023-08-26");
+
         /**
           Handle additional args
         */
-        //echo $argc;
-        //print(var_dump($argv));
-
+        $today = strtotime("now");
+        $loopStart = strtotime("2018-02-26");
         if (isset($argv) && is_array($argv)) {
             foreach($argv as $arg) {
-                //echo $arg."substr: \"".substr($arg, 0, 5)."\"\n";
                 if (is_numeric($arg)) {
-                    //$iso_week = $arg;
-                    $dateObj = new SpinsDate($FANNIE_PLUGIN_SETTINGS['SpinsOffset'], $arg);
+                    $iso_week = $arg;
                 } else if ($arg == '--file') {
                     $upload = false;
                 } else if (substr($arg, 0, 7) == '--start') {
                     $parts = explode('=', $arg);
-                    echo var_dump($parts)."\n";
+                    //echo var_dump($parts)."\n";
                     $loopStart = strtotime($parts[1]);
                 } else if (substr($arg, 0, 5) == '--end') {
                     $parts = explode('=', $arg);
-                    echo var_dump($parts)."\n";
+                    //echo var_dump($parts)."\n";
                     $today = strtotime($parts[1]);
                 }
             }
@@ -90,11 +82,10 @@ class SpinsSubmitLoopTask extends FannieTask
         /**
           Keep SPINS week number separate for logging purposes
         */
-        //$spins_week = $iso_week;
-        $spins_week = $dateObj->spinsWeek();
-        //if (isset($FANNIE_PLUGIN_SETTINGS['SpinsOffset'])) {
-        //    $iso_week += $FANNIE_PLUGIN_SETTINGS['SpinsOffset'];
-        //}
+        $spins_week = $iso_week;
+        if (isset($FANNIE_PLUGIN_SETTINGS['SpinsOffset'])) {
+            $iso_week += $FANNIE_PLUGIN_SETTINGS['SpinsOffset'];
+        }
 
         while ($loopStart < $today) {
                     // walk forward to Sunday
@@ -103,9 +94,6 @@ class SpinsSubmitLoopTask extends FannieTask
             while (date('w', $end) != 0) {
                 $end = mktime(0,0,0,date('n',$end),date('j',$end)+1,date('Y',$end));
             }
-            $week = (int)date('W', $end);
-            $dateObj = new SpinsDate($FANNIE_PLUGIN_SETTINGS['SpinsOffset'], $week);
-            $spins_week = $dateObj->spinsWeek();
             $dlog = DTransactionsModel::selectDlog(date('Y-m-d', $start), date('Y-m-d',$end));
 
             $lastDay = date("M d, Y", $end) . ' 11:59PM'; 
@@ -125,20 +113,17 @@ class SpinsSubmitLoopTask extends FannieTask
                     AND tdate BETWEEN ? AND ? AND d.store_id=?
                   GROUP BY d.upc, p.description";
 
-            $filename = $FANNIE_PLUGIN_SETTINGS['SpinsPrefix'];
-            if ($this->config->get('STORE_MODE') == 'HQ') {
-                $filename .= sprintf('%02d', $this->config->get('STORE_ID'));
-            }
-            if (!empty($filename)) {
-                $filename .= '_';
-            }
-            $filename .= date('mdY', $dateObj->endTimeStamp()) . '.csv';
+            $filenameprefix = 'GFM02';
+            //if (isset($FANNIE_PLUGIN_SETTINGS['SpinsPrefix'])) {
+            //    $filenameprefix = $FANNIE_PLUGIN_SETTINGS['SpinsPrefix'];
+           // }
 
+            $filename = $filenameprefix . date('mdY', $end) . '.csv';
             $outfile = sys_get_temp_dir()."/".$filename;
             $fp = fopen($outfile,"w");
 
             $dataP = $dbc->prepare($dataQ);
-            $args = array(date('Y-m-d 00:00:00', $start), date('Y-m-d 23:59:59', $end), $this->config->get('STORE_ID'));
+            $args = array(date('Y-m-d 00:00:00', $start), date('Y-m-d 23:59:59', $end), 2);
             $dataR = $dbc->execute($dataP, $args);
             while($row = $dbc->fetch_row($dataR)){
                 for($i=0;$i<4; $i++){
@@ -185,6 +170,7 @@ class SpinsSubmitLoopTask extends FannieTask
         }
 
     }
+
     public function upload($server, $localPath, $filename) {
         global $FANNIE_PLUGIN_SETTINGS;
     
@@ -220,6 +206,6 @@ class SpinsSubmitLoopTask extends FannieTask
     
         return $success;
     }
-
 }
+
 

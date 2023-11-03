@@ -74,7 +74,7 @@ class NewMemberTool extends FanniePage
         $opts = "";
         while($w = $dbc->fetch_row($r)) {
             $opts .= sprintf("<option %s value=%d>%s</option>",
-                ($w['memtype'] == 1 ? 'selected' : ''),
+                ($w['memtype'] == 2 ? 'selected' : ''),
                 $w['memtype'],$w['memDesc']);
         }
 

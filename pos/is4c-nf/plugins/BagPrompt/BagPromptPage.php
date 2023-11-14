@@ -47,8 +47,15 @@ if (!class_exists("AutoLoader")) include_once(realpath(dirname(__FILE__).'/../..
 
 class BagPromptPage extends NoInputCorePage 
 {
+    private $boxColor;
+    private $msg;
+    private $heading;
+
     function preprocess()
     {
+        $this->boxColor = "coloredArea";
+        $this->msg = _("Please enter the number of paperbags used,</br>press enter or clear if the customer has thier own bags.");
+        $this->heading = "Enter Bags";
         // get calling class (required)
         $item = FormLib::get('item');
         $pos_home = MiscLib::base_url().'gui-modules/pos2.php';
@@ -64,15 +71,17 @@ class BagPromptPage extends NoInputCorePage
                 // clear; go home
                 return $this->done($pos_home);
             } else {
-
                 if ($reginput === '' || $reginput === '0'){
                     return $this->done($pos_home);
                 } 
-                if (is_numeric($reginput)) {
+                if (is_numeric($reginput) && $reginput < 30) {
                     //TransRecord::addTare($reginput);
                     $this->addBags($reginput);
                     return $this->done($pos_home);
- 
+                } else {
+                    $this->boxColor="errorColoredArea";
+                    $this->msg = _("Numeric Value between 0-30 required.");
+                    return true;
                 }
             }
         }
@@ -141,16 +150,16 @@ class BagPromptPage extends NoInputCorePage
     function body_content(){
         ?>
         <div class="baseHeight">
-        <div class="colored centeredDisplay">
+        <div class="<?php echo $this->boxColor; ?> centeredDisplay">
         <span class="larger">
-        Enter Bags
-        </span>
+        <?php echo $this->heading; ?>
+        </span><br />
         <form name="form" method="post" autocomplete="off" action="<?php AutoLoader::ownURL(); ?>">
         <input type="text" id="reginput" name='input' tabindex="0" onblur="$('#input').focus()" />
         <input type="hidden" name="item" value="<?php echo FormLib::get('item'); ?>" />
         </form>
         <p>
-        Please enter the number of paperbags used, press enter or clear if the customer has thier own bags.
+        <?php echo $this->msg; ?>
         </p>
         </div>
         </div>

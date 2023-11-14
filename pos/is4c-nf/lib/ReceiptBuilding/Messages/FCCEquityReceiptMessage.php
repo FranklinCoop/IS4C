@@ -23,6 +23,7 @@
 
 namespace COREPOS\pos\lib\ReceiptBuilding\Messages;
 use COREPOS\pos\lib\ReceiptLib;
+use COREPOS\pos\lib\MiscLib;
 use \CoreLocal;
 
 /**
@@ -48,7 +49,7 @@ class FCCEquityReceiptMessage extends ReceiptMessage {
         $slip .= ReceiptLib::biggerFont(sprintf('Amount: $%.2f',$val))."\n";
         $slip .= "\n";
         $slip .= "Record of equity.\n";
-        $slip .= "Cashier Please Retain in Drawer.\n\n";
+        $slip .= "Please retain receipt for your records\n\n";
         $slip .= ReceiptLib::centerString("................................................")."\n\n";
 
         CoreLocal::set("equityNoticeAmt",$val);

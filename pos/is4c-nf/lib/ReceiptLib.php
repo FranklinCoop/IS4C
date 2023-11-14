@@ -739,6 +739,8 @@ static private $msgMods = array(
     'WicReceiptMessage',
     'PayPalReceiptMessage',
     'RCreditReceiptMessage',
+    'SquareReceiptMessage',
+    'FCCEquityReceiptMessage',
 );
 
 static private function getTypeMap()
@@ -800,11 +802,15 @@ static private function receiptFooters($receipt, $ref)
         $receipt['any'] .= self::$PRINT->centerString("returns accepted with this receipt through ".$refundDate);
         $receipt['any'] .= "\n";
     }
+    // don't do this for Franklin Community coop.
+    if (!(CoreLocal::get("store")=="GreenFieldsMarket" || CoreLocal::get('store') == 'FranklinCoop' || CoreLocal::get('store') == 'McCuskersMarket')) {
+        $chargeProgram = 'charge';
+        /***** CvR add charge total to receipt bottom ****/
+        $receipt['any'] = self::chargeBalance($receipt['any'], $chargeProgram, $ref);
+          /**** CvR end ****/
+    }
 
-    $chargeProgram = 'charge';
-    /***** CvR add charge total to receipt bottom ****/
-    $receipt['any'] = self::chargeBalance($receipt['any'], $chargeProgram, $ref);
-    /**** CvR end ****/
+  
 
     return $receipt;
 }

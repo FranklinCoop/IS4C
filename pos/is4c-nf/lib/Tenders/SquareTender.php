@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2012 Whole Foods Co-op
+    Copyright 2023 Franklin Community Co-op
 
     This file is part of IT CORE.
 
@@ -32,7 +32,7 @@ use \CoreLocal;
 class SquareTender extends TenderModule 
 {
 
-    protected $slip_type = 'sqSlip';
+    protected $slip_type = 'spSlip';
     /**
       Check for errors
       @return True or an error message string

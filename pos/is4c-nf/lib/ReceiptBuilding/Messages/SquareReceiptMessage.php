@@ -46,7 +46,7 @@ class SquareReceiptMessage extends ReceiptMessage
         //    return ' CASE WHEN trans_subtype=\'MI\' THEN 1 ELSE 0 END ';
         //}
 
-        return "SUM(CASE WHEN trans_subtype='PY' THEN 1 ELSE 0 END)";
+        return "SUM(CASE WHEN trans_subtype='SQ' THEN 1 ELSE 0 END)";
     }
 
     /**
@@ -59,7 +59,6 @@ class SquareReceiptMessage extends ReceiptMessage
     public function message($val, $ref, $reprint=false)
     {
         return "TEST REMOVE LATER\n\n\n";
-
     }
 
     public function standalone_receipt($ref, $reprint=false)
@@ -108,6 +107,6 @@ class SquareReceiptMessage extends ReceiptMessage
         return $slip;
     }
 
-    public $standalone_receipt_type = 'sqSlip';
+    public $standalone_receipt_type = 'spSlip';
 }
 

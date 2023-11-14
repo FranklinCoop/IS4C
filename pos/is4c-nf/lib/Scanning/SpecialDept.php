@@ -106,6 +106,7 @@ class SpecialDept
         'EquityEndorseDept',
         'EquityWarnDept',
         'PaidOutDept',
+        'FCCEquityDept',
     );
 
     public static function factory($class, $session)

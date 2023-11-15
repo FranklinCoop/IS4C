@@ -217,6 +217,54 @@ class HouseCoupon extends SpecialUPC
             );
         }
 
+        $prefix = $this->session->get('houseCouponPrefix');
+        if ($prefix == '') {
+            $prefix = '00499999';
+        }
+        $upc = $prefix . str_pad($coupID, 5, '0', STR_PAD_LEFT);
+
+        /*Check if this coupon exludeds other coupons there are two because then an exclusion doesn't require two enteies in
+         *houseCoouponItems.
+         *check if the coupon is excluded because it has an EXCLUDE Entry for a previously entered coupon.*/
+        $transDB = Database::tDataConnect();
+        $excludeQ = 'SELECT SUM(l.quantity) as qty, l.`description`
+            FROM localtemptrans AS l
+            INNER JOIN ' . $this->session->get('pDatabase') . $transDB->sep() . 'houseCouponItems AS h 
+            ON h.upc=l.upc
+            WHERE h.`type` = \'EXCLUDE\' and h.coupID=' . ((int)$coupID);
+        $excludeR = $transDB->query($excludeQ);
+        $excludeW = $transDB->fetch_row($excludeR);
+        if($excludeW) {
+            if($excludeW[0] != 0 && !is_null(excludeW[1])){
+                return $this->errorOrQuiet(_('Coupon does not stack with:</br>'.$excludeW[1]), false);
+            }
+        }
+
+        /* check if this coupon is exluded because of an entery in an applied coupon has an EXCLUDE Entery for it. */
+        $excludeQ = "SELECT SUM(l.quantity) as qty, l.`description` 
+            FROM  opdata.houseCouponItems AS h
+            JOIN localtemptrans AS l on LPAD(h.coupID, 13, '0049999900000') = l.upc
+            WHERE h.upc = '".$upc."' AND h.`type` = 'EXCLUDE'";
+        $excludeR = $transDB->query($excludeQ);
+        $excludeW = $transDB->fetch_row($excludeR);
+        if($excludeW) {
+            if($excludeW[0] != 0 && !is_null(excludeW[1])){
+                return $this->errorOrQuiet(_('Coupon does not stack with:</br>'.$excludeW[1]), false);
+            }
+        }
+        /* Check that the coupon has not been previously applied over the max value */
+        $maxValue = $infoW['maxValue'];
+        if($maxValue != 0) {
+            $totalQ = 'SELECT SUM(-total) FROM localtemptrans AS l WHERE l.upc ='.$upc;
+            $totalR = $transDB->query($totalQ);
+            $totalW = $transDB->fetch_row($totalR);
+            if($totalW) {
+                if($totalW[0] >= $maxValue) {
+                    return $this->errorOrQuiet(_('Coupon already applied.'), false);
+                }
+            }
+        }
+
         /* verify the minimum purchase has been made */
         $transDB = Database::tDataConnect();
         switch ($infoW["minType"]) {
@@ -956,6 +1004,31 @@ class HouseCoupon extends SpecialUPC
                 // transaction to track usage
                 $value = 0;
                 $description = $couponPD . ' % Discount Coupon';
+                break;
+            case "FE": // flat discount that turns off other discounts.
+                $prefix = $this->session->get('houseCouponPrefix');
+                if ($prefix == '') {
+                    $prefix = '00499999';
+                }
+                $upc = $prefix . str_pad($coupID, 5, '0', STR_PAD_LEFT);
+                $usedValue = 0;
+                $usedQ = 'SELECT SUM(-total) as usedValue FROM localtemptrans AS l WHERE l.upc ='.$upc;
+                $usedR = $transDB->query($usedQ);
+                $usedW = $transDB->fetch_row($usedR);
+                if ($usedW) {  $usedValue = $usedW['usedValue'];  }
+                $valQ = "SELECT sum(total)
+                FROM localtemptrans AS l
+                WHERE l.trans_type in ('D','I')";
+                $valR = $transDB->query($valQ);
+                $row = $transDB->fetch_row($valR);
+                $scale = floor($row[0]/100);
+                if($scale > 3) {$scale = 2;}
+                $value = $infoW["discountValue"] * $scale;
+                if($value > $infoW['maxValue'] - $usedValue) {
+                    $value = $infoW['maxValue'] - $usedValue;
+                }
+                $discountable = 0;
+                DiscountModule::updateDiscount(new DiscountModule(0, 'custdata'));
                 break;
         }
 

@@ -89,11 +89,11 @@ class BagPromptPage extends NoInputCorePage
     }
 
     private function done($pos_home){
+        $repeat = CoreLocal::get('msgrepeat');
         CoreLocal::set("strEntered","TL");
         CoreLocal::set('bagProptAsked', 1);
-        //return MiscLib::baseURL()."gui-modules/boxMsg2.php?quiet=1";
-            $this->change_page($pos_home.'?quite=1');
-            return false;
+        $this->change_page($pos_home.'?reginput=TL&repeat=1');
+        return true;
     }
 
     private function addBags($amount) {

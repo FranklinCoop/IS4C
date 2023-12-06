@@ -32,7 +32,7 @@ class PriceCheckTabletPage2 extends FannieRESTfulPage
         if (!isset($this->session->pctItems) || !is_array($this->session->pctItems)) {
             $this->session->pctItems = array();
         }
-        if (get_form_value('serialNumber') != null && FormLib::get_form_value('serialNumber') != '') {
+        if (FormLib::get_form_value('serialNumber') != null && FormLib::get_form_value('serialNumber') != '') {
             $this->session->serialNumber = FormLib::get_form_value('serialNumber');
         }
 

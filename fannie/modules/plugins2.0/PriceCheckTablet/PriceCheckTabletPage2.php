@@ -32,7 +32,7 @@ class PriceCheckTabletPage2 extends FannieRESTfulPage
         if (!isset($this->session->pctItems) || !is_array($this->session->pctItems)) {
             $this->session->pctItems = array();
         }
-        if (!isset($this->session->serialNumber)) {
+        if (get_form_value('serialNumber') != null && FormLib::get_form_value('serialNumber') != '') {
             $this->session->serialNumber = FormLib::get_form_value('serialNumber');
         }
 
@@ -134,6 +134,7 @@ class PriceCheckTabletPage2 extends FannieRESTfulPage
             case 1:
                 $price = sprintf('Sale Price: $%.2f', $row['special_price']);
                 break;
+            case 2:
             case 0:
                 $price = sprintf('Price: $%.2f', $row['normal_price']);
                 break;

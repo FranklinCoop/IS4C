@@ -79,7 +79,7 @@ class PriceCheckTabletPageGFMFP extends FannieRESTfulPage
         }
 
 
-        return 'PriceCheckTabletPage.php';
+        return 'PriceCheckTabletPageGFMFP.php';
     }
     /**
      * Handles upcs 

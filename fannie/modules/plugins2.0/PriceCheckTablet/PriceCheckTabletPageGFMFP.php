@@ -71,7 +71,7 @@ class PriceCheckTabletPageGFMFP extends FannieRESTfulPage
             //$ipAdd = $FANNIE_PLUGIN_SETTINGS['T1PrintIP'];
     
             $net = new COREPOS\pos\lib\PrintHandlers\ESCNetRawHandler();
-            $net->setTarget('192.168.2.157:9100');
+            $net->setTarget('192.168.2.159:9100');
             $net->writeLine($receipt);
             //$net->writeLine($receipt);
             //clear memory we don't need it anymore if because we printed the receipt

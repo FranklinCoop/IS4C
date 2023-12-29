@@ -49,13 +49,13 @@ class CustdataHistoryInitTask extends FannieTask
         //$row = $dbc->execute($prep,array());
 
         $start_date = new DateTime('2023-11-01 00:00:00');
-        $end_date = new DateTime('2023-12-01 00:00:00');
+        $end_date = new DateTime('2023-11-30 00:00:00');
         $stringDate = $start_date->format('Y-m-d H:i:s');
         while($start_date->format('Y-m-d') != $end_date->format('Y-m-d')) {
             $updateQ = "INSERT INTO core_op.custdataHistory (CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`,
             memType, staff, SSI, Purchases, NumberOfChecks, memCoupons, blueLine, Shown, LastChange, histDate)
             SELECT CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`, memType, staff, SSI, Purchases,
-            NumberOfChecks, memCoupons, blueLine, Shown, LastChange, '{$stringDate}' FROM core_bak.custdata20231031 WHERE personNum = 1";
+            NumberOfChecks, memCoupons, blueLine, Shown, LastChange, '{$stringDate}' FROM core_bak.custdata23111 WHERE personNum = 1";
             $prep = $dbc->prepare($updateQ);
             $dbc->execute($prep,array());
             $start_date->modify('+1 day');
@@ -63,7 +63,7 @@ class CustdataHistoryInitTask extends FannieTask
             //echo "date: ".$stringDate."\n";
         }
 
-        $start_date = new DateTime('2023-12-01 00:00:00');
+        $start_date = new DateTime('2023-11-30 00:00:00');
         $end_date = new DateTime('2023-12-30 00:00:00');
         $end_date->modify('-1 day');
         $stringDate = $start_date->format('Y-m-d H:i:s');

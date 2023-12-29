@@ -49,9 +49,8 @@ class CustdataHistoryInitTask extends FannieTask
         //$row = $dbc->execute($prep,array());
 
         $start_date = new DateTime('2023-11-01 00:00:00');
-        $end_date = new DateTime('2023-11-30 00:00:00');
+        $end_date = new DateTime('2023-12-01 00:00:00');
         $stringDate = $start_date->format('Y-m-d H:i:s');
-
         while($start_date->format('Y-m-d') != $end_date->format('Y-m-d')) {
             $updateQ = "INSERT INTO core_op.custdataHistory (CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`,
             memType, staff, SSI, Purchases, NumberOfChecks, memCoupons, blueLine, Shown, LastChange, histDate)
@@ -65,7 +64,7 @@ class CustdataHistoryInitTask extends FannieTask
         }
 
         $start_date = new DateTime('2023-12-01 00:00:00');
-        $end_date = new DateTime('2023-12-26 00:00:00');
+        $end_date = new DateTime('2023-12-30 00:00:00');
         $end_date->modify('-1 day');
         $stringDate = $start_date->format('Y-m-d H:i:s');
 

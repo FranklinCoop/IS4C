@@ -109,6 +109,89 @@ class MonthlyMemberReport extends FannieReportPage
         return $data;
     }
 
+    private function get_data($dbc, $sdate, $edate, $data){        
+        $query = "SELECT count(*), 'Total Joins' as lineName FROM (
+            SELECT p.card_no,SUM(p.stockPurchase) as equity, min(p.tdate) as startDate  FROM core_trans.stockpurchases p
+            LEFT JOIN (
+                SELECT p.card_no, SUM(p.stockPurchase), MAX(tdate) as close_date, MIN(tdate) as start_date FROM core_trans.stockpurchases p 
+                where p.tdate < '{$sdate}'
+                group by p.card_no having SUM(p.stockPurchase) = 0) as e on p.card_no = e.card_no
+            WHERE (p.tdate > e.close_date OR e.close_date is null)
+            group by card_no having SUM(stockPurchase) > 0
+        ) as p
+        WHERE p.startDate between '{$sdate}' and '{$edate}'
+        UNION
+        SELECT COUNT(p.card_no), 'Total Terms' as lineName FROM 
+        (SELECT card_no,SUM(stockPurchase) as equity, max(tdate) as endDate  FROM core_trans.stockpurchases
+        group by card_no having SUM(stockPurchase) = 0) p
+        LEFT JOIN (SELECT * FROM core_op.custdataHistory WHERE histDate = '{$sdate}') h on p.card_no = h.cardNo
+        WHERE p.endDate between '{$sdate}' and '{$edate}'
+        UNION
+        SELECT  count(c.cardNo), 'New FFAs' as lineName
+        FROM core_op.custdataHistory c
+        LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
+        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND c.memType = 6 AND (h.memType != c.memType or h.memType is null)
+        UNION
+        SELECT  count(c.cardNo), 'FFA Non-Renewals' as lineName
+        FROM core_op.custdataHistory c
+        LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
+        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND h.memType = 6 AND (h.memType != c.memType)
+        UNION
+        SELECT  count(c.cardNo), 'Total FFA' as lineName
+        FROM core_op.custdataHistory c
+        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND c.memType = 6
+        UNION
+        SELECT count(c.cardNo), 'Total Members' as lineName FROM (
+            SELECT p.card_no, SUM(p.stockPurchase) as equity
+            FROM core_trans.stockpurchases p WHERE p.tdate < '{$edate}' group by p.card_no  having SUM(p.stockPurchase) > 0
+        ) as p
+        LEFT JOIN (
+            select * from core_op.custdataHistory where histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND)
+        ) as c on p.card_no = c.cardNo             
+        WHERE c.personNum = 1
+        UNION
+        SELECT count(c.cardNo), 'Total Members GS' as lineName FROM (
+            SELECT p.card_no, SUM(p.stockPurchase) as equity
+            FROM core_trans.stockpurchases p WHERE p.tdate < '{$edate}' group by p.card_no  having SUM(p.stockPurchase) > 0
+        ) as p
+        LEFT JOIN (
+            select * from core_op.custdataHistory where histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND)
+        ) as c on p.card_no = c.cardNo             
+        WHERE c.personNum = 1 AND c.memType in (1,3,5,6,8,9,10)
+        UNION
+        SELECT count(c.cardNo), 'Total Members NGS' as lineName FROM (
+            SELECT p.card_no, SUM(p.stockPurchase) as equity
+            FROM core_trans.stockpurchases p WHERE p.tdate < '{$edate}' group by p.card_no  having SUM(p.stockPurchase) > 0
+        ) as p
+        LEFT JOIN (
+            select * from core_op.custdataHistory where histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND)
+        ) as c on p.card_no = c.cardNo             
+        WHERE c.personNum = 1 AND c.memType not in (1,3,5,6,8,9,10)
+        UNION
+        SELECT count(p.card_no), 'Total Members Reachable' as lineName FROM (
+            SELECT p.card_no, SUM(p.stockPurchase) as equity
+            FROM core_trans.stockpurchases p WHERE p.tdate < '{$edate}' group by p.card_no  having SUM(p.stockPurchase) > 0
+        ) as p
+        LEFT JOIN core_op.meminfo i on p.card_no = i.card_no 
+        WHERE (i.street IS NOT NULL AND i.street NOT IN ('','*','.','\n'))
+        UNION
+        SELECT count(p.card_no), 'Total Members uneachable' as lineName FROM (
+            SELECT p.card_no, SUM(p.stockPurchase) as equity
+            FROM core_trans.stockpurchases p WHERE p.tdate < '{$edate}' group by p.card_no  having SUM(p.stockPurchase) > 0
+        ) as p
+        LEFT JOIN core_op.meminfo i on p.card_no = i.card_no 
+        WHERE (i.street IN('','*','.','\n') OR i.street is NULL)";
+
+        $prep = $dbc->prepare($query);
+        $results = $dbc->execute($query, array());
+        $i =1;
+        while ($row = $dbc->fetch_row($results)) {
+            $data[$i][] = $row[0];
+            $i++;
+        }
+        return $data;
+    }
+
     
     
     function form_content()

@@ -46,109 +46,69 @@ class MonthlyMemberReport extends FannieReportPage
         $date1 = $this->form->date1;
         $date2 = $this->form->date2;
 
-        $lookupHistory = 'SELECT * FROM core_op.FCC_MemberReportArchive WHERE `month` BETWEEN ? AND ?';
-        $lookupP = $dbc->prepare($lookupHistory);
-        $lookupR = $dbc->execute($lookupP, 
-            array($date1, $date2));
+        $startDate = new DateTime($date1);
+        $endDate = new DateTime($date2);
 
-        $data = array();
-        while ($row = $dbc->fetch_row($lookupR)) {
-            
-            $tempArray = array();
-            $tempArray[] = $row[1];
-            $tempArray[] = $row[2];
-            $tempArray[] = $row[3];
-            $tempArray[] = $row[4];
-            $tempArray[] = $row[5];
-            $tempArray[] = $row[6];
-            $tempArray[] = $row[7];
-            $tempArray[] = $row[8];
-            $tempArray[] = $row[9];
-            $tempArray[] = $row[10];
-            $data[] = $tempArray;
+        $startDate->modify('first day of this month');
+        $endDate->modify('last day of this month');
+        //$startStr  = $startDate->format('Y-m-d').' 00:00:00';
+        //$endStr = $endDate->format('Y-m-d').' 23:59:59';
+        $endLoop = $endDate;
+        $endLoop->modify('+1 Day');
+
+        $exit = 0;
+        $rawdata = array();
+        $data = array(array(''), array('Total Joins'), array('Total Terms'),array('Total New FFA'),array('FFA Non-renewal'),
+                      array('Total FFA'),array('Total Members'),array('In Good Standing'),array('Not In Good Standing'),array('Reachable'),array('Unreachable'));
+        $errorCheckCount = 0;
+        while($startDate->format('Y-m-d') != $endLoop->format('Y-m-d')) {
+            $startStr  = $startDate->format('Y-m-d').' 00:00:00';
+            $stopDate = $startDate;
+            $stopDate->modify('last day of this month');
+            if ($stopDate->format('Y-m-d') > date('Y-m-d')){
+                $stopDate = new DateTime(date('Y-m-d'));
+                $stopDate->modify('-1 day');
+            }
+            $endStr = $stopDate->format('Y-m-d').' 23:59:59';
+            $data[0][] = $endStr;
+            $data = $this->get_data($dbc, $startStr, $endStr, $data);
+            $startDate->modify('first day of next month');
+            $errorCheckCount ++;
+            //$data = array('start date'=>$startStr,'endStr'=>$endStr, 'endLoop'=> $endLoop->format('Y-m-d'), $data);
+            //$data[] = $line;
+            if ($exit == 20) {
+                break;
+            } else {
+                $exit++;
+            }
         }
 
-        $today = $this->get_current_data($dbc);
+        //error checking
+        
+        $inGoodStandingCheck = array('CHK IGS');
+        $reachableCheck = array('CHK reachable');
+        $joinsCheck = array('CHK Joins','');
+        $ffaCheck = array('CHK FFA','');
+        $space = array('');
+        for ($i=1; $i <= $errorCheckCount; $i++) {
+            $space[] ='';
+            $inGoodStandingCheck[]  = $data[6][$i] - $data[7][$i] - $data[8][$i];
+            $reachableCheck[] =$data[6][$i] - $data[9][$i] - $data[10][$i];
+            if($i > 1) {
+                $joinsCheck[] = $data[6][$i-1] + $data[1][$i] - $data[2][$i] - $data[6][$i];
+                $ffaCheck[] = $data[5][$i-1] + $data[3][$i] - $data[4][$i] - $data[5][$i];
+            }
+        }
+        $data[] = $space;
+        $data[] = $inGoodStandingCheck;
+        $data[] = $reachableCheck;
+        $data[] = $joinsCheck;
+        $data[] = $ffaCheck;
 
-        $data[] = $today;
 
         return $data;
     }
 
-private function get_current_data($dbc) {
-            $data = array();
-            $data[] = date('Y-m-d');
-            //members in good standing
-            $query = "SELECT count(*) AS gsMembers FROM core_op.custdata WHERE personNum =1 AND memType IN (1,3,5,6,8,9,10)";
-            $prep = $dbc->prepare($query);
-            $results = $dbc->execute($prep,array());
-            $row = $dbc->fetch_row($results);
-            $data[] = $row[0];
-    
-            //members not in good standing
-            $query = "SELECT count(*) AS ngsMembers FROM core_op.custdata WHERE personNum =1 AND memType =12";
-            $prep = $dbc->prepare($query);
-            $results = $dbc->execute($prep,array());
-            $row = $dbc->fetch_row($results);
-            $data[] = $row[0];
-    
-            //total members
-            $query = "SELECT count(*) AS totalMembers FROM core_op.custdata WHERE personNum =1 AND memType IN (1,3,5,6,8,9,10,12)";
-            $prep = $dbc->prepare($query);
-            $results = $dbc->execute($prep,array());
-            $row = $dbc->fetch_row($results);
-            $data[] = $row[0];
-            //reachable in good stnading
-            $query = "SELECT count(*) AS gsReachable FROM core_op.custdata c
-                      LEFT JOIN core_op.meminfo i ON c.cardNo = i.card_no
-                      WHERE c.personNum =1 AND c.memType IN (1,3,5,6,8,9,10) AND (i.street IS NOT NULL AND i.street NOT IN ('','*','.','\n'))";
-            $prep = $dbc->prepare($query);
-            $results = $dbc->execute($prep,array());
-            $row = $dbc->fetch_row($results);
-            $data[] = $row[0];
-            //reachable not in good standing
-            $query = "SELECT count(*) AS ngsReachable FROM core_op.custdata c
-                      LEFT JOIN core_op.meminfo i ON c.cardNo = i.card_no
-                      WHERE c.personNum =1 AND c.memType = 12 AND (i.street IS NOT NULL AND i.street NOT IN ('','*','.','\n'))";
-            $prep = $dbc->prepare($query);
-            $results = $dbc->execute($prep,array());
-            $row = $dbc->fetch_row($results);
-            $data[] = $row[0];
-            //total reachable
-            $query = "SELECT count(*) AS reachableTotal FROM core_op.custdata c
-                      LEFT JOIN core_op.meminfo i ON c.cardNo = i.card_no
-                      WHERE c.personNum =1 AND c.memType IN (1,3,5,6,8,9,10,12) AND (i.street IS NOT NULL AND i.street NOT IN ('','*','.','\n'))";
-            $prep = $dbc->prepare($query);
-            $results = $dbc->execute($prep,array());
-            $row = $dbc->fetch_row($results);
-            $data[] = $row[0];
-            //unreachable in good standing
-            $query = "SELECT count(*) AS gsUnreach FROM core_op.custdata c
-                      LEFT JOIN core_op.meminfo i ON c.cardNo = i.card_no
-                      WHERE c.personNum =1 AND c.memType IN (1,3,5,6,8,9,10) AND ((i.street IN('','*','.','\n') OR i.street IS NULL))";
-            $prep = $dbc->prepare($query);
-            $results = $dbc->execute($prep,array());
-            $row = $dbc->fetch_row($results);
-            $data[] = $row[0];
-            //unreachable not in good standing
-            $query = "SELECT count(*) AS ngsUnreach FROM core_op.custdata c
-                      LEFT JOIN core_op.meminfo i ON c.cardNo = i.card_no
-                      WHERE c.personNum =1 AND c.memType = 12 AND (i.street IN('','*','.','\n') OR i.street IS NULL)";
-            $prep = $dbc->prepare($query);
-            $results = $dbc->execute($prep,array());
-            $row = $dbc->fetch_row($results);
-            $data[] = $row[0];
-            //unreachable total
-            $query = "SELECT count(*) AS totalUnreach FROM core_op.custdata c
-                      LEFT JOIN core_op.meminfo i ON c.cardNo = i.card_no
-                      WHERE c.personNum =1 AND c.memType IN (1,3,5,6,8,9,10,12) AND (i.street IN('','*','.','\n') OR i.street is NULL)";
-            $prep = $dbc->prepare($query);
-            $results = $dbc->execute($prep,array());
-            $row = $dbc->fetch_row($results);
-            $data[] = $row[0];
-
-            return $data;
-}
     
     
     function form_content()

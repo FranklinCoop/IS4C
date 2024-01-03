@@ -31,13 +31,13 @@ class MonthlyMemberReport extends FannieReportPage
 
     protected $title = "Fannie : FCC Monthly Member Report";
     protected $header = "FCC Monthly Member Report";
-    protected $report_headers = array('month', 'members_good_standing', 'members_not_good_standing', 'members_total', 'reachable_good_standing',
-                    'reachable_not_good_standing', 'reachable_total', 'unreachable_good_standing', 'unreachable_not_good_standing', 'unreachable_total');
+    protected $report_headers = array();
     protected $required_fields = array('date1', 'date2');
 
-    public $description = '[Item Purchases] lists each transaction containing a particular item';
+    public $description = '[Member Status] Shows member statuses and counts';
     public $themed = true;
-    public $report_set = 'Transaction Reports';
+    public $report_set = 'Member reports';
+    protected $sortable = False;
 
     function fetch_report_data()
     {

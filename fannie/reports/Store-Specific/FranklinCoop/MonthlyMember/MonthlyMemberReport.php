@@ -32,7 +32,7 @@ class MonthlyMemberReport extends FannieReportPage
     protected $title = "Fannie : FCC Monthly Member Report";
     protected $header = "FCC Monthly Member Report";
     protected $report_headers = array();
-    protected $required_fields = array('date1', 'date2');
+    //protected $required_fields = array('date1', 'date2');
 
     public $description = '[Member Status] Shows member statuses and counts';
     public $themed = true;
@@ -43,13 +43,23 @@ class MonthlyMemberReport extends FannieReportPage
     {
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
-        $date1 = $this->form->date1;
-        $date2 = $this->form->date2;
+        //$date1 = $this->form->date1;
+        //$date2 = $this->form->date2;
 
-        $startDate = new DateTime($date1);
-        $endDate = new DateTime($date2);
+        $m = FormLib::get('month', 1);
+        $y = FormLib::get('year', date('Y'));
 
-        $startDate->modify('first day of this month');
+        $startDate = new DateTime($y.'-'.$m.'-01 00:00:00');
+        $startDate->modify('-6 months');
+        if ($startDate->format('Y-m-d') < '2023-10-01 00:00:00') {
+            $startDate = new DateTime('2023-10-01 00:00:00');
+        }
+
+        $endDate = new DateTime($y.'-'.$m.'-01 00:00:00');
+        //$startDate = new DateTime($date1);
+        //$endDate = new DateTime($date2);
+
+        //$startDate->modify('first day of this month');
         $endDate->modify('last day of this month');
         //$startStr  = $startDate->format('Y-m-d').' 00:00:00';
         //$endStr = $endDate->format('Y-m-d').' 23:59:59';
@@ -67,7 +77,7 @@ class MonthlyMemberReport extends FannieReportPage
             $stopDate->modify('last day of this month');
             if ($stopDate->format('Y-m-d') > date('Y-m-d')){
                 $stopDate = new DateTime(date('Y-m-d'));
-                $stopDate->modify('-1 day');
+                $stopDate->modify('-2 day');
             }
             $endStr = $stopDate->format('Y-m-d').' 23:59:59';
             $data[0][] = $endStr;
@@ -199,25 +209,33 @@ class MonthlyMemberReport extends FannieReportPage
         ob_start();
 ?>
 <form method="get" action="<?php echo $_SERVER['PHP_SELF']; ?>">
+
+
+
+
+
 <div class="col-sm-5">
     <div class="form-group">
-        <label>Start Date</label>
-        <input type=text id=date1 name=date1 
-            class="form-control date-field" required />
+    <select id="smonth" class="form-control">
+<?php 
+for ($i=1;$i<=12;$i++) {
+    printf("<option %s value=%d>%s</option>",
+        ($i == date('m') ? 'selected' : ''),
+        $i,date("F",mktime(0,0,0,$i,1,2000)));
+}
+?>
+</select>
     </div>
     <div class="form-group">
-        <label>End Date</label>
-        <input type=text id=date2 name=date2 
-            class="form-control date-field" required />
+    <input type="number" class="form-control" id="syear" 
+    placeholder="Year" required value="<?php echo date("Y"); ?>" />
     </div>
     <p>
         <button type=submit class="btn btn-default btn-core">Submit</button>
         <button type=reset class="btn btn-default btn-reset">Start Over</button>
     </p>
 </div>
-<div class="col-sm-5">
-    <?php echo FormLib::date_range_picker(); ?>
-</div>
+
 </form>
 <?php
         $this->add_onload_command('$(\'#upc-field\').focus();');
@@ -232,6 +250,27 @@ class MonthlyMemberReport extends FannieReportPage
             </p>';
     }
 }
+
+/*
+<div id="#myform" class="form-group form-inline">
+<form onsubmit="lookupSales(); return false;">
+<select id="smonth" class="form-control">
+<?php 
+for ($i=1;$i<=12;$i++) {
+    printf("<option %s value=%d>%s</option>",
+        ($i == date('m') ? 'selected' : ''),
+        $i,date("F",mktime(0,0,0,$i,1,2000)));
+}
+?>
+</select>
+
+<input type="number" class="form-control" id="syear" 
+    placeholder="Year" required value="<?php echo date("Y"); ?>" />
+
+<button type="submit" class="btn btn-default">Lookup Sales</button>
+</form>
+</div>
+*/
 
 FannieDispatch::conditionalExec();
 

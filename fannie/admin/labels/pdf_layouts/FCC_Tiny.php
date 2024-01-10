@@ -42,7 +42,7 @@ if (!class_exists('FpdfWithBarcode')) {
           $this->Text($x+6,$y+$h+11/$this->k,substr($barText,-$len));
     }
   }
-  
+  use \COREPOS\Fannie\API\item\FannieSignage;
   /**------------------------------------------------------------
    *       End barcode creation class 
    *-------------------------------------------------------------*/
@@ -218,7 +218,18 @@ if (!class_exists('FpdfWithBarcode')) {
                             $row['description'], $row['bit_number']);
             $i++;*/
 
-        $price = $row['normal_price'];
+            $formater = new FannieSignage($data);
+            $price = $row['normal_price'];
+            if ($row['scale']) {
+                 if (substr($price, 0, 1) != '$') {
+                     $price = sprintf('$%.2f', $price);
+                 }
+                 #$price .= ' /lb.';
+             } elseif (isset($row['signMultiplier'])) {
+                 $price = $formater->formatPrice($row['normal_price'], $row['signMultiplier']);
+             } else {
+                 $price = $formater->formatPrice($row['normal_price']);
+             }
         $desc = strtoupper(substr($row['description'],0,27));
         $brand = ucwords(strtolower(substr($row['brand'],0,13)));
         $pak = $row['units'];
@@ -256,7 +267,7 @@ if (!class_exists('FpdfWithBarcode')) {
     
         $pdf->SetFont('steelfish','',29);
         $pdf->SetXY($genLeft+30.55 -3,$unitTop+8.5); //price on the right side top Made this +3 cause it goes up toward last row of labels
-        $pdf->Cell(10,8,"\$$price",0,0,'R'); //\$$price $barLeft
+        $pdf->Cell(10,8,$price,0,0,'R'); //\$$price $barLeft
   
         $pdf->SetFont('arialnarrow','',6);
         $pdf->SetXY($genLeft+1, $unitTop+18.5); //desc of tiem

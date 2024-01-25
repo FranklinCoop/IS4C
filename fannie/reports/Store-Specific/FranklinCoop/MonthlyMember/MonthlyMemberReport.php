@@ -32,7 +32,7 @@ class MonthlyMemberReport extends FannieReportPage
     protected $title = "Fannie : FCC Monthly Member Report";
     protected $header = "FCC Monthly Member Report";
     protected $report_headers = array();
-    protected $required_fields = array('date1', 'date2');
+    protected $required_fields = array('smonth', 'syear');
 
     public $description = '[Member Status] Shows member statuses and counts';
     public $themed = true;
@@ -43,16 +43,32 @@ class MonthlyMemberReport extends FannieReportPage
     {
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
-        $date1 = $this->form->date1;
-        $date2 = $this->form->date2;
 
-        $startDate = new DateTime($date1);
-        $endDate = new DateTime($date2);
+        $month = FormLib::get('smonth', date('m'));//$this->form->smonth;
+        $year = FormLib::get('syear',date('Y'));
 
-        $startDate->modify('first day of this month');
+        //$startDate = new DateTime($date1);
+        //$endDate = new DateTime($date2);
+        $startDate = new DateTime($year.'-'.$month.'-01 00:00:00');
+        $startDate->modify('-6 months');
+        if ($startDate->format('Y-m-d') < '2023-10-01 00:00:00') {
+            $startDate = new DateTime('2023-10-01 00:00:00');
+        }
+        //$startDate->modify('first day of this month');
+
+        $endDate = new DateTime($year.'-'.$month.'-01 00:00:00');
         $endDate->modify('last day of this month');
+        if ($endDate->format('Y-m-d') < '2023-10-01 00:00:00') {
+            $endDate = new DateTime('2023-10-31 23:59:59');
+        }
+
+        
+        
         //$startStr  = $startDate->format('Y-m-d').' 00:00:00';
         //$endStr = $endDate->format('Y-m-d').' 23:59:59';
+
+        //echo '<br>'.$startDate->format('Y-m-d').'</br>';
+        //echo '<br>'.$endDate->format('Y-m-d').'</br';
         $endLoop = $endDate;
         $endLoop->modify('+1 Day');
 
@@ -278,22 +294,23 @@ class MonthlyMemberReport extends FannieReportPage
 
 <div class="col-sm-5">
     <div class="form-group">
-        <label>Start Date</label>
-        <input type=text id=date1 name=date1 
-            class="form-control date-field" required />
-    </div>
-    <div class="form-group">
-        <label>End Date</label>
-        <input type=text id=date2 name=date2 
-            class="form-control date-field" required />
+    <select class="form-control" id="smonth"  name="smonth">
+        <?php 
+    for ($i=1;$i<=12;$i++) {
+    printf("<option %s value=%d>%s</option>",
+        ($i == date('m') ? 'selected' : ''),
+        $i,date("F",mktime(0,0,0,$i,1,2000)));
+    }
+    ?>
+    </select>
+
+        <input type="number" class="form-control" id="syear" name=syear
+        placeholder="Year" required value="<?php echo date("Y"); ?>" />
     </div>
     <p>
         <button type=submit class="btn btn-default btn-core">Submit</button>
         <button type=reset class="btn btn-default btn-reset">Start Over</button>
     </p>
-</div>
-<div class="col-sm-5">
-    <?php echo FormLib::date_range_picker(); ?>
 </div>
 </form>
 <?php

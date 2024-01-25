@@ -32,7 +32,7 @@ class MonthlyMemberReport extends FannieReportPage
     protected $title = "Fannie : FCC Monthly Member Report";
     protected $header = "FCC Monthly Member Report";
     protected $report_headers = array();
-    //protected $required_fields = array('date1', 'date2');
+    protected $required_fields = array('date1', 'date2');
 
     public $description = '[Member Status] Shows member statuses and counts';
     public $themed = true;
@@ -43,23 +43,13 @@ class MonthlyMemberReport extends FannieReportPage
     {
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
-        //$date1 = $this->form->date1;
-        //$date2 = $this->form->date2;
+        $date1 = $this->form->date1;
+        $date2 = $this->form->date2;
 
-        $m = FormLib::get('month', 1);
-        $y = FormLib::get('year', date('Y'));
+        $startDate = new DateTime($date1);
+        $endDate = new DateTime($date2);
 
-        $startDate = new DateTime($y.'-'.$m.'-01 00:00:00');
-        $startDate->modify('-6 months');
-        if ($startDate->format('Y-m-d') < '2023-10-01 00:00:00') {
-            $startDate = new DateTime('2023-10-01 00:00:00');
-        }
-
-        $endDate = new DateTime($y.'-'.$m.'-01 00:00:00');
-        //$startDate = new DateTime($date1);
-        //$endDate = new DateTime($date2);
-
-        //$startDate->modify('first day of this month');
+        $startDate->modify('first day of this month');
         $endDate->modify('last day of this month');
         //$startStr  = $startDate->format('Y-m-d').' 00:00:00';
         //$endStr = $endDate->format('Y-m-d').' 23:59:59';
@@ -75,13 +65,16 @@ class MonthlyMemberReport extends FannieReportPage
             $startStr  = $startDate->format('Y-m-d').' 00:00:00';
             $stopDate = $startDate;
             $stopDate->modify('last day of this month');
+            $useCustData = false;
             if ($stopDate->format('Y-m-d') > date('Y-m-d')){
                 $stopDate = new DateTime(date('Y-m-d'));
-                $stopDate->modify('-2 day');
+                //$stopDate->modify('-1 day');
+                $useCustData = true;
+
             }
             $endStr = $stopDate->format('Y-m-d').' 23:59:59';
             $data[0][] = $endStr;
-            $data = $this->get_data($dbc, $startStr, $endStr, $data);
+            $data = $this->get_data($dbc, $startStr, $endStr, $data, $useCustData);
             $startDate->modify('first day of next month');
             $errorCheckCount ++;
             //$data = array('start date'=>$startStr,'endStr'=>$endStr, 'endLoop'=> $endLoop->format('Y-m-d'), $data);
@@ -119,7 +112,7 @@ class MonthlyMemberReport extends FannieReportPage
         return $data;
     }
 
-    private function get_data($dbc, $sdate, $edate, $data){        
+    private function get_data($dbc, $sdate, $edate, $data, $useCustData){        
         $query = "SELECT count(*), 'Total Joins' as lineName FROM (
             SELECT p.card_no,SUM(p.stockPurchase) as equity, min(p.tdate) as startDate  FROM core_trans.stockpurchases p
             LEFT JOIN (
@@ -191,6 +184,79 @@ class MonthlyMemberReport extends FannieReportPage
         ) as p
         LEFT JOIN core_op.meminfo i on p.card_no = i.card_no 
         WHERE (i.street IN('','*','.','\n') OR i.street is NULL)";
+        if($useCustData) {
+            $query = "SELECT count(*), 'Total Joins' as lineName FROM (
+                SELECT p.card_no,SUM(p.stockPurchase) as equity, min(p.tdate) as startDate  FROM core_trans.stockpurchases p
+                LEFT JOIN (
+                    SELECT p.card_no, SUM(p.stockPurchase), MAX(tdate) as close_date, MIN(tdate) as start_date FROM core_trans.stockpurchases p 
+                    where p.tdate < '{$sdate}'
+                    group by p.card_no having SUM(p.stockPurchase) = 0) as e on p.card_no = e.card_no
+                WHERE (p.tdate > e.close_date OR e.close_date is null)
+                group by card_no having SUM(stockPurchase) > 0
+            ) as p
+            WHERE p.startDate between '{$sdate}' and '{$edate}'
+            UNION
+            SELECT COUNT(p.card_no), 'Total Terms' as lineName FROM 
+            (SELECT card_no,SUM(stockPurchase) as equity, max(tdate) as endDate  FROM core_trans.stockpurchases
+            group by card_no having SUM(stockPurchase) = 0) p
+            LEFT JOIN (SELECT * FROM core_op.custdata WHERE personNum =1) h on p.card_no = h.cardNo
+            WHERE p.endDate between '{$sdate}' and '{$edate}'
+            UNION
+            SELECT  count(c.cardNo), 'New FFAs' as lineName
+            FROM core_op.custdata c
+            LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
+            WHERE c.personNum = 1 AND c.memType = 6 AND (h.memType != c.memType or h.memType is null)
+            UNION
+            SELECT  count(c.cardNo), 'FFA Non-Renewals' as lineName
+            FROM core_op.custdata c
+            LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
+            WHERE c.personNum = 1 AND h.memType = 6 AND (h.memType != c.memType)
+            UNION
+            SELECT  count(c.cardNo), 'Total FFA' as lineName
+            FROM core_op.custdata c
+            WHERE c.personNum = 1 AND c.memType = 6
+            UNION
+            SELECT count(c.cardNo), 'Total Members' as lineName FROM (
+                SELECT p.card_no, SUM(p.stockPurchase) as equity
+                FROM core_trans.stockpurchases p WHERE p.tdate < '{$edate}' group by p.card_no  having SUM(p.stockPurchase) > 0
+            ) as p
+            LEFT JOIN (
+                select * from core_op.custdata where personNum = 1
+            ) as c on p.card_no = c.cardNo             
+            WHERE c.personNum = 1
+            UNION
+            SELECT count(c.cardNo), 'Total Members GS' as lineName FROM (
+                SELECT p.card_no, SUM(p.stockPurchase) as equity
+                FROM core_trans.stockpurchases p WHERE p.tdate < '{$edate}' group by p.card_no  having SUM(p.stockPurchase) > 0
+            ) as p
+            LEFT JOIN (
+                select * from core_op.custdata where personNum = 1
+            ) as c on p.card_no = c.cardNo             
+            WHERE c.personNum = 1 AND c.memType in (1,3,5,6,8,9,10)
+            UNION
+            SELECT count(c.cardNo), 'Total Members NGS' as lineName FROM (
+                SELECT p.card_no, SUM(p.stockPurchase) as equity
+                FROM core_trans.stockpurchases p WHERE p.tdate < '{$edate}' group by p.card_no  having SUM(p.stockPurchase) > 0
+            ) as p
+            LEFT JOIN (
+                select * from core_op.custdata where personNum = 1
+            ) as c on p.card_no = c.cardNo             
+            WHERE c.personNum = 1 AND c.memType not in (1,3,5,6,8,9,10)
+            UNION
+            SELECT count(p.card_no), 'Total Members Reachable' as lineName FROM (
+                SELECT p.card_no, SUM(p.stockPurchase) as equity
+                FROM core_trans.stockpurchases p WHERE p.tdate < '{$edate}' group by p.card_no  having SUM(p.stockPurchase) > 0
+            ) as p
+            LEFT JOIN core_op.meminfo i on p.card_no = i.card_no 
+            WHERE (i.street IS NOT NULL AND i.street NOT IN ('','*','.','\n'))
+            UNION
+            SELECT count(p.card_no), 'Total Members uneachable' as lineName FROM (
+                SELECT p.card_no, SUM(p.stockPurchase) as equity
+                FROM core_trans.stockpurchases p WHERE p.tdate < '{$edate}' group by p.card_no  having SUM(p.stockPurchase) > 0
+            ) as p
+            LEFT JOIN core_op.meminfo i on p.card_no = i.card_no 
+            WHERE (i.street IN('','*','.','\n') OR i.street is NULL)";
+        } 
 
         $prep = $dbc->prepare($query);
         $results = $dbc->execute($query, array());
@@ -210,32 +276,25 @@ class MonthlyMemberReport extends FannieReportPage
 ?>
 <form method="get" action="<?php echo $_SERVER['PHP_SELF']; ?>">
 
-
-
-
-
 <div class="col-sm-5">
     <div class="form-group">
-    <select id="smonth" class="form-control">
-<?php 
-for ($i=1;$i<=12;$i++) {
-    printf("<option %s value=%d>%s</option>",
-        ($i == date('m') ? 'selected' : ''),
-        $i,date("F",mktime(0,0,0,$i,1,2000)));
-}
-?>
-</select>
+        <label>Start Date</label>
+        <input type=text id=date1 name=date1 
+            class="form-control date-field" required />
     </div>
     <div class="form-group">
-    <input type="number" class="form-control" id="syear" 
-    placeholder="Year" required value="<?php echo date("Y"); ?>" />
+        <label>End Date</label>
+        <input type=text id=date2 name=date2 
+            class="form-control date-field" required />
     </div>
     <p>
         <button type=submit class="btn btn-default btn-core">Submit</button>
         <button type=reset class="btn btn-default btn-reset">Start Over</button>
     </p>
 </div>
-
+<div class="col-sm-5">
+    <?php echo FormLib::date_range_picker(); ?>
+</div>
 </form>
 <?php
         $this->add_onload_command('$(\'#upc-field\').focus();');
@@ -269,8 +328,7 @@ for ($i=1;$i<=12;$i++) {
 
 <button type="submit" class="btn btn-default">Lookup Sales</button>
 </form>
-</div>
-*/
+</div>*/
 
 FannieDispatch::conditionalExec();
 

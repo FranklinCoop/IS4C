@@ -63,7 +63,7 @@ class MCC_Kicker extends Kicker
     */
     public function kickOnSignIn()
     {
-        return false;
+        return true;
     }
 
     /**
@@ -73,7 +73,12 @@ class MCC_Kicker extends Kicker
     */
     public function kickOnSignOut()
     {
-        return false;
+      global $CORE_LOCAL;
+      if($CORE_LOCAL->get('training') == 1) {
+          return false;
+      } else {
+        return true;
+      }
     }
 }
 

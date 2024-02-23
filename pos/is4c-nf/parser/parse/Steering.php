@@ -99,7 +99,7 @@ class Steering extends Parser
                 return true;
 
             case "MSTG":
-                if ($this->session->get('memType') == 1 || $this->session->get('memType') == 2) {
+                if ($this->session->get('isMember') == 1) {
                     // could this be $this->session->get('isMember') == 1
                     // to avoid relying on specific memTypes?
                     $this->ret['output'] = DisplayLib::boxMsg(
@@ -108,7 +108,7 @@ class Steering extends Parser
                         true,
                         DisplayLib::standardClearButton()
                     );
-                } elseif ($this->session->get("SecuritySR") > 20){
+                } elseif ($this->session->get("SecuritySR") > 15){
                     $this->ret['main_frame'] = $myUrl."gui-modules/adminlogin.php?class=COREPOS-pos-lib-adminlogin-MemStatusAdminLogin";
                 } else {
                     $this->ret['output'] = DisplayLib::boxMsg(
@@ -207,34 +207,7 @@ class Steering extends Parser
                 if ($this->session->get("LastID") != 0) {
                     $this->ret['output'] = $in_progress_msg;
                 } else {
-                    TransRecord::addLogRecord(array(
-                        'upc' => 'SIGNOUT',
-                        'description' => 'Sign Out Emp#' . $this->session->get('CashierNo'),
-                    ));
-                    Database::setglobalvalue("LoggedIn", 0);
-                    $this->session->set("LoggedIn",0);
-                    $this->session->set("training",0);
-                    /**
-                      An empty transaction may still contain
-                      invisible, logging records. Rotate those
-                      out of localtemptrans to ensure sequential
-                      trans_id values
-                    */
-                    if (Database::rotateTempData()) {
-                        Database::clearTempTables();
-                    }
-                    if ($str == 'SO') {
-                        $drawer = new Drawers($this->session, Database::pDataConnect());
-                        if (session_id() != '') {
-                            session_write_close();
-                        }
-                        $kicker_object = Kicker::factory($this->session->get('kickerModule'));
-                        if ($kicker_object->kickOnSignOut()) {
-                            $drawer->kick();
-                        }
-                        $drawer->free($drawer->current());
-                    }
-                    $this->ret['main_frame'] = $myUrl."login.php";
+                    $this->ret['main_frame'] = $myUrl."gui-modules/logout.php";
                 }
                 return true;
 

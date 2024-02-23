@@ -23,7 +23,7 @@
 if (!class_exists('FpdfWithBarcode')) {
     include(dirname(__FILE__) . '/../FpdfWithBarcode.php');
 }
-
+use \COREPOS\Fannie\API\item\FannieSignage;
   class FCC_Large_PDF extends FpdfWithBarcode
   {
     function barcodeText($x, $y, $h, $barcode, $len)
@@ -214,7 +214,18 @@ function FCC_Large($data,$offset=0){
        $showNONGMO = $flags['Non_GMO'];
        $showGlutenFree = $flags['Gluten Free'];
 
-        $price = $row['normal_price'];
+       $formater = new FannieSignage($data);
+       $price = $row['normal_price'];
+       if ($row['scale']) {
+            if (substr($price, 0, 1) != '$') {
+                $price = sprintf('$%.2f', $price);
+            }
+            #$price .= ' /lb.';
+        } elseif (isset($row['signMultiplier'])) {
+            $price = $formater->formatPrice($row['normal_price'], $row['signMultiplier']);
+        } else {
+            $price = $formater->formatPrice($row['normal_price']);
+        }
         $desc = strtoupper(substr($row['description'],0,27));
         $brand = ucwords(strtolower(substr($row['brand'],0,13)));
         $pak = $row['units'];
@@ -249,7 +260,7 @@ function FCC_Large($data,$offset=0){
   
   $pdf->SetFont('Arial','B',30);
   $pdf->SetXY($genLeft+28.6,$unitTop+8.7); //price on the right side top Made this +3 cause it goes up toward last row of labels
-  $pdf->Cell($w/2,8,"\$$price",0,0,'R');
+  $pdf->Cell($w/2,8,$price,0,0,'R');
   
 
   

@@ -27,6 +27,7 @@ use COREPOS\pos\lib\Drawers;
 use COREPOS\pos\lib\UdpComm;
 use COREPOS\pos\lib\TransRecord;
 use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\Kickers\Kicker;
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
 class logout extends NoInputCorePage 
@@ -75,17 +76,15 @@ class logout extends NoInputCorePage
                 if (Database::rotateTempData()) {
                     Database::clearTempTables();
                 }
-                if ($str == 'SO') {
-                    $drawer = new Drawers($this->session, Database::pDataConnect());
-                    if (session_id() != '') {
-                        session_write_close();
-                    }
-                    $kicker_object = Kicker::factory($this->session->get('kickerModule'));
-                    if ($kicker_object->kickOnSignOut()) {
-                        $drawer->kick();
-                    }
-                    $drawer->free($drawer->current());
+                $drawer = new Drawers($this->session, Database::pDataConnect());
+                if (session_id() != '') {
+                    session_write_close();
                 }
+                $kicker_object = Kicker::factory($this->session->get('kickerModule'));
+                if ($kicker_object->kickOnSignOut()) {
+                    $drawer->kick();
+                }
+                $drawer->free($drawer->current());
                 $this->change_page($this->page_url."login.php");
                 return false;
             }

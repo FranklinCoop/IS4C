@@ -58,7 +58,7 @@ class SquareReceiptMessage extends ReceiptMessage
     */
     public function message($val, $ref, $reprint=false)
     {
-        return "TEST REMOVE LATER\n\n\n";
+        return "";
     }
 
     public function standalone_receipt($ref, $reprint=false)

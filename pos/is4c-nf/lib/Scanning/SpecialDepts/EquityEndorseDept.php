@@ -45,7 +45,7 @@ class EquityEndorseDept extends SpecialDept
                 .trim($this->session->get("transno"));
             if ($this->session->get("LastEquityReference") != $ref) {
                 $this->session->set("equityAmt",$amount);
-                $this->session->set("boxMsg",_("<b>Equity Sale</b><br>Insert paperwork"));
+                $this->session->set("boxMsg",_("<b>Equity Sale</b><br>Insert"));
                 $this->session->set('boxMsgButtons', array(
                     _('Confirm [enter]') => '$(\'#reginput\').val(\'\');submitWrapper();',
                     _('Cancel [clear]') => '$(\'#reginput\').val(\'CL\');submitWrapper();',

@@ -36,7 +36,7 @@ class FCCEquityDept extends SpecialDept
 
     public function handle($deptID,$amount,$json)
     {
-        $nonEquityNumbers = array(8001);
+        $nonEquityNumbers = array(8001,8002);
         if ($this->session->get("memberID") == "0" || $this->session->get("memberID") == $this->session->get("defaultNonMem")) {
             $this->session->set('strEntered','');
             $this->session->set('boxMsg',_('Equity requires member.<br />Apply member number first'));

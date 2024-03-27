@@ -108,7 +108,13 @@ class AjaxEnd extends AjaxCallback
     private function outputReceipt($receiptContent, $customerEmail)
     {
         $printObj = PrintHandler::factory($this->session->get('ReceiptDriver'));
-        $emailObj = $this->emailObj();
+        $emailObj = $this->emailObj($this->session->get('ReceiptDriver'));
+        if ( $this->session->get('ReceiptDriver')=='COREPOS\pos\lib\PrintHandlers\ESCNetRawHandler') {
+            $printerPort = $this->session->get('printerPort');
+            $target = substr($printerPort, 6);
+            $printObj->setTarget($target);
+            //$printObj->writeLine($this->session->get('ReceiptDriver'));
+        }
         foreach ($receiptContent as $receipt) {
             if (is_array($receipt)) {
                 if (!empty($receipt['print'])) {

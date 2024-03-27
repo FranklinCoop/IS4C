@@ -35,6 +35,12 @@ class rplist extends NoInputCorePage
     private function printReceipt($trans)
     {
         $PRINT = PrintHandler::factory($this->session->get('ReceiptDriver'));
+        if ( $this->session->get('ReceiptDriver')=='COREPOS\pos\lib\PrintHandlers\ESCNetRawHandler') {
+            $printerPort = $this->session->get('printerPort');
+            $target = substr($printerPort, 6);
+            $PRINT->setTarget($target);
+            //$PRINT->writeLine($this->session->get('printerPort'));
+        }
         $saved = $this->session->get('receiptToggle');
         $this->session->set('receiptToggle', 1);
         $receipt = ReceiptLib::printReceipt('reprint', $trans);

@@ -29,6 +29,7 @@ use COREPOS\pos\lib\PrintHandlers\PrintHandler;
 use COREPOS\pos\lib\PrintHandlers\ESCNetRawHandler;
 use COREPOS\pos\lib\ReceiptBuilding\Messages\StoreChargeMessage;
 use COREPOS\pos\lib\Tenders;
+use COREPOS\pos\lib\Scanning\SpecialDept;
 use \CoreLocal;
 
 /**
@@ -60,7 +61,8 @@ static public function writeLine($text)
         $printerPort = CoreLocal::get('printerPort');
         if (substr($printerPort, 0, 6) == "tcp://") {
             $net = new ESCNetRawHandler();
-            $net->setTarget(substr($printerPort, 6));
+            $target = substr($printerPort, 6);
+            $net->setTarget($target);
             $net->writeLine($text);
         } else {
             /* check fails on LTP1: in PHP4
@@ -1015,7 +1017,7 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
                 // $receipt['print'] .= $msg->standalone_receipt($ref);
             } else {
                 $receipt .= self::printChargeFooterStore($dateTimeStamp, $ref, $chargeProgram);
-                // $receipt .= $msg->standalone_receipt($ref);
+                // $receipt .= $msg->standalone_rec(eipt($ref);
             }
         }
     }
@@ -1035,7 +1037,7 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
     //$receipt .= self::transactionBarcode($ref);
     
     /*
-     Finds slips neede for each tender.
+     Finds slips needed for each tender.
     */
     foreach ($tmap as $tender => $tenderClass) {
         if (!class_exists($tenderClass)) { // try namespaced version
@@ -1049,6 +1051,31 @@ static public function printReceipt($arg1, $ref, $second=False, $email=False)
             $receipt .= $mod->standalone_receipt($ref);
         } 
     }
+    /*
+    Find Slips standalone slips for special departments
+    */
+    $deptmods = CoreLocal::get('SpecialDeptMap');
+    if (!is_array($deptmods) && ($this->session->get('NoCompat') == 1 || $dbc->table_exists('SpecialDeptMap'))) {
+        $model = new \COREPOS\pos\lib\models\op\SpecialDeptMapModel($dbc);
+        $deptmods = $model->buildMap();
+        $this->session->set('SpecialDeptMap', $deptmods);
+    }
+    //$receipt .= json_encode($deptmods);
+
+    if (is_array($deptmods)){
+        foreach($deptmods as $dept => $deptClass){
+            $className = $deptClass[0];
+            $obj = new $className(0);
+            $slipType = $obj->getSlip();
+
+            if(isset($typeMap[$slipType]) && isset($validSlips[$slipType])) {
+                $mod = $validSlips[$slipType];
+                $receipt = self::cutReceipt($receipt, $second);
+                $receipt .= $mod->standalone_receipt($ref);
+            }
+        }
+    }
+
 
     $receipt = self::cutReceipt($receipt, $second);
 

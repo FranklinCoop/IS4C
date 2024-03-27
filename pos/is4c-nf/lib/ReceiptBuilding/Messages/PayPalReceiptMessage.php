@@ -1,8 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2013 Whole Foods Co-op
-
+    Copyright 2023 Franklin Community co-op
     This file is part of IT CORE.
 
     IT CORE is free software; you can redistribute it and/or modify
@@ -29,15 +28,9 @@ use COREPOS\pos\lib\Database;
 use \CoreLocal;
 
 /**
-  @class StoreChargeMessage
+  @class PayPalReceiptMessage
 
-  This replaces a pair of receipt methods that were/are
-  hardcoded into ReceiptLib. Every receipt that has charge
-  activity includes the current balance as a footer. That's
-  the primary message provided by this class. A transaction
-  that includes a charge may also trigger a signature slip
-  if paper signature slips are being used. The signature
-  slip is provided by standalone receipt.
+  slip printing for SquareTender
 */
 class PayPalReceiptMessage extends ReceiptMessage 
 {
@@ -65,13 +58,12 @@ class PayPalReceiptMessage extends ReceiptMessage
     */
     public function message($val, $ref, $reprint=false)
     {
-        return "TEST REMOVE LATER\n\n\n";
-
+        return "";
     }
 
     public function standalone_receipt($ref, $reprint=false)
     {
-	      $date = ReceiptLib::build_time(time());
+	    $date = ReceiptLib::build_time(time());
         list($emp, $reg, $trans) = ReceiptLib::parseRef($ref);
         $slip = '';
 

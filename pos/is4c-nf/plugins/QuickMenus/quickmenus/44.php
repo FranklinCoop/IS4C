@@ -10,6 +10,8 @@ $my_menu = array(
     "Preorder Supplements" => "7999",
     "Preorder Supplements Taxed" => "7998",
     "Preorder Body Care" => "7997",
+    "Preorder Produce" => "8281",
+    "Preorder Produce Taxed" => "8059",
     "Bakery Catering" => "8502",
     "Deli Catering" => "8501",
 );

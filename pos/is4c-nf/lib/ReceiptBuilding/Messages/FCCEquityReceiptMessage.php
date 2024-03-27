@@ -22,8 +22,10 @@
 *********************************************************************************/
 
 namespace COREPOS\pos\lib\ReceiptBuilding\Messages;
-use COREPOS\pos\lib\ReceiptLib;
+use COREPOS\pos\lib\MemberLib;
 use COREPOS\pos\lib\MiscLib;
+use COREPOS\pos\lib\ReceiptLib;
+use COREPOS\pos\lib\Database;
 use \CoreLocal;
 
 /**
@@ -79,8 +81,9 @@ class FCCEquityReceiptMessage extends ReceiptMessage {
             }
         }
 
-        $sql = "SELECT -1*SUM(Total) AS amount, 
-                `datetime` AS datetime
+        $sql = "SELECT 1*SUM(Total) AS amount, 
+                `datetime` AS datetime,
+                card_no
                 FROM localtranstoday 
                 WHERE department IN (" . $equityString . ")
                    AND emp_no=".$emp."
@@ -97,9 +100,10 @@ class FCCEquityReceiptMessage extends ReceiptMessage {
                 $slip .= ReceiptLib::centerString(CoreLocal::get("chargeSlip" . $i))."\n";
             }
             $slip .= "\n";
-            $slip .= "EQUITY PRUCHASE CHARGE\n";
+            $slip .= ReceiptLib::boldFont()."EQUITY PRUCHASE PAYMENT\n";
             $slip .= "Date: ".date('m/d/y h:i a', strtotime($row['datetime']))."\n";
-            $slip .= "REFERNCE #: ".$emp."-".$reg."-".$trans."\n\n";
+            $slip .= "REFERNCE #: ".$emp."-".$reg."-".$trans."\n";
+            $slip .= "Member Account:".$row['card_no']."\n\n";
             $slip .= ReceiptLib::boldFont().ReceiptLib::centerString(" S T O R E   C O P Y ").ReceiptLib::normalFont()."\n";
             $slip .= ReceiptLib::boldFont().ReceiptLib::centerString("K E E P  I N  D R A W E R\n").ReceiptLib::normalFont()."\n";
             $slip .= "\n\n";

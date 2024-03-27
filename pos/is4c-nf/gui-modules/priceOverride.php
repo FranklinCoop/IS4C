@@ -23,6 +23,7 @@
 
 use COREPOS\pos\lib\gui\NoInputCorePage;
 use COREPOS\pos\lib\Database;
+use COREPOS\pos\lib\Scanning\SpecialDept;
 
 include_once(dirname(__FILE__).'/../lib/AutoLoader.php');
 
@@ -87,11 +88,17 @@ class PriceOverride extends NoInputCorePage {
         if ($dept == CoreLocal::get("BottleReturnDept")) {
             return true;
         }
-
-        $deptmods = CoreLocal::get('SpecialDeptMap');
+        $deptmods = $this->session->get('SpecialDeptMap');
+        if (!is_array($deptmods) && ($this->session->get('NoCompat') == 1 || $dbc->table_exists('SpecialDeptMap'))) {
+            $model = new \COREPOS\pos\lib\models\op\SpecialDeptMapModel($dbc);
+            $deptmods = $model->buildMap();
+            $this->session->set('SpecialDeptMap', $deptmods);
+        }
         if (is_array($deptmods) && isset($deptmods[$dept])){
             foreach($deptmods[$dept] as $mod){
-                if ($mod === 'BottleReturnDept') {
+                if ($mod === 'COREPOS\pos\lib\Scanning\SpecialDepts\BottleReturnDept') {
+                    return true;
+                } else if ($mod === 'COREPOS\pos\lib\Scanning\SpecialDepts\PaidOutDept') {
                     return true;
                 }
             }

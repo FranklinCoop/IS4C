@@ -218,6 +218,11 @@ messages from POS?',
             'description' => 'Department number used when selling/issuing gift cards',
             'default' => '902', // historically hardcoded default
         ),
+        'PaycardsPLUGift' => array(
+            'label' => 'Gift Card Issue PLU',
+            'description' => 'PLU number used when selling/issuing gift cards',
+            'default' => '', // historically hardcoded default
+        ),
         'MercuryE2ETerminalID' => array(
             'label' => 'Mercury E2E Terminal ID',
             'description' => 'Terminal ID number for use with encrypted Mercury processing',

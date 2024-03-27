@@ -184,9 +184,35 @@ class MercuryGift extends BasicCCModule
             case PaycardLib::PAYCARD_MODE_ACTIVATE:
                 $ttl = $this->conf->get("paycard_amount");
                 $dept = $this->conf->get('PaycardDepartmentGift');
+                $plu = $this->conf->get('PaycardsPLUGift');
                 $dept = $dept == '' ? 902 : $dept;
-                $deptObj = new COREPOS\pos\lib\DeptLib($this->conf);
-                $deptObj->deptkey($ttl*100, $dept . '0');
+                if ($plu != '') {
+                    $upc = str_pad($plu, 13,'0000000000000', STR_PAD_LEFT);
+                    $row = $this->lookupItem($upc);
+                    TransRecord::addRecord(array(
+                        'upc' => $row['upc'],
+                        'description' => $row['description'],
+                        'trans_type' => 'I',
+                        'trans_subtype' => (isset($row['trans_subtype'])) ? $row['trans_subtype'] : '',
+                        'department' => $row['department'],
+                        'quantity' => 1,
+                        'unitPrice' => $ttl,
+                        'total' => $ttl,
+                        'regPrice' => $ttl,
+                        'scale' => $row['scale'],
+                        'tax' => $row['tax'],
+                        'foodstamp' => $row['foodstamp'],
+                        'discount' => 0,
+                        'memDiscount' => 0,
+                        'discountable' => $row['discount'],
+                        'discounttype' => $row['discounttype'],
+                        'ItemQtty' => 1
+                    ));
+                } else {
+                    $deptObj = new COREPOS\pos\lib\DeptLib($this->conf);
+                    $deptObj->deptkey($ttl*100, $dept . '0');
+                }
+
                 $resp = $this->conf->get("paycard_response");    
                 $this->conf->set("boxMsg","<b>Success</b><font size=-1>
                                            <p>New card balance: $" . $resp["Balance"] . "
@@ -825,6 +851,21 @@ class MercuryGift extends BasicCCModule
             return false;
         }
         return $this->conf->get("paycard_tr2");
+    }
+
+    private function lookupItem($upc)
+    {
+        $dbc = Database::pDataConnect();
+        $query = "SELECT inUse,upc,description,normal_price,scale,deposit,
+            qttyEnforced,department,local,tax,foodstamp,discount,
+            discounttype,specialpricemethod,special_price,groupprice,
+            pricemethod,quantity,specialgroupprice,specialquantity,
+            mixmatchcode,idEnforced,tareweight,scaleprice";
+        $query .= " FROM products WHERE upc = '".$upc."'";
+        $result = $dbc->query($query);
+        $row = $dbc->fetchRow($result);
+
+        return $row;
     }
 
     /**

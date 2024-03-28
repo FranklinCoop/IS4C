@@ -423,22 +423,30 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             if ($upc == 'upc') {
                 continue; //skip first line
             }
+            //sanitize flag data.
+            $flagNames = array('local', 'organic', 'nongmo', 'glutenfree', 'traitor','vegan','bipoc','women_owned','lgbtq');
+            $updateFlags = false;
+           
+            foreach ($flagNames as $flagNo => $flag) {
+                $value = $line[$indexes[$flag]];
+                #echo "FLAG: ".$flag."INPUT VALUE:".$value;
+                if (strtolower($value) == 'false' || $value == 0) {
+                   $value = 0;
+                } else if ($value != '' && $value != 0) {
+                    $value = 1;
+                } else {$value = '';}
+                $line[$indexes[$flag]] = $value;
+                #echo " SANE VALUE:".$line[$indexes[$flag]]." </br>";
+                // do the flags need to be updated.
+                if($line[$indexes[$flag]] != '') {
+                    $updateFlags = True;
+                }
+            }
 
 
             //item flags 1 or 0 multiplied by only if flags are present
             $numflag = '';
-            if (
-            $line[$indexes['local']] != '' ||
-            $line[$indexes['organic']] !='' ||
-            $line[$indexes['coopbasic']] !='' ||
-            $line[$indexes['nongmo']] !='' ||
-            $line[$indexes['glutenfree']] !='' ||
-            $line[$indexes['traitor']] !='' ||
-            $line[$indexes['vegan']] !='' ||
-            $line[$indexes['bipoc']] !='' ||
-            $line[$indexes['women_owned']] !='' ||
-            $line[$indexes['lgbtq']] != ''
-            ) {
+            if ($updateFlags) {
                 $newJson = array('Local' => $line[$indexes['local']],
                                  'Organic' => $line[$indexes['organic']],
                                  'Coop Basic' => $line[$indexes['coopbasic']],
@@ -451,6 +459,12 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                                  'Vegan' => $line[$indexes['vegan']]);              
 
                 $numflag = $this->proc_flags($upc, '', $newJson);
+            } 
+            if ($numflag > 1023) {
+                $ret .= "<i>Falg Eroors item. Identifier {$upc} MANUALLY SET FLAGGING DATA</i><br />";
+                $this->stats['errors'][] = 'FLAG ERROR FOR UPC ' . $upc .' MANUALLY SET FLAGGING DATA';
+                //processing error don't reset flags
+                $numfalg = '';
             } 
 
             if ($desc !='') $model->description($desc);
@@ -537,15 +551,15 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $curP = $dbc->prepare($curQ);
         $current = $dbc->getValue($curP, array($upc));
         $curJSON = false;
-        //echo 'Current Fales'.$current.'<br>';
+        #echo 'Current Fales'.$current.'<br>';
     
         $curJSON = json_decode($current, true);
         
         $flags = array();
         
-        //echo 'FLAGGING ITEM :'.$upc.'<br>';
-        //echo 'newJSON'.print_r($newJSON).'<br>'; //var_dump($flags);
-        //echo 'curJSON'.print_r($curJSON).'<br>'; //var_dump($flags);
+        #echo 'FLAGGING ITEM :'.$upc.'<br>';
+        #echo 'newJSON'.print_r($newJSON).'<br>'; //var_dump($flags);
+        #echo 'curJSON'.print_r($curJSON).'<br>'; //var_dump($flags);
         for ($j=0; $j<count($newJSON); $j++) {
             $flags[$j] = intval($newJSON[$fnames[$j]])*($j+1); // just set the flag to the new JSON value.
             //check if the flag should actually stay the same.

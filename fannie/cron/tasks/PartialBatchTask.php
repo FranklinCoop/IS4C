@@ -164,6 +164,7 @@ times will be limited by how frequently this task runs.';
             FROM PartialBatches AS p
                 INNER JOIN batches AS b ON p.batchID=b.batchID
                 INNER JOIN batchList AS l ON p.batchID=l.batchID
+                INNER JOIN StoreBatchMap AS m ON b.batchID=m.batchID
             WHERE ? BETWEEN b.startDate AND b.endDate
                 AND b.discounttype > 0';
         return array($curP, $unsaleP, $saleP, $query);

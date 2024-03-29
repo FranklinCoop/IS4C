@@ -159,7 +159,8 @@ times will be limited by how frequently this task runs.';
                 l.salePrice,
                 b.discounttype,
                 l.upc,
-                p.batchID
+                p.batchID,
+                m.storeID
             FROM PartialBatches AS p
                 INNER JOIN batches AS b ON p.batchID=b.batchID
                 INNER JOIN batchList AS l ON p.batchID=l.batchID

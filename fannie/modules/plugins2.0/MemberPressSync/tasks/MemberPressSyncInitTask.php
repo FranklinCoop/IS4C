@@ -178,11 +178,11 @@ class MemberPressSyncInitTask extends FannieTask
             $memberID = MemberPressSyncLib::memberExistsMP($connection, $core_member['email']);
             if ($memberID === False) {
                 //$member = array('id'=>'');
-                //$member = MemberPressSyncLib::createMember($connection, $memberInfo,$mpURL, $mpKey, $core_member['cardNo']);
+                $member = MemberPressSyncLib::createMember($connection, $memberInfo,$mpURL, $mpKey, $core_member['cardNo']);
                 //$msg = "New Member: ".$member['id']."-".$core_member['cardNo']." Added\n";
                 //echo $this->cronMsg($msg);
             } else {
-                //MemberPressSyncLib::updateMember($memberInfo,$memberID, $mpURL, $mpKey);
+                MemberPressSyncLib::updateMember($memberInfo,$memberID, $mpURL, $mpKey);
                 //$msg = "New Member: ".$memberID."-".$core_member['cardNo']." Updated\n";
                 //echo $this->cronMsg($msg);
             }
@@ -219,7 +219,7 @@ class MemberPressSyncInitTask extends FannieTask
             //$msg = $this->echoTransaction($transInfo);
             //echo $this->cronMsg($msg);
             $cardNo = 0;
-            //MemberPressSyncLib::createTransaction($connection, $transInfo ,$mpURL, $mpKey, $cardNo);
+            MemberPressSyncLib::createTransaction($connection, $transInfo ,$mpURL, $mpKey, $cardNo);
             $pushCount++;
         }
         $msg = "Pushed: ".$pushCount." Transactions\n";
@@ -308,7 +308,9 @@ class MemberPressSyncInitTask extends FannieTask
                 //echo "Origin: ".$transInfo['origin']."  trans_num: ".$transInfo['trans_num']."\n";
             }
             //$this->echoTransaction($transInfo);
-            MemberPressSyncLib::addMPTransaction($connection, $transInfo) ;
+            if ($transInfo['status' !== 'Failed']) {
+                MemberPressSyncLib::addMPTransaction($connection, $transInfo) ;
+            }
 
         }
         $msg = "\n########### Pull Transactions End ###########\n";

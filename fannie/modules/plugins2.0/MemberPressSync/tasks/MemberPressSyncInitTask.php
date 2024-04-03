@@ -166,8 +166,8 @@ class MemberPressSyncInitTask extends FannieTask
                 'first_name' => $core_member['FirstName'],
                 'last_name' => $core_member['LastName'],
                 'transaction' => $firstTrans,
-                'send_welcome_email' => true,
-                'send_password_email' => true,
+                'send_welcome_email' => false,
+                'send_password_email' => false,
                 'address1' => $core_member['street'],
                 'address2' => '',
                 'city' => $core_member['city'],
@@ -182,6 +182,8 @@ class MemberPressSyncInitTask extends FannieTask
                 //$msg = "New Member: ".$member['id']."-".$core_member['cardNo']." Added\n";
                 //echo $this->cronMsg($msg);
             } else {
+                $memberInfo['send_welcome_email'] = true;
+                $memberInfo['send_password_email'] = true;
                 MemberPressSyncLib::updateMember($memberInfo,$memberID, $mpURL, $mpKey);
                 //$msg = "New Member: ".$memberID."-".$core_member['cardNo']." Updated\n";
                 //echo $this->cronMsg($msg);

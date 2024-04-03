@@ -39,23 +39,15 @@ class CustdataHistoryInitTask extends FannieTask
         $data = array();
         
         
-        $start_date = new DateTime('2023-10-31 00:00:00');
-        $stringDate = $start_date->format('Y-m-d H:i:s');
-        $updateQ = "INSERT INTO core_op.custdataHistory (CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`,
-                                                         memType, staff, SSI, Purchases, NumberOfChecks, memCoupons, blueLine, Shown, LastChange, histDate)
-                    SELECT CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`, memType, staff, SSI, Purchases,
-                    NumberOfChecks, memCoupons, blueLine, Shown, LastChange, '{$stringDate}' FROM core_bak.custdata20231031 WHERE personNum = 1";
-        //$prep = $dbc->prepare($updateQ);
-        //$row = $dbc->execute($prep,array());
 
-        $start_date = new DateTime('2023-11-01 00:00:00');
-        $end_date = new DateTime('2023-12-01 00:00:00');
+        $start_date = new DateTime('2023-10-01 00:00:00');
+        $end_date = new DateTime('2023-10-28 00:00:00');
         $stringDate = $start_date->format('Y-m-d H:i:s');
         while($start_date->format('Y-m-d') != $end_date->format('Y-m-d')) {
             $updateQ = "INSERT INTO core_op.custdataHistory (CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`,
             memType, staff, SSI, Purchases, NumberOfChecks, memCoupons, blueLine, Shown, LastChange, histDate)
             SELECT CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`, memType, staff, SSI, Purchases,
-            NumberOfChecks, memCoupons, blueLine, Shown, LastChange, '{$stringDate}' FROM core_bak.custdata2023111 WHERE personNum = 1";
+            NumberOfChecks, memCoupons, blueLine, Shown, LastChange, '{$stringDate}' FROM core_op_23_10_01.custdata WHERE personNum = 1";
             $prep = $dbc->prepare($updateQ);
             $dbc->execute($prep,array());
             $start_date->modify('+1 day');
@@ -63,8 +55,40 @@ class CustdataHistoryInitTask extends FannieTask
             //echo "date: ".$stringDate."\n";
         }
 
-        $start_date = new DateTime('2023-12-01 00:00:00');
-        $end_date = new DateTime('2023-12-30 00:00:00');
+        $start_date = new DateTime('2023-10-28 00:00:00');
+        $end_date = new DateTime('2023-11-02 00:00:00');
+        $stringDate = $start_date->format('Y-m-d H:i:s');
+        while($start_date->format('Y-m-d') != $end_date->format('Y-m-d')) {
+            $updateQ = "INSERT INTO core_op.custdataHistory (CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`,
+            memType, staff, SSI, Purchases, NumberOfChecks, memCoupons, blueLine, Shown, LastChange, histDate)
+            SELECT CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`, memType, staff, SSI, Purchases,
+            NumberOfChecks, memCoupons, blueLine, Shown, LastChange, '{$stringDate}' FROM core_op_23_10_29.custdata WHERE personNum = 1";
+            $prep = $dbc->prepare($updateQ);
+            $dbc->execute($prep,array());
+            $start_date->modify('+1 day');
+            $stringDate = $start_date->format('Y-m-d H:i:s');
+            //echo "date: ".$stringDate."\n";
+        }
+
+        $start_date = new DateTime('2023-11-02 00:00:00');
+        $end_date = new DateTime('2023-12-27 00:00:00');
+        $stringDate = $start_date->format('Y-m-d H:i:s');
+        while($start_date->format('Y-m-d') != $end_date->format('Y-m-d')) {
+            $updateQ = "INSERT INTO core_op.custdataHistory (CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`,
+            memType, staff, SSI, Purchases, NumberOfChecks, memCoupons, blueLine, Shown, LastChange, histDate)
+            SELECT CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`, memType, staff, SSI, Purchases,
+            NumberOfChecks, memCoupons, blueLine, Shown, LastChange, '{$stringDate}' FROM core_op_23nov.custdata  WHERE personNum = 1";
+            $prep = $dbc->prepare($updateQ);
+            $dbc->execute($prep,array());
+            $start_date->modify('+1 day');
+            $stringDate = $start_date->format('Y-m-d H:i:s');
+            //echo "date: ".$stringDate."\n";
+        }
+
+        //core_op231126.custdata 
+
+        $start_date = new DateTime('2023-12-27 00:00:00');
+        $end_date = new DateTime('2024-01-02 00:00:00');
         $end_date->modify('-1 day');
         $stringDate = $start_date->format('Y-m-d H:i:s');
 
@@ -72,7 +96,7 @@ class CustdataHistoryInitTask extends FannieTask
             $updateQ = "INSERT INTO core_op.custdataHistory (CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`,
             memType, staff, SSI, Purchases, NumberOfChecks, memCoupons, blueLine, Shown, LastChange, histDate)
             SELECT CardNo, personNum, LastName, FirstName, CashBack, Balance, Discount, MemDiscountLimit, ChargeLimit, ChargeOk, WriteChecks, StoreCoupons, `Type`, memType, staff, SSI, Purchases,
-            NumberOfChecks, memCoupons, blueLine, Shown, LastChange, '{$stringDate}' FROM core_bak.custdata231201 WHERE personNum = 1";
+            NumberOfChecks, memCoupons, blueLine, Shown, LastChange, '{$stringDate}' FROM core_op.custdata WHERE personNum = 1";
             $prep = $dbc->prepare($updateQ);
             $dbc->execute($prep,array());
             $start_date->modify('+1 day');

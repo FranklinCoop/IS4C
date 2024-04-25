@@ -41,11 +41,6 @@ class PayPalReceiptMessage extends ReceiptMessage
 
     public function select_condition()
     {
-        //$arDepts = MiscLib::getNumbers(CoreLocal::get('ArDepartments'));
-        //if (count($arDepts) == 0) {
-        //    return ' CASE WHEN trans_subtype=\'MI\' THEN 1 ELSE 0 END ';
-        //}
-
         return "SUM(CASE WHEN trans_subtype='PY' THEN 1 ELSE 0 END)";
     }
 

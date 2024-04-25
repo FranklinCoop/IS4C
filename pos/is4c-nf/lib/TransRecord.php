@@ -711,6 +711,7 @@ static public function additemdiscount($intdepartment, $dbltotal, $tax=0, $fs=0)
         'ItemQtty' => 1,
         'tax' => $tax,
         'foodstamp' => $fs,
+        'discountable' => 1,
     ));
 }
 
@@ -736,6 +737,7 @@ static public function addBogoDiscount($intdepartment, $dbltotal, $tax=0, $fs=0,
         'ItemQtty' => 1,
         'tax' => $tax,
         'foodstamp' => $fs,
+        'discountable' => 1,
         'mixMatch' => $mixmatch,
     ));
 }

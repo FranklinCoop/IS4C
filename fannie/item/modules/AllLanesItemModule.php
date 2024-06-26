@@ -85,10 +85,9 @@ function pollLanes() {
             });
         });
     } else { 
-        setTimeout(pollLanes, 120);
+        setTimeout(pollLanes, 50);
     }
 }
 JAVASCRIPT;
     }
 }
-

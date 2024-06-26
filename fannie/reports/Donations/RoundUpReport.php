@@ -101,8 +101,8 @@ class RoundUpReport extends FannieReportPage
             $sums[1] += $row[3];
             $sums[2] += $row[4];
         }
-
-        return array('Total', '', $sums[0], number_format($sums[1], 2), number_format($sums[2], 2), sprintf('%.2f', ($sums[0] / $sums[2]) * 100));
+        return false;
+        //return array('Total', '', $sums[0], number_format($sums[1], 2), number_format($sums[2], 2), sprintf('%.2f', ($sums[0] / $sums[2]) * 100));
     }
 
     public function form_content()

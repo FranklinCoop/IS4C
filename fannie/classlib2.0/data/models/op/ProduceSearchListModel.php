@@ -36,7 +36,19 @@ class ProduceSearchListModel extends BasicModel
     'searchable' => array('type'=>'TINYINT', 'default'=>1),
 
     );
+    
+    public function save()
+    {
+        $stack = debug_backtrace();
+        $lane_push = false;
+        if (isset($stack[1]) && $stack[1]['function'] == 'pushToLanes') {
+            $lane_push = true;
+        }
 
+        $saved = parent::save();
+
+        return $saved;
+    }
 
     public function doc()
     {

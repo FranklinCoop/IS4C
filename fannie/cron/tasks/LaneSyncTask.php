@@ -53,6 +53,7 @@ Replaces nightly.lanesync.php and/or lanesync.api.php';
         'custPreferences',
         'taxrates',
         'StoreEmployeeMap',
+        'produceSearchList',
     );
 
     public function run()

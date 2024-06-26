@@ -68,7 +68,7 @@ Server side tax table remains the same.';
         $query = 'UPDATE core_op.taxrates SET rate = ? WHERE id = ?';
         $args = array(0.0625, 1); //asummes sales tax is id 1 change as needed
         $prep = $dbc->prepare($query);
-        $result = $dbc->execute($prep,$args,$lane['trans']);
+        $result = $dbc->execute($prep,$args);
 
         for ($i = 0; $i < count($FANNIE_LANES); $i++) {
             if (isset($FANNIE_LANES[$i]['offline']) && $FANNIE_LANES[$i]['offline']) {

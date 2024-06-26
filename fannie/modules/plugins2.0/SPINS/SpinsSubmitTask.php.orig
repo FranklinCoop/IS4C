@@ -21,9 +21,6 @@
 
 *********************************************************************************/
 
-use League\Flysystem\Sftp\SftpAdapter;
-use League\Flysystem\Filesystem;
-
 include(dirname(__FILE__).'/../../../config.php');
 if (!class_exists('FannieAPI')) {
     include(__DIR__ . '/../../../classlib2.0/FannieAPI.php');
@@ -90,19 +87,20 @@ class SpinsSubmitTask extends FannieTask
                     '$lastDay' AS lastDay
                   FROM $dlog AS d
                     " . DTrans::joinProducts('d', 'p', 'INNER') . "
-                  WHERE d.Scale = 0
+                  WHERE p.Scale = 0
                     AND d.upc > '0000000999999' 
                     AND tdate BETWEEN ? AND ?
-                    " . ($this->config->get('STORE_MODE') == 'HQ' ? ' AND d.store_id=? ' : '') . "
+                    AND d.store_id=?
                   GROUP BY d.upc, p.description";
+
         $outfile = sys_get_temp_dir()."/".$filename;
         $fp = fopen($outfile,"w");
 
         $dataP = $dbc->prepare($dataQ);
         $args = array($dateObj->startDate() . ' 00:00:00', $dateObj->endDate() . ' 23:59:59');
-        if ($this->config->get('STORE_MODE') == 'HQ') {
+        //if ($this->config->get('STORE_MODE') == 'HQ') {
             $args[] = $this->config->get('STORE_ID');
-        }
+        //}
         $dataR = $dbc->execute($dataP, $args);
         while($row = $dbc->fetch_row($dataR)){
             for($i=0;$i<4; $i++){
@@ -123,10 +121,7 @@ class SpinsSubmitTask extends FannieTask
             $maxAttempts = isset($FANNIE_PLUGIN_SETTINGS['SpinsUploadAttempts']) ? $FANNIE_PLUGIN_SETTINGS['SpinsUploadAttempts'] : 1;
             $delay = isset($FANNIE_PLUGIN_SETTINGS['SpinsRetryDelay']) ? $FANNIE_PLUGIN_SETTINGS['SpinsRetryDelay'] : 30;
             while (true) {
-                if ($FANNIE_PLUGIN_SETTINGS['SpinsSftp'] && $this->sftp_upload($server, $outfile, $filename)) {
-                    $this->cronMsg('SFTP upload successful', FannieLogger::INFO);
-                    break;
-                } elseif (!$FANNIE_PLUGIN_SETTTINGS['SpinsSftp'] && $this->upload($server, $outfile, $filename)) {
+                if ($this->upload($server, $outfile, $filename)) {
                     $this->cronMsg('FTP upload successful', FannieLogger::INFO);
                     break;
                 }
@@ -147,6 +142,9 @@ class SpinsSubmitTask extends FannieTask
         }
     }
 
+<<<<<<< HEAD
+
+=======
     public function upload($server, $localPath, $filename) {
         global $FANNIE_PLUGIN_SETTINGS;
 
@@ -166,20 +164,5 @@ class SpinsSubmitTask extends FannieTask
         ftp_close($conn_id);
         return $uploaded;
     }
-
-    public function sftp_upload($server, $localPath, $filename)
-    {
-        $settings = FannieConfig::config('PLUGIN_SETTINGS');
-        $adapter = new SftpAdapter(array(
-            'host' => $server,
-            'username' => $settings['SpinsFtpUser'],
-            'password' => $settings['SpinsFtpPw'],
-            'port' => 22,
-        ));
-
-        $filesystem = new Filesystem($adapter);
-        $success = $filesystem->put($settings['SpinsFtpUser'] . '/' . $filename, file_get_contents($localPath));
-
-        return $success;
-    }
 }
+>>>>>>> upstream/master

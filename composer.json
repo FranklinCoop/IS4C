@@ -67,5 +67,12 @@
             "COREPOS\\Fannie\\API\\": "fannie/classlib2.0/",
             "COREPOS\\Fannie\\Plugin\\": "fannie/modules/plugins2.0/"
         }
+    },
+    "config": {
+        "allow-plugins": {
+            "composer/installers": true,
+            "corepos/composer-installer": true,
+            "oomphinc/composer-installers-extender": true
+        }
     }
 }

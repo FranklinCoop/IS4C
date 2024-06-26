@@ -1,16 +1,16 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2023-12-06 Franklin Community Coop
+    Copyright 2018 Franklin Community co-op
 
-    This file is part of IT CORE.
+    This file is part of CORE-POS.
 
-    IT CORE is free software; you can redistribute it and/or modify
+    CORE-POS is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    IT CORE is distributed in the hope that it will be useful,
+    CORE-POS is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
@@ -21,60 +21,102 @@
 
 *********************************************************************************/
 
-use COREPOS\Fannie\API\item\ItemText;
-
-include(dirname(__FILE__).'/../../../../config.php');
+require(dirname(__FILE__) . '/../../../../config.php');
 if (!class_exists('FannieAPI')) {
     include(__DIR__ . '/../../../../classlib2.0/FannieAPI.php');
 }
-include_once(dirname(__FILE__).'/../lib/MemberPressSyncLib.php');
-/**
-*/
-class MemberPressHandleMemberHook
+//file_put_contents('test.txt', file_get_contents('php://input'));
+class MemberPressHandleMemberHook extends FannieRESTfulPage
 {
+    protected $header = 'WebHook Test';
+    protected $title = 'WebHook Test';
+
+    public $description = '[Webhook Test] Testing incoming webhooks from memberpress on the website.';
+
+    public $themed = true;
     
-    
-    private static $receivedWebhook    = null;
-    /**
-     * Retrieve the incoming webhook request as sent.
-     *
-     * @param string $input An optional raw POST body to use instead of php://input - mainly for unit testing.
-     *
-     * @return array|false    An associative array containing the details of the received webhook
-     */
-    public static function receive($input = null)
+
+    public function preprocess()
     {
-        if (is_null($input)) {
-            if (self::$receivedWebhook !== null) {
-                $input = self::$receivedWebhook;
-            } else {
-                $input = file_get_contents("php://input");
-            }
-        }
+        //$this->__routes[] = 'get<date><store><pdf>';
+        $this->__routes[] = 'post<contents>';
+        //$this->__routes[] = 'post<date><store>';
+        //$this->__routes[] = 'post<id><value>';
+        //$this->__routes[] = 'post<id><total>';
+        //$this->__routes[] = 'post<id><notes>';
+        return parent::preprocess();
+    }
 
-        if (!is_null($input) && $input != '') {
-            return self::processWebhook($input);
-        }
-
+    public function post_contents_handler() {
+        //$json = $json_decode($this->contents);
+        echo 'TEST';
         return false;
     }
 
-    /**
-     * Process the raw request into a PHP array and dispatch any matching subscription callbacks
-     *
-     * @param string $input The raw HTTP POST request
-     *
-     * @return array|false    An associative array containing the details of the received webhook
-     */
-    private static function processWebhook($input)
+    public function post_handler()
     {
-        self::$receivedWebhook = $input;
-        parse_str($input, $result);
-        if ($result && isset($result['type'])) {
-            self::dispatchWebhookEvent($result['type'], $result['data']);
-            return $result;
-        }
+        //GLOBAL $FANNIE_PLUGIN_SETTINGS;
+        //$dbc = FannieDB::get($FANNIE_PLUGIN_SETTINGS['OverShortDatabase']);
+        //$json = json_decode($data);
 
+        $actual_link = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+        file_put_contents('test.txt', file_get_contents('php://input')."\n");
+        //file_put_contents('test.txt', $actual_link."\n\n");
+        //echo json_encode($json);
+        echo var_dump($actual_link)."\n".$this->input;
         return false;
+    }
+
+    public function get_view()
+    {
+        $dbc = $this->connection;
+        $table = 'HELLO WORLD </br>';
+        ob_start();
+        ?>
+        <div id="displayarea">
+            <?php echo $table; ?>
+        </div>
+
+        <?php
+        return ob_get_clean();
+
+    }
+
+    public function helpContent()
+    {
+        return '<p>
+            A page for testing webhooks recvied from memberpress.
+            </p>';
+    }
+
+    public function unitTest($phpunit)
+    {
+        $phpunit->assertNotEquals(0, strlen($this->get_view()));
     }
 }
+
+FannieDispatch::conditionalExec();
+/*
+<?php
+echo "<body><b>HELLO WORLD!</b></body>";
+file_put_contents('test.txt', file_get_contents('php://input'));
+?>
+<table>
+<?php 
+
+
+    foreach ($_POST as $key => $value) {
+        echo "<tr>";
+        echo "<td>";
+        echo $key;
+        echo "</td>";
+        echo "<td>";
+        echo $value;
+        echo "</td>";
+        echo "</tr>";
+    }
+
+
+?>
+</table>
+*/

@@ -27,9 +27,9 @@ class CustdataHistoryTask extends FannieTask
 	public $description = 'A daily archive for custdata';
 
     public $default_schedule = array(
-        'min' => 30,
-        'hour' => 1,
-        'day' => '1',
+        'min' => 45,
+        'hour' => 11,
+        'day' => '*',
         'month' => '*',
         'weekday' => '*',
         );                       

@@ -59,25 +59,25 @@ class StoreFloorsPage extends FannieRESTfulPage
         }
 
         return <<<HTML
-<a href="FloorSectionsPage.php" class="btn btn-default">Manage Label Positions</a>
-<div style="padding: 2em;">
-<div class="floorplan" style="position: relative;">
-    <img src="{$imageUrl}" style="border: solid 1px black;" />
-    {$labels}
-</div>
-</div>
-HTML;
+            <a href="FloorSectionsPage.php" class="btn btn-default">Manage Label Positions</a>
+            <div style="padding: 2em;">
+            <div class="floorplan" style="position: relative;">
+            <img src="{$imageUrl}" style="border: solid 1px black;" />
+            {$labels}
+            </div>
+            </div>
+        HTML;
     }
 
     public function javascript_content()
     {
         return <<<JAVASCRIPT
-$(document).mousedown(function(e){
-    x = e.offsetX;
-    y = e.offsetY;
-    console.log(x+', '+y);
-});
-JAVASCRIPT;
+        $(document).mousedown(function(e){
+            x = e.offsetX;
+            y = e.offsetY;
+            console.log(x+', '+y);
+        });
+        JAVASCRIPT;
     }
 
     protected function get_upload_view()
@@ -85,19 +85,19 @@ JAVASCRIPT;
         $stores = FormLib::storePicker('store', false);
 
         return <<<HTML
-<form method="post" enctype="multipart/form-data">
-<div class="form-group">
-    <label>Store</label>
-    {$stores['html']}
-</div>
-<div class="form-group">
-    <label>New Image</label>
-    <input type="file" name="image" class="form-control" accept="image/png" />
-</div>
-<div class="form-group">
-    <button type="submit" class="btn btn-default btn-core">Upload</button>
-</div>
-HTML;
+        <form method="post" enctype="multipart/form-data">
+        <div class="form-group">
+        <label>Store</label>
+        {$stores['html']}
+        </div>
+        <div class="form-group">
+        <label>New Image</label>
+        <input type="file" name="image" class="form-control" accept="image/png" />
+        </div>
+        <div class="form-group">
+        <button type="submit" class="btn btn-default btn-core">Upload</button>
+        </div>
+        HTML;
     }
 }
 

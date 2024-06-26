@@ -23,6 +23,7 @@ class MailChimpTask30 extends FannieTask
                         'email_address' => $row['email_1'],
                         'status' => 'subscribed',
                     );
+                    echo $this->cronMsg("account email: ".$row['email_1']."\n");
                 }
                 $sent[$row['email_1']] = true;
                 if (count($accounts) >= 450) {
@@ -32,6 +33,7 @@ class MailChimpTask30 extends FannieTask
                         'update_existing' => false,
                     ));
                     $accounts = array();
+                    echo "Over 450 accounts:".var_dump($resp)."\n";
                 }
             }
             if (count($accounts) > 0) {
@@ -40,6 +42,7 @@ class MailChimpTask30 extends FannieTask
                     'sync_tags' => false,
                     'update_existing' => false,
                 ));
+                echo "Uploading Accounts";
             }
         } catch (Exception $ex) {
             echo $ex->getResponse()->getBody()->getContents();

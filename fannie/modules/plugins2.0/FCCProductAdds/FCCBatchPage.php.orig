@@ -90,37 +90,21 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             'display_name' => 'Vegan',
             'default' => 11,
         ),
-            'bipoc' => array(
-            'display_name' => 'BIPOC',
-            'default' => 12,
-        ),
-        'women_owned' => array(
-            'display_name' => 'Women Owned',
-            'default' => 13,
-        ),        
-        'lgbtq' => array(
-            'display_name' => 'LGBTQ',
-            'default' => 14,
-        ),
         'traitor' => array(
             'display_name' => 'Traitor Brand',
-            'default' => 15,
+            'default' => 12,
         ),
         'coopbasic' => array(
             'display_name' => 'Coop Basics',
-            'default' => 16,
+            'default' => 13,
         ),
         'pack_size' => array(
             'display_name' => 'pack_size',
-            'default' => 17,
+            'default' => 14,
         ),
         'unitOfMesure' => array(
             'display_name' => 'Tag Format',
-            'default' => 18,
-        ),
-        'sku' => array(
-            'display_name' => 'Vendor SKU',
-            'default' => 19,
+            'default' => 15,
         )
 
     );
@@ -178,8 +162,6 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
         $ftype = FormLib::get('ftype','UPCs');
         $has_checks = FormLib::get('has_checks') !== '' ? True : False;
-        //used later for tag batches if they don't have needed
-        $btype = FormLib::get('btype',0);
 
         //update or adds products as needed
         if ($ftype=='UPCs') {
@@ -201,7 +183,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $saveCost = false;
         if (isset($batchList['cost'])) {
             $insP = $dbc->prepare("INSERT INTO batchList 
-                (batchID, pricemethod, quantity, active, upc, salePrice, groupSalePrice, signMultiplier, cost)
+                (batchID, pricemethod, quantity, active, upc, salePrice, groupSalePrice, cost, signMultiplier)
                 VALUES
                 (?, 0, 0, 0, ?, ?, ?, ?, ?)");
             $saveCost = true;
@@ -248,33 +230,17 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             if ($ftype == 'UPCs'){
                 $chkR = $dbc->execute($upcChk, array($upc));
                 if ($dbc->num_rows($chkR) ==  0) continue;
-            }
+            }   
 
             if (isset($line[5]) && trim($line[5]) == 's') {
                 $mult = 0;
             }
 
-            //for tag batches
-            if ($btype == 6) {
-                $prodModel = new ProductsModel($dbc);
-                $prodModel->reset();
-                $prodModel->upc($upc);
-                $prodModel->store_id(1);
-                $exists = $prodModel->load();
-
-                if (($price == 0 || $price =='')&& $exists) {
-                    $price = $prodModel->price();
-                }
-                if (($cost == 0 || $cost =='')&& $exists) {
-                    $cost = $prodModel->cost();
-                }
-            }
-            #(batchID, upc, salePrice, groupSalePrice, signMultiplier, cost)
             $insArgs = array($batchID, $upc, $price, $price);
-            $insArgs[] = $mult;
             if ($saveCost) {
                 $insArgs[] = $cost;
             }
+            $insArgs[] = $mult;
             $dbc->execute($insP, $insArgs);
             /** Worried about speed here. Log many?
             $bu = new BatchUpdateModel($dbc);
@@ -359,20 +325,12 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $stores = new StoresModel($dbc);
         $stores->hasOwnItems(1);
         $stores = $stores->find();
-        //find the discount type so we know if we should update cost or put in special cost.
-        $btype = FormLib::get('btype',0);
-        $dtQ = $dbc->prepare("SELECT discType FROM batchType WHERE batchTypeID=?");
-        $discountType = $dbc->getValue($dtQ, array($btype));
-        if ($discountType === false || !is_numeric($discountType)) {
-            $discountType = 0;
-        }
 
         $ret = true;
         $linecount = 0;
         $checks = FormLib::get('has_checks') !== '' ? True : False;
         //$skipExisting = FormLib::get('skipExisting', 0);
         $model = new ProductsModel($dbc);
-        $vendModel = new VendorItemsModel($dbc);
         $dbc->startTransaction();
         foreach($linedata as $line) {
             // get info from file and member-type default settings
@@ -392,7 +350,17 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $vendor = $line[$indexes['vendor']];
             $pack_size = $line[$indexes['pack_size']];
             $unitOfMesure = $line[$indexes['unitOfMesure']];
-            $sku = $line[$indexes['sku']];
+
+            //item flags 1 or 0 multiplied by 
+            $flags = array($line[$indexes['local']]*1,
+                        $line[$indexes['organic']]*2,
+                        $line[$indexes['coopbasic']]*3,
+                        $line[$indexes['nongmo']]*4,
+                        $line[$indexes['glutenfree']]*6,
+                        $line[$indexes['traitor']]*8,
+                        $line[$indexes['vegan']]*10,);
+            
+            $numflag = $this->proc_flags($upc, '', $flags);
 
             // upc cleanup
             $upc = str_replace(" ","",$upc);
@@ -412,10 +380,11 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 continue;
             }
 
+
             $upc = BarcodeLib::padUPC($upc);
 
             if (strlen($desc) > 35) $desc = substr($desc,0,35);     
-            //update product model.
+
             $model->reset();
             $model->upc($upc);
             $model->store_id(1);
@@ -423,65 +392,16 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             if ($upc == 'upc') {
                 continue; //skip first line
             }
-            //sanitize flag data.
-            $flagNames = array('local', 'organic', 'nongmo', 'glutenfree', 'traitor','vegan','bipoc','women_owned','lgbtq');
-            $updateFlags = false;
-           
-            foreach ($flagNames as $flagNo => $flag) {
-                $value = $line[$indexes[$flag]];
-                #echo "FLAG: ".$flag."INPUT VALUE:".$value;
-                if (strtolower($value) == 'false' || $value == 0) {
-                   $value = 0;
-                } else if ($value != '' && $value != 0) {
-                    $value = 1;
-                } else {$value = '';}
-                $line[$indexes[$flag]] = $value;
-                #echo " SANE VALUE:".$line[$indexes[$flag]]." </br>";
-                // do the flags need to be updated.
-                if($line[$indexes[$flag]] != '') {
-                    $updateFlags = True;
-                }
-            }
-
-
-            //item flags 1 or 0 multiplied by only if flags are present
-            $numflag = '';
-            if ($updateFlags) {
-                $newJson = array('Local' => $line[$indexes['local']],
-                                 'Organic' => $line[$indexes['organic']],
-                                 'Coop Basic' => $line[$indexes['coopbasic']],
-                                 'Non_GMO' => $line[$indexes['nongmo']],
-                                 'bipoc' => $line[$indexes['bipoc']],
-                                 'Gluten Free' => $line[$indexes['glutenfree']],
-                                 'Woman Owned' => $line[$indexes['women_owned']],
-                                 'Traitor Brand' => $line[$indexes['traitor']],
-                                 'LGBTQ' => $line[$indexes['lgbtq']],
-                                 'Vegan' => $line[$indexes['vegan']]);              
-
-                $numflag = $this->proc_flags($upc, '', $newJson);
-            } 
-            if ($numflag > 1023) {
-                $ret .= "<i>Falg Eroors item. Identifier {$upc} MANUALLY SET FLAGGING DATA</i><br />";
-                $this->stats['errors'][] = 'FLAG ERROR FOR UPC ' . $upc .' MANUALLY SET FLAGGING DATA';
-                //processing error don't reset flags
-                $numfalg = '';
-            } 
-
             if ($desc !='') $model->description($desc);
             //$model->normal_price($price);
             if ($dept !='') $model->department($dept);
             if ($tax !='') $model->tax($tax);
             if ($fstamp !='') $model->foodstamp($fstamp);
             if ($discount !='') $model->discount($discount);
-            if ($cost !='' && $discountType < 1) $model->cost($cost);
+            if ($cost !='') $model->cost($cost);
             if ($brand !='') $model->brand($brand);
             if ($numflag !='') $model->numflag($numflag);
-            //takes the currently set vendor if there is none to use for vendor cost updates.
-            if ($vendor !='' && $vendor!='#N/A') {
-                $model->default_vendor_id($vendor);
-            } else {
-                $vendor = $model->default_vendor_id();
-            }
+            if ($vendor !='') $model->default_vendor_id($vendor);
             if ($pack_size !='') $model->size($pack_size);
             if ($unitOfMesure !='') $model->unitofmeasure($unitOfMesure);
             if (!$exists) {
@@ -500,7 +420,6 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 $model->wicable(0);
                 $model->inUse(1);
                 $model->created(date('Y-m-d H:i:s'));
-                $model->scale(0);
             }
             $try = $model->save();
 
@@ -510,21 +429,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                     $model->save();
                 }
             }
-
-            //update catalog only if vendor number is present.
-            if($vendor != '' && $sku != '') {
-                $vendModel->reset();
-                $vendModel->vendorID($vendor);
-                $vendModel->sku($sku);
-                $vendExist = $vendModel->load();
-                if($upc != '') $vendModel->upc($upc);
-                if ($cost !='') $vendModel->cost($cost);
-                if ($brand !='') $vendModel->brand($brand);
-                if ($pack_size !='') $vendModel->size($pack_size);
-                if ($dept !='') $vendModel->vendorDept($dept);
-                if ($desc !='') $vendModel->description($desc);
-                $vendModel->save();
-            }
+            
 
             if ($try) {
                 if (!$exists){
@@ -541,49 +446,11 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         return $ret;
     }
 
-    function proc_flags($upc, $store, $newJSON) {
+    function proc_flags($upc, $store, $flags) {
         $dbc = $this->connection;
-        $attrs = array(1,2,3,4,5,6,7,8,9,10);
-        $fnames = array('Local','Organic','Coop Basic','Non_GMO','bipoc','Gluten Free','Woman Owned','Traitor Brand','LGBTQ','Vegan');
-        $bits = array(1,2,3,4,5,6,7,8,9,10);
-        
-        $curQ = 'SELECT attributes FROM ProductAttributes WHERE upc=? ORDER BY modified DESC';
-        $curQ = $dbc->addSelectLimit($curQ, 1);
-        $curP = $dbc->prepare($curQ);
-        $current = $dbc->getValue($curP, array($upc));
-        $curJSON = false;
-        #echo 'Current Fales'.$current.'<br>';
-    
-        $curJSON = json_decode($current, true);
-        
-        $flags = array();
-        
-        #echo 'FLAGGING ITEM :'.$upc.'<br>';
-        #echo 'newJSON'.print_r($newJSON).'<br>'; //var_dump($flags);
-        #echo 'curJSON'.print_r($curJSON).'<br>'; //var_dump($flags);
-        for ($j=0; $j<count($newJSON); $j++) {
-            $flags[$j] = intval($newJSON[$fnames[$j]])*($j+1); // just set the flag to the new JSON value.
-            //check if the flag should actually stay the same.
-            if (($newJSON[$fnames[$j]] === '' || (is_null($newJSON[$fnames[$j]]))) && $curJSON != false) {
-                if(array_key_exists($fnames[$j], $curJSON)) {
-                    $flags[$j] = intval($curJSON[$fnames[$j]])*($j+1);
-                }
-            }
-        }
-        //echo "flags first dump: ".print_r($flags).'<br>'; //var_dump($flags);
-        /**
-        $flags = array(intval($line[$indexes['local']])*1,
-        intval($line[$indexes['organic']])*2,
-        intval($line[$indexes['coopbasic']])*3,
-        intval($line[$indexes['nongmo']])*4,
-        intval($line[$indexes['bipoc']])*5,
-        intval($line[$indexes['glutenfree']])*6,
-        intval($line[$indexes['women_owned']])*7,
-        intval($line[$indexes['traitor']])*8,
-        intval($line[$indexes['lgbtq']])*9,
-        intval($line[$indexes['vegan']])*10,);
-
-        */
+        $attrs = array(1,2,3,4,6,8,10);
+        $fnames = array('Local','Organic','Coop Basic','Non_GMO','Gluten Free','Traitor Brand','Vegan');
+        $bits = array(1,2,3,4,6,8,10);
         /**
           Collect known flags and initialize
           JSON object with all flags false
@@ -592,21 +459,12 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $bitStatus = array();
         $flagMap = array();
         for ($i=0; $i<count($attrs); $i++) {
-            //$json[$fnames[$i]] = false;
+            $json[$attrs[$i]] = false;
             $flagMap[$bits[$i]] = $attrs[$i];
             $bitStatus[$bits[$i]] = false;
-            //if($newJSON[$fnames[$i]] === '' || is_null($newJSON[$fnames[$i]])) {
-                //$flags[$i] = intval($curJSON[$fnames[$i]])*($i+1);
-                $json[$fnames[$i]] = ($flags[$i]) ? true : false ;
-                //$bitStatus[$bits[$i]] = $curJSON[$fnames[$i]];
-            //} else {
-            //    $flags[$i] = intval($newJSON[$fnames[$i]])*($i+1);
-            //}
-            
         }
 
-        //echo 'flags end: '.print_r($flags).'<br>';
-        //echo 'json dump: '.print_r($json).'<br>';
+
 
         //flags needs to hold bit numbers.
         $numflag = 0;   
@@ -618,43 +476,11 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
             // set flag in JSON representation
             $attr = $flagMap[$f];
-            //$json[$fnames[$attr]] = true;
+            $json[$attr] = true;
             $bitStatus[$f] = true;
         }
 
-        /**
-          Only add attributes entry if it changed
-        */
-        if (($store === '' || $store == FannieConfig::config('STORE_ID')) && $numflag < 1023 ) {
-            $curQ = 'SELECT attributes FROM ProductAttributes WHERE upc=? ORDER BY modified DESC';
-            $curQ = $dbc->addSelectLimit($curQ, 1);
-            $curP = $dbc->prepare($curQ);
-            $current = $dbc->getValue($curP, array($upc));
-            $curJSON = json_decode($current, true);
-            if ($current === false || $curJSON != $json) {
-                $model = new ProductAttributesModel($dbc);
-                $model->upc($upc);
-                $model->modified(date('Y-m-d H:i:s'));
-                $model->attributes(json_encode($json));
-                $model->save();
-            }
-        }
-
         return $numflag;
-    }
-
-    private function getFlags($dbc, $upc){
-        $query = "SELECT upc, JSON_EXTRACT(attributes, '$.Local') as `Local`,
-            JSON_EXTRACT(attributes, '$.Organic') as Organic,
-            JSON_EXTRACT(attributes, '$.Non_GMO') as Non_GMO,
-            JSON_EXTRACT(attributes, '$.\"Gluten Free\"') as Gluten_Free,
-            JSON_EXTRACT(attributes, '$.\"Traitor Brand\"') as traitor_brands,
-            JSON_EXTRACT(attributes, '$.BIPOC') as BIPOC,
-            JSON_EXTRACT(attributes, '$.\"Woman Owned\"') as Woman_Owned,
-            JSON_EXTRACT(attributes, '$.LGBTQ') as LGBTQ
-        from core_op.ProductAttributes where upc = ? having max(modified)";
-        
-        
     }
 
     private function queueUpdate($queue, $upc, $vendor, $name)

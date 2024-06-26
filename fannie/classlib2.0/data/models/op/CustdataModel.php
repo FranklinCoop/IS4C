@@ -130,5 +130,20 @@ Maintenance:
 - Batch import: fannie/mem/import/*.php
         ';
     }
+
+    public function save()
+    {
+        $stack = debug_backtrace();
+        $lane_push = false;
+        if (isset($stack[1]) && $stack[1]['function'] == 'pushToLanes') {
+            $lane_push = true;
+        }
+
+        if ($this->record_changed && !$lane_push) {
+            $this->LastChange(date('Y-m-d H:i:s'));
+        }
+
+        return parent::save();
+    }
 }
 

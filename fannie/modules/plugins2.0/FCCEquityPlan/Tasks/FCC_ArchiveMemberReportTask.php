@@ -117,6 +117,17 @@ class FCC_ArchiveMemberReportTask extends FannieTask
         $results = $dbc->execute($prep,$data);
         $row = $dbc->fetch_row($results);
 
-	}
+        //backup the whole of custdata.
+        $currentDateTime = new DateTime('now'); 
+        $currentDate = $currentDateTime->format('Ym');
+        $tableName = 'custdata'.$currentDate;
+        echo $tableName;
+        $tableName = "aaaaa";
+        $dbc->query("CREATE TABLE core_bak.{$tableName} LIKE core_op.custdata",array());
+        #$dbc->execute($prep, $array($tableName));
+        //$backupQ = "CREATE TABLE core_bak.gabroni AS SELECT * FROM core_op.custdata";
+        //$backupP = $dbc->prepare($backupQ);
+        //$backupR = $dbc->execute($backupP, array());
 
+	}
 }

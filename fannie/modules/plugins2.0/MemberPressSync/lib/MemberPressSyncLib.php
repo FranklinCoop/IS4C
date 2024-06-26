@@ -371,16 +371,20 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
             );
             //$transNo = $row[0];
             //if the trans_num is not uninque make it unique with member number and date.
-            //if ($equityTotal <= 175.00) {
-                $trans_num  = $cardNo.'-'.$row[0].'-'.$row[3];
-              //  $equityTotal += $row[1];
-            //}
+            $trans_num  = $cardNo.'-'.$row[0].'-'.$row[3];
+            if ($equityTotal <= 175.00) {
+                $equityTotal += $row[1];
+            }
             //if (!preg_match("\d{1,4}(?:-\d{1,4})(?:-\d{1,4})", $row[0])) {
                 
             //}
             //$expires_at = date("Y-m-d", strtotime("+1 month", $row[3]));
             $expires_at = new DateTime($row[3]);
             $expires_at->modify('+1 month');
+            $expDateStr = $expires_at->format('Y-m-d H:i:s');
+            if ($equityTotal >= 175.00) {
+                $expires_at = '';
+            }
 
             $trans['trans_num'] = $trans_num;
             $trans['amount'] = $row[1];
@@ -388,7 +392,7 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
             $trans['member'] = $row[2];
             $trans['membership'] = $activeMembershipID;
             $trans['created_at'] = $row[3];
-            $trans['expires_at'] = $expires_at->format('Y-m-d H:i:s');
+            $trans['expires_at'] = $expDateStr;
             $ret[] = $trans;
         }
         return $ret;
@@ -505,7 +509,10 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
         
         $newCardNo = MemberPressSyncLib::getFirstUnusedCardNo($connection);
         $memberShipID = MemberPressSyncLib::getActiveMembershipID($memberInfo['active_memberships']);
-        $memType = MemberPressSyncLib::memberShipID_to_memType($connection, $memberShipID);
+        $memType = 12;
+        if (!is_null($memberShipID) && $memberShipID != 0) {
+            $memType = MemberPressSyncLib::memberShipID_to_memType($connection, $memberShipID);
+        }
         $discount = MemberPressSyncLib::getDiscount($connection, $memType);
         $person_num = 1;
         $custData = new CustdataModel($connection);
@@ -526,16 +533,16 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
         $person_num++;
         
         
-        $profile = $memberInfo['profile'];
+        //$profile = $memberInfo['profile'];
         $otherAdults = array();
-        if ($profile['mepr_adult_one'] != '') {
-            $otherAdults[] = $profile['mepr_adult_one'];
+        if (!is_null($memberInfo['mepr_adult_one']) && $memberInfo['mepr_adult_one'] != '') {
+            $otherAdults[] = $memberInfo['mepr_adult_one'];
         }
-        if ($profile['mepr_adult_two'] != '') {
-            $otherAdults[] = $profile['mepr_adult_two'];
+        if (!is_null($memberInfo['mepr_adult_two'])  && $memberInfo['mepr_adult_two'] != '') {
+            $otherAdults[] = $memberInfo['mepr_adult_two'];
         }
-        if ($profile['mepr_adult_three'] != '') {
-            $otherAdults[] = $profile['mepr_adult_three'];
+        if (!is_null($memberInfo['mepr_adult_three']) && $memberInfo['mepr_adult_three'] != '') {
+            $otherAdults[] = $memberInfo['mepr_adult_three'];
         }
         foreach ($otherAdults as $adult) {
             $names = explode(' ',$adult);
@@ -565,16 +572,20 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
             $custData->save();
             $person_num++;
         }
-
-        $address = $memberInfo['address'];
+        /*            $memberInfo = array('id' => $row[0], 'email' =>$row[1], 'username'=>$row[2], 'nicename'=>$row[3], 'url'=>$row[4], 'message'=>$row[5], 'registered_at'=>$row[6], 'first_name'=>$row[7], 'last_name'=>$row[8], 'display_name'=>$row[9], 'active_memberships'=>$row[10], 
+            'active_txn_count'=>$row[11],'expired_txn_count'=>$row[12], 'trial_txn_count'=>$row[13], 'sub_count'=>$row[14], 'login_count'=>$row[15], 'first_txn'=>$row[16], 'latest_txn'=>$row[17], 'mepr-address-one'=>$row[18], 'mepr-address-two'=>$row[19], 'mepr-address-city'=>$row[20],
+            'mepr-address-state'=>$row[21], 'mepr-address-zip'=>$row[22], 'mepr-address-country'=>$row[23], 'mepr_phone'=>$row[24], 'mepr_email'=>$row[25], 'mepr_how_would_you_like_to_receive_information_about_the_co_op'=>$row[26], 
+            'mepr_adult_one'=>$row[27], 'mepr_adult_two'=>$row[28], 'mepr_adult_three'=>$row[29],'recent_transactions'=>$row[30], 'recent_subscriptions'=>$row[31], 'origin'=>$row[32], 'cardNo'=>$row[33]);
+            $ret[] = $memberInfo;*/
+        //$address = $memberInfo['address'];
         $meminfo = new MeminfoModel($connection);
         $meminfo->card_no($newCardNo);
         $meminfo->last_nane($memberInfo['last_name']);
         $meminfo->first_name($memberInfo['first_name']);
-        $meminfo->street($address['mepr-address-one']." ".$address['mepr-address-two']);
-        $meminfo->city($address['mepr-address-city']);
-        $meminfo->state($address['mepr-address-state']);
-        $meminfo->zip($address['mepr-address-zip']);
+        $meminfo->street($memberInfo['mepr-address-one']." ".$memberInfo['mepr-address-two']);
+        $meminfo->city($memberInfo['mepr-address-city']);
+        $meminfo->state($memberInfo['mepr-address-state']);
+        $meminfo->zip($memberInfo['mepr-address-zip']);
         $meminfo->phone($profile['mepr_phone']);
         $meminfo->email_1($memberInfo['email']);
         $meminfo->modified(date('Y-m-d H:i:s'));
@@ -600,22 +611,25 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
         $meminfo->city($memberInfo['city']);
         $meminfo->state($memberInfo['state']);
         $meminfo->zip($memberInfo['zip']);
-        //$meminfo->phone($memberInfo['phone']);
+        $meminfo->phone($memberInfo['phone']);
         $meminfo->email_1($memberInfo['email']);
         $meminfo->modified(date('Y-m-d H:i:s'));
         $meminfo->save();
     }
+
     /**
-     * create a member number for new memberpress members.
+     * update member info in core
      */
-    public static function updateCOREMember($connection,$cardNo, $memberInfo) {
-        
+    public static function updateCOREcustdata($connection, $member) {
+        $cardNo = $member['cardNo'];
         $memberShipID = MemberPressSyncLib::getActiveMembershipID($memberInfo['active_memberships']);
         $memType = MemberPressSyncLib::memberShipID_to_memType($connection, $memberShipID);
         $discount = MemberPressSyncLib::getDiscount($connection, $memType);
         $person_num = 1;
         $custData = new CustdataModel($connection);
+        $custData->CardNo($cardNo);
         $custData->personNum($person_num);
+        $exists = $custData->load();
         $custData->LastName($memberInfo['last_name']);
         $custData->FirstName($memberInfo['first_name']);
         $custData->CashBack(999.99);
@@ -628,21 +642,10 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
         $custData->memType($memType);
         $custData->CardNo($cardNo);
         $custData->blueLine($cardNo.' '.$memberInfo['last_name']);
-        $custData->save();
+        $saved = $custData->save();
         $person_num++;
-        
-        
-        $profile = $memberInfo['profile'];
-        $otherAdults = array();
-        if ($profile['mepr_adult_one'] != '') {
-            $otherAdults[] = $profile['mepr_adult_one'];
-        }
-        if ($profile['mepr_adult_two'] != '') {
-            $otherAdults[] = $profile['mepr_adult_two'];
-        }
-        if ($profile['mepr_adult_three'] != '') {
-            $otherAdults[] = $profile['mepr_adult_three'];
-        }
+
+        $otherAdults = array($member['mepr_adult_one'], $member['mepr_adult_two'], $member['mepr_adult_three']);
         foreach ($otherAdults as $adult) {
             $names = explode(' ',$adult);
             $first_name ='';
@@ -675,13 +678,12 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
         $address = $memberInfo['address'];
         $meminfo = new MeminfoModel($connection);
         $meminfo->card_no($cardNo);
-        $meminfo->last_nane($memberInfo['last_name']);
-        $meminfo->first_name($memberInfo['first_name']);
-        $meminfo->street($address['mepr-address-one']." ".$address['mepr-address-two']);
-        $meminfo->city($address['mepr-address-city']);
-        $meminfo->state($address['mepr-address-state']);
-        $meminfo->zip($address['mepr-address-zip']);
-        $meminfo->phone($profile['mepr_phone']);
+        $exists = $custData->load();
+        $meminfo->street($memberInfo['street']);
+        $meminfo->city($memberInfo['city']);
+        $meminfo->state($memberInfo['state']);
+        $meminfo->zip($memberInfo['zip']);
+        $meminfo->phone($memberInfo['phone']);
         $meminfo->email_1($memberInfo['email']);
         $meminfo->modified(date('Y-m-d H:i:s'));
         $meminfo->save();
@@ -689,7 +691,8 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
         $mapInfo = array('memberPressID'=>$memberInfo['id'], 'cardNo'=>$newCardNo, 'lastPullDate'=>'', 
         'lastPushDate'=> date('Y-m-d H:i:s'), 'origin'=>'MemberPress');
         MemberPressSyncLib::mapMember($connection, $mapInfo);
-        echo "New Member: ".$newCardNo." MemberPressID".$memberInfo['id']."\n";
+        echo "Updating Member ".$newCardNo." MemberPressID".$memberInfo['id']."\n";
+        
     }
     /**
    "address": {
@@ -835,25 +838,28 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
      * Find a member in the core database by accoication, used for initlizing after words member should beable to be looked up based solely on the map.
      */
     public static function coreMemberByName($connection, $mpID, $FirstName, $LastName, $email) {
-        $ret =  array('cardNo'=>'','FirstName'=>'','LastName'=>'','street'=>'', 'city'=>'','state'=>'','zip'=>'', 'email'=>'');
+        $ret =  array('cardNo'=>'','FirstName'=>'','LastName'=>'','street'=>'', 'city'=>'','state'=>'','zip'=>'', 'email'=>'', 'mepr_adult_one'=>'','mepr_adult_two'=>'','mepr_adult_three'=>'');
         $row = MemberPressSyncLib::isMapped($connection,$mpID,1);
+        $memberQ = "SELECT c.cardNo, c.FirstName, c.LastName, i.street, i.city, i.state, i.zip, i.email_1 FROM core_op.custdata c,
+            CONCAT(c2.FirstName, ' ', c2.LastName) as  mepr_adult_one ,CONCAT(c3.FirstName, ' ', c3.LastName) as  mepr_adult_two,
+            CONCAT(c4.FirstName, ' ', c4.LastName) as  mepr_adult_three
+            LEFT JOIN core_op.meminfo i ON c.cardNo = i.card_no
+            LEFT JOIN (select CardNo, LastName, FirstName FROM core_op.custdata WHERE personNum  = 2) c2 on c.cardNo = c2.CardNo
+            LEFT JOIN (select CardNo, LastName, FirstName FROM core_op.custdata WHERE personNum  = 3) c3 on c.cardNo = c3.CardNo
+            LEFT JOIN (select CardNo, LastName, FirstName FROM core_op.custdata WHERE personNum  = 4) c4 on c.cardNo = c4.CardNo";
         if ($row === false) {
             //if the member is not mapped try and find by name.
-            $memberQ = "SELECT c.cardNo, c.FirstName, c.LastName, i.street, i.city, i.state, i.zip, i.email_1 FROM core_op.custdata c 
-            LEFT JOIN core_op.meminfo i ON c.cardNo = i.card_no
-            WHERE (UPPER(c.LastName) = ? OR UPPER(i.last_name) = ?) AND (UPPER(c.FirstName) =? OR UPPER(i.first_name) = ?) and c.personNum=1";
+            $memberQ .= " WHERE (UPPER(c.LastName) = ? OR UPPER(i.last_name) = ?) AND (UPPER(c.FirstName) =? OR UPPER(i.first_name) = ?) and c.personNum=1";
             $prep = $connection->prepare($memberQ);
             $row = $connection->getRow($prep, array(strtoupper($LastName), strtoupper($LastName), strtoupper($FirstName), strtoupper($FirstName)));
             if ($row === false) {
                 //find my email
-                $memberQ = "SELECT c.cardNo, c.FirstName, c.LastName, i.street, i.city, i.state, i.zip, i.email_1 FROM core_op.custdata c 
-                LEFT JOIN core_op.meminfo i ON c.cardNo = i.card_no
-                WHERE UPPER(i.email_1) = ? and c.personNum=1";
+                $memberQ .= " WHERE UPPER(i.email_1) = ? and c.personNum=1";
                 $prep = $connection->prepare($memberQ);
                 $row = $connection->getRow($prep, array(strtoupper($email)));
                 if ($row === false) {
                     // add member to core if they have a subscriptions.
-                    $ret =  array('cardNo'=>'','FirstName'=>'','LastName'=>'','street'=>'', 'city'=>'','state'=>'','zip'=>'','email'=>'');
+                    $ret =  array('cardNo'=>'','FirstName'=>'','LastName'=>'','street'=>'', 'city'=>'','state'=>'','zip'=>'', 'email'=>'', 'mepr_adult_one'=>'','mepr_adult_two'=>'','mepr_adult_three'=>'');
                 } else {
                     $ret = MemberPressSyncLib::getCOREMemberReturnArray($row);
                 }
@@ -862,13 +868,11 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
             }
         } else {
             //the member is already mapped, update member.
-            $memberQ = "SELECT c.cardNo, c.FirstName, c.LastName, i.street, i.city, i.state, i.zip, i.email_1 FROM core_op.custdata c 
-            LEFT JOIN core_op.meminfo i ON c.cardNo = i.card_no
-            WHERE c.cardNo IN( SELECT cardNo FROM core_op.MemberPressMemberMap WHERE memberPressID =? )";
+            $memberQ = " WHERE c.cardNo IN( SELECT cardNo FROM core_op.MemberPressMemberMap WHERE memberPressID =? )";
             $prep = $connection->prepare($memberQ);
             $newRow = $connection->getRow($prep, array($mpID));
             if ($newRow === false) {
-                $ret =  array('cardNo'=>'MapError','FirstName'=>'MapError','LastName'=>'MapError','street'=>'MapError', 'city'=>'MapError','state'=>'MapError','zip'=>'MapError', 'email'=>'MapError');
+                $ret =  array('cardNo'=>'MapError','FirstName'=>'MapError','LastName'=>'MapError','street'=>'MapError', 'city'=>'MapError','state'=>'MapError','zip'=>'MapError', 'email'=>'MapError', 'mepr_adult_one'=>'MapError','mepr_adult_two'=>'MapError','mepr_adult_three'=>'MapError');
             } else {
                 $ret = MemberPressSyncLib::getCOREMemberReturnArray($newRow);
             }
@@ -878,7 +882,8 @@ WHERE p.tdate >= h.startdate AND p.stockPurchase > 0 AND m.memberPressID AND m.o
     }
     private static function getCOREMemberReturnArray($row){
         $ret = array('cardNo'=>$row[0],'FirstName'=>$row[1],'LastName'=>$row[2],
-                            'street'=>$row[3], 'city'=>$row[4],'state'=>$row[5],'zip'=>$row[6], 'email'=>$row[7]);
+                     'street'=>$row[3], 'city'=>$row[4],'state'=>$row[5], 'zip'=>$row[6],
+                     'email'=>$row[7], 'mepr_adult_one'=>$row[8],'mepr_adult_two'=>$row[9],'mepr_adult_three'=>$row[10]);
         return $ret;
     } 
     public static function getNewCOREMembers($connection){

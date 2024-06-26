@@ -30,7 +30,7 @@ if (!class_exists('FannieAPI')) {
 include_once(dirname(__FILE__).'/../lib/MemberPressSyncLib.php');
 /**
 */
-class MemberPressSyncInitTask extends FannieTask 
+class MemberPressSyncTransactionsTask extends FannieTask 
 {
     public $name = 'Initilize Member Press Sync Tables';
 
@@ -66,15 +66,15 @@ class MemberPressSyncInitTask extends FannieTask
         //echo MemberPressSyncLib::getMember($mpURL,$mpKey,643);
         $this->initUnmapable($dbc);
         $this->initPaymentPlanMap($dbc);
-        //$this->updateCorePayments($dbc);
-        //$this->pullMembers($dbc, $mpURL, $mpKey);
-        //$this->syncMembers($dbc, $mpURL, $mpKey);
+        $this->updateCorePayments($dbc);
+        $this->pullMembers($dbc, $mpURL, $mpKey);
+        $this->syncMembers($dbc, $mpURL, $mpKey);
         
-        //$this->pullTransactions($dbc, $mpURL, $mpKey);
-        //$this->syncTransactions($dbc, $mpURL, $mpKey);
+        $this->pullTransactions($dbc, $mpURL, $mpKey);
+        $this->syncTransactions($dbc, $mpURL, $mpKey);
         
-        //$this->pushMembers($dbc, $mpURL, $mpKey);
-        //$this->pushTransactions($dbc, $mpURL, $mpKey);
+        $this->pushMembers($dbc, $mpURL, $mpKey);
+        $this->pushTransactions($dbc, $mpURL, $mpKey);
         //643
     }
     private function updateCOREPayments($connection) {
@@ -471,11 +471,11 @@ class MemberPressSyncInitTask extends FannieTask
 
 
         $memberInfo['email'] = ($core_member['email'] === '') ? $member['email'] : $core_member['email'];
-        $memberInfo['street'] = ($core_member['street'] === '') ? $member['mepr-address-one'].' '.$member['mepr-address-two']  : $core_member['street'];
+        $memberInfo['street'] = ($core_member['street'] === '') ? $member['mepr-address-one'].' '.$address['mepr-address-two']  : $core_member['street'];
         $memberInfo['city'] = ($core_member['city'] === '') ? $member['mepr-address-city'] : $core_member['city'];
         $memberInfo['state'] = ($core_member['state'] === '') ? $member['mepr-address-state'] : $core_member['state'];
         $memberInfo['zip'] = ($core_member['zip'] === '') ? $member['mepr-address-zip'] : $core_member['zip'];
-        $memberInfo['pnone'] = ($core_member['phone'] === '') ? $member['mepr_phone'] : $core_member['phone'];
+        //$memberInfo['pnone'] = ($core_member['phone'] === '') ? $profile['mepr_phone'] : $core_member['phone'];
 
         $runUpdate = False;
 

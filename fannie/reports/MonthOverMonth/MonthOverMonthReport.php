@@ -90,7 +90,7 @@ class MonthOverMonthReport extends FannieReportPage {
                         YEAR(tdate) AS year
                       FROM $dlog AS t "
                         . DTrans::joinProducts('t', 'p') . " 
-                      WHERE t.trans_status <> 'M'
+                      WHERE t.trans_type IN ('I', 'D')
                         AND tdate BETWEEN ? AND ?
                         AND t.upc IN $inClause
                       GROUP BY YEAR(tdate),
@@ -110,7 +110,7 @@ class MonthOverMonthReport extends FannieReportPage {
                 SUM(total) as sales, MONTH(tdate) as month, YEAR(tdate) as year
                 FROM $dlog AS t
                 LEFT JOIN departments AS d ON t.department=d.dept_no
-                WHERE t.trans_status <> 'M'
+                WHERE t.trans_type IN ('I', 'D')
                 AND tdate BETWEEN ? AND ?
                 AND t.department BETWEEN ? AND ?
                 GROUP BY YEAR(tdate),MONTH(tdate),t.department,d.dept_name

@@ -69,8 +69,9 @@ class MonthOverMonthReport extends FannieReportPage {
         $dlog = DTransactionsModel::selectDlog($date1,$date2);
         $date1 .= ' 00:00:00';
         $date2 .= ' 00:00:00';
+        $store = FormLib::get('store');
 
-        $qArgs = array($date1,$date2);
+        $qArgs = array($date1,$date2,$store);
         $query = "";
         $type = FormLib::get_form_value('mtype','upc');
         if ($type == 'upc'){
@@ -93,6 +94,7 @@ class MonthOverMonthReport extends FannieReportPage {
                       WHERE t.trans_type IN ('I', 'D')
                         AND tdate BETWEEN ? AND ?
                         AND t.upc IN $inClause
+                        AND " . DTrans::isStoreID($store, 't') . "
                       GROUP BY YEAR(tdate),
                         MONTH(tdate),
                         t.upc,
@@ -112,6 +114,7 @@ class MonthOverMonthReport extends FannieReportPage {
                 LEFT JOIN departments AS d ON t.department=d.dept_no
                 WHERE t.trans_type IN ('I', 'D')
                 AND tdate BETWEEN ? AND ?
+                AND " . DTrans::isStoreID($store, 't') . "
                 AND t.department BETWEEN ? AND ?
                 GROUP BY YEAR(tdate),MONTH(tdate),t.department,d.dept_name
                 ORDER BY YEAR(tdate),MONTH(tdate),t.department,d.dept_name";
@@ -139,6 +142,7 @@ class MonthOverMonthReport extends FannieReportPage {
         $dbc = $this->connection;
         $dbc->selectDB($this->config->get('OP_DB'));
         $depts = array();
+        $store = FormLib::storePicker();
         $q = $dbc->prepare("SELECT dept_no,dept_name FROM departments ORDER BY dept_no");
         $r = $dbc->execute($q);
         while($w = $dbc->fetch_row($r))
@@ -197,6 +201,10 @@ class MonthOverMonthReport extends FannieReportPage {
     <p>
         <label class="control-label">Results in</label>
         <select class="form-control" name=results><option>Sales</option><option>Quantity</option></select>
+    </p>
+    <p>
+        <label>Store(s)</label>
+        <?php echo $store['html']; ?>
     </p>
     <p>
         <button type="submit" value="Run Report" class="btn btn-default">Run Report</button>

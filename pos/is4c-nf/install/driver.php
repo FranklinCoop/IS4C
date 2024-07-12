@@ -29,7 +29,7 @@ $known_good_modules = array(
     'SPH_Datacap_PDCX' => array(
         'description' => _('Datacap ActiveX compatible devices (Windows-only)'),
         'common-ports' => array(
-            'VX805XPI:*' => _('Verifone VX805 on COM*'),
+            //'VX805XPI:*' => _('Verifone VX805 on COM*'),
             'VX805XPI_MERCURY_E2E:*' => _('Verifone VX805 with Mercury encryption on COM*'),
             'INGENICOISC250_MERCURY_E2E:*' => _('Ingenico iSC250 with Mercury encryption on COM*'),
         ),
@@ -37,9 +37,10 @@ $known_good_modules = array(
     'SPH_Datacap_EMVX' => array(
         'description' => _('Datacap ActiveX compatible devices with EMV support (Windows-only)'),
         'common-ports' => array(
-            'VX805XPI:*' => _('Verifone VX805 on COM*'),
+            //'VX805XPI:*' => _('Verifone VX805 on COM*'),
             'VX805XPI_MERCURY_E2E:*' => _('Verifone VX805 with Mercury encryption on COM*'),
             'INGENICOISC250_MERCURY_E2E:*' => _('Ingenico iSC250 with Mercury encryption on COM*'),
+            'INGENICOLANE7000_MERCURY_E2E:*' => _('Ingenico LANE 7000 with Mercury encryption on COM*'),
         ),
     ),
     'SPH_SignAndPay_Native' => array(

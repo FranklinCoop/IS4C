@@ -746,7 +746,8 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             case "INGENICOISC250":
             case "INGENICOISC250_MERCURY_E2E":
             case "INGENICOISC250_RAPIDCONNECT_E2E":
-            case "INGENICOLANE8000_MERCURY":
+            case "INGENICOLANE8000_MERCURY_E2E":
+            case "INGENICOLANE7000_MERCURY_E2E":
                 return ComPortUtility.FindComPort("Ingenico");
             default:
                 return "";
@@ -769,8 +770,9 @@ public class SPH_Datacap_EMVX : SerialPortHandler
             case "INGENICOISC480":
             case "INGENICOISC480_RAPIDCONNECT_E2E":
                 return "ISC480";
-            case "INGENICOLANE8000_MERCURY":
+            case "INGENICOLANE8000_MERCURY_E2E":
                 return "LANE8000";
+            case "INGENICOLANE7000_MERCURY_E2E":
             case "LANE7000_RAPIDCONNECT_E2E":
                 return "LANE7000";
             default:
@@ -796,6 +798,8 @@ public class SPH_Datacap_EMVX : SerialPortHandler
                 return "EMV_ISC480_RAPIDCONNECT_E2E";
             case "INGENICOLANE8000_MERCURY":
                 return "EMV_LANE8000_MERCURY";
+            case "INGENICOLANE7000_MERCURY_E2E":
+                return "EMV_LANE7000_MERCURY";
             case "LANE7000_RAPIDCONNECT_E2E":
                 return "EMV_LANE7000_RAPIDCONNECT_E2E";
             default:

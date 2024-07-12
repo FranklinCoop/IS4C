@@ -39,7 +39,7 @@ class CheckWriting extends \COREPOS\Fannie\API\member\MemberModule {
             if (!$c['accountHolder']) {
                 continue;
             }
-            $accountValue = $c['WritesChecks'] ? 'checked' : '';
+            $accountValue = $c['checksAllowed'] ? 'checked' : '';
                     // Compose the display/edit block.
             $ret = "<div class=\"panel panel-default\">
                 <div class=\"panel-heading\">Check Writing Privilage</div>
@@ -47,8 +47,8 @@ class CheckWriting extends \COREPOS\Fannie\API\member\MemberModule {
 
             $ret .= '<div class="form-group form-inline">
                 <span class="label primaryBackground">Allow Checks </span>';
-            $ret .= sprintf('<input type="checkbox" name="MemCheckWriting"
-                %s value="%d" class="checkbox-inline" /></label>',$accountValue,$c['WritesChecks']);
+            $ret .= sprintf('<input type="checkbox" name="MemCheckWriting" id="MemCheckWriting"
+                %s value="%d" class="checkbox-inline" /></label>',$accountValue,$c['checksAllowed']);
             $ret .= "</select></div>";
 
             $ret .= "</div>";
@@ -67,32 +67,15 @@ class CheckWriting extends \COREPOS\Fannie\API\member\MemberModule {
     // Return "" on success or an error message.
     public function saveFormData($memNum, $json=array())
     {
-        $dbc = $this->db();
+        $formPref = FormLib::get('MemCheckWriting')==='' ? '0' : '1';
 
-        $formPref = FormLib::get('MemCheckWriting')==='checked' ? 1 : 0;
-        $infoQ = $dbc->prepare("SELECT WriteChecks
-                FROM custdata
-                WHERE CardNo=?");
-        $infoR = $dbc->execute($infoQ,array($memNum));
-        $row = $dbc->fetch_row($infoR);
-        $dbPref = $row['WriteChecks'];
-
-        //$account = self::getAccount();
-        //$dbPref = $account['checksAllowed'];
-        if ( $formPref != $dbPref ) {
-            $upQ = $dbc->prepare("UPDATE custdata SET WriteChecks = ?
-                WHERE CardNo = ?");
-            $upR = $dbc->execute($upQ,array($formPref, $memNum));
-            $json['checksAllowed'] = $fromPref;
-            if ( $upR === False )
-                return "Error: problem updating Check Writing Privilage.";
-            else
-                return '';
+        foreach ($json['customers'] as $key=>$customer) {
+            if ($customer['checksAllowed'] != $formPref) {
+                $json['customers'][$key]['checksAllowed'] = $formPref;
+            }
         }
+        return $json;
 
-        return "";
-
-    // saveFormData
     }
 
 // CheckWriting

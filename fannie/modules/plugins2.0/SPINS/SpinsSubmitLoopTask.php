@@ -77,11 +77,11 @@ class SpinsSubmitLoopTask extends FannieTask
                     $upload = false;
                 } else if (substr($arg, 0, 7) == '--start') {
                     $parts = explode('=', $arg);
-                    echo var_dump($parts)."\n";
+                    //echo var_dump($parts)."\n";
                     $loopStart = strtotime($parts[1]);
                 } else if (substr($arg, 0, 5) == '--end') {
                     $parts = explode('=', $arg);
-                    echo var_dump($parts)."\n";
+                    //echo var_dump($parts)."\n";
                     $today = strtotime($parts[1]);
                 }
             }
@@ -108,7 +108,8 @@ class SpinsSubmitLoopTask extends FannieTask
             $spins_week = $dateObj->spinsWeek();
             $dlog = DTransactionsModel::selectDlog(date('Y-m-d', $start), date('Y-m-d',$end));
 
-            $lastDay = date("M d, Y", $end) . ' 11:59PM'; 
+            $lastDay = date("M d, Y", $end) . ' 11:59PM';
+            $fileDay = date("mdY", $end);
 
             $this->cronMsg('SPINS data for week #' . $spins_week . '(' . date('Y-m-d', $start) . ' to ' . date('Y-m-d', $end) . ')', FannieLogger::INFO);
 
@@ -120,7 +121,7 @@ class SpinsSubmitLoopTask extends FannieTask
                     '$lastDay' AS lastDay
                   FROM $dlog AS d
                     " . DTrans::joinProducts('d', 'p', 'INNER') . "
-                  WHERE p.Scale = 0
+                  WHERE d.Scale = 0
                     AND d.upc > '0000000999999' 
                     AND tdate BETWEEN ? AND ? AND d.store_id=?
                   GROUP BY d.upc, p.description";

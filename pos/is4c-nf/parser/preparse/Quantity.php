@@ -26,7 +26,8 @@ use COREPOS\pos\parser\PreParser;
 
 class Quantity extends PreParser 
 {
-    
+    const SCANNED_PREFIX = '0XA';
+
     function check($str){
         if (strstr($str,"*"))
             return True;
@@ -39,7 +40,8 @@ class Quantity extends PreParser
             strpos($str,"*") != strlen($str)-1){
             $split = explode("*",$str);
             if (is_numeric($split[0]) &&
-               (strpos($split[1],"DP") || is_numeric($split[1]))){
+               (strpos($split[1],"DP") || is_numeric($split[1]) 
+               || substr($split[1],0,3) === self::SCANNED_PREFIX)){
                    $this->session->set("quantity",$split[0]);
                    $this->session->set("multiple",1);
                    $str = $split[1];

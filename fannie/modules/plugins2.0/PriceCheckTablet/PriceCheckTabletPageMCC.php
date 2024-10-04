@@ -149,7 +149,7 @@ class PriceCheckTabletPageMCC extends FannieRESTfulPage
     {
         $this->addJQuery();
         $this->addBootstrap();
-        $this->addScript('priceCheckTabletMCC.js');
+        $this->addScript('priceCheckMCC.js');
         $this->addOnloadCommand("\$('#pc-upc').focus();");
         $this->addOnloadCommand("priceCheckTabletMCC.showDefault();");
         if (file_exists(__DIR__ . '/../../../src/javascript/composer-components/bootstrap/css/bootstrap.min.css')) {

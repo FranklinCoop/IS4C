@@ -865,7 +865,8 @@ public class SPH_Datacap_Gen2 : SerialPortHandler
                 return ComPortUtility.FindComPort("Verifone");
             case "INGENICOISC250":
             case "INGENICOISC250_MERCURY_E2E":
-            case "INGENICOLANE8000_MERCURY":
+            case "INGENICOLANE8000_MERCURY_E2E":
+            case "INGENICOLANE7000_MERCURY_E2E":
             case "INGENICOISC250_RAPIDCONNECT_E2E":
                 return ComPortUtility.FindComPort("Ingenico");
             default:
@@ -888,8 +889,10 @@ public class SPH_Datacap_Gen2 : SerialPortHandler
                 return "ISC250";
             case "INGENICOIPP320":
                 return "IPP320";
-            case "INGENICOLANE8000_MERCURY":
+            case "INGENICOLANE8000_MERCURY_E2E":
                 return "LANE8000";
+            case "INGENICOLANE7000_MERCURY_E2E":
+                return "LANE7000";
             default:
                 return device;
         }
@@ -911,8 +914,10 @@ public class SPH_Datacap_Gen2 : SerialPortHandler
                 return "EMV_ISC250_RAPIDCONNECT_E2E";
             case "INGENICOIPP320":
                 return "EMV_IPP320_RAPIDCONNECT";
-            case "INGENICOLANE8000_MERCURY":
+            case "INGENICOLANE8000_MERCURY_E2E":
                 return "EMV_LANE8000_MERCURY";
+            case "INGENICOLANE7000_MERCURY_E2E":
+                return "EMV_LANE7000_MERCURY";
             default:
                 return "EMV_" + device;
         }

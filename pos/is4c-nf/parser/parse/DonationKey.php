@@ -49,50 +49,57 @@ class DonationKey extends Parser
         }
 
         $ret = $this->default_json();
+
         $lib = new DeptLib($this->session);
         if ($str == "RU") {
             Database::getsubtotals();
             $ttl = $this->session->get("amtdue");    
             $next = ceil($ttl);
             $amt = sprintf('%.2f',(($ttl == $next) ? 1.00 : ($next - $ttl)));
-            if ($plu != '') {
-                $upc = str_pad($plu, 13,'0000000000000', STR_PAD_LEFT);
-                $row = $this->lookupItem($upc);
-                TransRecord::addRecord(array(
-                    'upc' => $row['upc'],
-                    'description' => $row['description'],
-                    'trans_type' => 'I',
-                    'trans_subtype' => (isset($row['trans_subtype'])) ? $row['trans_subtype'] : '',
-                    'department' => $row['department'],
-                    'quantity' => 1,
-                    'unitPrice' => $amt,
-                    'total' => $amt,
-                    'regPrice' => $amt,
-                    'scale' => $row['scale'],
-                    'tax' => $row['tax'],
-                    'foodstamp' => $row['foodstamp'],
-                    'discount' => 0,
-                    'memDiscount' => 0,
-                    'discountable' => $row['discount'],
-                    'discounttype' => $row['discounttype'],
-                    'ItemQtty' => 1
-                ));
-            } else {
-                $ret = $lib->deptkey($amt*100, $dept.'0', $ret);
-            }
-            
+            $this->addRoundUp($str, $amt, $plu, $dept);
             
             PrehLib::ttl();
             $ret['output'] = DisplayLib::lastpage();
             $ret['redraw_footer'] = True;
 
-
         } else {
             $amt = substr($str,0,strlen($str)-2);
-            $ret = $lib->deptkey($amt, $dept.'0', $ret);
+            $this->addRoundUp($str, $amt, $plu, $dept);
         }
 
         return $ret;
+    }
+
+    private function addRoundUp($str, $amt, $plu, $dept) {
+        //I moved this to it's own function because it would be aduplication of function
+        //in parse() in an if/else statement.
+        if ($plu != '') {
+            //if the plu is set use the plu
+            $upc = str_pad($plu, 13,'0000000000000', STR_PAD_LEFT);
+            $row = $this->lookupItem($upc);
+            TransRecord::addRecord(array(
+                'upc' => $row['upc'],
+                'description' => $row['description'],
+                'trans_type' => 'I',
+                'trans_subtype' => (isset($row['trans_subtype'])) ? $row['trans_subtype'] : '',
+                'department' => $row['department'],
+                'quantity' => 1,
+                'unitPrice' => $amt,
+                'total' => $amt,
+                'regPrice' => $amt,
+                'scale' => $row['scale'],
+                'tax' => $row['tax'],
+                'foodstamp' => $row['foodstamp'],
+                'discount' => 0,
+                'memDiscount' => 0,
+                'discountable' => $row['discount'],
+                'discounttype' => $row['discounttype'],
+                'ItemQtty' => 1
+            ));
+        }  else {
+            //if the plu is not set open ring.
+            $ret = $lib->deptkey($amt*100, $dept.'0', $ret);
+        }
     }
 
         

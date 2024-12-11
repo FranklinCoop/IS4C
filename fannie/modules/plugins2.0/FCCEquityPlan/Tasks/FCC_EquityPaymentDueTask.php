@@ -66,10 +66,18 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			$mostRecentDate = new DateTime($row['mostRecent']);
 			$mostRecentDate->modify('first day of this month')->setTime(0,0,0);
 			$interval = $now->diff($mostRecentDate);
-			$years = $interval->y;
-			$months = $interval->m;
-			$days = $interval->d;
-			$months = $years*12+$months; //It wraps around so we need to track if it's been more than a year;
+			//checking the value to see if the payment is dated out past currnet date, do not calcualte a total if
+			//the payment date is later then the current date, wait until it catches up.
+			$years = 0;
+			$months = 0;
+			$days = 0;
+			if ($interval->invert) {
+				$years = $interval->y;
+				$months = $interval->m;
+    			$days = $interval->d;
+    			$months = $years*12+$months; //It wraps around so we need to track if it's been more than a year;
+			}
+			
 			$blueLine = $row['blueLine'];
 			$newLine = '';
 			$memType = $row['memType'];
@@ -81,6 +89,7 @@ class FCC_EquityPaymentDueTask extends FannieTask
 				$paymentDue = $paymentDue - (($paid+$paymentDue) - 175);
 			}
 			
+			//find what the new buleline should be.
 			$updateAccount = false;
 			if($months >= 1 && $row['equityPaymentPlanID'] == 1 && $row['payments'] < 175 && $memType != 0){
 				$remainAmt = 175 - $paid;

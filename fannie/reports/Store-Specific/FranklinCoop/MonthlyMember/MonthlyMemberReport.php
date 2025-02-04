@@ -226,7 +226,7 @@ class MonthlyMemberReport extends FannieReportPage
             SELECT  count(c.cardNo), 'FFA Non-Renewals' as lineName
             FROM core_op.custdata c
             LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
-            WHERE c.personNum = 1 AND h.memType = (6,14,15) AND (h.memType not in  (6,14,15))
+            WHERE c.personNum = 1 AND h.memType in (6,14,15) AND (h.memType not in  (6,14,15))
             UNION
             SELECT  count(c.cardNo), 'Total FFA' as lineName
             FROM core_op.custdata c

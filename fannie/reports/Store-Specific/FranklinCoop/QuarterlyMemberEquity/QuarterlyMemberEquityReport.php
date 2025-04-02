@@ -28,15 +28,15 @@ if (!class_exists('FannieAPI')) {
 
 class QuarterlyMemberEquityReport extends FannieReportPage 
 {
-    public $description = '[Quaterly Member Equity Report] Shows sales and % of sales based on product attributes. e.g. organic, gulten free.'; 
+    public $description = '[Quaterly Member Equity Report] List of member paymetns in the date range.'; 
     public $report_set = 'Sales Reports';
     public $themed = true;
     protected $new_tablesorter = true;
 
-    protected $title = "Fannie : Attribute Sale Report";
-    protected $header = "Attribute Sales Report";
+    protected $title = "Quaterly Member Equity Report";
+    protected $header = "Quaterly Member Equity Report";
     protected $report_cache = 'none';
-    protected $grandTTL = 1;
+    protected $grandTTL = 0;
     protected $multi_report_mode = true;
     protected $sortable = false;
     protected $no_sort_but_style = true;
@@ -72,16 +72,18 @@ class QuarterlyMemberEquityReport extends FannieReportPage
         $data = array();
         $row = array('FCC Totals','','');
         $data[] = $row;
-        $row = array('Attribute', 'Total Sales', '% Sales');
+        $row = array('Date','Member #', 'Last Name', 'First Name', 'Payment','Transaction');
         $data[] = $row;
 
         $dlog = DTransactionsModel::selectDlog($date1,$date2);
-        $salesQ = $dbc->prepare("SELECT sum(t.total) AS Dept_Total
-                                 FROM trans_archive.bigArchive t
-                                 WHERE trans_type IN ('I','D') AND t.`datetime` BETWEEN ? AND ?
-                                 AND t.store_id =? AND trans_status != 'X'");
+        $salesQ = $dbc->prepare("SELECT DATE(p.tdate) as `date`, p.card_no, c.LastName, c.FirstName, p.stockPurchase, p.trans_num
+            FROM core_trans.stockpurchases p
+            JOIN core_op.custdata c ON p.card_no = c.cardNo AND c.personNum = 1
+            WHERE p.tdate BETWEEN ? AND ?
+            AND p.trans_num != 'sch'
+            ORDER BY p.tdate");
         $salesR = $dbc->execute($salesQ,$dates);
-        $report = array();
+        $report = array(); 
         $storeTotals = array();
         while($salesW = $dbc->fetch_row($salesR)){
             

@@ -149,16 +149,16 @@ class MonthlyMemberReport extends FannieReportPage
         SELECT  count(c.cardNo), 'New FFAs' as lineName
         FROM core_op.custdataHistory c
         LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
-        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND c.memType IN (6,14,15) AND (h.memType not in (6,14,15) or h.memType is null)
+        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND c.memType = 6 AND (h.memType != c.memType or h.memType is null)
         UNION
         SELECT  count(c.cardNo), 'FFA Non-Renewals' as lineName
         FROM core_op.custdataHistory c
         LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
-        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND h.memType in (6,14,15) AND (c.memType not in (6,14,15))
+        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND h.memType = 6 AND (h.memType != c.memType)
         UNION
         SELECT  count(c.cardNo), 'Total FFA' as lineName
         FROM core_op.custdataHistory c
-        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND c.memType  in (6,14,15)
+        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND c.memType = 6
         UNION
         SELECT count(c.cardNo), 'Total Members' as lineName FROM (
             SELECT p.card_no, SUM(p.stockPurchase) as equity
@@ -212,25 +212,24 @@ class MonthlyMemberReport extends FannieReportPage
             ) as p
             WHERE p.startDate between '{$sdate}' and '{$edate}'
             UNION
-            SELECT COUNT(p.card_no), 'Total Terms' as lineName FROM 
-            (SELECT card_no,SUM(stockPurchase) as equity, max(tdate) as endDate  FROM core_trans.stockpurchases
-            group by card_no having SUM(stockPurchase) = 0) p
-            LEFT JOIN (SELECT * FROM core_op.custdata WHERE personNum =1) h on p.card_no = h.cardNo
-            WHERE p.endDate between '{$sdate}' and '{$edate}'
+            SELECT COUNT(card_no), 'Total Terms' as lineName 
+            FROM core_trans.equity_history_sum 
+            WHERE payments = 0 and mostRecent 
+            BETWEEN '{$sdate}' and '{$edate}'
             UNION
             SELECT  count(c.cardNo), 'New FFAs' as lineName
             FROM core_op.custdata c
             LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
-            WHERE c.personNum = 1 AND c.memType in (6,14,15) AND (c.memType NOT IN (6,14,15) or h.memType is null)
+            WHERE c.personNum = 1 AND c.memType = 6 AND (h.memType != c.memType or h.memType is null)
             UNION
             SELECT  count(c.cardNo), 'FFA Non-Renewals' as lineName
             FROM core_op.custdata c
             LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
-            WHERE c.personNum = 1 AND h.memType in (6,14,15) AND (c.memType not in  (6,14,15))
+            WHERE c.personNum = 1 AND h.memType = 6 AND (h.memType != c.memType)
             UNION
             SELECT  count(c.cardNo), 'Total FFA' as lineName
             FROM core_op.custdata c
-            WHERE c.personNum = 1 AND c.memType in (6,14,15)
+            WHERE c.personNum = 1 AND c.memType = 6
             UNION
             SELECT count(c.cardNo), 'Total Members' as lineName FROM (
                 SELECT p.card_no, SUM(p.stockPurchase) as equity

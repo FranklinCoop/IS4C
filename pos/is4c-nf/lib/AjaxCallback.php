@@ -81,6 +81,10 @@ class AjaxCallback
             self::perfStart();
             self::executeCallback($callback_class);
             self::perfEnd($callback_class);
+        } elseif ($callback_class === 'COREPOS\pos\ajax\AjaxParser' && basename($file) === 'login.php') {
+            self::$logger->debug("User Logout No Callback but not an error"); // this was thowing an error every logout now it just post a debug
+        }  elseif ($callback_class === 'COREPOS\pos\ajax\AjaxParser' && basename($file) === 'pos2.php') {
+            self::$logger->debug("User Login No Callback but not an error"); // this was thowing an error every login now it just gives a debug.
         } else {
             self::$logger->error("$callback_class is not correct for the file $file");
         }

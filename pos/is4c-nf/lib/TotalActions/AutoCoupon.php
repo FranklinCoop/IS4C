@@ -88,6 +88,11 @@ class AutoCoupon extends TotalAction
                 // error. no feedback necessary
                 continue;
             }
+            if ($hcoup->checkLimits($id, true) !== true){
+                // coupon has already been applied the do not apply againt
+                // same as above but checks limits.
+                continue;
+            }
 
             // get value of coupon AND value
             // of any previous applications of this coupon

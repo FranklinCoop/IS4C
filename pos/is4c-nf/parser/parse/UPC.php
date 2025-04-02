@@ -681,6 +681,12 @@ class UPC extends Parser
     public static function requestInfoCallback($info)
     {
         if ((is_numeric($info) && strlen($info)==8) || $info == 1){
+            // allows entry in MMDDYYYY format.
+            $year = substr($info, 0, 4);
+            if ($year < 1900) {
+                $info = substr($info, 4, 4).substr($info,0,4);          
+            }
+
             CoreLocal::set("memAge",$info);
             $inp = urlencode(CoreLocal::get('strEntered'));
             return MiscLib::baseURL() . 'gui-modules/pos2.php?reginput=' . $inp . '&repeat=1';

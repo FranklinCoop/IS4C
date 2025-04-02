@@ -93,5 +93,17 @@ class SpecialUPC
 
     }
 
+        /**
+     Process Voids
+     @param $upc the UPC
+     @param $json Keyed array
+
+     Special void operations.
+    */
+    public function handelVoid($upc, $json)
+    {
+        
+    }
+
 }
 

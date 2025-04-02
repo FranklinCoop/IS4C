@@ -108,7 +108,6 @@ class memlist extends NoInputCorePage
 
     function preprocess()
     {
-        echo("<script>console.log('preprocess');</script>");
         $entered = $this->getInput();
         if ($entered === false) {
             return true;
@@ -123,7 +122,6 @@ class memlist extends NoInputCorePage
         $this->submitted = true;
         if (strstr($entered, "::") !== false) {
             // User selected a :: delimited item from the list interface
-            echo("<script>console.log('list');</script>");
 
             list($memberID, $personNum) = explode("::", $entered, 2);
         } else {
@@ -141,12 +139,9 @@ class memlist extends NoInputCorePage
             }
         }
 
-echo("<script>console.log('here');</script>");
         // we have exactly one row and 
         // don't need to confirm any further
         if ($memberID !== false && $personNum !== false) {
-            echo("<script>console.log('singleperson');</script>");
-
             if ($memberID == $this->session->get('defaultNonMem')) {
                 $personNum = 1;
             }
@@ -178,12 +173,10 @@ echo("<script>console.log('here');</script>");
             } elseif ($redirect !== true) {
                 $url = $redirect;
             }
-            echo("<script>console.log('end');</script>");
             $this->change_page($url);
 
             return false;
         }
-echo("<script>console.log('ture');</script>");
 
         return true;
 
@@ -195,11 +188,8 @@ echo("<script>console.log('ture');</script>");
     */
     private function getCallbackAction($cardNo)
     {
-        echo("<script>console.log('getCallbackAction');</script>");
         $dbc = Database::pDataConnect();
         if ($this->session->get('NoCompat') != 1 && !$dbc->tableExists('CustomerNotifications')) {
-            echo("<script>console.log('no notifications');</script>");
-            echo 'no notifications';
             return false;
         }
         $prep = $dbc->prepare("
@@ -214,7 +204,6 @@ echo("<script>console.log('ture');</script>");
         $className = 'COREPOS\\pos\\lib\\MemberActions\\' . $className;
         if ($res === false || !class_exists($className)) {
             var_dump($res);
-            echo("<script>console.log('PHP: " . !is_subclass_of($res['modifierModule'], 'COREPOS\\pos\\lib\\TotalActions\\MemTotalAction') . "');</script>");
             return false;
         }
 

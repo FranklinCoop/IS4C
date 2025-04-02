@@ -50,29 +50,27 @@ class DonationKey extends Parser
 
         $ret = $this->default_json();
 
-        $lib = new DeptLib($this->session);
         if ($str == "RU") {
             Database::getsubtotals();
             $ttl = $this->session->get("amtdue");    
             $next = ceil($ttl);
             $amt = sprintf('%.2f',(($ttl == $next) ? 1.00 : ($next - $ttl)));
-            $this->addRoundUp($str, $amt, $plu, $dept);
-            
-            PrehLib::ttl();
-            $ret['output'] = DisplayLib::lastpage();
-            $ret['redraw_footer'] = True;
-
+            $ret = $this->addRoundUp($amt, $plu, $dept);
         } else {
-            $amt = substr($str,0,strlen($str)-2);
-            $this->addRoundUp($str, $amt, $plu, $dept);
+            $amt = substr($str,0,strlen($str)-2)/100;
+            $ret = $this->addRoundUp($amt, $plu, $dept);
         }
+        PrehLib::ttl();
+        $ret['output'] = DisplayLib::lastpage();
+        $ret['redraw_footer'] = True;
 
         return $ret;
     }
 
-    private function addRoundUp($str, $amt, $plu, $dept) {
-        //I moved this to it's own function because it would be aduplication of function
+    private function addRoundUp($amt, $plu, $dept) {
+        //I moved this to it's own function because it would be a duplication of function
         //in parse() in an if/else statement.
+        $ret = $this->default_json();
         if ($plu != '') {
             //if the plu is set use the plu
             $upc = str_pad($plu, 13,'0000000000000', STR_PAD_LEFT);
@@ -98,8 +96,10 @@ class DonationKey extends Parser
             ));
         }  else {
             //if the plu is not set open ring.
+            $lib = new DeptLib($this->session);
             $ret = $lib->deptkey($amt*100, $dept.'0', $ret);
         }
+        return $ret;
     }
 
         

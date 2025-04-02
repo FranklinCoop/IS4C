@@ -29,9 +29,9 @@ use COREPOS\pos\lib\Database;
 use \CoreLocal;
 
 /**
-  @class GiftSaleReceiptMessage
+  @class PaidOutReceiptMessage
 */
-class GiftSaleReceiptMessage extends ReceiptMessage {
+class PaidOutReceiptMessage extends ReceiptMessage {
 
     public function select_condition(){
         $paycardConf = new PaycardConf();

@@ -434,11 +434,11 @@ class HouseCoupon extends SpecialUPC
       @param $coupID [int] coupon ID
       @return [boolean] true or [string] error message
     */
-    public function checkLimits($coupID)
+    public function checkLimits($coupID, $quiet=false)
     {
         $infoW = $this->lookupCoupon($coupID);
         if ($infoW === false) {
-            return $this->errorOrQuiet(_('coupon not found'), false);
+            return $this->errorOrQuiet(_('coupon not found'), $quiet);
         }
 
         /* limit types 
@@ -468,7 +468,7 @@ class HouseCoupon extends SpecialUPC
         $limitW = $transDB->fetch_row($limitR);
         $timesUsed = $limitW[0];
         if ($timesUsed >= $infoW["limit"]) {
-            return $this->errorOrQuiet(_('coupon already applied'), false);
+            return $this->errorOrQuiet(_('coupon already applied'), $quiet);
         }
 
         /**
@@ -487,7 +487,7 @@ class HouseCoupon extends SpecialUPC
                 $chkP = $opDB->prepare("SELECT coupID FROM houseVirtualCoupons WHERE coupID=? AND card_no=?");
                 $chkR = $opDB->execute($chkP, array($coupID, $this->session->get('memberID')));
                 if ($opDB->numRows($chkR) === 0) {
-                    return $this->errorOrQuiet(_('coupon not available<br />on this account'), false);
+                    return $this->errorOrQuiet(_('coupon not available<br />on this account'), $quiet);
                 }
 
                 return true;
@@ -531,7 +531,7 @@ class HouseCoupon extends SpecialUPC
                     $tRow = $tDB->fetch_row($tRes);
                     $uses = $mRow['quantity'] + $tRow['quantity'];
                     if ($uses >= $infoW["limit"] - 100) {
-                        return $this->errorOrQuiet(_('daily coupon limit already reached<br />on this membership'), false);
+                        return $this->errorOrQuiet(_('daily coupon limit already reached<br />on this membership'), $quiet);
                     }
                 }
             } else {
@@ -541,7 +541,7 @@ class HouseCoupon extends SpecialUPC
                     $mRow = $mDB->fetch_row($mRes);
                     $uses = $mRow['quantity'];
                     if ($uses >= $infoW["limit"]) {
-                        return $this->errorOrQuiet(_('coupon already used<br />on this membership'), false);
+                        return $this->errorOrQuiet(_('coupon already used<br />on this membership'), $quiet);
                     }
                 }
             }
@@ -949,7 +949,7 @@ class HouseCoupon extends SpecialUPC
             case "%D": // percent discount on all items in give department(s)
                 $valQ = "select sum(total) 
                     " . $this->baseSQL($transDB, $coupID, 'department') . "
-                    and h.type in ('BOTH', 'DISCOUNT') AND l.discountable >= 0";
+                    and h.type in ('BOTH', 'DISCOUNT') AND l.discountable >= 0 and trans_subtype != 'IC'";
                 $valR = $transDB->query($valQ);
                 $row = $transDB->fetch_row($valR);
                 $value = $row[0] * $infoW["discountValue"];
@@ -963,6 +963,113 @@ class HouseCoupon extends SpecialUPC
                 $row = $transDB->fetch_row($valR);
                 $value = $row[0] * $infoW["discountValue"];
                 break;
+            case "%E": // better percent discount applies to specified department only
+                Database::getsubtotals();
+                $couponDiscount = (int)($infoW['discountValue']*100);
+                $value = 0;
+                if ($couponDiscount > $this->session->get('percentDiscount')) {
+                    // coupon discount is better than customer's discount
+                    // apply coupon & exclude those items from customer's discount
+                    $valQ = "select sum(total) 
+                        " . $this->baseSQL($transDB, $coupID, 'department') . "
+                        and h.type in ('BOTH', 'DISCOUNT')";
+                    $valR = $transDB->query($valQ);
+                    $row = $transDB->fetch_row($valR);
+                    $value = $row[0] * $infoW["discountValue"];                 
+
+                    $clearQ = "
+                        UPDATE localtemptrans AS l 
+                            INNER JOIN " . $this->session->get('pDatabase') . $transDB->sep() . "houseCouponItems AS h ON l.department = h.upc
+                        SET l.discountable=0
+                        WHERE h.coupID = " . $coupID . "
+                            AND h.type IN ('BOTH', 'DISCOUNT')";
+                    $clearR = $transDB->query($clearQ);
+                }
+                break;
+            case 'PD': // modify customer percent discount
+                   // rather than add line-item
+                $couponPD = $infoW['discountValue'] * 100;
+                DiscountModule::updateDiscount(new DiscountModule($couponPD, 'HouseCoupon'));
+                // still need to add a line-item with the coupon UPC to the
+                // transaction to track usage
+                $value = 0;
+                $description = $couponPD . ' % Discount Coupon';
+                break;
+            case 'OD': // override customer percent discount
+                   // rather than add line-item
+                $couponPD = $infoW['discountValue'] * 100;
+                DiscountModule::updateDiscount(new DiscountModule(0, 'custdata'));
+                DiscountModule::updateDiscount(new DiscountModule($couponPD, 'HouseCoupon'));
+                // still need to add a line-item with the coupon UPC to the
+                // transaction to track usage
+                $value = 0;
+                $description = $couponPD . ' % Discount Coupon';
+                break;
+            case "%Q": //set quantity discount
+                $valQ = "select sum(total)
+                " . $this->baseSQL($transDB, $coupID, 'department') . "
+                and h.type in ('BOTH', 'DISCOUNT') AND l.discountable >= 0";
+                $valR = $transDB->query($valQ);
+                $row = $transDB->fetch_row($valR);
+                $value = $row[0] * $infoW["discountValue"];
+                break;
+            case "FE": // flat discount that turns off other discounts.
+                //how much off is the customer getting;
+                Database::getsubtotals();
+                $couponPD = 20/$this->session->get('amtdue');
+                if ($couponPD > $this->session->get('percentDiscount')) {
+                    $prefix = $this->session->get('houseCouponPrefix');
+                    if ($prefix == '') {
+                        $prefix = '00499999';
+                    }
+                    $upc = $prefix . str_pad($coupID, 5, '0', STR_PAD_LEFT);
+                    $usedValue = 0;
+                    $usedQ = 'SELECT SUM(-total) as usedValue FROM localtemptrans AS l WHERE l.upc ='.$upc;
+                    $usedR = $transDB->query($usedQ);
+                    $usedW = $transDB->fetch_row($usedR);
+                    if ($usedW) {  $usedValue = $usedW['usedValue'];  }
+                    $valQ = "SELECT sum(total)
+                    FROM localtemptrans AS l
+                    WHERE l.trans_type in ('D','I')";
+                    $valR = $transDB->query($valQ);
+                    $row = $transDB->fetch_row($valR);
+                    $scale = floor($row[0]/100);
+                    if($scale > 3) {$scale = 2;}
+                    $value = $infoW["discountValue"] * $scale;
+                    if($value > $infoW['maxValue'] - $usedValue) {
+                        $value = $infoW['maxValue'] - $usedValue;
+                    }
+                    $discountable = 0;
+                    DiscountModule::updateDiscount(new DiscountModule(0, 'custdata'));
+                } else {
+
+                }
+                break;
+        }
+
+        if ($infoW['maxValue'] > 0 && $value > $infoW['maxValue']) {
+            $value = $infoW['maxValue'];
+        }
+
+        return array('value' => $value, 'department' => $infoW['department'], 'description' => $description, 'discountable'=>$discountable, 'tax'=>$tax);
+    }
+
+    public function handleVoid($upc, $json)
+    {
+        $coupID = ltrim(substr($ubc,5), "0");
+        $infoW = $this->lookupCoupon($coupID);
+        if ($infoW === false) {
+            return $infoW;
+        }
+
+        $transDB = Database::tDataConnect();
+        /* if we got this far, the coupon
+         * should be valid
+         */
+        $value = 0;
+        $discountable = 1;
+        $tax = 0;
+        switch ($infoW["discountType"]) {
             case "%E": // better percent discount applies to specified department only
                 Database::getsubtotals();
                 $couponDiscount = (int)($infoW['discountValue']*100);
@@ -1030,13 +1137,11 @@ class HouseCoupon extends SpecialUPC
                 $discountable = 0;
                 DiscountModule::updateDiscount(new DiscountModule(0, 'custdata'));
                 break;
+            default:
+                return false;
+                break;
         }
 
-        if ($infoW['maxValue'] > 0 && $value > $infoW['maxValue']) {
-            $value = $infoW['maxValue'];
-        }
-
-        return array('value' => $value, 'department' => $infoW['department'], 'description' => $description, 'discountable'=>$discountable, 'tax'=>$tax);
     }
 
     /**

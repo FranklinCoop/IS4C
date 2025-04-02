@@ -62,6 +62,14 @@ class adminlist extends NoInputCorePage
                 $this->change_page($url);
                 return false;
             case 'REOPEN':
+                if (CoreLocal::get('store') == 'McCuskers' || CoreLocal::get('store')=='GreenFieldsMarket' || CoreLocal::get('store') == 'FranklinCoop') {
+                    $this->session->set("boxMsg",_("I can think of no concevable reason you would need to do this, please talk to a manager."));
+                    $this->session->set('boxMsgButtons', array(
+                        'Dismiss [clear]' => '$(\'#reginput\').val(\'CL\');submitWrapper();',
+                    ));
+                    $this->change_page($this->page_url."gui-modules/boxMsg2.php");
+                    return false;  
+                }
                 $this->change_page($this->page_url . 'gui-modules/TransList.php');
                 return false;
             case 'TR':
@@ -79,6 +87,14 @@ class adminlist extends NoInputCorePage
                 }
                 return true;
             case 'UNDO':
+                if (CoreLocal::get('store') == 'McCuskers' || CoreLocal::get('store')=='GreenFieldsMarket' || CoreLocal::get('store') == 'FranklinCoop') {
+                    $this->session->set("boxMsg",_("Function Disabled do a return, finish the transaction with cash if only partially paid."));
+                    $this->session->set('boxMsgButtons', array(
+                        'Dismiss [clear]' => '$(\'#reginput\').val(\'CL\');submitWrapper();',
+                    ));
+                    $this->change_page($this->page_url."gui-modules/boxMsg2.php");
+                    return false;  
+                }
                 if ($this->security >= 30) {
                     $this->change_page($this->page_url . 'gui-modules/undo.php');
                     return false;

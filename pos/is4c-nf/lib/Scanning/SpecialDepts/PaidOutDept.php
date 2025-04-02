@@ -29,6 +29,7 @@ use \CoreLocal;
 class PaidOutDept extends SpecialDept
 {
     public $help_summary = 'Negate entered amount and also prompt for comment';
+    protected $slip_type = 'poSlip';
 
     public function handle($deptID,$amount,$json)
     {

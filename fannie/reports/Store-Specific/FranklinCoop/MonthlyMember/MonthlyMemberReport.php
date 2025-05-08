@@ -56,7 +56,7 @@ class MonthlyMemberReport extends FannieReportPage
         }
         //$startDate->modify('first day of this month');
 
-        $endDate = new DateTime($year.'-'.$month.'-01 00:00:00');
+        $endDate = new DateTime($year.'-'.$month.'-01 23:59:59');
         $endDate->modify('last day of this month');
         if ($endDate->format('Y-m-d') < '2023-10-01 00:00:00') {
             $endDate = new DateTime('2023-10-31 23:59:59');
@@ -144,7 +144,7 @@ class MonthlyMemberReport extends FannieReportPage
         (SELECT card_no,SUM(stockPurchase) as equity, max(tdate) as endDate  FROM core_trans.stockpurchases
         group by card_no having SUM(stockPurchase) = 0) p
         LEFT JOIN (SELECT * FROM core_op.custdataHistory WHERE histDate = '{$sdate}') h on p.card_no = h.cardNo
-        WHERE p.endDate between '{$sdate}' and '{$edate}'
+        WHERE p.endDate between '{$sdate}' and DATE_ADD('{$edate}', INTERVAL 1 SECOND)
         UNION
         SELECT  count(c.cardNo), 'New FFAs' as lineName
         FROM core_op.custdataHistory c
@@ -212,10 +212,9 @@ class MonthlyMemberReport extends FannieReportPage
             ) as p
             WHERE p.startDate between '{$sdate}' and '{$edate}'
             UNION
-            SELECT COUNT(card_no), 'Total Terms' as lineName 
+            SELECT COUNT(card_no), 'Total Terms' as lineName
             FROM core_trans.equity_history_sum 
-            WHERE payments = 0 and mostRecent 
-            BETWEEN '{$sdate}' and '{$edate}'
+            WHERE payments = 0 and mostRecent BETWEEN '{$sdate}' and '{$edate}'
             UNION
             SELECT  count(c.cardNo), 'New FFAs' as lineName
             FROM core_op.custdata c

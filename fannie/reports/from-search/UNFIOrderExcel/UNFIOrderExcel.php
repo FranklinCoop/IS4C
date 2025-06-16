@@ -37,7 +37,7 @@ class UNFIOrderExcel extends FannieReportPage
 
     protected $report_headers = array('UPC', 'Brand', 'Pack', 'Size', 'Description');
     protected $required_fields = array('u');
-    protected $sort_column = 1;
+    protected $sort_column = 2;
 
     public function fetch_report_data()
     {
@@ -66,7 +66,7 @@ class UNFIOrderExcel extends FannieReportPage
             $data[] = array(
                 $row['upc'],
                 $row['brand'],
-                $row['units'],
+                $row['pack'],
                 $row['size'],
                 $row['description'],
             );

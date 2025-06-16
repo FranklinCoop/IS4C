@@ -46,11 +46,12 @@ class UNFIOrderExcel extends FannieReportPage
 
         $upcs = FormLib::get('u', array());
         list($in, $args) = $dbc->safeInClause($upcs);
-        $prep = $dbc->prepare("SELECT p.`upc`, p.`brand`, v.units as pack, p.`size` AS size, p.`description`
+        $prep = $dbc->prepare("SELECT p.`upc`, v.`brand`, v.units as pack, p.`size` AS size, v.`description`
             FROM core_op.products as p
             LEFT JOIN core_op.vendorItems v on p.upc = v.upc and v.vendorID = 2
             WHERE p.upc IN ({$in})
                 AND p.store_id=?
+            GROUP BY p.upc
             ORDER BY p.brand,
                 p.description");
         $store = Store::getIdByIp();

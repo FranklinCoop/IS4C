@@ -65,7 +65,7 @@ class UNFIOrderExcel extends FannieReportPage
             }    
             $data[] = array(
                 $row['upc'],
-                $row['brand'] ? $row['brand'] : '',
+                $row['brand'],
                 $row['units'],
                 $row['size'],
                 $row['description'],

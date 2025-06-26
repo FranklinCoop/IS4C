@@ -368,8 +368,8 @@ private function genRowData($dbc,$dlog,$args, $store) {
     $ret[] = $row;
     //Tax Section
     $rowNames = array('PLUS SALES TAX Collected','PLUS MEALS TAX Collected','TOTAL TAX');
-    $gfmAcctNo = array('(2400G990)','(2450A990)','');
-    $mccAcctNo = array('(2400M990)','(2450A990)','');
+    $gfmAcctNo = array('(2450A990)','(2400G990)','');
+    $mccAcctNo = array('(2450A990)','(2400M990)','');
     $accountNumbers = ($store == 1) ? $gfmAcctNo : $mccAcctNo ;
     $reportOrder = array(1,2,3);
     $values = $this->getTaxTotals($dbc,$dlog,$args);

@@ -56,6 +56,7 @@ class VendorIndexPage extends FannieRESTfulPage
             'post<delivery>',
             'post<id><shipping>',
             'post<id><rate>',
+            'post<id><tariff>',
             'post<id><inactive>',
             'post<id><autoID>'
         );
@@ -421,10 +422,10 @@ class VendorIndexPage extends FannieRESTfulPage
             </div>
             <div class="form-group">
                 <div class="input-group">
-                    <span class="input-group-addon">Tariff Rate</span>
+                    <span class="input-group-addon">Tariff</span>
                     <input type="text" id="vc-tariff" name="tariff" ' . $noEdit . '
                         title="Markup for tariff line items"
-                        onchange="vendorEditor.saveDiscountRate(this.value);"
+                        onchange="vendorEditor.saveTariff(this.value);"
                         class="form-control" value="' . $model->tariffMarkup() * 100 . '" />
                     <span class="input-group-addon">%</span>
                 </div>
@@ -741,6 +742,7 @@ class VendorIndexPage extends FannieRESTfulPage
 
         $this->rate=100;
         $this->shipping=100;
+        $this->tariff=100;
         ob_start();
         $this->post_id_rate_handler();
         $this->post_id_shipping_handler();

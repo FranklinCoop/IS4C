@@ -714,6 +714,13 @@ HTML;
         } else {
             $shipping = '';
         }
+        $tariff = $vendor->tariffMarkup();
+        if ($tariff > 0) {
+            $tariff = $vendor->tariffMarkup() * 100;
+            $tariff = "<label>tariff Markup</label> $tariff%";
+        } else {
+            $tariff = '';
+        }
 
 
         return <<<HTML
@@ -730,6 +737,7 @@ HTML;
     </div>
 </form>
 <div>$shipping</div>
+<div>$tariff</div>
 $vdepts
 <form class="form-inline" method="get">
     {$table}

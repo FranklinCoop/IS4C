@@ -114,6 +114,19 @@ var vendorEditor = (function($) {
         });
     };
 
+    mod.saveTariff = function(s) {
+        var dstr = 'id='+$('#vendorselect').val()+'&tariff='+s;
+        $.ajax({
+            url: 'VendorIndexPage.php',
+            method: 'post',
+            data: dstr,
+            dataType: 'json'
+        }).done(function(resp) {
+            var elem = $('#vc-tariff');
+            showBootstrapPopover(elem, 0, resp.error);
+        });
+    };
+
     mod.toggleActive = function(obj, vid) {
         var dstr = 'id=' + vid;
         if ($(obj).prop('checked')) {

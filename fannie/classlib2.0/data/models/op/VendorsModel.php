@@ -49,6 +49,7 @@ class VendorsModel extends BasicModel
     'inactive' => array('type'=>'TINYINT', 'default'=>0),
     'orderMinimum' => array('type'=>'MONEY', 'default'=>0),
     'halfCases' => array('type'=>'TINYINT', 'default'=>0),
+    'tariffMarkup' => array('type'=>'DOUBLE', 'default'=>0),
     );
 
     public function hookAddColumnvendorAbbreviation()

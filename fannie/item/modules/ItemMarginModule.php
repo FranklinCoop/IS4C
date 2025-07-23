@@ -270,6 +270,7 @@ class ItemMarginModule extends \COREPOS\Fannie\API\item\ItemModule
         $shippingP = $dbc->prepare('
             SELECT v.shippingMarkup,
                 v.discountRate,
+                v.tariffMarkup,
                 v.vendorName
             FROM products AS p
                 INNER JOIN vendors AS v ON p.default_vendor_id = v.vendorID
@@ -291,8 +292,14 @@ class ItemMarginModule extends \COREPOS\Fannie\API\item\ItemModule
                         ($w['shippingMarkup']*100));
                 $shipping_markup = $w['shippingMarkup'];
             }
+            if ($w['tariffMarkup'] > 0) {
+                $ret .= sprintf('Tariff Markup for this vendor (%s) is %.2f%%<br />',
+                        $w['vendorName'],
+                        ($w['tariffMarkup']*100));
+                $shipping_markup = $w['tariffMarkup'];
+            }
         }
-        $cost = Margin::adjustedCost($cost, $vendor_discount, $shipping_markup);
+        $cost = Margin::adjustedCost($cost, $vendor_discount, $shipping_markup, $tariffMarkup);
         $actual_margin = Margin::toMargin($cost, $price, array(100,2));
         
         if ($actual_margin > $desired_margin && is_numeric($desired_margin)){

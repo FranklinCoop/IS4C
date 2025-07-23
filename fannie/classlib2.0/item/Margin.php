@@ -34,16 +34,18 @@ class Margin
       @param $base_cost [number] the cost of the item
       @param $discount_percent [number] a percent discount off the listed cost
       @param $shipping_percent [number] a percent markup for shipping
+      @param $tariff_percent [number] a percent markup for tariffs
       @return [number] adjusted cost
 
       Both percent parameters default to zero.
       Percents should be expressed as decimals - i.e., 0.10 means 10%
     */
-    public static function adjustedCost($base_cost, $discount_percent=0, $shipping_percent=0)
+    public static function adjustedCost($base_cost, $discount_percent=0, $shipping_percent=0, $tariff_percent=0)
     {
         $base_cost = (float)$base_cost;
         $base_cost *= (1 - $discount_percent);
         $base_cost *= (1 + $shipping_percent);
+        $base_cost *= (1 + $tariff_percent);
 
         return $base_cost;
     }
@@ -53,14 +55,15 @@ class Margin
       @param $base_cost [expression] the cost of the item
       @param $discount_percent [expression] a percent discount off the listed cost
       @param $shipping_percent [expression] a percent markup for shipping
+      @param $tariff_percent [number] a percent markup for tariffs
       @return [string] SQL for calculating adjusted cost
 
       Intended for building queries. User input should not be part
       of any of the parameters
     */
-    public static function adjustedCostSQL($base_cost, $discount_percent=0, $shipping_percent=0)
+    public static function adjustedCostSQL($base_cost, $discount_percent=0, $shipping_percent=0, $tariff_percent=0)
     {
-        return "( ({$base_cost}) * (1.0 - ({$discount_percent})) * (1.0 + ({$shipping_percent})) )";
+        return "( ({$base_cost}) * (1.0 - ({$discount_percent})) * (1.0 + ({$shipping_percent})) * (1.0 +({$tariff_percent})) )";
     }
 
     /**

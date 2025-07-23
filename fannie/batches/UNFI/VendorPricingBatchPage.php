@@ -182,7 +182,7 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             $batchUPCs[$obj->upc()] = true;
         }
 
-        $costSQL = Margin::adjustedCostSQL('p.cost', 'b.discountRate', 'b.shippingMarkup');
+        $costSQL = Margin::adjustedCostSQL('p.cost', 'b.discountRate', 'b.shippingMarkup','b.tariffMarkup');
         $marginSQL = Margin::toMarginSQL($costSQL, 'p.normal_price');
         $marginCase = '
             CASE
@@ -208,6 +208,7 @@ class VendorPricingBatchPage extends FannieRESTfulPage
             p.cost,
             b.shippingMarkup,
             b.discountRate,
+            b.tariffMarkup,
             p.normal_price,
             " . Margin::toMarginSQL($costSQL, 'p.normal_price') . " AS current_margin,
             " . Margin::toMarginSQL($costSQL, 'v.srp') . " AS desired_margin,

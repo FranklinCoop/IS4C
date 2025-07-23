@@ -221,7 +221,7 @@ class ApiLibTest extends PHPUnit_Framework_TestCase
 
     public function testMargin()
     {
-        $this->assertEquals(108, COREPOS\Fannie\API\item\Margin::adjustedCost(100, 0.10, 0.20));
+        $this->assertEquals(108, COREPOS\Fannie\API\item\Margin::adjustedCost(100, 0.10, 0.20, .08));
         $this->assertEquals(0, COREPOS\Fannie\API\item\Margin::toMargin(0, 0));
         $this->assertEquals(50, COREPOS\Fannie\API\item\Margin::toMargin(5, 10, array(100, 0)));
         $this->assertEquals('(0)', COREPOS\Fannie\API\item\Margin::toMarginSQL(0, 0));

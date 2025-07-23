@@ -209,6 +209,26 @@ class VendorIndexPage extends FannieRESTfulPage
         return false;
     }
 
+    protected function post_id_tariff_handler()
+    {
+        if (!$this->canEdit) return false;
+        $ret = array('error'=>0);
+        if ($this->id === ''){
+            $ret['error'] = 'Bad request';
+        } else {
+            $dbc = FannieDB::get($this->config->get('OP_DB'));
+            $vModel = new VendorsModel($dbc);
+            $vModel->vendorID($this->id);
+            $vModel->tariffMarkup($this->tariff / 100.00);
+            if (!$vModel->save()) {
+                $ret['error'] = 'Save failed!';
+            }
+        }
+        echo json_encode($ret);
+
+        return false;
+    }
+
     protected function post_delivery_handler()
     {
         if (!$this->canEdit) return false;
@@ -396,6 +416,16 @@ class VendorIndexPage extends FannieRESTfulPage
                         title="Markdown percentage from catalog list costs"
                         onchange="vendorEditor.saveDiscountRate(this.value);"
                         class="form-control" value="' . $model->discountRate() * 100 . '" />
+                    <span class="input-group-addon">%</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="input-group">
+                    <span class="input-group-addon">Tariff Rate</span>
+                    <input type="text" id="vc-tariff" name="tariff" ' . $noEdit . '
+                        title="Markup for tariff line items"
+                        onchange="vendorEditor.saveDiscountRate(this.value);"
+                        class="form-control" value="' . $model->tariffMarkup() * 100 . '" />
                     <span class="input-group-addon">%</span>
                 </div>
             </div>';
@@ -714,6 +744,7 @@ class VendorIndexPage extends FannieRESTfulPage
         ob_start();
         $this->post_id_rate_handler();
         $this->post_id_shipping_handler();
+        $this->post_id_tariff_handler();
         ob_end_clean();
         $this->inactive = 0;
         $this->post_id_inactive_handler();
@@ -722,6 +753,7 @@ class VendorIndexPage extends FannieRESTfulPage
         $phpunit->assertEquals(true, $vendor->load());
         $phpunit->assertEquals(1, $vendor->shippingMarkup());
         $phpunit->assertEquals(1, $vendor->discountRate());
+        $phpunit->assertEquals(1, $vendor->tariffMarkup());
         $phpunit->assertEquals(0, $vendor->inactive());
 
         $this->name = 'TEST';

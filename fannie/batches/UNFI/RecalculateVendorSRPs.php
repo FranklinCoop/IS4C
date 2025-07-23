@@ -59,7 +59,8 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
                 v.cost,
                 a.margin,
                 COALESCE(n.shippingMarkup, 0) as shipping,
-                COALESCE(n.discountRate, 0) as discount
+                COALESCE(n.discountRate, 0) as discount,
+                COALESCE(m.tariffMarkup, 0) as tariff
             FROM vendorItems as v 
                 LEFT JOIN vendorDepartments AS a ON v.vendorID=a.vendorID AND v.vendorDept=a.deptID
                 INNER JOIN vendors AS n ON v.vendorID=n.vendorID
@@ -112,7 +113,7 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
                 }
             }
             // calculate a SRP from unit cost and desired margin
-            $adj = \COREPOS\Fannie\API\item\Margin::adjustedCost($fetchW['cost'], $fetchW['discount'], $fetchW['shipping']);
+            $adj = \COREPOS\Fannie\API\item\Margin::adjustedCost($fetchW['cost'], $fetchW['discount'], $fetchW['shipping'], $fetchW['tariff']);
             $srp = \COREPOS\Fannie\API\item\Margin::toPrice($adj, $fetchW['margin']);
 
             $srp = $rounder->round($srp);
@@ -162,7 +163,7 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
                 WHEN s.margin IS NOT NULL AND s.margin <> 0 THEN s.margin
                 ELSE d.margin
             END';
-        $costSQL = Margin::adjustedCostSQL('p.cost', 'b.discountRate', 'b.shippingMarkup');
+        $costSQL = Margin::adjustedCostSQL('p.cost', 'b.discountRate', 'b.shippingMarkup','b.tariffMarkup');
         $marginSQL = Margin::toMarginSQL($costSQL, 'p.normal_price');
         $srpSQL = Margin::toPriceSQL($costSQL, $marginCase);
         $vendorID = FormLib::get('id');
@@ -177,6 +178,7 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
             p.cost,
             b.shippingMarkup,
             b.discountRate,
+            b.tariffMarkup,
             p.normal_price,
             " . Margin::toMarginSQL($costSQL, 'p.normal_price') . " AS current_margin,
             " . Margin::toMarginSQL($costSQL, 'v.srp') . " AS desired_margin,

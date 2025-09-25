@@ -24,7 +24,7 @@ if (!class_exists('FpdfWithBarcode')) {
     include(dirname(__FILE__) . '/../FpdfWithBarcode.php');
 }
 use \COREPOS\Fannie\API\item\FannieSignage;
-  class FCC_Small_PDF extends FpdfWithBarcode
+  class FCC_Small_Background_PDF extends FpdfWithBarcode
   {
     function barcodeText($x, $y, $h, $barcode, $len)
     {
@@ -52,7 +52,7 @@ use \COREPOS\Fannie\API\item\FannieSignage;
    * begin to create PDF file using fpdf functions
    */
 
-  function FCC_Small($data,$offset=0){
+  function FCC_Small_Background($data,$offset=0){
     global $FANNIE_OP_DB;
     global $FANNIE_ROOT;
     //global $FANNIE_COOP_ID;
@@ -60,13 +60,13 @@ use \COREPOS\Fannie\API\item\FannieSignage;
 
     $hspace = 1.5;
     $h = 37.36875; //what is this?
-    $top = 5.99 + 2.5; //was 12.7 + 2.5
+    $top = 5.99 + 3.5; //was 12.7 + 2.5
     $left = 5; //left margin 
     // above..this was two by shifing it to 4 we get two columns until I set $LeftShift at 66 or so
     // and it seems to shift them all right
     $space = 1.190625 * 2; //tried 3 to see if shift columns over
     
-    $pdf=new FCC_Small_PDF('P', 'mm', 'Letter');
+    $pdf=new FCC_Small_Background_PDF('P', 'mm', 'Letter');
     $pdf->AddFont('arialnarrow');
     $pdf->AddFont('steelfish');
     $pdf->SetMargins($left ,$top + $hspace);
@@ -255,45 +255,52 @@ use \COREPOS\Fannie\API\item\FannieSignage;
         */
 
         //Add Orange Rectangle and Blue Stripe
-        //oranges square is 17x10mm
-        $pdf->SetFillColor(241,101,22);
-        $pdf->SetDrawColor(241,101,22);
-        $pdf->Rect($genLeft, $unitTop, 17, 10,'DF');
-        //blue retail price line is 22x3mm
-        $pdf->SetFillColor(2,128,199);
-        $pdf->SetDrawColor(2,128,199);
-        $pdf->Rect($genLeft+17,$unitTop, 22,3, 'DF');
-        $pdf->SetFont('arialnarrow','', 8);
-        $pdf->SetXY($genLeft + 17, $unitTop);
-        $pdf->Cell(17,3, 'RETAIL PRICE', 0,0,'C');
-        
+	//oranges square is 17x10mm
+	$rectH = 18;
+	$rectW = 12;
+        $pdf->SetFillColor(243,112,22);
+        $pdf->SetDrawColor(243,112,22);
+        $pdf->Rect($genLeft+1, $unitTop+4, $rectH, $rectW,'DF');
+        //blue retail price line is 17x3mm
+        $pdf->SetFillColor(0,141,207);
+        $pdf->SetDrawColor(0,141,207);
+        //$pdf->Rect($genLeft+$rectH+1,$unitTop+4, 20,3, 'DF');
+	$pdf->SetFont('Arial','B', 7);
+	$pdf->SetTextColor(255,255,255);
+        $pdf->SetXY($genLeft + $rectH+1, $unitTop+4);
+        $pdf->Cell(20,3, 'RETAIL PRICE', 1,0,'C',1);
+	//Clean up
+	$pdf->SetFillColor(0,0,0);
+	$pdf->SetDrawColor(0,0,0);
+	$pdf->SetTextColor(0,0,0);
 
-
+	//Unit Price
         $pdf->SetXY($genLeft +1, $unitTop+8); 
         $pdf->SetFont('steelfish','',29);
         $pdf->Cell(8,4,"\$$num_unit",0,0,'L');
-        $pdf->SetFont('Arial','',7);
+	
+	$pdf->SetFont('Arial','',7);
         $pdf->SetXY($genLeft+2, $unitTop+13.2); //numerical unit // silas: was above
-        //  $pdf->SetXY($genLeft+4.7, $unitTop+10);
+        $pdf->MultiCell(20,3,$alpha_unit,0,'L',0); //send alpha into a two liner to the right of UNIT price    
 
-        $pdf->MultiCell(20,3,$alpha_unit,0,'L',0); //send alpha into a two liner to the right of UNIT price
-        //$pdf->SetFont('Arial','B',8);
-        //$pdf->SetXY($genLeft+9,$unitTop+8.35); //price on the right side top Made this +3 cause it goes up toward last row of labels
-        //$pdf->Cell(10,8,"$",0,0,'R');
-    
-        $pdf->SetFont('steelfish','',29);
+	//Price
+	$pdf->SetFont('steelfish','',29);
         $pdf->SetXY($genLeft+30.55,$unitTop+8.5); //price on the right side top Made this +3 cause it goes up toward last row of labels
         $pdf->Cell(10,8,"$price",0,0,'R'); //\$$price $barLeft
-  
+  	
+	// Brand and Description
         $pdf->SetFont('arialnarrow','',6);
         $pdf->SetXY($genLeft+1, $unitTop+18.5); //desc of tiem
         $pdf->Cell(0,4,"$brand $desc",0,0,'L');
         $pdf->SetFont('Arial','',6);
-                
+
+	// Unit Size	
         $pdf->SetXY($genLeft+1, $unitTop+16.2);
-        $pdf->Cell(24,4,$size,0,0,'R');
+	$pdf->Cell(24,4,$size,0,0,'L');
+
+	//Flaging Graphics
         $pdf->SetXY($genLeft+25, $unitTop+16.2);
-        //please use the order  "Local, Organic, NONGMO, Gluten Free
+	//please use the order  "Local, Organic, NONGMO, Gluten Free
         if ($showLocal) {$pdf->Image($FANNIE_ROOT.'src/images/Local.jpg',$genLeft+26,$unitTop+16,3);}
         if ($showOrganic) {$pdf->Image($FANNIE_ROOT.'src/images/Organic.jpg',$genLeft+29.5,$unitTop+16,3);}
         if ($showNONGMO) {$pdf->Image($FANNIE_ROOT.'src/images/non-gmo.jpg',$genLeft+33,$unitTop+16,3);}

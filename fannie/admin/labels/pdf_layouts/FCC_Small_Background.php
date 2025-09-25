@@ -255,9 +255,9 @@ use \COREPOS\Fannie\API\item\FannieSignage;
         */
 
         //Add Orange Rectangle and Blue Stripe
-	//oranges square is 17x10mm
-	$rectH = 18;
-	$rectW = 12;
+        //oranges square is 17x10mm
+	    $rectH = 18;
+	    $rectW = 12;
         $pdf->SetFillColor(243,112,22);
         $pdf->SetDrawColor(243,112,22);
         $pdf->Rect($genLeft+1, $unitTop+4, $rectH, $rectW,'DF');
@@ -265,69 +265,64 @@ use \COREPOS\Fannie\API\item\FannieSignage;
         $pdf->SetFillColor(0,141,207);
         $pdf->SetDrawColor(0,141,207);
         //$pdf->Rect($genLeft+$rectH+1,$unitTop+4, 20,3, 'DF');
-	$pdf->SetFont('Arial','B', 7);
-	$pdf->SetTextColor(255,255,255);
+	    $pdf->SetFont('Arial','B', 7);
+	    $pdf->SetTextColor(255,255,255);
         $pdf->SetXY($genLeft + $rectH+1, $unitTop+4);
         $pdf->Cell(20,3, 'RETAIL PRICE', 1,0,'C',1);
-	//Clean up
-	$pdf->SetFillColor(0,0,0);
-	$pdf->SetDrawColor(0,0,0);
-	$pdf->SetTextColor(0,0,0);
+	    //Clean up
+	    $pdf->SetFillColor(0,0,0);
+	    $pdf->SetDrawColor(0,0,0);
+	    $pdf->SetTextColor(0,0,0);
 
-	//Unit Price
+	    //Unit Price
         $pdf->SetXY($genLeft +1, $unitTop+8); 
         $pdf->SetFont('steelfish','',29);
         $pdf->Cell(8,4,"\$$num_unit",0,0,'L');
 	
-	$pdf->SetFont('Arial','',7);
+	    $pdf->SetFont('Arial','',7);
         $pdf->SetXY($genLeft+2, $unitTop+13.2); //numerical unit // silas: was above
         $pdf->MultiCell(20,3,$alpha_unit,0,'L',0); //send alpha into a two liner to the right of UNIT price    
 
-	//Price
-	$pdf->SetFont('steelfish','',29);
+	    //Price
+	    $pdf->SetFont('steelfish','',29);
         $pdf->SetXY($genLeft+30.55,$unitTop+8.5); //price on the right side top Made this +3 cause it goes up toward last row of labels
         $pdf->Cell(10,8,"$price",0,0,'R'); //\$$price $barLeft
   	
-	// Brand and Description
+	    // Brand and Description
         $pdf->SetFont('arialnarrow','',6);
         $pdf->SetXY($genLeft+1, $unitTop+18.5); //desc of tiem
         $pdf->Cell(0,4,"$brand $desc",0,0,'L');
         $pdf->SetFont('Arial','',6);
 
-	// Unit Size	
+	    // Unit Size	
         $pdf->SetXY($genLeft+1, $unitTop+16.2);
-	$pdf->Cell(24,4,$size,0,0,'L');
+	    $pdf->Cell(24,4,$size,0,0,'L');
 
-	//Flaging Graphics
+	    //Flaging Graphics
         $pdf->SetXY($genLeft+25, $unitTop+16.2);
-	//please use the order  "Local, Organic, NONGMO, Gluten Free
+	    //please use the order  "Local, Organic, NONGMO, Gluten Free
         if ($showLocal) {$pdf->Image($FANNIE_ROOT.'src/images/Local.jpg',$genLeft+26,$unitTop+16,3);}
         if ($showOrganic) {$pdf->Image($FANNIE_ROOT.'src/images/Organic.jpg',$genLeft+29.5,$unitTop+16,3);}
         if ($showNONGMO) {$pdf->Image($FANNIE_ROOT.'src/images/non-gmo.jpg',$genLeft+33,$unitTop+16,3);}
         if ($showGlutenFree) {$pdf->Image($FANNIE_ROOT.'src/images/Gluten-Free.jpg',$genLeft+36.5,$unitTop+16,3);}        
-              
-        //$pdf->Cell($w,4,"1/".$size_value." ".$size_unit,0,0,'L');
-        $pdf->SetFont('Arial','',7);
-        //$pdf->SetXY($priceLeft-22,$skuTop+10);
-  
-
-        $pdf->SetXY($genLeft+1, $unitTop+28.5);
-        $pdf->Cell(0,4,"$vendor $sku",0,0,'L');
-        $pdf->SetXY($genLeft+28-.5, $unitTop+28.5);
-        $pdf->Cell(12,4,$tagdate,0,0,'R'); 
-        /** 
-        * add check digit to pid from testQ
-        */
+    
+        // UPC
         $pdf->SetFont('Arial','',4);
         // silas: was $pdf->UPC_A($genLeft+1.25, $unitTop+21.5,$upc,3);
         if (strlen($upc) <= 11)
-            $pdf->UPC_A($genLeft+3.5, $unitTop+21.5,$upc,3);
+            $pdf->UPC_A($genLeft+3.5, $unitTop+22,$upc,3);
         else
-            $pdf->EAN13($genLeft+3.5, $unitTop+21.5,$upc,3);
+            $pdf->EAN13($genLeft+3.5, $unitTop+22,$upc,3);
 
-        //  $pdf->SetFont('Arial','',7);
-        $pdf->SetXY($genLeft+1.3, $unitTop+23.6);
-        //$pdf->Cell(5,5,$caseqty,0,0,'L'); 
+        
+        //Vendor SKU
+        $pdf->SetFont('Arial','',7);
+        $pdf->SetXY($genLeft+1, $unitTop+28.5);
+        $pdf->Cell(0,4,"$vendor $sku",0,0,'L');
+        //Date
+        $pdf->SetXY($genLeft+28-.5, $unitTop+28.5);
+        $pdf->Cell(12,4,$tagdate,0,0,'R'); 
+
         /**
         * increment label parameters for next label
         */

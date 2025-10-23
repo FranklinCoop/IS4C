@@ -36,7 +36,7 @@ class NewItemsReport extends FannieReportPage
     protected $title = "Fannie : New Items Report";
     protected $header = "New Items Report";
 
-    protected $report_headers = array('Added', 'Brand', 'UPC', 'Desc', 'Dept#', 'Dept', 'Qty Sold', 'All Stores');
+    protected $report_headers = array('Added', 'Brand', 'UPC', 'Desc', 'Dept#', 'Dept', 'Qty Sold','Sales', 'All Stores');
     protected $required_fields = array('date1', 'date2');
 
     public function report_description_content()
@@ -100,6 +100,7 @@ class NewItemsReport extends FannieReportPage
         $dlog = DTransactionsModel::selectDLog($date1, $date2);
 
         $query = "SELECT MAX(p.created) AS entryDate, " . DTrans::sumQuantity('t') . " AS qty,
+            sum(t.total) as ttl,
             SUM(CASE WHEN p.last_sold IS NULL THEN 1 ELSE 0 END) AS allStores,
             p.upc, p.brand, p.description, p.department, d.dept_name
             FROM products AS p
@@ -138,6 +139,7 @@ class NewItemsReport extends FannieReportPage
             $row['department'],
             $row['dept_name'],
             sprintf('%.2f', $row['qty']),
+            sprintf('$%.2f', $row['ttl']),
             $row['allStores'] ? 'No' : 'Yes',
         );
     }

@@ -31,10 +31,10 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
     protected $MED_FONT = 9;
     protected $SMALL_FONT = 7;
 
-    protected $fontHead = 'ModestoIOpenPrimary';
-    protected $font = 'ModestoOpenInlineFill';
-    protected $fontH = 'ModestoOpenInlineFillH';
-    protected $fontM = 'ModestoOpenInlineFillM';
+    protected $fontHead = 'ModesReg';
+    protected $font = 'Neue';
+    protected $fontH = 'ModesReg';
+    protected $fontM = 'ModesReg';
 
     protected $width = 288;
     protected $height = 216;
@@ -49,10 +49,10 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
         //define('FPDF_FONTPATH', dirname(__FILE__) . '/../../../src/fpdf/font/');
         define('FPDF_FONTPATH',dirname(__FILE__) . '/../../../src/fpdf/font/proprietary/');
         $pdf = new \FpdfWithMultiCellCount('P', 'pt', 'Letter');
-        $pdf->AddFont('ModestoIOpenPrimary','','ModestoIOpenPrimary.php');
-        $pdf->AddFont('ModestoOpenInlineFillH', '', 'ModestoOpen-InlineFillH.php');
-        $pdf->AddFont('ModestoOpenInlineFillM', '','ModestoOpen-InlineFillM.php');
-        $pdf->AddFont('ModestoOpenInlineFill', '', 'ModestoOpenInlineFill.php');
+        $pdf->AddFont('Neue','','NeueKabelRegular.php');
+        $pdf->AddFont('ModesReg', '', 'ModesReg.php');
+        //$pdf->AddFont('ModestoOpenInlineFillM', '','ModestoOpen-InlineFillM.php');
+        //$pdf->AddFont('ModestoOpenInlineFill', '', 'ModestoOpenInlineFill.php');
         $pdf->SetMargins($this->startX, $this->startY, $this->startX);
         $pdf->SetAutoPageBreak(false);
         //$pdf = $this->loadPluginFonts($pdf);
@@ -86,94 +86,109 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
             $x=$this->startX;
             $textWidth = $this->width - ($this->width*.4) - 4;
 
+            if ($flags['Organic']) {
+                $pdf->SetDrawColor(118,185,181);
+            } else {
+                $pdf->SetDrawColor(214, 118, 47);
+            }
 
             //draw border
-            $pdf->SetDrawColor(118,185,181);
+            //$pdf->SetDrawColor(118,185,181);
             $pdf->SetLineWidth($this->outerBorderWidth);
             $y += $yOffset*$row;
             $x += $xOffset*$column;
             $pdf->Rect($x, $y, $this->width, $this->height);
-            $pdf->SetDrawColor(30, 77, 44);
+
+            if ($flags['Organic']) {
+                $pdf->SetDrawColor(50,134, 93);
+            } else {
+                $pdf->SetDrawColor(214, 118, 47);
+            }
+
+            
             $pdf->SetLineWidth($this->innderBorderWidth);
             $y += $this->outerBorderWidth/2;
             $x += $this->outerBorderWidth/2;
             $pdf->Rect($x, $y, $this->width-$this->outerBorderWidth, $this->height-$this->outerBorderWidth);
-            $pdf->SetLineWidth(1);
+            $pdf->SetLineWidth(2);
             
 
-
+            $localFillColor = array(189,212,96);
+            $organicFillColor = array(50,134, 93);
+            $organicFontSize = 18;
+            $localFontSize = 33;
 
             if ($flags['Local']&&$flags['Organic']) {
                 //LOCAL
-                $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-0.5;
-                $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -59.14;
+                $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-1;
+                $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -48.14;
                 $end_x = ($xOffset*$column) + $this->width+1+$this->startX-($this->borderLineWidth/2)-.5;
-                $end_y = ($yOffset*$row) + $this->height+$this->startY-($this->borderLineWidth/2) -20;
-                $eq_x1 = $start_x+200;
-                $eq_y1 = $start_y;
+                $end_y = ($yOffset*$row) + $this->height+$this->startY-($this->borderLineWidth/2);
+                $eq_x1 = $start_x+250;
+                $eq_y1 = $start_y - 5;
                 $eq_x2 = $end_x;
                 $eq_y2 = $end_y;
                 $w = $this->width-11;
-                $h = 60.14;
-                $pdf->topCurveRect($start_x,$start_y,$eq_x1,$eq_y1,$eq_x2,$eq_y2,$end_x,$end_y,$w, $h,'FD', null, array(151,174,103));
+                $h = 48.14;
+                $pdf->topCurveRect($start_x,$start_y,$eq_x1,$eq_y1,$eq_x2,$eq_y2,$end_x,$end_y,$w, $h,'FD', null, $localFillColor);
                 $fontSize = 28;
-                $pdf->SetTextColor(30, 77, 44);
-                $pdf->SetFont('ModestoOpenInlineFillH', '', $fontSize);
-                $pdf->SetXY($start_x,$start_y+2);
-                $pdf->CellFit($this->width-170, $fontSize, 'LOCAL',0,0,'L');
+                $pdf->SetTextColor(0, 0, 0);
+                $pdf->SetFont('Neue', '', $organicFontSize);
+                $pdf->SetXY($start_x+3,$start_y+7);
+                $pdf->Cell($this->width-170, $organicFontSize, 'LOCAL',0,0,'L');
                 // ORGANIC
-                $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-1;
-                $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -30.4;
+                $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-1.5;
+                $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -19.4;
                 $end_x = ($xOffset*$column) + $this->width+$this->startX-($this->borderLineWidth/2);
-                $end_y = ($yOffset*$row) + $this->height+$this->startY-($this->borderLineWidth/2)-5;
+                $end_y = ($yOffset*$row) + $this->height+$this->startY-($this->borderLineWidth/2);
                 $eq_x1 = $start_x+200;
                 $eq_y1 = $start_y-5;
                 $eq_x2 = $end_x;
                 $eq_y2 = $end_y;
                 $w = $this->width-11;
-                $h = 31.4;
-                $pdf->topCurveRect($start_x,$start_y,$eq_x1,$eq_y1,$eq_x2,$eq_y2,$end_x,$end_y,$w, $h,'FD', null, array(30, 77, 44));
+                $h = 19.4;
+                $pdf->topCurveRect($start_x,$start_y,$eq_x1,$eq_y1,$eq_x2,$eq_y2,$end_x,$end_y,$w, $h,'FD', null, $organicFillColor);
                 $fontSize = 28;
-                $pdf->SetFont('ModestoOpenInlineFillH', '', $fontSize);
+                $pdf->SetFont('Neue', '', $organicFontSize);
                 $pdf->SetTextColor(255,255,255);
-                $pdf->SetXY($start_x,$start_y+5);
-                $pdf->CellFit($w-130, $fontSize, 'ORGANIC',0,0,'L');
+                $pdf->SetXY($start_x+3,$start_y +3);
+                $pdf->Cell($w-130, $organicFontSize, 'ORGANIC',0,0,'L');
             } elseif ($flags['Local']) {
                 //LOCAL .43 inch 31pt
                 $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-0.5;
-                $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -31.4;
+                $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -41.4;
                 $end_x = ($xOffset*$column) + $this->width+$this->startX-($this->borderLineWidth/2);
                 $end_y = ($yOffset*$row) + $this->height+$this->startY-($this->borderLineWidth/2);
-                $pdf->topCurveRect($start_x,$start_y,$start_x+200,$start_y,$end_x,$end_y,$end_x,$end_y,$this->width-11, 32.4,'FD', null, array(151,174,103));
+                $pdf->topCurveRect($start_x,$start_y,$start_x+250,$start_y,$end_x,$end_y,$end_x,$end_y,$this->width-11, 42.4,'FD', null, $localFillColor);
                 $fontSize = 28;
-                $pdf->SetTextColor(30, 77, 44);
-                $pdf->SetFont('ModestoOpenInlineFillH', '', $fontSize);
-                $pdf->SetXY($start_x,$start_y+4);
-                $pdf->Cell($this->width-170, $fontSize, 'LOCAL',0,0,'L');
+                $pdf->SetTextColor(0, 0, 0);
+                $pdf->SetFont('Neue', '', $localFontSize);
+                $pdf->SetXY($start_x +3,$start_y+6);
+                $pdf->Cell($this->width-170, $localFontSize, 'LOCAL',0,0,'L');
             } elseif ($flags['Organic']) {
                 // ORGANIC
                 $start_x = ($xOffset*$column) + $this->startX+($this->borderLineWidth/2)-0.5;
-                $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -32.4;
+                $start_y = ($yOffset*$row) + $this->startY-($this->borderLineWidth/2) + $this->height -42.4;
                 $end_x = ($xOffset*$column) + $this->width+$this->startX-($this->borderLineWidth/2);
                 $end_y = ($yOffset*$row) + $this->height+$this->startY-($this->borderLineWidth/2)+1;
-                $pdf->topCurveRect($start_x,$start_y,$start_x+200,$start_y,$end_x,$end_y,$end_x,$end_y,$this->width-11, 33.4,'FD', null, array(30, 77, 44));
+                $pdf->topCurveRect($start_x,$start_y,$start_x+250,$start_y,$end_x,$end_y,$end_x,$end_y,$this->width-11, 43.4,'FD', null, $organicFillColor);
                 $fontSize = 28;
                 $w = $this->width-8;
-                $pdf->SetFont('ModestoOpenInlineFillH', '', $fontSize);
+                $pdf->SetFont('Neue', '', $localFontSize);
                 $pdf->SetTextColor(255,255,255);
-                $pdf->SetXY($start_x,$start_y+7);
-                $pdf->CellFit($w-130, $fontSize, 'ORGANIC',0,0,'L');
+                $pdf->SetXY($start_x+3,$start_y+9);
+                $pdf->CellFit($w-130, $localFontSize, 'ORGANIC',0,0,'L');
             }
             
             $pdf->SetTextColor(30, 77, 44);
             //PLU or UPC
             $plu = $this->barcodeText($item['upc'], strlen($item['upc']));
-            $fontSize = 10;
+            $fontSize = 12;
             $x += 0;
             $y += 3;
             $w = $this->width;
             $h = $fontSize;
-            $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
+            $pdf->SetFont('Neue','',$fontSize);
             $pdf->SetFontSize($fontSize);
             $pdf->SetXY($x, $y);
             $pdf->Cell($w,$h, $plu, 0,0, 'L');
@@ -192,39 +207,47 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
             //varity
             $descParts = explode(', ',$item['description']);
             $varity = '';
+            $y += 5;
+            $y += $fontSize;
+            $fontSize = 26;
             if (sizeof($descParts) > 1) {
                 $varity = $descParts[1];
-            }
-            $description = $descParts[0];
-            $x = $this->startX + $xOffset*$column + $this->outerBorderWidth/2;
-            $y += $fontSize +10;
-            $fontSize = 14;
-            $w = $this->width - $this->outerBorderWidth;
-            $h = $fontSize;
-            $spacing = 5;
-            $pdf->SetFont('ModestoIOpenPrimary','',$fontSize);
-            $pdf->SetXY($x, $y);            
+                $description = $descParts[0];
+                $x = $this->startX + $xOffset*$column + $this->outerBorderWidth/2;
+                
+                
+                $w = $this->width - $this->outerBorderWidth;
+                $h = $fontSize;
+                $spacing = 5;
+                $pdf->SetFont('ModesReg','',$fontSize);
+                $pdf->SetXY($x, $y);            
             
-            $pdf->Cell($w, $h, $varity, 0, 0, 'C');
+                $pdf->Cell($w, $h, $varity, 0, 0, 'C');
+            }
+
             //Description
             $y += $fontSize + 1.5;
             $fontSize = 26;
             $h = $fontSize;
-            $pdf->SetFont('ModestoIOpenPrimary','',$fontSize);
+            $pdf->SetFont('ModesReg','',$fontSize);
             $pdf->SetXY($x, $y);
             $lines = $pdf->MultiCellRet($w, $h, $description,0, 'C');
             $blankSpace = ($lines==1) ? $fontSize : 0;
             // Vendor/Farm
             $brand = $item['brand'];
-            $x = $this->startX + $xOffset*$column + $this->outerBorderWidth/2;
-            $y += $fontSize +1;
-            $fontSize = 12;
-            $w = $this->width - $this->outerBorderWidth;
-            $h = $fontSize;
-            $spacing = 5;
-            $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
-            $pdf->SetXY($x, $y);
-            $pdf->Cell($w, $h, $brand, 0, 0, 'C');           
+
+            if($brand) {
+                $x = $this->startX + $xOffset*$column + $this->outerBorderWidth/2;
+                $y += $fontSize +1;
+                $fontSize = 16;
+                $w = $this->width - $this->outerBorderWidth;
+                $h = $fontSize;
+                $spacing = 5;
+                $pdf->SetFont('ModesReg','',$fontSize);
+                $pdf->SetXY($x, $y);
+                $pdf->Cell($w, $h, $brand, 0, 0, 'C');   
+            }
+        
 
             //price
             //$price ='';
@@ -246,10 +269,10 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
                 $price = $this->formatPrice($item['normal_price']);
             }
             
-            $y += $fontSize + 10; //space bewtten top and start of first element.
-            $fontSize = 46;
+            $y += $fontSize + 5; //space bewtten top and start of first element.
+            $fontSize = 50;
             $h = $fontSize;
-            $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
+            $pdf->SetFont('Neue','',$fontSize);
             $pdf->SetXY($x, $y);
             $pdf->Cell($w, $h, $price, 0, 0, 'C');
 
@@ -261,10 +284,10 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
                 $units = 'per Each';
             }
             //$x += 10;
-            $y += $fontSize; //space bewtten top and start of first element.
+            $y += $fontSize - 4; //space bewtten top and start of first element.
             $fontSize = 14;
             $h = $fontSize;
-            $pdf->SetFont('ModestoOpenInlineFillH','',$fontSize);
+            $pdf->SetFont('Neue','',$fontSize);
             $pdf->SetXY($x, $y);
             $pdf->Cell($w, $h, $units, 0, 0, 'C');
 

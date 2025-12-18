@@ -210,6 +210,7 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
             $y += 5;
             $y += $fontSize;
             $fontSize = 26;
+            $description = 'ERROR';
             if (sizeof($descParts) > 1) {
                 $varity = $descParts[1];
                 $description = $descParts[0];
@@ -223,6 +224,8 @@ class FCCProduce6upP extends \COREPOS\Fannie\API\item\FannieSignage
                 $pdf->SetXY($x, $y);            
             
                 $pdf->Cell($w, $h, $varity, 0, 0, 'C');
+            } else {
+                $description = $item['description'];
             }
 
             //Description

@@ -25,8 +25,8 @@ namespace COREPOS\Fannie\Plugin\CoopDealsSigns {
 
 class CoopDeals12UpDarkL extends \COREPOS\Fannie\API\item\signage\Signage12UpL 
 {
-    protected $BIG_FONT = 40;
-    protected $MED_FONT = 14;
+    protected $BIG_FONT = 38;
+    protected $MED_FONT = 12;
     protected $SMALL_FONT = 10;
     protected $SMALLER_FONT = 8;
     protected $SMALLEST_FONT = 6;

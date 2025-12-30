@@ -49,6 +49,7 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
         $dbc = FannieDB::get($FANNIE_OP_DB);
 
         $id = $this->id;
+        //$ret ='<div><b>Test</b></div>';
 
         $delQ = $dbc->prepare("DELETE FROM vendorSRPs WHERE vendorID=?");
         $delR = $dbc->execute($delQ,array($id));
@@ -60,11 +61,12 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
                 a.margin,
                 COALESCE(n.shippingMarkup, 0) as shipping,
                 COALESCE(n.discountRate, 0) as discount,
-                COALESCE(m.tariffMarkup, 0) as tariff
+                COALESCE(n.tariffMarkup, 0) as tariff
             FROM vendorItems as v 
                 LEFT JOIN vendorDepartments AS a ON v.vendorID=a.vendorID AND v.vendorDept=a.deptID
                 INNER JOIN vendors AS n ON v.vendorID=n.vendorID
             WHERE v.vendorID=?';
+
         $dbc2 = FannieDB::getReadOnly($this->config->get('OP_DB'));
         $fetchP = $dbc2->prepare($query);
         $fetchR = $dbc2->execute($fetchP, array($id));
@@ -74,6 +76,7 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
                 LEFT JOIN VendorSpecificMargins AS c ON c.vendorID=p.default_vendor_id AND p.department=c.deptID
             WHERE p.default_vendor_id=?");
         $prodR = $dbc2->execute($prodP, array($id));
+
         $prodData = array();
         while ($row = $dbc2->fetchRow($prodR)) {
             $prodData[$row['upc']] = array(
@@ -117,7 +120,8 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
             $srp = \COREPOS\Fannie\API\item\Margin::toPrice($adj, $fetchW['margin']);
 
             $srp = $rounder->round($srp);
-
+            $ret .= 'UPC: '.$fetchW['upc'].' cost: '.$fetchW['cost'].' margin: '.$fetchW['margin'].' SRP: '.$srp.'</br>';  
+            //$ret .= 'ID: '.$id.' SRP: '.$srp.' SKU: '.$sku.'</br>';   
             $upR = $dbc->execute($upP, array($srp, $id, $fetchW['sku']));
             if ($insP) {
                 $insR = $dbc->execute($insP,array($id,$fetchW['upc'],$srp));
@@ -126,7 +130,7 @@ class RecalculateVendorSRPs extends FannieRESTfulPage
         $dbc->commitTransaction();
 
 
-        $ret = "<div><b>SRPs have been updated</b></div>";
+        $ret .= "<div><b>SRPs have been updated</b></div>";
         if ($this->config->get('COOP_ID') == 'WFC_Duluth' && !in_array($id, array(1,2))) {
             list($found, $vendorName) = $this->checkPriceChanges();
             if ($found == 0) {

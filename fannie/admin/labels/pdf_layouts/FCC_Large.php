@@ -202,9 +202,9 @@ function FCC_Large($data,$offset=0){
                 FROM prodFlags AS f
                 WHERE f.active=1');
             $res = $dbc->execute($prep);
-        }//please use the order  "Local, Organic, NONGMO, Gluten Free
-        //please use the order  "Local, Organic, NONGMO, Gluten Free
-        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false);
+        }//please use the order  "Local, Organic, NONGMO, Gluten Free, cv
+        //please use the order  "Local, Organic, NONGMO, Gluten Free, cv
+        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false, 'cv' => false);
         
         while($info = $dbc->fetchRow($res)){
                 $flags[$info['description']] = $info['flagIsSet'];
@@ -213,6 +213,7 @@ function FCC_Large($data,$offset=0){
        $showOrganic = $flags['Organic'];
        $showNONGMO = $flags['Non_GMO'];
        $showGlutenFree = $flags['Gluten Free'];
+       $showCV = $flags['cv'];
 
        $formater = new FannieSignage($data);
        $price = $row['normal_price'];
@@ -245,37 +246,69 @@ function FCC_Large($data,$offset=0){
 
            /* begin creating tag
    */
-  $pdf->SetFont('Arial','',24);
-  $pdf->SetXY($genLeft-2, $unitTop+5.9); //per unit cost numerical total
-  $pdf->Cell($w,4,"\$$num_unit",0,0,'L');
-  
-  $pdf->SetFont('Arial','',12);
-  $pdf->SetXY($genLeft+1, $unitTop+11.2); //numerical unit
-  $pdf->MultiCell(20,4,$alpha_unit,0,'C',0); //send alpha into a two liner to the right of UNIT price
-  
-   
-  //$pdf->SetFont('Arial','B',8);
-  //$pdf->SetXY($genLeft+7,$unitTop+8.7); //price on the right side top Made this +3 cause it goes up toward last row of labels
-  //$pdf->Cell($w/2,8,"\$",0,0,'R');
-  
-  $pdf->SetFont('Arial','B',30);
-  $pdf->SetXY($genLeft+28.6,$unitTop+8.7); //price on the right side top Made this +3 cause it goes up toward last row of labels
-  $pdf->Cell($w/2,8,$price,0,0,'R');
-  
 
-  
-  $pdf->SetFont('Arial','',9);
-  $pdf->SetXY($genLeft-2, $descTop+3.4); //desc of tiem
-  $pdf->Cell($w,4,"$brand $desc",0,0,'L');
-          //please use the order  "Local, Organic, NONGMO, Gluten Free
-        if ($showLocal) {$pdf->Image($FANNIE_ROOT.'src/images/Local.jpg',$genLeft+43 ,$unitTop+17,4);}
-        if ($showOrganic) {$pdf->Image($FANNIE_ROOT.'src/images/Organic.jpg',$genLeft+48,$unitTop+17,4);}
-        if ($showNONGMO) {$pdf->Image($FANNIE_ROOT.'src/images/non-gmo.jpg',$genLeft+53,$unitTop+17,4);}
-        if ($showGlutenFree) {$pdf->Image($FANNIE_ROOT.'src/images/Gluten-Free.jpg',$genLeft+58,$unitTop+17,4);} 
-  //$pdf->SetXY($genLeft,$brandTop);
-  //$pdf->Cell($w/2,4,Test1,0,0,'L'); //this is not showing was $brand
-  //$pdf->SetXY($genLeft,$sizeTop); 
-  //$pdf->Cell($w/2,4,$size,0,0,'L'); //was creating - mark under unit cost
+    ### Price Per Unit
+    $pdf->SetFont('Arial','',24);
+    $pdf->SetXY($genLeft-2, $unitTop+5.9); //per unit cost numerical total
+    $pdf->Cell($w,4,"\$$num_unit",0,0,'L');
+
+    ### unit
+    $pdf->SetFont('Arial','',12);
+    $pdf->SetXY($genLeft+1, $unitTop+11.2); //numerical unit
+    $pdf->MultiCell(20,4,$alpha_unit,0,'C',0); //send alpha into a two liner to the right of UNIT price
+
+    ### Price
+    $pdf->SetFont('Arial','B',30);
+    $pdf->SetXY($genLeft+28.6,$unitTop+8.7); //price on the right side top Made this +3 cause it goes up toward last row of labels
+    $pdf->Cell($w/2,8,$price,0,0,'R');
+    
+    ### Brand
+    $pdf->SetFont('Arial','',9);
+    $pdf->SetXY($genLeft-2, $descTop+3.4); //desc of tiem
+    $pdf->Cell($w,4,"$brand $desc",0,0,'L');
+    
+    ### Flag Images
+    //please use the order  "Local, Organic, NONGMO, Gluten Free, cv
+    $flagX = $genLeft + 58;
+    $flagY = $unitTop + 17;
+    $flagW = 4;
+    foreach ($flags as $flag => $show) {
+        $imagePath = '';
+        if($show) {
+            switch ($flag) {
+                case 'Local':
+                    $imagePath = $FANNIE_ROOT.'src/images/local-V2.png';
+                    break;
+                case 'Organic':
+                    $imagePath = $FANNIE_ROOT.'src/images/organic-V2.png';
+                    break;    
+                case 'Non_GMO':
+                    $imagePath = $FANNIE_ROOT.'src/images/non-gmo-V2.png';
+                    break;
+                case 'Gluten Free':
+                       $imagePath = $FANNIE_ROOT.'src/images/Gluten-Free-V2.png';
+                    break;
+                case 'cv':
+                    $imagePath = $FANNIE_ROOT.'src/images/cv.png';
+                    break;
+                default:
+                    # do nothing.
+                    break;
+            }
+            if ($imagePath) {
+                $pdf->Image($imagePath,$flagX, $flagY, $flagW);
+                $flagX =$flagX - 4.5;
+            }
+        }
+    }
+        
+    //if ($showLocal) {$pdf->Image($FANNIE_ROOT.'src/images/local-V2.png',$genLeft+38 ,$unitTop+17,4);}
+    //if ($showOrganic) {$pdf->Image($FANNIE_ROOT.'src/images/organic-V2.png',$genLeft+43,$unitTop+17,4);}
+    //if ($showNONGMO) {$pdf->Image($FANNIE_ROOT.'src/images/non-gmo-V2.png',$genLeft+48,$unitTop+17,4);}
+    //if ($showGlutenFree) {$pdf->Image($FANNIE_ROOT.'src/images/Gluten-Free-V2.png',$genLeft+53,$unitTop+17,4);}
+    //if ($showCV) {$pdf->Image($FANNIE_ROOT.'src/images/cv.png',$genLeft+58,$unitTop+17,4);}
+        
+    ### Pack Size
   $pdf->SetXY($vendLeft+26,$unitTop+24);
   $pdf->Cell($w/3,4,$size,0,0,'R');
   //$pdf->Cell($w/3,4,"1/".$size_value." ".$size_unit,0,0,'R'); //this was date now going to be unit under normal price

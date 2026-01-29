@@ -110,17 +110,21 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             'display_name' => 'Coop Basics',
             'default' => 16,
         ),
+        'cv' => array(
+            'display_name' => 'cv',
+            'default' => 17,
+        ),
         'pack_size' => array(
             'display_name' => 'pack_size',
-            'default' => 17,
+            'default' => 18,
         ),
         'unitOfMesure' => array(
             'display_name' => 'Tag Format',
-            'default' => 18,
+            'default' => 19,
         ),
         'sku' => array(
             'display_name' => 'Vendor SKU',
-            'default' => 19,
+            'default' => 20,
         )
 
     );
@@ -393,6 +397,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $pack_size = $line[$indexes['pack_size']];
             $unitOfMesure = $line[$indexes['unitOfMesure']];
             $sku = $line[$indexes['sku']];
+            $local = $line[$indexes['local']];
 
             // upc cleanup
             $upc = str_replace(" ","",$upc);
@@ -423,8 +428,35 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             if ($upc == 'upc') {
                 continue; //skip first line
             }
+            if (!$exists) {
+                // fully init new record
+                $model->brand('');
+                $model->formatted_name('');
+                $model->normal_price($price);
+                $model->pricemethod(0);
+                $model->groupprice(0.00);
+                $model->special_price(0);
+                $model->specialpricemethod(0);
+                $model->specialquantity(0);
+                $model->specialgroupprice(0);
+                $model->advertised(0);
+                $model->tareweight(0);
+                $model->start_date('1900-01-01');
+                $model->end_date('1900-01-01');
+                $model->scale(0);
+                $model->scaleprice(0.00);
+                $model->mixmatchcode('');
+                $model->discounttype(0);
+                $model->wicable(0);
+                $model->qttyEnforced(0);
+                $model->idEnforced(0);
+                $model->inUse(1);
+                $model->created(date('Y-m-d H:i:s'));
+                $model->subdept(0);
+                $model->deposit(0);
+            }
             //sanitize flag data.
-            $flagNames = array('local', 'organic', 'nongmo', 'glutenfree', 'traitor','vegan','bipoc','women_owned','lgbtq');
+            $flagNames = array('local', 'organic', 'nongmo', 'glutenfree', 'traitor','vegan','bipoc','women_owned','lgbtq','cv');
             $updateFlags = false;
            
             foreach ($flagNames as $flagNo => $flag) {
@@ -456,7 +488,8 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                                  'Woman Owned' => $line[$indexes['women_owned']],
                                  'Traitor Brand' => $line[$indexes['traitor']],
                                  'LGBTQ' => $line[$indexes['lgbtq']],
-                                 'Vegan' => $line[$indexes['vegan']]);              
+                                 'Vegan' => $line[$indexes['vegan']],
+                                 'cv'=> $line[$indexes['cv']]);            
 
                 $numflag = $this->proc_flags($upc, '', $newJson);
             } 
@@ -476,6 +509,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             if ($cost !='' && $discountType < 1) $model->cost($cost);
             if ($brand !='') $model->brand($brand);
             if ($numflag !='') $model->numflag($numflag);
+            if ($local !='') $model->local($local);
             //takes the currently set vendor if there is none to use for vendor cost updates.
             if ($vendor !='' && $vendor!='#N/A') {
                 $model->default_vendor_id($vendor);
@@ -484,23 +518,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             }
             if ($pack_size !='') $model->size($pack_size);
             if ($unitOfMesure !='') $model->unitofmeasure($unitOfMesure);
-            if (!$exists) {
-                // fully init new record
-                $model->normal_price($price);
-                $model->pricemethod(0);
-                $model->special_price(0);
-                $model->specialpricemethod(0);
-                $model->specialquantity(0);
-                $model->specialgroupprice(0);
-                $model->advertised(0);
-                $model->tareweight(0);
-                $model->start_date('1900-01-01');
-                $model->end_date('1900-01-01');
-                $model->discounttype(0);
-                $model->wicable(0);
-                $model->inUse(1);
-                $model->created(date('Y-m-d H:i:s'));
-            }
+
             $try = $model->save();
 
             foreach ($stores as $s) {
@@ -542,9 +560,9 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
     function proc_flags($upc, $store, $newJSON) {
         $dbc = $this->connection;
-        $attrs = array(1,2,3,4,5,6,7,8,9,10);
-        $fnames = array('Local','Organic','Coop Basic','Non_GMO','bipoc','Gluten Free','Woman Owned','Traitor Brand','LGBTQ','Vegan');
-        $bits = array(1,2,3,4,5,6,7,8,9,10);
+        $attrs = array(1,2,3,4,5,6,7,8,9,10,11);
+        $fnames = array('Local','Organic','Coop Basic','Non_GMO','bipoc','Gluten Free','Woman Owned','Traitor Brand','LGBTQ','Vegan','cv');
+        $bits = array(1,2,3,4,5,6,7,8,9,10,11);
         
         $curQ = 'SELECT attributes FROM ProductAttributes WHERE upc=? ORDER BY modified DESC';
         $curQ = $dbc->addSelectLimit($curQ, 1);
@@ -581,6 +599,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         intval($line[$indexes['traitor']])*8,
         intval($line[$indexes['lgbtq']])*9,
         intval($line[$indexes['vegan']])*10,);
+        intval($line[$indexes['cv']])*11,);
 
         */
         /**
@@ -650,7 +669,8 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             JSON_EXTRACT(attributes, '$.\"Traitor Brand\"') as traitor_brands,
             JSON_EXTRACT(attributes, '$.BIPOC') as BIPOC,
             JSON_EXTRACT(attributes, '$.\"Woman Owned\"') as Woman_Owned,
-            JSON_EXTRACT(attributes, '$.LGBTQ') as LGBTQ
+            JSON_EXTRACT(attributes, '$.LGBTQ') as LGBTQ,
+            JSON_EXTRACT(attributes, '$.cv') as cv
         from core_op.ProductAttributes where upc = ? having max(modified)";
         
         

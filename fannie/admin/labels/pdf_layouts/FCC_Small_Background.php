@@ -194,42 +194,25 @@ use \COREPOS\Fannie\API\item\FannieSignage;
             $res = $dbc->execute($prep);
         }
 
-        //please use the order  "Local, Organic, NONGMO, Gluten Free
-        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false);
+        //please use the order  "Local, Organic, NONGMO, Gluten Free, cv
+        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false, 'cv' => false);
         
         while($info = $dbc->fetchRow($res)){
                 $flags[$info['description']] = $info['flagIsSet'];
        }
-       $showLocal = $flags['Local'];
-       $showOrganic = $flags['Organic'];
-       $showNONGMO = $flags['Non_GMO'];
-       $showGlutenFree = $flags['Gluten Free'];
-           /* if ($i==0) $ret .= '<tr>';
-            if ($i != 0 && $i % 2 == 0) $ret .= '</tr><tr>';
-            $ret .= sprintf('<td><input type="checkbox" id="item-flag-%d" name="flags[]" value="%d" %s /></td>
-                <td><label for="item-flag-%d">%s</label></td>',$i, $row['bit_number'],
-                ($row['flagIsSet']==0 ? '' : 'checked'),
-                $i,
-                $row['description']
-            );
-            // embed flag info to avoid re-querying it on save
-            $ret .= sprintf('<input type="hidden" name="pf_attrs[]" value="%s" />
-                            <input type="hidden" name="pf_bits[]" value="%d" />',
-                            $row['description'], $row['bit_number']);
-            $i++;*/
 
-            $formater = new FannieSignage($data);
-            $price = $row['normal_price'];
-            if ($row['scale']) {
-                 if (substr($price, 0, 1) != '$') {
-                     $price = sprintf('$%.2f', $price);
-                 }
-                 #$price .= ' /lb.';
-             } elseif (isset($row['signMultiplier'])) {
-                 $price = $formater->formatPrice($row['normal_price'], $row['signMultiplier']);
-             } else {
-                 $price = $formater->formatPrice($row['normal_price']);
-             }
+        $formater = new FannieSignage($data);
+        $price = $row['normal_price'];
+        if ($row['scale']) {
+                if (substr($price, 0, 1) != '$') {
+                $price = sprintf('$%.2f', $price);
+            }
+            #$price .= ' /lb.';
+        } elseif (isset($row['signMultiplier'])) {
+            $price = $formater->formatPrice($row['normal_price'], $row['signMultiplier']);
+        } else {
+            $price = $formater->formatPrice($row['normal_price']);
+        }
         $desc = strtoupper(substr($row['description'],0,27));
         $brand = ucwords(strtolower(substr($row['brand'],0,13)));
         $pak = $row['units'];
@@ -300,11 +283,39 @@ use \COREPOS\Fannie\API\item\FannieSignage;
 
 	    //Flaging Graphics
         $pdf->SetXY($genLeft+25, $unitTop+16.2);
-	    //please use the order  "Local, Organic, NONGMO, Gluten Free
-        if ($showLocal) {$pdf->Image($FANNIE_ROOT.'src/images/Local.jpg',$genLeft+26,$unitTop+16,3);}
-        if ($showOrganic) {$pdf->Image($FANNIE_ROOT.'src/images/Organic.jpg',$genLeft+29.5,$unitTop+16,3);}
-        if ($showNONGMO) {$pdf->Image($FANNIE_ROOT.'src/images/non-gmo.jpg',$genLeft+33,$unitTop+16,3);}
-        if ($showGlutenFree) {$pdf->Image($FANNIE_ROOT.'src/images/Gluten-Free.jpg',$genLeft+36.5,$unitTop+16,3);}        
+          //please use the order  "Local, Organic, NONGMO, Gluten Free, cv
+        $flagX = $genLeft + 36;
+        $flagY = $unitTop + 16;
+        $flagW = 3;
+        foreach ($flags as $flag => $show) {
+            $imagePath = '';
+            if($show) {
+                switch ($flag) {
+                    case 'Local':
+                        $imagePath = $FANNIE_ROOT.'src/images/local-V2.png';
+                        break;
+                    case 'Organic':
+                        $imagePath = $FANNIE_ROOT.'src/images/organic-V2.png';
+                        break;    
+                    case 'Non_GMO':
+                        $imagePath = $FANNIE_ROOT.'src/images/non-gmo-V2.png';
+                        break;
+                    case 'Gluten Free':
+                        $imagePath = $FANNIE_ROOT.'src/images/Gluten-Free-V2.png';
+                        break;
+                    case 'cv':
+                        $imagePath = $FANNIE_ROOT.'src/images/cv.png';
+                        break;
+                    default:
+                        # do nothing.
+                        break;
+                }
+                if ($imagePath) {
+                    $pdf->Image($imagePath,$flagX, $flagY, $flagW);
+                    $flagX =$flagX - 3.25;
+                }
+            }
+        }
     
         // UPC
         $pdf->SetFont('Arial','',4);

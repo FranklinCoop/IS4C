@@ -261,7 +261,7 @@ if (!class_exists('FpdfWithBarcode')) {
         $pdf->Cell(24,4,$size,0,0,'R');
         $pdf->SetXY($genLeft+25, $unitTop+16.2);
           //please use the order  "Local, Organic, NONGMO, Gluten Free, cv
-        $flagX = $genLeft + 36;
+        $flagX = $genLeft + 33;
         $flagY = $unitTop + 16;
         $flagHeight = 3;
         foreach ($flags as $flag => $show) {

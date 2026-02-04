@@ -302,13 +302,8 @@ function FCC_Large($data,$offset=0){
         }
     }
         
-    //if ($showLocal) {$pdf->Image($FANNIE_ROOT.'src/images/local-V2.png',$genLeft+38 ,$unitTop+17,4);}
-    //if ($showOrganic) {$pdf->Image($FANNIE_ROOT.'src/images/organic-V2.png',$genLeft+43,$unitTop+17,4);}
-    //if ($showNONGMO) {$pdf->Image($FANNIE_ROOT.'src/images/non-gmo-V2.png',$genLeft+48,$unitTop+17,4);}
-    //if ($showGlutenFree) {$pdf->Image($FANNIE_ROOT.'src/images/Gluten-Free-V2.png',$genLeft+53,$unitTop+17,4);}
-    //if ($showCV) {$pdf->Image($FANNIE_ROOT.'src/images/cv.png',$genLeft+58,$unitTop+17,4);}
         
-    ### Pack Size
+  ### Pack Size
   $pdf->SetXY($vendLeft+26,$unitTop+24);
   $pdf->Cell($w/3,4,$size,0,0,'R');
   //$pdf->Cell($w/3,4,"1/".$size_value." ".$size_unit,0,0,'R'); //this was date now going to be unit under normal price

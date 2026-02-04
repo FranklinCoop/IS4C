@@ -257,29 +257,29 @@ use \COREPOS\Fannie\API\item\FannieSignage;
 	    $pdf->SetDrawColor(0,0,0);
 	    $pdf->SetTextColor(0,0,0);
 
-	    //Unit Price
+	    ### Unit Price
         $pdf->SetXY($genLeft +1, $unitTop+8); 
         $pdf->SetFont('steelfish','',29);
         $pdf->Cell(8,4,"\$$num_unit",0,0,'L');
 	
-	    $pdf->SetFont('Arial','',7);
+	    $pdf->SetFont('Arial','',8);
         $pdf->SetXY($genLeft+2, $unitTop+13.2); //numerical unit // silas: was above
         $pdf->MultiCell(20,3,$alpha_unit,0,'L',0); //send alpha into a two liner to the right of UNIT price    
 
-	    //Price
+	    ### Price
 	    $pdf->SetFont('steelfish','',29);
         $pdf->SetXY($genLeft+30.55,$unitTop+8.5); //price on the right side top Made this +3 cause it goes up toward last row of labels
         $pdf->Cell(10,8,"$price",0,0,'R'); //\$$price $barLeft
   	
-	    // Brand and Description
+	    ### Brand and Description
         $pdf->SetFont('arialnarrow','',6);
         $pdf->SetXY($genLeft+1, $unitTop+18.5); //desc of tiem
         $pdf->Cell(0,4,"$brand $desc",0,0,'L');
         $pdf->SetFont('Arial','',6);
 
-	    // Unit Size	
+	    ### Unit Size	
         $pdf->SetXY($genLeft+1, $unitTop+16.2);
-	    $pdf->Cell(24,4,$size,0,0,'L');
+	    $pdf->Cell(10,4,'Pk Size: '.$size,0,0,'L');
 
 	    //Flaging Graphics
         $pdf->SetXY($genLeft+25, $unitTop+16.2);

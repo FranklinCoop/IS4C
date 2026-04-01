@@ -274,7 +274,7 @@ class PriceLib
         //return the unit price.
         $pricePerUnit = ($unitSize && $unitSize != 0) ? $price*($rowConversion['rate']/$unitSize)  : 0 ;
         if ($pricePerUnit == 0) {return "Size: ".$packUnit."\n Conversion Factor: ". $rowConversion['rate']; }
-        else { return round($pricePerUnit,2); }
+        else { return number_format($pricePerUnit,2); }
     }
 }
 

@@ -46,6 +46,7 @@ class Signage16UpP extends \COREPOS\Fannie\API\item\FannieSignage
         $pdf->SetAutoPageBreak(false);
         $pdf = $this->loadPluginFonts($pdf);
         $pdf->SetFont($this->font, '', 16);
+        $pdf->AddFont('steelfish');
 
         return $pdf;
     }
@@ -58,7 +59,7 @@ class Signage16UpP extends \COREPOS\Fannie\API\item\FannieSignage
 
         $price = $this->printablePrice($item);
 
-        $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($row*$this->height)+6);
+        $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($row*$this->height)+3);
         $pdf->SetFont($this->font, 'B', $this->SMALL_FONT);
         $pdf = $this->fitText($pdf, $this->SMALL_FONT, 
             strtoupper($item['brand']), array($column, 6, 1));
@@ -72,7 +73,7 @@ class Signage16UpP extends \COREPOS\Fannie\API\item\FannieSignage
         $item['size'] = $this->formatSize($item['size'], $item);
         $pdf->Cell($effective_width, 6, $item['size'], 0, 1, 'C');
 
-        $pdf->Ln(4);
+        $pdf->Ln(2);
         $pdf->SetFont($this->font, '', $this->BIG_FONT);
         $font_shrink = 0;
         while (true) {
@@ -123,21 +124,59 @@ class Signage16UpP extends \COREPOS\Fannie\API\item\FannieSignage
                 $pdf->SetTextColor(0, 0, 0);
             }
         }
-
+        // if the item is on sale.
         if ($this->validDate($item['startDate']) && $this->validDate($item['endDate'])) {
             // intl would be nice
             $datestr = $this->getDateString($item['startDate'], $item['endDate']);
-            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 10));
-            $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 9));
+            $pdf->SetFont($this->alt_font, '', 7);
             $pdf->Cell($effective_width, 6, strtoupper($datestr), 0, 1, 'R');
+            // regular price
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 13));
+            $pdf->Cell($effective_width, 6, sprintf('Regular Price: $%.2f', $item['nonSalePrice']), 0, 1, 'R');
         }
-
+        // no idea.
         if ($item['originShortName'] != '' || (isset($item['nonSalePrice']) && $item['nonSalePrice'] > $item['normal_price'])) {
-            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 10));
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 14));
             $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
             $text = ($item['originShortName'] != '') ? $item['originShortName'] : sprintf('Regular Price: $%.2f', $item['nonSalePrice']);
             $pdf->Cell($effective_width, 6, $text, 0, 1, 'L');
         }
+
+        // unite of mesure calculations for Mass State Laws
+        $unitStandard = 'error';
+        $str = $item['unitofmeasure'];
+        $strArray = explode('/', $str);
+        if(sizeof($strArray) > 2) { 
+            $unitStandard = $strArray[2];
+        } else if ($item['size'] !=''){
+            $unitStandard = preg_replace('/[0-9]+/', '', $item['size']);
+        }
+
+
+	    $num_unit = $item['pricePerUnit'];
+        $alpha_unit = "per ".$unitStandard;
+
+        //Add Orange Rectangle and Blue Stripe
+        //oranges square is 17x10mm
+        $rectH = 12;
+	    $rectW = 20;
+        $pdf->SetFillColor(243,112,22);
+        $pdf->SetDrawColor(243,112,22);
+        $pdf->Rect($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 14), $rectW, $rectH,'DF');
+	    //Clean up
+	    $pdf->SetFillColor(0,0,0);
+	    $pdf->SetDrawColor(0,0,0);
+	    $pdf->SetTextColor(0,0,0);
+
+	    //Unit Price
+        $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 10.5));
+        $pdf->SetFont('steelfish','',27);
+        $pdf->Cell($rectW,4,"\$$num_unit",0,0,'C');
+	
+	    $pdf->SetFont('Arial','',9);
+        $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 5.5)); //numerical unit // silas: was above
+        $pdf->MultiCell(20,3,$alpha_unit,0,'C',0); //send alpha into a two liner to the right of UNIT price    
 
         return $pdf;
     }

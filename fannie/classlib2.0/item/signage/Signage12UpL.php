@@ -51,6 +51,7 @@ class Signage12UpL extends \COREPOS\Fannie\API\item\FannieSignage
         $pdf->SetFont($this->font, 'B', $this->SMALL_FONT);
         $pdf = $this->fitText($pdf, $this->SMALL_FONT, 
             strtoupper($item['brand']), array($column, 6, 1));
+        $pdf->AddFont('steelfish');
 
         $pdf->SetFont($this->font, '', $this->MED_FONT);
         $pdf = $this->fitText($pdf, $this->MED_FONT, 
@@ -59,22 +60,22 @@ class Signage12UpL extends \COREPOS\Fannie\API\item\FannieSignage
         $pdf->SetX($this->left + ($this->width*$column));
         $pdf->SetFont($this->alt_font, '', $this->SMALLER_FONT);
         $item['size'] = $this->formatSize($item['size'], $item);
-        $pdf->Cell($effective_width, 6, $item['size'], 0, 1, 'C');
+        $pdf->Cell($effective_width, 3, $item['size'], 0, 1, 'C');
 
         if (!isset($item['signMultiplier']) || $item['signMultiplier'] != -3) {
-            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 41));
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 42));
             $pdf->SetFont($this->font, '', $this->BIG_FONT);
-            $pdf->Cell($effective_width, 12, $price, 0, 1, 'C');
+            $pdf->Cell($effective_width, 11, $price, 0, 1, 'C');
         } else {
-            $pdf->SetXY(-5 + $this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 41));
+            $pdf->SetXY(-5 + $this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 42));
             if (strpos($price, 'FREE') != false) {
                 $pdf->SetTextColor(244, 116, 30);
 
-                $pdf->SetXY($this->left + ($this->width*$column) - 3, $this->top + ($this->height*$row) + ($this->height - 45));
+                $pdf->SetXY($this->left + ($this->width*$column) - 3, $this->top + ($this->height*$row) + ($this->height - 46));
                 $pdf->SetFont($this->font, 'B', 12);
                 $pdf->Cell($this->width, 12, 'Buy One, Get One', 0, 1, 'C');
 
-                $pdf->SetXY($this->left + ($this->width*$column) - 3, $this->top + ($this->height*$row) + ($this->height - 36));
+                $pdf->SetXY($this->left + ($this->width*$column) - 3, $this->top + ($this->height*$row) + ($this->height - 37));
                 $pdf->SetFont($this->font, 'B', $this->BIG_FONT);
                 $pdf->Cell($this->width, 12, 'FREE', 0, 1, 'C');
 
@@ -102,6 +103,9 @@ class Signage12UpL extends \COREPOS\Fannie\API\item\FannieSignage
             $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 33));
             $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
             $pdf->Cell($effective_width, 20, strtoupper($datestr), 0, 1, 'R');
+                        // regular price
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 13));
+            $pdf->Cell($effective_width, 6, sprintf('Regular Price: $%.2f', $item['nonSalePrice']), 0, 1, 'R');
         }
 
         // suppress "regular" price on price change batches
@@ -110,17 +114,48 @@ class Signage12UpL extends \COREPOS\Fannie\API\item\FannieSignage
         }
 
         if (isset($item['nonSalePrice']) && $item['nonSalePrice'] > $item['normal_price']) {
-            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 35.5));
-            $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
-            $text = sprintf('Regular Price: $%.2f', $item['nonSalePrice']);
-            $pdf->Cell($effective_width, 20, $text, 0, 1, 'L');
-            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 33));
-            $pdf->Cell($effective_width, 20, $item['upc'], 0, 1, 'L');
+            // regular price
+            $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 13));
+            $pdf->Cell($effective_width, 6, sprintf('Regular Price: $%.2f', $item['nonSalePrice']), 0, 1, 'R');
         } else {
             $pdf->SetFont($this->alt_font, '', $this->SMALLEST_FONT);
             $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - 33));
             $pdf->Cell($effective_width, 20, $item['upc'], 0, 1, 'L');
         } 
+
+        $unitStandard = 'error';
+        $str = $item['unitofmeasure'];
+        $strArray = explode('/', $str);
+        if(sizeof($strArray) > 2) { 
+            $unitStandard = $strArray[2];
+        } else if ($item['size'] !=''){
+            $unitStandard = preg_replace('/[0-9]+/', '', $item['size']);
+        }
+
+
+	    $num_unit = $item['pricePerUnit'];
+        $alpha_unit = "per ".$unitStandard;
+
+        //Add Orange Rectangle and Blue Stripe
+        //oranges square is 17x10mm
+        $rectH = 12;
+	    $rectW = 20;
+        $pdf->SetFillColor(243,112,22);
+        $pdf->SetDrawColor(243,112,22);
+        $pdf->Rect($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 13.4), $rectW, $rectH,'DF');
+	    //Clean up
+	    $pdf->SetFillColor(0,0,0);
+	    $pdf->SetDrawColor(0,0,0);
+	    $pdf->SetTextColor(0,0,0);
+
+	    //Unit Price
+        $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 11));
+        $pdf->SetFont('steelfish','',22);
+        $pdf->Cell($rectW,4.5,"\$$num_unit",0,0,'C');
+	
+	    $pdf->SetFont('Arial','',6);
+        $pdf->SetXY($this->left + ($this->width*$column), $this->top + ($this->height*$row) + ($this->height - $this->top - 6.5)); //numerical unit // silas: was above
+        $pdf->MultiCell(20,2.5,$alpha_unit,0,'C',0); //send alpha into a two liner to the right of UNIT price    
 
         return $pdf;
     }

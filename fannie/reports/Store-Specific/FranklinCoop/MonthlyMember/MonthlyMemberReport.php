@@ -149,16 +149,16 @@ class MonthlyMemberReport extends FannieReportPage
         SELECT  count(c.cardNo), 'New FFAs' as lineName
         FROM core_op.custdataHistory c
         LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
-        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND c.memType = 6 AND (h.memType != c.memType or h.memType is null)
+        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND c.memType in (6,10,14,15) AND (h.memType != c.memType or h.memType is null)
         UNION
         SELECT  count(c.cardNo), 'FFA Non-Renewals' as lineName
         FROM core_op.custdataHistory c
         LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
-        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND h.memType = 6 AND (h.memType != c.memType)
+        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND h.memType in (6,10,14,15) AND (h.memType != c.memType)
         UNION
         SELECT  count(c.cardNo), 'Total FFA' as lineName
         FROM core_op.custdataHistory c
-        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND c.memType = 6
+        WHERE c.histDate = DATE_ADD('{$edate}', INTERVAL 1 SECOND) AND c.memType in (6,10,14,15)
         UNION
         SELECT count(c.cardNo), 'Total Members' as lineName FROM (
             SELECT p.card_no, SUM(p.stockPurchase) as equity
@@ -219,16 +219,16 @@ class MonthlyMemberReport extends FannieReportPage
             SELECT  count(c.cardNo), 'New FFAs' as lineName
             FROM core_op.custdata c
             LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
-            WHERE c.personNum = 1 AND c.memType = 6 AND (h.memType != c.memType or h.memType is null)
+            WHERE c.personNum = 1 AND c.memType in (6,10,14,15) AND (h.memType != c.memType or h.memType is null)
             UNION
             SELECT  count(c.cardNo), 'FFA Non-Renewals' as lineName
             FROM core_op.custdata c
             LEFT JOIN core_op.custdataHistory h on c.cardNo = h.cardNo and h.histDate = '{$sdate}'
-            WHERE c.personNum = 1 AND h.memType = 6 AND (h.memType != c.memType)
+            WHERE c.personNum = 1 AND h.memType in (6,10,14,15) AND (h.memType != c.memType)
             UNION
             SELECT  count(c.cardNo), 'Total FFA' as lineName
             FROM core_op.custdata c
-            WHERE c.personNum = 1 AND c.memType = 6
+            WHERE c.personNum = 1 AND c.memType in (6,10,14,15)
             UNION
             SELECT count(c.cardNo), 'Total Members' as lineName FROM (
                 SELECT p.card_no, SUM(p.stockPurchase) as equity

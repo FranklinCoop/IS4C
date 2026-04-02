@@ -116,19 +116,19 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
         ),
         'glyphosate-free' => array(
             'display_name' => 'glyphosate-free',
-            'default' => 16,
+            'default' => 18,
         ),
         'pack_size' => array(
             'display_name' => 'pack_size',
-            'default' => 18,
+            'default' => 19,
         ),
         'unitOfMesure' => array(
             'display_name' => 'Tag Format',
-            'default' => 19,
+            'default' => 20,
         ),
         'sku' => array(
             'display_name' => 'Vendor SKU',
-            'default' => 20,
+            'default' => 21,
         )
 
     );

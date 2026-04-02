@@ -194,8 +194,8 @@ use \COREPOS\Fannie\API\item\FannieSignage;
             $res = $dbc->execute($prep);
         }
 
-        //please use the order  "Local, Organic, NONGMO, Gluten Free
-        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false);
+        //please use the order  "Local, Organic, NONGMO, Gluten Free, glyphosate-free
+        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false, 'glyphosate-free' => false);
         
         while($info = $dbc->fetchRow($res)){
                 $flags[$info['description']] = $info['flagIsSet'];
@@ -274,11 +274,14 @@ use \COREPOS\Fannie\API\item\FannieSignage;
                     case 'Non_GMO':
                         $imagePath = $FANNIE_ROOT.'src/images/non-gmo-V2.png';
                         break;
-                    case 'Gluten Free':
-                        $imagePath = $FANNIE_ROOT.'src/images/Gluten-Free-V2.png';
-                        break;
+                    //case 'Gluten Free':
+                    //    $imagePath = $FANNIE_ROOT.'src/images/Gluten-Free-V2.png';
+                    //    break;
                     case 'cv':
                         $imagePath = $FANNIE_ROOT.'src/images/cv.png';
+                        break;
+                    case 'glyphosate-free':
+                        $imagePath = $FANNIE_ROOT.'src/images/glyphosate-free.png';
                         break;
                     default:
                         # do nothing.

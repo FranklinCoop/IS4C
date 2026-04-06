@@ -114,17 +114,21 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             'display_name' => 'cv',
             'default' => 17,
         ),
+        'glyphosate-free' => array(
+            'display_name' => 'glyphosate-free',
+            'default' => 18,
+        ),
         'pack_size' => array(
             'display_name' => 'pack_size',
-            'default' => 18,
+            'default' => 19,
         ),
         'unitOfMesure' => array(
             'display_name' => 'Tag Format',
-            'default' => 19,
+            'default' => 20,
         ),
         'sku' => array(
             'display_name' => 'Vendor SKU',
-            'default' => 20,
+            'default' => 21,
         )
 
     );
@@ -456,7 +460,7 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 $model->deposit(0);
             }
             //sanitize flag data.
-            $flagNames = array('local', 'organic', 'nongmo', 'glutenfree', 'traitor','vegan','bipoc','women_owned','lgbtq','cv');
+            $flagNames = array('local', 'organic', 'nongmo', 'glutenfree', 'traitor','vegan','bipoc','women_owned','lgbtq','cv', 'glyphosate-free');
             $updateFlags = false;
            
             foreach ($flagNames as $flagNo => $flag) {
@@ -489,12 +493,13 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
                                  'Traitor Brand' => $line[$indexes['traitor']],
                                  'LGBTQ' => $line[$indexes['lgbtq']],
                                  'Vegan' => $line[$indexes['vegan']],
-                                 'cv'=> $line[$indexes['cv']]);            
+                                 'cv'=> $line[$indexes['cv']],
+                                 'glyphosate-free' => $line[$indexes['glyphosate-free']]);            
 
                 $numflag = $this->proc_flags($upc, '', $newJson);
             } 
-            if ($numflag > 1023) {
-                $ret .= "<i>Falg Eroors item. Identifier {$upc} MANUALLY SET FLAGGING DATA</i><br />";
+            if ($numflag > 4095) {
+                $ret .= "<i>Flag Error item. Identifier {$upc} MANUALLY SET FLAGGING DATA</i><br />";
                 $this->stats['errors'][] = 'FLAG ERROR FOR UPC ' . $upc .' MANUALLY SET FLAGGING DATA';
                 //processing error don't reset flags
                 $numfalg = '';
@@ -560,9 +565,9 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
 
     function proc_flags($upc, $store, $newJSON) {
         $dbc = $this->connection;
-        $attrs = array(1,2,3,4,5,6,7,8,9,10,11);
-        $fnames = array('Local','Organic','Coop Basic','Non_GMO','bipoc','Gluten Free','Woman Owned','Traitor Brand','LGBTQ','Vegan','cv');
-        $bits = array(1,2,3,4,5,6,7,8,9,10,11);
+        $attrs = array(1,2,3,4,5,6,7,8,9,10,11,12);
+        $fnames = array('Local','Organic','Coop Basic','Non_GMO','bipoc','Gluten Free','Woman Owned','Traitor Brand','LGBTQ','Vegan','cv', 'glyphosate-free');
+        $bits = array(1,2,3,4,5,6,7,8,9,10,11,12);
         
         $curQ = 'SELECT attributes FROM ProductAttributes WHERE upc=? ORDER BY modified DESC';
         $curQ = $dbc->addSelectLimit($curQ, 1);
@@ -670,7 +675,8 @@ class FCCBatchPage extends \COREPOS\Fannie\API\FannieUploadPage {
             JSON_EXTRACT(attributes, '$.BIPOC') as BIPOC,
             JSON_EXTRACT(attributes, '$.\"Woman Owned\"') as Woman_Owned,
             JSON_EXTRACT(attributes, '$.LGBTQ') as LGBTQ,
-            JSON_EXTRACT(attributes, '$.cv') as cv
+            JSON_EXTRACT(attributes, '$.cv') as cv,
+            JOSN_EXTRACT(attributes, '$.glyphosate-free' as glyphosate-free
         from core_op.ProductAttributes where upc = ? having max(modified)";
         
         

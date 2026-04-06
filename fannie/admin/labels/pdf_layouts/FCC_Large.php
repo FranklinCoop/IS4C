@@ -202,18 +202,14 @@ function FCC_Large($data,$offset=0){
                 FROM prodFlags AS f
                 WHERE f.active=1');
             $res = $dbc->execute($prep);
-        }//please use the order  "Local, Organic, NONGMO, Gluten Free, cv
-        //please use the order  "Local, Organic, NONGMO, Gluten Free, cv
-        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false, 'cv' => false);
+        }
+        //please use the order  "Local, Organic, NONGMO, Gluten Free, cv, glyphosate-free
+        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false, 'cv' => false, 'glyphosate-free' => false);
         
         while($info = $dbc->fetchRow($res)){
                 $flags[$info['description']] = $info['flagIsSet'];
        }
-       $showLocal = $flags['Local'];
-       $showOrganic = $flags['Organic'];
-       $showNONGMO = $flags['Non_GMO'];
-       $showGlutenFree = $flags['Gluten Free'];
-       $showCV = $flags['cv'];
+
 
        $formater = new FannieSignage($data);
        $price = $row['normal_price'];
@@ -268,7 +264,7 @@ function FCC_Large($data,$offset=0){
     $pdf->Cell($w,4,"$brand $desc",0,0,'L');
     
     ### Flag Images
-    //please use the order  "Local, Organic, NONGMO, Gluten Free, cv
+    //please use the order  "Local, Organic, NONGMO, Gluten Free, cv, lyphosate-free
     $flagX = $genLeft + 58;
     $flagY = $unitTop + 17;
     $flagW = 4;
@@ -285,11 +281,14 @@ function FCC_Large($data,$offset=0){
                 case 'Non_GMO':
                     $imagePath = $FANNIE_ROOT.'src/images/non-gmo-V2.png';
                     break;
-                case 'Gluten Free':
-                       $imagePath = $FANNIE_ROOT.'src/images/Gluten-Free-V2.png';
-                    break;
+                //case 'Gluten Free':
+                //       $imagePath = $FANNIE_ROOT.'src/images/Gluten-Free-V2.png';
+                //    break;
                 case 'cv':
                     $imagePath = $FANNIE_ROOT.'src/images/cv.png';
+                    break;
+                case 'glyphosate-free':
+                    $imagePath = $FANNIE_ROOT.'src/images/glyphosate-free.png';
                     break;
                 default:
                     # do nothing.
@@ -306,10 +305,7 @@ function FCC_Large($data,$offset=0){
   ### Pack Size
   $pdf->SetXY($vendLeft+26,$unitTop+24);
   $pdf->Cell($w/3,4,$size,0,0,'R');
-  //$pdf->Cell($w/3,4,"1/".$size_value." ".$size_unit,0,0,'R'); //this was date now going to be unit under normal price
-  // $pdf->SetFont('Arial','',10);
-  //$pdf->SetXY($genLeft,$skuTop);
-  //$pdf->Cell($w/3,4,Test2,0,0,'L'); //this was not showing was $sku
+
   $pdf->SetFont('Arial','',7);
   //$pdf->SetXY($priceLeft-22,$skuTop+10);
   $pdf->SetXY($vendLeft+26,$skuTop+16.5);

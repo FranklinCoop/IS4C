@@ -534,8 +534,14 @@ class MercuryE2E extends BasicCCModule
             } elseif ($request->type == 'EBTCASH') {
                 $msgXml .= '<CardType>Cash</CardType>';
                 $this->conf->set('EbtCaBalance', 'unknown');
-            }
-        } else {
+            } 
+        } elseif ($request->type == 'EMVDC') {
+            $msgXml .= '<TranType>'.$request->type.'</TranType>';
+            $msgXml .= '<CardType>Debit</CardType>';
+        } elseif ($request->type == 'EMVCC') {
+            $msgXml .= '<TranType>'.$request->type.'</TranType>';
+            $msgXml .= '<CardType>Credit</CardType>';
+        }  else {
             $msgXml .= '<TranType>'.$request->type.'</TranType>';
         }
         $msgXml .= '<TranCode>'.$request->mode.'</TranCode>';
@@ -960,7 +966,7 @@ class MercuryE2E extends BasicCCModule
             if (is_numeric($cbMax) && $cbMax > 0) {
                 $msgXml .= sprintf('<MaximumCashBack>%.2f</MaximumCashBack>', $cbMax);
             }
-        } elseif ($this->conf->get('PaycardsOfferCashBack') == 4 && in_array(strtoupper($request->type), array('DEBIT','EMV'))) {
+        } elseif ($this->conf->get('PaycardsOfferCashBack') == 4 && in_array(strtoupper($request->type), array('DEBIT','EMVDC'))) {
             $msgXml .= "<CashBack>Prompt</CashBack>";
             if (is_numeric($cbMax) && $cbMax > 0) {
                 $msgXml .= sprintf('<MaximumCashBack>%.2f</MaximumCashBack>', $cbMax);

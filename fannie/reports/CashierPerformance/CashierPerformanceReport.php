@@ -38,6 +38,7 @@ class CashierPerformanceReport extends FannieReportPage
     protected $report_headers = array('Cashier', 'Rings', 'Refunds', 'Refund%', 'Avg. Refund',
                                     'Voids', 'Void%', 'Avg. Void', 'Open Rings', 'Open Ring%',
                                     'Avg. Open Ring', 'Cancels', 'Cancel%', 'Avg. Cancel',
+                                    'Seinor', 'Senior%', 'Avg. Senior', 'Seinor Tuesday', 'Seinor Tuesday %', 'Avg. Senior Tuesday',
                                     '#Trans', 'Minutes', 'Rings/Minute');
 
     public $description = '[Cashier Performance] lists cashier scan metrics over a given date range.';
@@ -84,7 +85,7 @@ class CashierPerformanceReport extends FannieReportPage
         $basicQ = '
             SELECT d.emp_no,
                 e.FirstName,
-                COUNT(*) AS rings,
+                SUM(CASE WHEN trans_type IN (\'I\', \'D\') THEN 1 ELSE 0 END) AS rings,
                 SUM(CASE WHEN trans_status=\'R\' THEN 1 ELSE 0 END) as refundRings,
                 SUM(CASE WHEN trans_status=\'V\' THEN 1 ELSE 0 END) as voidRings,
                 SUM(CASE WHEN trans_status=\'R\' THEN total ELSE 0 END) as refundTotal,
@@ -92,12 +93,17 @@ class CashierPerformanceReport extends FannieReportPage
                 SUM(CASE WHEN trans_type=\'D\' THEN 1 ELSE 0 END) as openRings,
                 SUM(CASE WHEN trans_type=\'D\' THEN total ELSE 0 END) as openRingTotal,
                 SUM(CASE WHEN trans_status=\'X\' AND charflag <> \'S\' THEN 1 ELSE 0 END) as cancelRings,
-                SUM(CASE WHEN trans_status=\'X\' AND charflag <> \'S\' THEN total ELSE 0 END) as cancelTotal
+                SUM(CASE WHEN trans_status=\'X\' AND charflag <> \'S\' THEN total ELSE 0 END) as cancelTotal,
+                SUM(CASE WHEN d.`description` = \'SeniorDiscount\' AND d.total = 2 THEN 1 ELSE 0 END) as SeniorDiscounts2,
+                SUM(CASE WHEN d.upc=\'DISCOUNT\' AND d.percentDiscount >0 AND d.percentDiscount-m.discount = 2  THEN -d.unitPrice*((d.percentDiscount-m.discount)/d.percentDiscount) ELSE 0 END) AS seinorDiscTotal2,
+                SUM(CASE WHEN d.`description` = \'SeniorDiscount\' AND d.total = 10 THEN 1 ELSE 0 END) as SeniorDiscounts10,
+                SUM(CASE WHEN d.upc=\'DISCOUNT\' AND d.percentDiscount >0 AND d.percentDiscount-m.discount = 10  THEN -d.unitPrice*((d.percentDiscount-m.discount)/d.percentDiscount) ELSE 0 END) AS seinorDiscTotal10
             FROM ' . $dtrans . ' AS d
                 INNER JOIN employees AS e ON d.emp_no=e.emp_no
                 LEFT JOIN Stores AS s ON d.store_id=s.storeID
+                LEFT JOIN core_op.memtype m on d.memType = m.memtype
             WHERE d.datetime BETWEEN ? AND ?
-                AND trans_type IN (\'I\', \'D\')
+               
                 AND trans_status <> \'M\'
                 AND register_no <> 99
                 AND d.emp_no <> 9999
@@ -118,6 +124,12 @@ class CashierPerformanceReport extends FannieReportPage
         $basicR = $dbc->execute($basicP, $args);
         $data = array();
         while ($row = $dbc->fetch_row($basicR)) {
+            $detailR = $dbc->execute($detailP, array($dt1, $dt2, $row['emp_no']));
+            $detailW = $dbc->fetch_row($detailR);
+            $time = $detailW['seconds'];
+            $trans = $detailW['numTrans'];
+            $minutes = $time / 60.0;
+        
             $record = array(
                 $row['FirstName'],
                 $row['rings'],
@@ -133,12 +145,15 @@ class CashierPerformanceReport extends FannieReportPage
                 $row['cancelRings'],
                 sprintf('%.2f%%', $this->safeDivide($row['cancelRings'], $row['rings']) * 100.00),
                 sprintf('$%.2f', $this->safeDivide($row['cancelTotal'], $row['cancelRings'])),
+                $row['SeniorDiscounts2'],
+                sprintf('%.2f%%', $this->safeDivide($row['SeniorDiscounts2'], $trans) * 100.00),
+                sprintf('$%.2f', $this->safeDivide($row['seinorDiscTotal2'],  $row['SeniorDiscounts2'])),
+                $row['SeniorDiscounts10'],
+                sprintf('%.2f%%', $this->safeDivide($row['SeniorDiscounts10'], $trans) * 100.00),
+                sprintf('$%.2f', $this->safeDivide($row['seinorDiscTotal10'], $row['SeniorDiscounts10']))
             );
-            $detailR = $dbc->execute($detailP, array($dt1, $dt2, $row['emp_no']));
-            $detailW = $dbc->fetch_row($detailR);
-            $time = $detailW['seconds'];
-            $trans = $detailW['numTrans'];
-            $minutes = $time / 60.0;
+
+            
             $record[] = $trans;
             $record[] = sprintf('%.2f', $time / 60.0);
             $record[] = sprintf('%.2f', $this->safeDivide($row['rings'], $minutes));

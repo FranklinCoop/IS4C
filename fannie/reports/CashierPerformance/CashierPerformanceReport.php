@@ -39,6 +39,7 @@ class CashierPerformanceReport extends FannieReportPage
                                     'Voids', 'Void%', 'Avg. Void', 'Open Rings', 'Open Ring%',
                                     'Avg. Open Ring', 'Cancels', 'Cancel%', 'Avg. Cancel',
                                     'Seinor', 'Senior%', 'Avg. Senior', 'Seinor Tuesday', 'Seinor Tuesday %', 'Avg. Senior Tuesday',
+                                    'Member Discounts','% Member Discounts','Avg. Member Discount',
                                     '#Trans', 'Minutes', 'Rings/Minute');
 
     public $description = '[Cashier Performance] lists cashier scan metrics over a given date range.';
@@ -97,7 +98,10 @@ class CashierPerformanceReport extends FannieReportPage
                 SUM(CASE WHEN d.`description` = \'SeniorDiscount\' AND d.total = 2 THEN 1 ELSE 0 END) as SeniorDiscounts2,
                 SUM(CASE WHEN d.upc=\'DISCOUNT\' AND d.percentDiscount >0 AND d.percentDiscount-m.discount = 2  THEN -d.unitPrice*((d.percentDiscount-m.discount)/d.percentDiscount) ELSE 0 END) AS seinorDiscTotal2,
                 SUM(CASE WHEN d.`description` = \'SeniorDiscount\' AND d.total = 10 THEN 1 ELSE 0 END) as SeniorDiscounts10,
-                SUM(CASE WHEN d.upc=\'DISCOUNT\' AND d.percentDiscount >0 AND d.percentDiscount-m.discount = 10  THEN -d.unitPrice*((d.percentDiscount-m.discount)/d.percentDiscount) ELSE 0 END) AS seinorDiscTotal10
+                SUM(CASE WHEN d.upc=\'DISCOUNT\' AND d.percentDiscount >0 AND d.percentDiscount-m.discount = 10  THEN -d.unitPrice*((d.percentDiscount-m.discount)/d.percentDiscount) ELSE 0 END) AS seinorDiscTotal10,
+                                SUM(CASE WHEN d.upc=\'DISCOUNT\' AND d.percentDiscount >0 AND d.percentDiscount-m.discount = 10  THEN -d.unitPrice*((d.percentDiscount-m.discount)/d.percentDiscount) ELSE 0 END) AS seinorDiscTotal10,
+				SUM(CASE WHEN d.`description` = \'custdata\' AND d.total between 1 and 15 THEN 1 ELSE 0 END) as MemDiscCount,
+				SUM(case when d.upc=\'DISCOUNT\'  and d.percentDiscount >= m.discount and m.staff = 0 and m.ssi = 0 and m.discount >1 then -d.unitPrice* (m.discount/d.percentDiscount) else 0 end) as MemDiscTotal
             FROM ' . $dtrans . ' AS d
                 INNER JOIN employees AS e ON d.emp_no=e.emp_no
                 LEFT JOIN Stores AS s ON d.store_id=s.storeID
@@ -150,7 +154,10 @@ class CashierPerformanceReport extends FannieReportPage
                 sprintf('$%.2f', $this->safeDivide($row['seinorDiscTotal2'],  $row['SeniorDiscounts2'])),
                 $row['SeniorDiscounts10'],
                 sprintf('%.2f%%', $this->safeDivide($row['SeniorDiscounts10'], $trans) * 100.00),
-                sprintf('$%.2f', $this->safeDivide($row['seinorDiscTotal10'], $row['SeniorDiscounts10']))
+                sprintf('$%.2f', $this->safeDivide($row['seinorDiscTotal10'], $row['SeniorDiscounts10'])),
+                $row['MemDiscCount'],
+                sprintf('%.2f%%', $this->safeDivide($row['MemDiscCount'], $trans) * 100.00),
+                sprintf('$%.2f', $this->safeDivide($row['MemDiscTotal'], $row['MemDiscCount'])),
             );
 
             

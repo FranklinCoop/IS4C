@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2013 Whole Foods Co-op.
+    Copyright 2024 Franklin Coop.
 
     This file is part of IT CORE.
 

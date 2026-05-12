@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2013 Whole Foods Co-op.
+    Copyright 2023 Franklin Community Coop
 
     This file is part of IT CORE.
 
@@ -73,7 +73,6 @@ class DepartmentProductSearch extends ProductSearch {
                     AND p.upc LIKE '0000000%'
                     AND p.inUse=1
                     AND s.searchable=1
-                    AND s.store_id = 1
                   ORDER BY description";
         $prep = $sql->prepare($query);
         $result = $sql->execute($prep, $args);

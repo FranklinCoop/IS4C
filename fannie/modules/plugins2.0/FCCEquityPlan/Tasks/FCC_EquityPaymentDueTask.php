@@ -91,11 +91,11 @@ class FCC_EquityPaymentDueTask extends FannieTask
 			
 			//find what the new buleline should be.
 			$updateAccount = false;
-			if($months >= 1 && $row['equityPaymentPlanID'] == 1 && $row['payments'] < 175 && $memType != 0){
+			if($months >= 1 && $row['equityPaymentPlanID'] == 1 && $row['payments'] < 175 && $memType != 0 && $row['payments'] != 0){
 				$remainAmt = 175 - $paid;
 				$newLine = sprintf("%s %s. %s %d/%d",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName'],$remainAmt,$paymentDue); //$row['card_no'].' '.substr($row['FirstName'], 0, 1).'. '.$row['LastName'].' '.$remainAmt.'/'.$paymentDue;
 			} else if($memType == 0) {
-				$newLine = sprintf("%s %s. %s %d/%d",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName'],175,3);
+				$newLine = sprintf("%s %s %s",$row['card_no'],$row['LastName'],'CLOSED ACCT');
 			} else {
 				$newLine = sprintf("%s %s. %s",$row['card_no'],substr($row['FirstName'], 0, 1),$row['LastName']);
 			}

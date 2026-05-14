@@ -87,6 +87,7 @@ class DepartmentSearchSearch extends ProductSearch {
                 );
             }
         }
+        $args[] = CoreLocal::get('store_id');
         $query = "SELECT p.upc, 
                     p.`description`, 
                     p.normal_price, 
@@ -99,13 +100,13 @@ class DepartmentSearchSearch extends ProductSearch {
                     AND p.upc LIKE '0000000%'
                     AND p.inUse=1
                     AND s.searchable=1
+                    AND s.store_id = ?                   
                   ORDER BY description";
         $prep = $sql->prepare($query);
         $result = $sql->execute($prep, $args);
         while ($row = $sql->fetch_row($result)) {
             $ret[$row['upc']] = $row;
         }
-
         return $ret;
     }
 }

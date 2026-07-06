@@ -273,7 +273,7 @@ class UPC extends Parser
             $peek = PrehLib::peekItem();
             if (strstr($peek,"** Tare Weight") === False)
                 TransRecord::addTare($row['tareweight']*100);
-        } elseif ($row['scale'] != 0 && !$this->session->get("tare") && Plugin::isEnabled('PromptForTare') && !$this->session->get("tarezero")) {
+        } elseif ($row['scale'] != 0 && !$this->session->get("tare") && Plugin::isEnabled('PromptForTare') && !$this->session->get("tarezero") && !$scaleStickerItem) {
             $ret['main_frame'] = $myUrl.'plugins/PromptForTare/TarePromptInputPage.php?item='.$upc;
             return $ret;
         } else {
@@ -680,8 +680,8 @@ class UPC extends Parser
     public static $requestInfoMsg = 'Type customer birthdate YYYYMMDD';
     public static function requestInfoCallback($info)
     {
-        if ((is_numeric($info) && strlen($info)==8) || $info == 1){
-            // allows entry in MMDDYYYY format.
+        if ((is_numeric($info) && strlen($info)==8)){
+            //allows entry in MMDDYYYY format.
             $year = substr($info, 0, 4);
             if ($year < 1900) {
                 $info = substr($info, 4, 4).substr($info,0,4);          

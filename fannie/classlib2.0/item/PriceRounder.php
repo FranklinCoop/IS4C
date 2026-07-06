@@ -49,7 +49,7 @@ class PriceRounder
             1 => array(0.39, 0.69, 0.99),
             2 => array(0.99)
         );
-        $endingCaps = array(6.99, 14.99, 9999.00);
+        $endingCaps = array(99.99, 999.99, 9999.00);
         // special round defines when to round down by $endingCaps
         $specialRound = array(
             0 => 0.10,

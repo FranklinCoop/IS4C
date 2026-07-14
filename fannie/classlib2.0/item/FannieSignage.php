@@ -716,6 +716,7 @@ class FannieSignage
         $height = isset($args['height']) ? $args['height'] : 16;
         $width = isset($args['width']) ? $args['width'] : 0.35;
         $align = isset($args['align']) ? $args['align'] : 'C';
+        $textheight = isset($args['textheight']) ? $args['textheight'] : 5;
         $valign = isset($args['valign']) ? $args['valign'] : 'B';
         $prefix = isset($args['prefix']) ? $args['prefix'] : '';
         $suffix = isset($args['suffix']) ? $args['suffix'] : '';
@@ -724,6 +725,7 @@ class FannieSignage
         $vertical = isset($args['vertical']) ? $args['vertical'] : false;
 
         $upc = ltrim($upc, '0');
+        $len = strlen($upc);
         $is_ean = false;
         if (strlen($upc) == 12) { 
             // must be EAN
@@ -734,6 +736,15 @@ class FannieSignage
             $upc = str_pad($upc, 11, '0', STR_PAD_LEFT);
             $check = BarcodeLib::getCheckDigit($upc);
             $upc = '0' . $upc . $check;
+        }
+        $barText = $upc;
+        
+        
+            
+        if ($len == 13) {
+            $barText = substr($upc, 0,1)."-".substr($upc,1,6)."-".substr($upc,7,6);
+        } else {
+            $barText = substr($upc,0,2)."-".substr($upc,2,5)."-".substr($upc,7,5)."-".substr($upc,12);
         }
 
         //Convert digits to bars
@@ -757,11 +768,11 @@ class FannieSignage
         if ($fontsize > 0 && !$vertical) {
             $pdf->SetFont($font, '', $fontsize);
             if ($valign == 'T') {
-                $pdf->SetXY($x, $y - 5);
+                $pdf->SetXY($x, $y - $textheight);
             } else {
                 $pdf->SetXY($x, $y + $height);
             }
-            $pdf->Cell($full_width, 5, $prefix . substr($upc, ($is_ean?-13:-12)) . $suffix, 0, 0, $align);
+            $pdf->Cell($full_width, $textheight, $prefix . substr($barText, ($is_ean?-16:-15)) . $suffix, 0, 0, $align);
         }
 
         return $pdf;

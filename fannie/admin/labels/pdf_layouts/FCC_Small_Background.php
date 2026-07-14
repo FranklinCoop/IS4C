@@ -31,7 +31,11 @@ use \COREPOS\Fannie\API\item\FannieSignage;
       if($len ==12) {
         $barText = substr($barcode,0,2)."-".substr($barcode,2,5)."-".substr($barcode,7,5)."-".substr($barcode,12);
         $len+=3;
-      } else {
+      } else if ($len == 13) {
+        $barText = substr($barcode, 0,1)."-".substr($barcode,1,6)."-".substr($barcode,7,6);
+        $len+=3;
+      }
+      else {
         $barText = $barcode;
       }
 

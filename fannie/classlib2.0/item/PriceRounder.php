@@ -45,7 +45,7 @@ class PriceRounder
 
         // acceptible price endings by $endingCaps
         $endings = array(
-            0 => array(0.19, 0.29, 0.39, 0.49, 0.59,  0.69, 0.79, 0.89, 0.99),
+            0 => array(0.09,0.19, 0.29, 0.39, 0.49, 0.59,  0.69, 0.79, 0.89, 0.99),
             1 => array(0.39, 0.69, 0.99),
             2 => array(0.99)
         );

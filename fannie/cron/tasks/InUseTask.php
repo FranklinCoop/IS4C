@@ -235,7 +235,7 @@ class InUseTask extends FannieTask
         $headers = array(
             'MIME-Version: 1.0',
             'Content-type: text/html; charset=iso-8859-1',
-            'from: automail@wholefoods.coop'
+            'from: automail@fcc.coop'
         );
 
         $end = time();
@@ -274,7 +274,7 @@ class InUseTask extends FannieTask
             $mail = OutgoingEmail::get();
             $mail->isHTML();
             $mail->addAddress($to);
-            $mail->From = 'automail@franklincommunity.coop';
+            $mail->From = 'automail@fcc.coop';
             $mail->FromName = 'CORE POS Monitoring';
             $mail->Subject = 'Report: In Use Task';
             $mail->Body = $msg;

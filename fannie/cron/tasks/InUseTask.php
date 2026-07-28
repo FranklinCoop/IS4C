@@ -274,7 +274,7 @@ class InUseTask extends FannieTask
             $mail = OutgoingEmail::get();
             $mail->isHTML();
             $mail->addAddress($to);
-            $mail->From = 'automail@franklincommunity.coop.coop';
+            $mail->From = 'automail@franklincommunity.coop';
             $mail->FromName = 'CORE POS Monitoring';
             $mail->Subject = 'Report: In Use Task';
             $mail->Body = $msg;

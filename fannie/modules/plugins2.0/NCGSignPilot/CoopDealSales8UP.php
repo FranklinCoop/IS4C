@@ -546,7 +546,7 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
                     $textHeight = $pdf->GetCellHeight(6,'in');
                     $pdf->SetXY($x, $y);
                     $pdf->SetFont('GillSansNova-Medium', '', 6);
-                    $pdf->Cell($orangeBoxW, $textHeight, $$unitString, $showBorders, 1, 'C');
+                    $pdf->Cell($orangeBoxW, $textHeight, $unitString, $showBorders, 1, 'C');
 
                     $textHeight = $pdf->GetCellHeight(5.5,'in');
                     $startDate = new DateTime($NCGItem['startDate']);

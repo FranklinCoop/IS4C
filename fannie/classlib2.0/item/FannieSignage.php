@@ -185,7 +185,7 @@ class FannieSignage
             if ($row['pricePerUnit'] == '') {
                 $pricePerUnit = 0;
                 if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
-                    $pricePerUnit =  PriceLib::FCC_PricePerUnit($dbc, $row['upc'],$row['normal_price'], $row['size']);
+                    $pricePerUnit = PriceLib::FCC_PricePerUnit($dbc, $row['upc'],$row['normal_price'], $row['size']);
                 } else {
                     $pricePerUnit = PriceLib::pricePerUnit($row['normal_price'], $row['size']);
                 }
@@ -338,6 +338,7 @@ class FannieSignage
                     v.sku,
                     \'\' AS pricePerUnit,
                     n.vendorName AS vendor,
+                    p.default_vendor_id as vendorID,
                     p.scale,
                     p.numflag,';
         // 22Jul2015 check table compatibility
@@ -381,7 +382,8 @@ class FannieSignage
                     b.transLimit,
                     CASE WHEN p.inUse = 1 THEN "Yes" ELSE "No" END AS inUse,
                     SUBSTR(p.last_sold, 1, 10) AS last_sold,
-                    CONCAT(d.dept_no, " ", d.dept_name) AS dept_name
+                    CONCAT(d.dept_no, " ", d.dept_name) AS dept_name,
+                    sn.super_name AS superDeptName
                  FROM batchList AS l
                     ' . DTrans::joinProducts('l', 'p', 'LEFT') . '
                     INNER JOIN batches AS b ON b.batchID=l.batchID
@@ -391,6 +393,8 @@ class FannieSignage
                     LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
                     LEFT JOIN departments AS d ON d.dept_no=p.department
+                    LEFT JOIN superdepts AS s ON s.dept_ID = d.dept_no
+                    LEFT JOIN superDeptNames AS sn ON sn.superID = s.superID 
                     ';
         if (isset($fs_def['sections'])) {
             $query .= ' LEFT JOIN FloorSectionsListView AS fs ON fs.upc=p.upc AND fs.storeID= ? ';
@@ -459,6 +463,7 @@ class FannieSignage
                     v.sku,
                     \'\' AS pricePerUnit,
                     n.vendorName AS vendor,
+                    p.default_vendor_id as vendorID,
                     p.scale,
                     p.numflag,
                     \'\' AS startDate,
@@ -511,6 +516,7 @@ class FannieSignage
                     v.sku,
                     \'\' AS pricePerUnit,
                     n.vendorName AS vendor,
+                    p.default_vendor_id as vendorID,
                     p.scale,
                     p.numflag,
                     \'\' AS startDate,
@@ -568,6 +574,7 @@ class FannieSignage
                     v.sku,
                     \'\' AS pricePerUnit,
                     n.vendorName AS vendor,
+                    p.default_vendor_id as vendorID,
                     p.scale,
                     p.numflag,
                     CASE
@@ -634,6 +641,7 @@ class FannieSignage
                     v.sku,
                     \'\' AS pricePerUnit,
                     n.vendorName AS vendor,
+                    p.default_vendor_id as vendorID,
                     p.scale,
                     p.numflag,
                     CASE
@@ -723,31 +731,30 @@ class FannieSignage
         $font = isset($args['font']) ? $args['font'] : 'Arial';
         $fontsize = isset($args['fontsize']) ? $args['fontsize'] : 9;
         $vertical = isset($args['vertical']) ? $args['vertical'] : false;
+        
 
+        if (!BarcodeLib::verifyCheckDigit($upc)) {
+            $upc .= $check = BarcodeLib::getCheckDigit($upc);
+            $upc = str_pad($upc, 13, '0', STR_PAD_LEFT);
+        }
         $upc = ltrim($upc, '0');
+        $upc = str_pad($upc, 12, '0', STR_PAD_LEFT);
         $len = strlen($upc);
         $is_ean = false;
-        if (strlen($upc) == 12) { 
-            // must be EAN
-            $check = BarcodeLib::getCheckDigit($upc);
-            $upc .= $check;
-            $is_ean = true;
-        } else {
-            $upc = str_pad($upc, 11, '0', STR_PAD_LEFT);
-            $check = BarcodeLib::getCheckDigit($upc);
-            $upc = '0' . $upc . $check;
-        }
+
         $barText = $upc;
         
         
             
         if ($len == 13) {
             $barText = substr($upc, 0,1)."-".substr($upc,1,6)."-".substr($upc,7,6);
+            $is_ean == true;
         } else {
-            $barText = substr($upc,0,2)."-".substr($upc,2,5)."-".substr($upc,7,5)."-".substr($upc,12);
+            $barText = substr($upc,0,1)."-".substr($upc,1,5)."-".substr($upc,6,5)."-".substr($upc,11);
         }
 
         //Convert digits to bars
+        $upc = str_pad($upc, 13, '0', STR_PAD_LEFT);
         $code = $this->upcToBitString($upc);
 
         //Draw bars

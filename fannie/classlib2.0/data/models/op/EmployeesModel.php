@@ -41,6 +41,17 @@ class EmployeesModel extends BasicModel
     'birthdate'=>array('type'=>'DATETIME')
     );
 
+    public function save()
+    {
+        $stack = debug_backtrace();
+        $lane_push = false;
+        if (isset($stack[1]) && $stack[1]['function'] == 'pushToLanes') {
+            $lane_push = true;
+        }
+
+        return parent::save();
+    }
+
     public function doc()
     {
         return '

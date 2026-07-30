@@ -34,6 +34,16 @@ class StoreEmployeeMapModel extends BasicModel
     'storeID' => array('type'=>'INT', 'primary_key'=>true),
     'empNo' => array('type'=>'INT', 'primary_key'=>true),
     );
+    public function save()
+    {
+        $stack = debug_backtrace();
+        $lane_push = false;
+        if (isset($stack[1]) && $stack[1]['function'] == 'pushToLanes') {
+            $lane_push = true;
+        }
+        
+        return parent::save();
+    }
 
     public function doc()
     {

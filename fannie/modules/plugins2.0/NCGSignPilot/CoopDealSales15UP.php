@@ -24,7 +24,7 @@
 namespace COREPOS\Fannie\Plugin\NCGSignPilot  {
 use DateTime;
 
-class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
+class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
 {
 
     protected $BIG_FONT = 85;
@@ -39,19 +39,19 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
     protected $font = 'GillSansNova-Medium';
     protected $alt_font = 'GillSansNova-CnMedium';
 
-    protected $width = 2.5;
-    protected $height = 3.8438;
-    protected $startY = .4063;
+    protected $width = 1.5;
+    protected $height = 3.375;
+    protected $startY = .4375;
     protected $startX = .5;
     protected $signMarginY = .125;
-    protected $signMarginX = .0625;
-    protected $marginTop=0.4063;
-    protected $marginLeft=0.50; // same as margin right
+    protected $signMarginX = .03125;
+    protected $marginTop=0.4375;
+    protected $marginLeft=0.5; // same as margin right
 
     protected function createPDF()
     {
         define('FPDF_FONTPATH',dirname(__FILE__) . '/noauto/fonts/');
-        $pdf = new lib\FPDF_Extended('L', 'in', 'Letter');
+        $pdf = new lib\FPDF_Extended('P', 'in', 'Letter');
         $pdf->AddFont('GillSansNova-CnMedium','','GillSansNova-CnMedium.php');
         $pdf->AddFont('GillSansNova-CnSemiBold','','GillSansNova-CnSemiBold.php');
         $pdf->AddFont('GillSansNova-Medium','','GillSansNova-Medium.php');
@@ -67,7 +67,8 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
     private function layoutFlags($pdf, $flagX, $flagY, $areaW, $areaH, $flags) {
         global $FANNIE_ROOT;
         if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
-            $flagW = $areaW;    
+            $flagW = .1;
+            $flagX = $flagX - .03;
             $flagCount = 0;
             foreach ($flags as $flag => $show) {
                 $imagePath = '';
@@ -97,36 +98,38 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
                     }
                     if ($imagePath) {
                         $pdf->Image($imagePath,$flagX, $flagY, $flagW,$flagW);
-                        $flagY += $flagW+.01;
+                        $flagX += $flagW+.01;
+                        if ($flagCount == 2) {
+                            $flagCount = 0;
+                            $flagX = $flagX - ($flagW+.01) * 3;
+                            $flagY += $flagW+.01;
+                        }
                         $flagCount++;
                     }
                 }
             }
         } else {
-            $imageHeight = $areaH;
                 foreach ($NCGItem['attribute'] as $flag => $show) {
-                $imagePath = '';
-                if($show) {
-                    switch ($flag) {
-                        case 'Local':
-                            $imagePath = $FANNIE_ROOT.'modules/plugins2.0/NCGSignPilot/noauto/images/Local_Bug.jpg';
+                    $imagePath = '';
+                    if($show) {
+                        switch ($flag) {
+                            case 'Local':
+                                $imagePath = $FANNIE_ROOT.'modules/plugins2.0/NCGSignPilot/noauto/images/Local_Bug.jpg';
+                                break;
+                            case 'Organic':
+                                $imagePath = $FANNIE_ROOT.'modules/plugins2.0/NCGSignPilot/noauto/images/Organic_Bug.jpg';
+                                break;    
+                            default:
+                                # do nothing.
                             break;
-                        case 'Organic':
-                            $imagePath = $FANNIE_ROOT.'modules/plugins2.0/NCGSignPilot/noauto/images/Organic_Bug.jpg';
-                            break;    
-                        default:
-                            # do nothing.
-                        break;
-                    }
-                    if ($imagePath) {
-                        $pdf->Image($imagePath, $flagX,$flagY, $areaW/2, $areaH);
-                        $flagY += $areaH/2 + .03;
+                        }
+                        if ($imagePath) {
+                            $pdf->Image($imagePath, $x,$y, $imageHeight, $imageHeight);
+                            $x += $imageHeight + .03;
+                        }
                     }
                 }
-            }
         }
-    
-
     }
 
     public function drawPDF()
@@ -139,13 +142,13 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
         $sign = 0;
         foreach ($data as $item) {
 
-            if ($count % 8 == 0) {
+            if ($count % 15 == 0) {
                 $pdf->AddPage();
                 $sign = 0;
             }
 
-            $row = floor($sign / 4);
-            $column = $sign % 4;
+            $row = floor($sign / 5);
+            $column = $sign % 5;
 
             
 
@@ -163,51 +166,37 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
                 $pdf->Rect($x, $y, $this->width, $this->height,'DF');
                 $pdf->Rect($x + $this->signMarginX, $y+ $this->signMarginY, $this->width - $this->signMarginX -$this->signMarginX, $this->height - $this->signMarginY - $this->signMarginX,'DF');
             }
- 
 
             /*
             * TOP LINE
             * Orange Box,
-            * Unit Price Label,
-            * Item Price label
-            * OGlogo (Size = .3475"w x .3475"h)
+            * Unit Price Label (Gill Sans Nova Medium @ 5pt), 
+            * Item Price label (Gill Sans Nova Medium @ 5pt)
             */
             $x = $this->startX + $this->signMarginX + ($this->width  *$column);
             $y = $this->startY + $this->signMarginY  + ($this->height *$row);
-            // Orange Box
-            $orangeBoxH = 0.52;
-	        $orangeBoxW = 0.75;
+            ##### Orange Box #####
+            $orangeBoxH = 0.45;
+	        $orangeBoxW = 0.687;
             $pdf->SetFillColor(255,161,0);
             $pdf->SetDrawColor(255,161,0);
             $pdf->Rect($x, $y, $orangeBoxW, $orangeBoxH,'DF');
 
             ##### Unit Price Label #####
-            $labelFontSize = 6;
+            $labelFontSize = 5;
             $labelFont = 'GillSansNova-Medium';
-            $textHeight = $pdf->getCellHeight($labelFontSize,'in'); //$textHeight = .12;
-            $y += .02;
+            $textHeight = $pdf->getCellHeight($labelFontSize,'in');
+            $y += 0.02;
             $pdf->SetXY($x, $y);
             $pdf->SetFont($labelFont, '', $labelFontSize);
             $pdf->Cell($orangeBoxW, $textHeight, 'UNIT PRICE', $showBorders, 1, 'C');
-            ##### Item Price Label #####
             
-            $imageHeight = .3475;
-            $imageWidth = .3475;
-            if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
-                $imageHeight = $imageHeight/5;
-                $imageWidth = $imageWidth/5;
-            }
-            $remainingWidth = $this->width - (2*$this->signMarginX) - $orangeBoxW - $imageWidth; 
+            ##### Item Price Label #####
+            $remainingWidth = $this->width - (2*$this->signMarginX) - $orangeBoxW; 
             $x += $orangeBoxW;
             $pdf->SetXY($x, $y);
             $pdf->SetFont($labelFont, '', $labelFontSize);
             $pdf->Cell($remainingWidth, $textHeight, 'ITEM PRICE', $showBorders, 1, 'C');
-            ##### Local & Organic Images #####
-            $x += $remainingWidth;
-            $imageY = $y;
-//$flagX, $flagY, $areaW, $areaH, $flags
-            $this->layoutFlags($pdf, $x,$y,$imageWidth*2,$imageHeight, $NCGItem['attribute']);
-
             // reset the draw colors to black and white mostly for trouble shooting if I need to draw borders.
             if ($showBorders == 1) {
                 $pdf->SetFillColor(255,255,255);
@@ -217,37 +206,37 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             /*
             * LINE 2
             * unit_price (Gill Sans Nova Condensed Medium @ 25pt) the dollar sign is 14.57,
-            * price (Gill Sans Nova Condensed Semibold @ 38pt) the dollar sign is 22.15
+            * price (Gill Sans Nova Condensed Semibold @ 27pt) the dollar sign is 15.75
             */
-            //$num_unit = $item['pricePerUnit'];
+            ##### Normal Unit PRice #####
             $unitPriceStr = $NCGItem['unitPrice'];
-            $unitPriceFontSize = 25;
+            $priceFontSize = 25;
             $dollarFontSize = 14.57;
             $priceFont = 'GillSansNova-CnMedium';
-            $yManualOffset = .06;
             $x = $this->startX  + $this->signMarginX  + ($this->width  *$column);
             $y += $textHeight;
             
+            //We need these values to make the dollar sign smaller and aligned to the price number
             $pdf->SetFont($priceFont, '', $dollarFontSize);
             $cellDW = $pdf->GetStringWidth('$');
-            $pdf->SetFont($priceFont, '', $unitPriceFontSize);
+            $pdf->SetFont($priceFont, '', $priceFontSize);
             $cellPW = $pdf->GetStringWidth($unitPriceStr);
             
-            $textHeight = $pdf->getCellHeight($unitPriceFontSize,'in');
+            // align the price number x and width offset by the width of the dollar sign text.
+            $textHeight = $pdf->getCellHeight($priceFontSize,'in');
             $cellW = $orangeBoxW - $cellDW;
-            $pdf->SetXY($x + $cellDW,$y);
+            $pdf->SetXY($x +$cellDW,$y);
             $pdf->Cell($cellW, $textHeight, $unitPriceStr, $showBorders, 1, 'C');
-
+            // place dollar sign in front of the price.
             $pdf->SetFont($priceFont, '', $dollarFontSize);
             $pdf->SetXY($x + (($orangeBoxW/2) -($cellPW/2)) - ($cellDW),$y);
-            $pdf->Cell($cellDW, $pdf->getCellHeight($dollarFontSize, 'in')+$yManualOffset, '$', $showBorders, 1, 'L');
+            $pdf->Cell($cellDW, $pdf->getCellHeight($dollarFontSize, 'in')+.05, '$', $showBorders, 1, 'L');
 
             ##### Tag Price #####
             $tagPriceString = $NCGItem['normalPrice'];
-            $priceFontSize = 38;
-            $dollarFontSize = 22.15;
+            $priceFontSize = 27;
+            $dollarFontSize = 15.75;
             $priceFont = 'GillSansNova-CnMedium';
-            $yManualOffset = .06;
             $x += $orangeBoxW;
             //We need these widths to make the dollar sign smaller and aligned to the price number
             $pdf->SetFont($priceFont, '', $dollarFontSize);
@@ -258,41 +247,39 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $pdf->SetFont($priceFont, '', $priceFontSize);
             $cellW = $remainingWidth - $cellDW;
             $pdf->SetXY($x + $cellDW,$y);
-            $textHeight = $pdf->getCellHeight($priceFontSize ,'in');;
+            $textHeight = $pdf->getCellHeight($priceFontSize ,'in');
             $pdf->Cell($cellW, $textHeight, $tagPriceString, $showBorders, 1, 'C');
             // place dollar sign in front of the price.
             $pdf->SetFont($priceFont, '', $dollarFontSize);
             $pdf->SetXY($x + (($remainingWidth/2) -($cellPW/2)) - ($cellDW),$y);
-            $pdf->Cell($cellDW, $pdf->getCellHeight($dollarFontSize, 'in')+$yManualOffset, '$', $showBorders, 1, 'L');
+            $pdf->Cell($cellDW, $pdf->getCellHeight($dollarFontSize, 'in')+.05, '$', $showBorders, 1, 'L');
             /*
             * LINE 3
-            * Unit_mesure (Gill Sans Nova Medium) @ 6pt,
-            * 
+            * Unit_mesure (Gill Sans Nova Medium @ 5pt),
             */
             ##### Tag Unit of Measure #####
-            $unitFontSize = 6;
+            $unitFontSize = 5;
             $unitFont = 'GillSansNova-Medium';
             $unit = $NCGItem['unitOfMeasure'];
-            $yManualAdjust = -0.02;
+            $yManualAdjust = -0.085;
             $unitString = strtoupper("per ".$unit);
-            
-            $textHeight = $pdf->getCellHeight($unitPriceFontSize,'in');
+
             $x = $this->startX  + $this->signMarginX  + ($this->width  *$column);
             $y += $textHeight + $yManualAdjust;
-
             $textHeight = $pdf->getCellHeight($unitFontSize,'in');
             $pdf->SetXY($x, $y);
-            $pdf->SetFont($unitFont, '',  $unitFontSize);
+            $pdf->SetFont($unitFont, '', $unitFontSize);
             $pdf->Cell($orangeBoxW, $textHeight, $unitString, $showBorders, 1, 'C');
 
             /*
-            * LINE 4 brand_name Gill Sans Nova Semibold @ 8.5pt
+            * LINE 4 
+            * brand_name (Gill Sans Nova Semibold @ 6.5pt)
             */
             ##### Brand Name #####
             $brandStr = $item['brand'];
-            $brandFontSize = 8.5;
+            $brandFontSize = 6.5;
             $brandFont = 'GillSansNova-SemiBold';
-            $cellW = $this->width - (2*$this->signMarginX)- $imageWidth;
+            $cellW = $this->width - (2*$this->signMarginX);
             $x = $this->startX + $this->signMarginX   + ($this->width  *$column);
             $y += $textHeight;
             $pdf->setXY($x,$y);
@@ -301,11 +288,12 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $pdf->Cell($cellW,$textHeight, $brandStr, $showBorders, 1, 'L');
 
             /*
-            * LINE 5 description
+            * LINE 5
+            * description (Gill Sans Nova Semibold @ 6.5pt)
             */
             ##### Description #####
             $itemName = $NCGItem['description'];
-            $descFontSize = 8.5;
+            $descFontSize = 6.5;
             $descFont = 'GillSansNova-SemiBold';
             $x = $this->startX  + $this->signMarginX  + ($this->width  *$column);
             $y += $textHeight;
@@ -315,43 +303,28 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $pdf->Cell($cellW,$textHeight, $itemName, $showBorders, 1, 'L');
             
             /*
-            * LINE 6 Itme Size(Gill Sans Nova Medium @ 5pt), Unity Qty(Gill Sans Nova Medium @ 5pt), 
-            * Barcode Image
+            * LINE 6 
+            *Itme Size(Gill Sans Nova Medium @ 5pt), Unity Qty(Gill Sans Nova Medium @ 5pt),  
             */
             ##### Item Size #####
-            $textString = strtoupper('ITEM SIZE: '.$NCGItem['unitSize']); //'ITEM SIZE 20 CHARCT - UNIT QTY 10'
-            $barcodeW = 1;
+            $textString = $NCGItem['unitSize']; //'ITEM SIZE 20 CHARCT - UNIT QTY 10'
             $sizeFontSize = 5;
             $sizeFont = 'GillSansNova-Medium';
-            $cellW = $this->width - (2*$this->signMarginX) - $barcodeW;
             $x = $this->startX  + $this->signMarginX  + ($this->width  *$column);
-            $y += $textHeight +.01;
+            $y += $textHeight;
             $pdf->setXY($x,$y);
-            $textHeight = $pdf->getCellHeight(5,'in');;
+            $textHeight = $pdf->getCellHeight($sizeFontSize,'in');;
 
-            $pdf->SetFont('GillSansNova-Medium', '', 5);
+            $pdf->SetFont($sizeFont, '', $sizeFontSize);
             $pdf->Cell($cellW, $textHeight, $textString , $showBorders, 0, 'L');
-            ##### Barcode/UPC #####
-            $upc = $item['upc'];
-            $pdf->SetDrawColor(0,0,0);
-            $pdf->SetFillColor(0,0,0);
-            $args = array(
-                'height'=>0.18, 
-                'width'=>$barcodeW/95,
-                'valign' => 'B',
-                'align'=>'C',
-                'textheight'=> $textHeight,
-                'font'=>'GillSansNova-Medium',
-                'fontsize'=> 5);
-            $this->drawBarcode($upc, $pdf, $x + $cellW, $y, $args);
-            
+
             /*
-            * LINE 7
-            * Department Name(Gill Sans Nova Medium @ 5pt), 
-            * DeptNo(Gill Sans Nova Medium @ 5pt)
+            * LINE 7 
+            * Department Name (Gill Sans Nova Medium @ 5pt)
+            * DeptNo (Gill Sans Nova Medium @ 5pt)
             */
-            ##### Department Name/Subdepartment #####
-            $textString = strtoupper($NCGItem['superDeptName'].' - '.$NCGItem['dept_name']); //'DEPARTMENT 8, Category - 00/00/00'
+            ##### Department Name #####
+            $textString = strtoupper($NCGItem['superDeptName'].' - '.$NCGItem['dept_name']);//'DEPARTMENT 8, Category - 00/00/00'
             $x = $this->startX + $this->signMarginX   + ($this->width  *$column);
             $y += $textHeight;
             $pdf->setXY($x,$y);
@@ -359,43 +332,69 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
 
             /*
             * LINE 8 
-            * Vendor,
-            * Vendor SKU
+            * Vendor (Gill Sans Nova Medium @ 5pt), 
+            * Vendor SKU (Gill Sans Nova Medium @ 5pt)
             */ 
             ##### Vendor/SKU #####
             $textString = strtoupper($NCGItem['vendor'].' - '.$NCGItem['sku']); //'SUPPLIER NAME TWENTY – 0123456789'
             $y += $textHeight;
             $pdf->setXY($x,$y);
             $pdf->Cell($cellW, $textHeight, $textString , $showBorders, 0, 'L');
-
+            
             /*
-            * LINE 9 
-            * saleprice (Gill Sans Nova Semibold @ 60pt) $ = 34.98pt
-            * OR BOGO LOGO (BOGO_Lockup.png 1.62" x. 62")
+            * LINE 9
+            * Barcode
+            * Local Image (Size =  .2”w x .2”h)
+            * OG Logo (Size =  .2”w x .2”h)
+            */
+            ##### Barcode #####
+            $y += $textHeight;
+            $cellW = $this->width - (2*$this->signMarginX);
+            $imageHeight = .2;
+            $barcodeW = $cellW - (2*$imageHeight);
+            $upc = $NCGItem['upc'];
+            $pdf->SetDrawColor(0,0,0);
+            $pdf->SetFillColor(0,0,0);
+            $args = array(
+                'height'=>0.18, 
+                'width'=>$barcodeW/108,
+                'valign' => 'B',
+                'align'=>'C',
+                'textheight'=> $textHeight,
+                'font'=>'GillSansNova-Medium',
+                'fontsize'=> 5);
+            $this->drawBarcode($upc, $pdf, $x, $y, $args);
+
+            ##### Local & Organic Image #####
+            $x += $barcodeW - .07;
+            $this->layoutFlags($pdf, $x,$y,$imageHeight*2,$imageHeight, $NCGItem['attribute']);
+            
+            /*
+            * LINE 10
+            * saleprice (Gill Sans Nova Condensed Semibold @ 48pts.) $ = 27.98pt
             */
             ##### Sale Price #####
-            $priceFontSize = 60;
-            $dollarFontSize = 34.98;
+            $priceFontSize = 48;
+            $dollarFontSize = 27.98;
             $priceFont = 'GillSansNova-CnSemiBold';
-            $x = $this->startX + $this->signMarginX + ($this->width  *$column);
-            $yManualAdjust = 1.25 + .95;  //shelf channel height + space between the top of the hanger and text
+            $x = $this->startX  + ($this->width  *$column);
+            $yManualAdjust = 1.25 + 0.88;  //shelf channel height + space between the top of the hanger and text
             $y = $this->startY  + ($this->height *$row) + $yManualAdjust;
             $textHeight = $pdf->getCellHeight($priceFontSize,'in');
             $cellW = $this->width - (2*$this->signMarginX);
             switch ($NCGItem['signPriceType']) {
                 case NCGSignage::PRICE_TYPE_BOGO:
-                    ##### BOGO Image #####
-                    $imageWidth = 1.62;
-                    $imageHeight = .62;
+                    $imageWidth = 1.25;
+                    $imageHeight = .475;
                     $bogoX = $x + ($cellW - $imageWidth)/2;
-                    $yManualAdjust = 1.25 + 1.05;  //shelf channel height + space between the top of the hanger and text
+                    $yManualAdjust = 1.25 + .95;  //shelf channel height + space between the top of the hanger and text
                     $y = $this->startY  + ($this->height *$row) + $yManualAdjust;
                     $imagePath = $FANNIE_ROOT.'modules/plugins2.0/NCGSignPilot/noauto/images/BOGO_Lockup.png';
                     $pdf->Image($imagePath, $bogoX,$y, $imageWidth, $imageHeight);
                     break;
                 case NCGSignage::PRICE_TYPE_SPLIT:
                     $textString = $NCGItem['priceDevider'].'/$'.$NCGItem['multiPrice'];
-                    $priceFontSize = 60;
+                    $priceFontSize = 48;
                     $pdf->SetFont($priceFont, '', $priceFontSize);
                     $pdf->setXY($x ,$y);
                     $pdf->Cell($cellW, $textHeight, $textString , $showBorders, 0, 'C');
@@ -418,22 +417,21 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
                     $pdf->Cell($cellDW, $pdf->getCellHeight($dollarFontSize, 'in')+.1, '$', $showBorders, 1, 'C');
                     break;
             }
-
             switch ($NCGItem['signPriceType']) {
                 case NCGSignage::PRICE_TYPE_BOGO:
                     /*
-                    * LINE 10 
-                    * You Saved Box (Size = 1.125”w x .25”h Color (RGB) = 255/161/0 @ 10%),
-                    * You Saved Label (Gill Sans Nova Condensed Semibold @ 15pt)
+                    * LINE 11
+                    * you saved boxx
+                    * you saved text
                     */
-                    $yousavedH = .25;
-                    $yousavedW = 1.125;
-                    $x = $this->startX + $this->signMarginX + ($this->width  *$column);
-                    $x += ($cellW - $yousavedW)/2; //center the box
-                    $yManualAdjust = .24;
+                    ##### You Saved Box #####
+                    $x += .36;
+                    $yManualAdjust = .14;
                     $y += $imageHeight + $yManualAdjust;
                     $pdf->SetXY($x, $y);
 
+                    $yousavedH = .1875;
+                    $yousavedW = 0.719;
                     $pdf->SetFillColor(255,161,0);
                     $pdf->SetDrawColor(255,161,0);
                     $pdf->SetAlpha(0.1);
@@ -445,19 +443,20 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
                         $pdf->SetDrawColor(0,0,0);
                     }
                     ##### You Saved Value #####
-                    $youSavedFontSize = 15;
+                    $youSavedFontSize = 10;
                     $youSavedFont = 'GillSansNova-CnSemiBold';
                     $pdf->SetFont($youSavedFont, '', $youSavedFontSize);
                     $textHeight = $pdf->getCellHeight($youSavedFontSize ,'in');
                     $textString = $this->calculateSaved($NCGItem['normalPrice'],$NCGItem['salePrice']);
                     $pdf->Cell($yousavedW, $yousavedH, $textString, $showBorders, 1, 'C');
-
                     /*
-                    * LINE 11 
-                    * Sale Dates (Gill Sans Nova Medium @ 5.5pt) ON SALE 00/00/00 – 00/00/00
+                    * LINE 12 
+                    * UnitPrice (Gill Sans Nova Condensed Medium @ 25pt),
+                    * You Saved Box (Size = 1.125”w x .25”h Color (RGB) = 255/161/0 @ 10%),
+                    * You Saved Label (Gill Sans Nova Condensed Semibold @ 10pts).
                     */
-                                        ##### Sale Dates #####
-                    $dateFontSize = 5.5;
+                    ##### Sale Dates #####
+                    $dateFontSize = 5;
                     $dateFont = 'GillSansNova-Medium';
                     $yManualAdjust = .06;
                     $y += + $textHeight+$yManualAdjust;
@@ -471,99 +470,117 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
                     break;
                 default:
                     /*
-                    * LINE 10
+                    * LINE 11
                     * 'Unit Price' label,
                     * Orange box
                     */
                     #### Orange Box #####
+                    $yManualAdjust = 0;
                     $x = $this->startX  + $this->signMarginX  + ($this->width  *$column);
-                    $y += $textHeight;
+                    $y += $textHeight + $yManualAdjust;
                     $pdf->setXY($x,$y);
                     $pdf->SetFillColor(255,161,0);
                     $pdf->SetDrawColor(255,161,0);
                     $pdf->Rect($x, $y, $orangeBoxW, $orangeBoxH,'DF');
+                    // reset the draw colors to black and white mostly for trouble shooting if I need to draw borders.
+                    if ($showBorders == 1) {
+                        $pdf->SetFillColor(255,255,255);
+                        $pdf->SetDrawColor(0,0,0);
+                    }
                     ##### Sale Unit Price Label #####
-                    $labelFontSize = 6;
+                    $labelFontSize = 5;
                     $labelFont = 'GillSansNova-Medium';
                     $textHeight = $pdf->getCellHeight($labelFontSize ,'in');
-                    $yManualAdjust = .02;
-                    $y += $yManualAdjust;
+                    $y += 0.02;
                     $pdf->setXY($x,$y);
                     $pdf->SetFont($labelFont, '', $labelFontSize );
                     
                     $pdf->Cell($orangeBoxW, $textHeight, 'UNIT PRICE', $showBorders, 1, 'C');
 
                     /*
-                    * LINE 11 
+                    * LINE 12 
                     * UnitPrice (Gill Sans Nova Condensed Medium @ 25pt),
                     * You Saved Box (Size = 1.125”w x .25”h Color (RGB) = 255/161/0 @ 10%),
-                    * You Saved Label (Gill Sans Nova Condensed Semibold @ 15pt)
+                    * You Saved Label (Gill Sans Nova Condensed Semibold @ 10pts).
                     */
-                    
+                    ##### Sale Unit Price #####
                     $textString = ltrim($NCGItem['saleUnitPrice'], '$ ');
+                    $priceFontSize = 25;
+                    $dollarFontSize = 14.57;
+                    $priceFont = 'GillSansNova-CnMedium';
                     $y += $textHeight;
                     $pdf->SetXY($x,$y);
-                                //$y += 0.0833333;
-                    
-                    $pdf->SetFont('GillSansNova-CnMedium', '', 14.57);
+
+                    //We need these values to make the dollar sign smaller and aligned to the price number
+                    $pdf->SetFont($priceFont, '', $dollarFontSize);
                     $cellDW = $pdf->GetStringWidth('$');
-                    $pdf->SetFont('GillSansNova-CnMedium', '', 25);
+                    $pdf->SetFont($priceFont, '', $priceFontSize);
                     $cellPW = $pdf->GetStringWidth($textString);
-                    ///Sale Unit Price
-                    $textHeight = 0.375;// $pdf->GetCellHeight(25,'in');
+                    // align the price number x and width offset by the width of the dollar sign text.
+                    $textHeight = $pdf->GetCellHeight($priceFontSize,'in');
                     $cellW = $orangeBoxW - $cellDW;
                     $pdf->SetXY($x + $cellDW,$y);
                     $pdf->Cell($cellW, $textHeight, $textString, $showBorders, 1, 'C');
-                    //Dollar Sign
-                    $pdf->SetFont('GillSansNova-CnMedium', '', 14.57);
+                    // place dollar sign in front of the price.
+                    $pdf->SetFont($priceFont, '', $dollarFontSize);
                     $pdf->SetXY($x + (($orangeBoxW/2) -($cellPW/2)) - ($cellDW),$y);
-                    $pdf->Cell($cellDW, 0.275, '$', $showBorders, 1, 'L');
+                    $pdf->Cell($cellDW, $pdf->getCellHeight($dollarFontSize, 'in')+.05, '$', $showBorders, 1, 'L');
 
-                    $x += 1.25;
+                    ##### You Saved Box #####
+                    $x += $orangeBoxW +.03;
                     $pdf->SetXY($x, $y);
 
-                    $pdf->SetFont('GillSansNova-CnSemiBold', '', 15);
-                    
-                    $textString = $this->calculateSaved($NCGItem['normalPrice'],$NCGItem['salePrice']);
-                    $yousavedH = .25;
-                    $yousavedW = 1.125;
-                    $pdf->Cell($yousavedW, $yousavedH, $textString, $showBorders, 1, 'C');
+                    $yousavedH = .1875;
+                    $yousavedW = 0.719;
                     $pdf->SetFillColor(255,161,0);
                     $pdf->SetDrawColor(255,161,0);
                     $pdf->SetAlpha(0.1);
                     $pdf->Rect($x, $y, $yousavedW, $yousavedH,'DF');
                     $pdf->SetAlpha(1);
-
+                    // reset the draw colors to black and white mostly for trouble shooting if I need to draw borders.
+                    if ($showBorders == 1) {
+                        $pdf->SetFillColor(255,255,255);
+                        $pdf->SetDrawColor(0,0,0);
+                    }
+                    ##### You Saved Value #####
+                    $youSavedFontSize = 10;
+                    $youSavedFont = 'GillSansNova-CnSemiBold';
+                    $pdf->SetFont($youSavedFont, '', $youSavedFontSize);
+                    $textString = $this->calculateSaved($NCGItem['normalPrice'],$NCGItem['salePrice']);
+                    $pdf->Cell($yousavedW, $yousavedH, $textString, $showBorders, 1, 'C');
 
                     /*
-                    * LINE 12
+                    * LINE 13
                     * UnitMesure,
-                    * Sale Dates (Gill Sans Nova Medium @ 5.5pt) ON SALE 00/00/00 – 00/00/00
+                    * Sale Dates (Gill Sans Nova Medium @ 5pts.) ON SALE 00/00/00 – 00/00/00
                     */
+                    ##### Unit of Mesure For Sale #####
+                    $yManualAdjust = -0.06;
                     $x = $this->startX  + $this->signMarginX  + ($this->width  *$column);
-                    $y += 0.32;
-
-                    $textHeight = $pdf->GetCellHeight(6,'in');
+                    $y += $textHeight + $yManualAdjust;
                     $pdf->SetXY($x, $y);
-                    $pdf->SetFont('GillSansNova-Medium', '', 6);
-                    $pdf->Cell($orangeBoxW, $textHeight, $$unitString, $showBorders, 1, 'C');
+                    $textHeight = $pdf->GetCellHeight($unitFontSize,'in');
+                    $pdf->SetFont($unitFont, '',$unitFontSize);
+                    $pdf->Cell($orangeBoxW, $textHeight, $unitString, $showBorders, 1, 'C');
 
-                    $textHeight = $pdf->GetCellHeight(5.5,'in');
+                    ##### Sale Dates #####
+                    $dateFontSize = 5;
+                    $dateFont = 'GillSansNova-Medium';
+                    $x += $orangeBoxW +.03;
+                    $y += 0-$textHeight-0.01;
+                    $textHeight = $pdf->GetCellHeight(5,'in');
                     $startDate = new DateTime($NCGItem['startDate']);
                     $endDate = new DateTime($NCGItem['endDate']);
-                    $textString = 'ON SALE '.$startDate->format('m/d/y').' - '.$endDate->format('m/d/y');
-                    $pdf->SetFont('GillSansNova-Medium', '', 5.5);
-                    $x += 1.25;
+                    $textString = "ON SALE\n".$startDate->format('m/d/y').' - '.$endDate->format('m/d/y');
+                    $pdf->SetFont($dateFont , '', $dateFontSize);
                     $pdf->SetXY($x, $y);
-                    $pdf->Cell($yousavedW, $textHeight, $textString, $showBorders, 1, 'C');
-                    break;
+                    $pdf->MultiCell($yousavedW, $textHeight, $textString, $showBorders, 'C',0);
             }
-
             $count++;
             $sign++;
         }
 
-        $pdf->Output('CoopDealsSales8UP.pdf', 'I');
+        $pdf->Output('CoopDealsSales15UP.pdf', 'I');
     }
 }
 

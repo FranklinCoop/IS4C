@@ -22,50 +22,112 @@
 *********************************************************************************/
 
 namespace COREPOS\Fannie\Plugin\NCGSignPilot {
+use COREPOS\Fannie\API\lib\PriceLib;
 use \BarcodeLib;
 use \NCGSignDataModel;
 use lib\FPDF_extended;
 use DateTime;
-
+use \VendorSKUtoPLUModel;
+use \FannieConfig;
 class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage 
 {   
+    //sgin hanger types
+    CONST PRICE_TYPE_NORMAL = 1;
+    CONST PRICE_TYPE_SPLIT  = 2;
+    CONST PRICE_TYPE_BOGO   = 3;
     //Retrive the line data from NCG if avalable.
     protected function getNCGSignData($item) {
         $dbc = $this->getDB();
-        
-        $upc = ltrim($item['upc'], '0');
-        $len = strlen($upc);
-        $is_ean = false;
-        if (strlen($upc) == 12) { 
-            // must be EAN
-            $check = BarcodeLib::getCheckDigit($upc);
-            $upc .= $check;
-            $is_ean = true;
-        } else {
-            $upc = str_pad($upc, 11, '0', STR_PAD_LEFT);
-            $check = BarcodeLib::getCheckDigit($upc);
-            $upc = '0' . $upc . $check;
+        $upc = $item['upc'];
+        if (!BarcodeLib::verifyCheckDigit($upc)) {
+            $upc .= $check = BarcodeLib::getCheckDigit($upc);
+            $upc = str_pad($upc, 13, '0', STR_PAD_LEFT);
         }
+        //check if the upc is a plu and needs to be mapped to a upc.
+        
+        $lookUpUPC = str_pad(ltrim($upc, '0'), 12, '0', STR_PAD_LEFT);
+        /*
+        if ($len < 6) {
+            $vendMapModel = new VendorSKUtoPLUModel($this->getDB());
+            $vendMapModel->sku[$item['upc']];
+            //$vendModel->vind();
+            foreach ($vendMapModel->find() as $obj) {
+                $lookUpUPC = $obj->upc;
+            }
+        }*/
+
+
         $start_date = new DateTime($item['startDate']);
         $end_date = new DateTime($item['endDate']);
 
-        $newItem = array();
+        $pricePerUnit = false;
+        $pricePerUnit = $this->getUnitPrice($dbc, $item['nonSalePrice'],$item['unitofmeasure'],$item['size'],$item['unitofmeasure']);
+        $pricePerUnit = ($pricePerUnit) ? $pricePerUnit : $item['pricePerUnit'];
+
+        $superName = $item['superDeptName'];
+        $strArray = explode(':', $item['superDeptName']);
+        if (sizeof($strArray) > 1){
+            $superName = ltrim($strArray[1]);
+        }
+        $newItem = array(
+                'upc' => $item['upc'],
+                'SignSize' => '',
+                'SignType' => '',
+                'startDate' => $item['startDate'],
+                'endDate' => $item['endDate'],
+                'brand' => $item['brand'],
+                'description' => $item['description'],
+                'unitSize' => $item['size'],
+                'unitOfMeasure' => $this->getUnit($item['unitofmeasure']),
+                'salePrice' => $item['normal_price'],
+                'normalPrice' => $item['nonSalePrice'],
+                'signPrice' => sprintf('$%.2f', $item['normal_price']),
+                'priceDevider' => $item['signMultiplier'],
+                'multiPrice' => '',
+                'unitPrice' => $pricePerUnit,
+                'saleUnitPrice' => '',
+                'attribute' => $this->getAttributes($dbc, $item['upc']),
+                'vendor' => $item['vendor'],
+                'sku' => $item['sku'],
+                'dept_name' => $item['dept_name'],
+                'superDeptName' => $superName,
+                'signPriceType' => NCGSignage::PRICE_TYPE_NORMAL
+        );
 
         $model = new NCGSignDataModel($dbc);
         $model->start_date($start_date->format('Y-m-d').' 00:00:00');
         $model->end_date($end_date->format('Y-m-d').' 23:59:59');            
-        $model->upc(str_pad(ltrim($upc, '0'), 12, '0', STR_PAD_LEFT));
+        $model->upc($lookUpUPC);
         $exists = $model->load();
+        
+        
 
         if ($exists) {
-                // fully init new record
-                $newItme['unitOfMesure'] = $model->unitOfMesure();
-                $newItme['salePrice'] = $model->posPrice();
-                $newItme['signPrice'] = $model->signPrice();
-                $newItme['priceDevider'] = $model->priceDevider();
-                $newItme['multiPrice'] = $model->multiPrice();
-                $newItme['unitPrice'] = $model->unitPrice();
-            $newItem = array(
+                $salePricePerUnit = false;
+
+                $salePricePerUnit = $this->getUnitPrice($dbc, $model->posPrice(),$item['unitofmeasure'], $model->unitSize(), $model->unitOfMesure());
+                $pricePerUnit = false;
+                $pricePerUnit = $this->getUnitPrice($dbc, $item['nonSalePrice'],$item['unitofmeasure'], $model->unitSize(), $model->unitOfMesure());
+                // update return array
+                //$newItem['unitOfMesure'] = $model->unitOfMesure();
+                $newItem['salePrice'] = $model->posPrice();
+                $newItem['signPrice'] = $model->signPrice();
+                $newItem['priceDevider'] = $model->priceDevider();
+                $newItem['multiPrice'] = $model->multiPrice();
+                $newItem['saleUnitPrice'] = ($salePricePerUnit) ? $salePricePerUnit :  $model->unitPrice();
+                $newItem['unitPrice'] = ($pricePerUnit) ? $pricePerUnit :  $newItem['unitPrice'];
+                $newItem['description'] = $model->description();
+                $newItem['brand'] = $model->brand();
+                $newItem['unitSize'] = $model->unitSize();
+                $newItem['unitOfMeasure'] = $this->getUnit($item['unitofmeasure'], $model->unitOfMesure());
+
+                if ($model->signPrice() === 'BOGO') {
+                    $newItem['signPriceType'] = NCGSignage::PRICE_TYPE_BOGO;
+                } elseif ($model->priceDevider() > 1) {
+                    $newItem['signPriceType'] = NCGSignage::PRICE_TYPE_SPLIT;
+                }
+                //$newItem['unitPrice'] = $model->unitPrice();
+            /*$newItem = array(
                 'upc' => $model->upc(),
                 'SignSize' => '',
                 'SignType' => '',
@@ -86,41 +148,72 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 'vendor' => $item['vendor'],
                 'sku' => $item['sku'],
                 'dept_name' => $item['dept_name']
-            );
-        } else {
-            $newItem = array(
-                'upc' => $upc,
-                'SignSize' => '',
-                'SignType' => '',
-                'startDate' => $item['startDate'],
-                'endDate' => $item['endDate'],
-                'brand' => $item['brand'],
-                'description' => $item['description'],
-                'unitSize' => $item['size'],
-                'unitOfMesure' => $item['unitofmeasure'],
-                'salePrice' => $item['normal_price'],
-                'normalPrice' => $item['nonSalePrice'],
-                'signPrice' => sprintf('$%.2f', $item['normal_price']),
-                'priceDevider' => '',
-                'multiPrice' => '',
-                'unitPrice' => $item['pricePerUnit'],
-                'saleUnitPrice' => '',
-                'attribute' => $item['numflag'],
-                'vendor' => $item['vendor'],
-                'sku' => $item['sku'],
-                'dept_name' => $item['dept_name']
-            );
+            );*/
         }
-
         return $newItem;
     }
 
-    private function getUnitPrice() {
+    private function getUnitPrice($dbc, $price, $unitofmaesure, $sizeStr = '', $ncgunit = '') {
+        $unitSize = '';
+        $packUnit = '';
+        $strUnit = '';
+        $rowConversion ='';
+        $strArray = explode('/', $unitofmaesure);
+        if (sizeof($strArray) < 3) {
+            $inNum = 1;
+            for ($i=0; $i < strlen($sizeStr); $i++) {
+                if ($inNum == 1) {
+                    if (is_numeric($sizeStr[$i]) or $sizeStr[$i] == ".") {
+                        $unitSize .= $sizeStr[$i];
+                    } else if ($sizeStr[$i] == "/" or $sizeStr[$i] == "-") {
+                        $mult = $unitSize;
+                        $unitSize = "";
+                    } else {
+                        $inNum = 0;
+                        $packUnit .= $sizeStr[$i];
+                    }
+                } else {
+                    $packUnit .= $sizeStr[$i];
+                }
+            }
+            ltrim($packUnit);
+            $stdUnit = $ncgunit;
+        } else {
+            $unitSize = $strArray[0];
+            $packUnit = $strArray[1];
+            $stdUnit = $strArray[2];
+        }
 
+        ///look up the unit conversion.
+        $conversion = 0;
+        if ($packUnit != $stdUnit) {
+            $queryConversion = "SELECT c.rate FROM unitConversion c WHERE c.unit_name = ? AND c.unit_std = ?";
+            $args = array($packUnit, $stdUnit);
+            $prepConversion = $dbc->prepare($queryConversion);
+            $resConversion = $dbc->execute($prepConversion, $args);
+            if (!$resConversion || $dbc->numRows($resConversion) == 0) {
+                $conversion = 1;
+            } else {
+                $rowConversion = $dbc->fetchRow($resConversion);
+                $conversion = $rowConversion['rate'];
+            }
+        }
+        if ($conversion == 0) return false;
+
+        $pricePerUnit = ($unitSize && $unitSize != 0) ? $price*($conversion/$unitSize)  : false ;
+        //if ($pricePerUnit == 0) return false;
+        return number_format($pricePerUnit,2);
     }
 
-    private function getUnit() {
-        
+    private function getUnit($fannieUnit, $ncgUnit = false) {
+        $strArray = explode('/', $fannieUnit);
+        $ret = $fannieUnit;
+        if (sizeof($strArray) < 3) {
+            if ($ncgUnit) $ret = $ncgUnit;    
+        } else {
+            $ret = $strArray[2];
+        }
+        return $ret;
     }
 
     protected function calculateSaved($normalPrice, $salePrice) {
@@ -130,10 +223,48 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
         
         return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $textString);
     }
+
+    protected function getAttributes($dbc, $upc) {
+        //get unit and flagging data;        
+        $query = "
+            SELECT f.description,
+                f.bit_number,
+                (1<<(f.bit_number-1)) & p.numflag AS flagIsSet
+            FROM products AS p, 
+                prodFlags AS f
+            WHERE p.upc=?
+                " . (FannieConfig::config('STORE_MODE') == 'HQ' ? ' AND p.store_id=? ' : '') . "
+                AND f.active=1";
+        $args = array($upc);
+        if (FannieConfig::config('STORE_MODE') == 'HQ') {
+            $args[] = FannieConfig::config('STORE_ID');
+        }
+        $prep = $dbc->prepare($query);
+        $res = $dbc->execute($prep,$args);
+        
+        if ($dbc->numRows($res) == 0){
+            // item does not exist
+            $prep = $dbc->prepare('
+                SELECT f.description,
+                    f.bit_number,
+                    0 AS flagIsSet
+                FROM prodFlags AS f
+                WHERE f.active=1');
+            $res = $dbc->execute($prep);
+        }
+
+        //please use the order  "Local, Organic, NONGMO, Gluten Free, cv, glyphosate-free
+        $flags = array('Local'=> false, 'Organic' => false, 'Non_GMO' => false, 'Gluten Free'=>false, 'cv' => false, 'glyphosate-free' => false);
+        
+        while($info = $dbc->fetchRow($res)){
+                $flags[$info['description']] = $info['flagIsSet'];
+       }
+       return $flags;
+    }
     
     public function drawPDF()
     {
-
+        
     }
 }
 

@@ -205,7 +205,6 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             ##### Local & Organic Images #####
             $x += $remainingWidth;
             $imageY = $y;
-//$flagX, $flagY, $areaW, $areaH, $flags
             $this->layoutFlags($pdf, $x,$y,$imageWidth*2,$imageHeight, $NCGItem['attribute']);
 
             // reset the draw colors to black and white mostly for trouble shooting if I need to draw borders.
@@ -219,7 +218,6 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             * unit_price (Gill Sans Nova Condensed Medium @ 25pt) the dollar sign is 14.57,
             * price (Gill Sans Nova Condensed Semibold @ 38pt) the dollar sign is 22.15
             */
-            //$num_unit = $item['pricePerUnit'];
             $unitPriceStr = $NCGItem['unitPrice'];
             $unitPriceFontSize = 25;
             $dollarFontSize = 14.57;
@@ -289,7 +287,7 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             * LINE 4 brand_name Gill Sans Nova Semibold @ 8.5pt
             */
             ##### Brand Name #####
-            $brandStr = $item['brand'];
+            $brandStr = $NCGItem['brand'];
             $brandFontSize = 8.5;
             $brandFont = 'GillSansNova-SemiBold';
             $cellW = $this->width - (2*$this->signMarginX)- $imageWidth;
@@ -298,7 +296,7 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $pdf->setXY($x,$y);
             $textHeight = $pdf->getCellHeight($brandFontSize,'in');
             $pdf->SetFont($brandFont, '', $brandFontSize);
-            $pdf->Cell($cellW,$textHeight, $brandStr, $showBorders, 1, 'L');
+            $pdf->Cell($cellW,$textHeight, $pdf->TruncateToCell($brandStr, $cellW, ''), $showBorders, 1, 'L');
 
             /*
             * LINE 5 description
@@ -312,6 +310,8 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $pdf->setXY($x,$y);
             $textHeight = $pdf->getCellHeight($descFontSize,'in');
             $pdf->SetFont($descFont, '', $descFontSize);
+
+            $itemName = $pdf->TruncateToCell($itemName, $cellW, '');
             $pdf->Cell($cellW,$textHeight, $itemName, $showBorders, 1, 'L');
             
             /*
@@ -332,7 +332,7 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $pdf->SetFont('GillSansNova-Medium', '', 5);
             $pdf->Cell($cellW, $textHeight, $textString , $showBorders, 0, 'L');
             ##### Barcode/UPC #####
-            $upc = $item['upc'];
+            $upc = $NCGItem['upc'];
             $pdf->SetDrawColor(0,0,0);
             $pdf->SetFillColor(0,0,0);
             $args = array(
@@ -355,6 +355,7 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $x = $this->startX + $this->signMarginX   + ($this->width  *$column);
             $y += $textHeight;
             $pdf->setXY($x,$y);
+            $textString = $pdf->TruncateToCell($textString, $cellW, '');
             $pdf->Cell($cellW, $textHeight,  $textString, $showBorders, 0, 'L');
 
             /*

@@ -58,7 +58,8 @@ class TrackChange extends FannieReportPage
                 u.name, 
                 u.real_name,
                 u.uid,
-                pu.upc
+                pu.upc,
+                pu.modified
             FROM prodUpdate as pu
             LEFT JOIN Users as u on u.uid=pu.user
             WHERE pu.upc='{$upc}'

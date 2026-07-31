@@ -46,6 +46,6 @@ class NCGSignDataModel extends BasicModel {
         'id' => array('type'=>'INT','primary_key'=>True,'increment'=>True),
 
     );
-    protected $unique = array('start_date','end_date','upc');
+    protected $unique = array('start_date','upc');
 
 }

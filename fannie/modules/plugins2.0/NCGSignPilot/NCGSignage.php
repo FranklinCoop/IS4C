@@ -38,8 +38,10 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
     //Retrive the line data from NCG if avalable.
     protected function getNCGSignData($item) {
         $dbc = $this->getDB();
-        $upc = $item['upc'];
-        if (!BarcodeLib::verifyCheckDigit($upc)) {
+        $upc = str_pad(ltrim($item['upc'], '0'), 12, '0', STR_PAD_LEFT);;
+
+        if (strlen($upc) == 12) {
+            $upc = ltrim($upc, '0');
             $upc .= $check = BarcodeLib::getCheckDigit($upc);
             $upc = str_pad($upc, 13, '0', STR_PAD_LEFT);
         }
@@ -64,6 +66,10 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
         $pricePerUnit = $this->getUnitPrice($dbc, $item['nonSalePrice'],$item['unitofmeasure'],$item['size'],$item['unitofmeasure']);
         $pricePerUnit = ($pricePerUnit) ? $pricePerUnit : $item['pricePerUnit'];
 
+        $salePricePerUnit = false;
+        $salePricePerUnit = $this->getUnitPrice($dbc, $item['normal_price'],$item['unitofmeasure'],$item['size'],$item['unitofmeasure']);
+        $salePricePerUnit = ($salePricePerUnit) ? $salePricePerUnit : $item['pricePerUnit'];
+
         $superName = $item['superDeptName'];
         $strArray = explode(':', $item['superDeptName']);
         if (sizeof($strArray) > 1){
@@ -85,7 +91,7 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 'priceDevider' => $item['signMultiplier'],
                 'multiPrice' => '',
                 'unitPrice' => $pricePerUnit,
-                'saleUnitPrice' => '',
+                'saleUnitPrice' => $salePricePerUnit,
                 'attribute' => $this->getAttributes($dbc, $item['upc']),
                 'vendor' => $item['vendor'],
                 'sku' => $item['sku'],
@@ -96,11 +102,9 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
 
         $model = new NCGSignDataModel($dbc);
         $model->start_date($start_date->format('Y-m-d').' 00:00:00');
-        $model->end_date($end_date->format('Y-m-d').' 23:59:59');            
+        //$model->end_date($end_date->format('Y-m-d').' 23:59:59');            
         $model->upc($lookUpUPC);
         $exists = $model->load();
-        
-        
 
         if ($exists) {
                 $salePricePerUnit = false;
@@ -149,6 +153,8 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 'sku' => $item['sku'],
                 'dept_name' => $item['dept_name']
             );*/
+        } else {
+            $newItem['dept_name'] = 'Failed NCG Data';
         }
         return $newItem;
     }

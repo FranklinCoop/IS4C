@@ -762,6 +762,31 @@ class FPDF_Extended extends FPDF
         }
     }
 
+        /**
+     * Truncates a string to visually fit inside a specified cell width.
+     * 
+     * @param string $text The original string
+     * @param float $w The width of the cell
+     * @param string $ellipsis Optional string to append to truncated text
+     * @return string
+     */
+    public function TruncateToCell($text, $w, $ellipsis = '...') {
+        // Account for cell's left and right internal padding
+        $availableWidth = $w - (2 * $this->cMargin);
+        
+        // If the full text already fits, return it as-is
+        if ($this->GetStringWidth($text) <= $availableWidth) {
+            return $text;
+        }
+        
+        // Loop backwards to find where the string fits with the ellipsis included
+        while (strlen($text) > 0 && ($this->GetStringWidth($text . $ellipsis) > $availableWidth)) {
+            $text = substr($text, 0, -1);
+        }
+        
+        return $text . $ellipsis;
+    }
+
     
 }
 

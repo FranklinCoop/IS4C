@@ -285,6 +285,7 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $pdf->setXY($x,$y);
             $textHeight = $pdf->getCellHeight($brandFontSize,'in');
             $pdf->SetFont($brandFont, '', $brandFontSize);
+            $brandStr = $pdf->TruncateToCell($brandStr, $cellW, '');
             $pdf->Cell($cellW,$textHeight, $brandStr, $showBorders, 1, 'L');
 
             /*
@@ -300,6 +301,7 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $pdf->setXY($x,$y);
             $textHeight = $pdf->getCellHeight($descFontSize,'in');
             $pdf->SetFont($descFont, '', $descFontSize);
+            $itemName = $pdf->TruncateToCell($itemName, $cellW, '');
             $pdf->Cell($cellW,$textHeight, $itemName, $showBorders, 1, 'L');
             
             /*
@@ -316,6 +318,7 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $textHeight = $pdf->getCellHeight($sizeFontSize,'in');;
 
             $pdf->SetFont($sizeFont, '', $sizeFontSize);
+            $textString = $pdf->TruncateToCell($textString, $cellW, '');
             $pdf->Cell($cellW, $textHeight, $textString , $showBorders, 0, 'L');
 
             /*
@@ -328,6 +331,7 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $x = $this->startX + $this->signMarginX   + ($this->width  *$column);
             $y += $textHeight;
             $pdf->setXY($x,$y);
+            $textString = $pdf->TruncateToCell($textString, $cellW, '');
             $pdf->Cell($cellW, $textHeight,  $textString, $showBorders, 0, 'L');
 
             /*
@@ -339,6 +343,7 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $textString = strtoupper($NCGItem['vendor'].' - '.$NCGItem['sku']); //'SUPPLIER NAME TWENTY – 0123456789'
             $y += $textHeight;
             $pdf->setXY($x,$y);
+            $textString = $pdf->TruncateToCell($textString, $cellW, '');
             $pdf->Cell($cellW, $textHeight, $textString , $showBorders, 0, 'L');
             
             /*

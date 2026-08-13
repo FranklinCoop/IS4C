@@ -277,7 +277,7 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             */
             ##### Brand Name #####
             $brandStr = $item['brand'];
-            $brandFontSize = 6.5;
+            $brandFontSize = 7.5;
             $brandFont = 'GillSansNova-SemiBold';
             $cellW = $this->width - (2*$this->signMarginX);
             $x = $this->startX + $this->signMarginX   + ($this->width  *$column);
@@ -294,7 +294,7 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             */
             ##### Description #####
             $itemName = $NCGItem['description'];
-            $descFontSize = 6.5;
+            $descFontSize = 7.5;
             $descFont = 'GillSansNova-SemiBold';
             $x = $this->startX  + $this->signMarginX  + ($this->width  *$column);
             $y += $textHeight;
@@ -310,7 +310,7 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             */
             ##### Item Size #####
             $textString = $NCGItem['unitSize']; //'ITEM SIZE 20 CHARCT - UNIT QTY 10'
-            $sizeFontSize = 5;
+            $sizeFontSize = 6;
             $sizeFont = 'GillSansNova-Medium';
             $x = $this->startX  + $this->signMarginX  + ($this->width  *$column);
             $y += $textHeight;
@@ -367,7 +367,7 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
                 'align'=>'C',
                 'textheight'=> $textHeight,
                 'font'=>'GillSansNova-Medium',
-                'fontsize'=> 5);
+                'fontsize'=> 6);
             $this->drawBarcode($upc, $pdf, $x, $y, $args);
 
             ##### Local & Organic Image #####
@@ -452,11 +452,10 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
                     $youSavedFont = 'GillSansNova-CnSemiBold';
                     $pdf->SetFont($youSavedFont, '', $youSavedFontSize);
                     $textHeight = $pdf->getCellHeight($youSavedFontSize ,'in');
-                    $textString = $this->calculateSaved($NCGItem['normalPrice'],$NCGItem['salePrice']);
+                    $textString = $this->calculateSaved($NCGItem['normalPrice'],$NCGItem['salePrice'],true);
                     $pdf->Cell($yousavedW, $yousavedH, $textString, $showBorders, 1, 'C');
                     /*
                     * LINE 12 
-                    * UnitPrice (Gill Sans Nova Condensed Medium @ 25pt),
                     * You Saved Box (Size = 1.125”w x .25”h Color (RGB) = 255/161/0 @ 10%),
                     * You Saved Label (Gill Sans Nova Condensed Semibold @ 10pts).
                     */

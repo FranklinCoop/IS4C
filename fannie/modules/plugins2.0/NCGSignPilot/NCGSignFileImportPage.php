@@ -152,8 +152,12 @@ class NCGSignFileImportPage extends \COREPOS\Fannie\API\FannieUploadPage {
             $start_date = new DateTime($line[$indexes['start_date']] . ' 00:00:00');
             $end_date = new DateTime($line[$indexes['end_date']] . ' 23:59:59');
 
+            $unitOfMesure = $line[$indexes['unitOfMesure']];
+            $posPrice = $line[$indexes['posPrice']];
             $priceDevider = $line[$indexes['priceDevider']];
             $multiPrice = $line[$indexes['multiPrice']];
+            $unitPrice = $line[$indexes['unitPrice']];
+
 
             $model->reset();
             $model->SignSize($line[$indexes['SignSize']]);
@@ -169,12 +173,12 @@ class NCGSignFileImportPage extends \COREPOS\Fannie\API\FannieUploadPage {
                 $model->brand($line[$indexes['brand']]);
                 $model->description($line[$indexes['description']]);
                 $model->unitSize($line[$indexes['unitSize']]);
-                $model->unitOfMesure($line[$indexes['unitOfMesure']]);
-                $model->posPrice($line[$indexes['posPrice']]);
+                if ($unitOfMesure !='') $model->unitOfMesure($unitOfMesure);
+                if ($posPrice !='') $model->posPrice($posPrice);
                 $model->signPrice($line[$indexes['signPrice']]);
                 if ($priceDevider !='') $model->priceDevider($priceDevider);
                 if ($multiPrice !='') $model->multiPrice($multiPrice);
-                $model->unitPrice($line[$indexes['unitPrice']]);
+                if ($unitPrice !='') $model->unitPrice($unitPrice);
                 $model->attribute($line[$indexes['attribute']]);
             }
 

@@ -36,12 +36,20 @@ class FpdfWithBarcode extends FPDF
    function TestCheckDigit($barcode)
    {
       //Test validity of check digit
+    /*
       $sum=0;
       for($i=1;$i<=11;$i+=2)
         $sum+=3*$barcode[$i];
       for($i=0;$i<=10;$i+=2)
         $sum+=$barcode[$i];
       return ($sum+$barcode[12])%10==0;
+    */
+    $sum = 0;
+    for ($i = 0; $i < 12; $i++) {
+      // If index is odd, multiply by 3, otherwise multiply by 1
+      $sum += ($i % 2 === 1) ? 3 * $barcode[$i] : $barcode[$i];
+      }
+    return ($sum + $barcode[12]) % 10 === 0;
    }
 
    function Barcode($x,$y,$barcode,$h,$w,$len)

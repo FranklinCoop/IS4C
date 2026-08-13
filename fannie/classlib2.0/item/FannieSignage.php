@@ -191,6 +191,9 @@ class FannieSignage
                 }
                 $row['pricePerUnit'] = $pricePerUnit;
             }
+            if ($row['unitStandard'] == '') {
+                $row['unitStandard'] = PriceLib::getUnitStd($row['unitofmeasure'], $row['size']);
+            }
             if ($row['sku'] == $row['upc']) {
                 $row['sku'] = '';
             }
@@ -284,6 +287,7 @@ class FannieSignage
                     s.size,
                     s.sku,
                     \'\' AS pricePerUnit,
+                    \'\' AS unitStandard,
                     \'\' AS unitofmeasure,
                     s.vendor,
                     p.scale,
@@ -330,6 +334,8 @@ class FannieSignage
         $query = 'SELECT l.upc,
                     l.salePrice AS normal_price,
                     p.normal_price AS nonSalePrice,
+                    l.groupSalePrice as groupPrice,
+                    p.groupprice as nonSaleGroupPrice,
                     ' . ItemText::longDescriptionSQL() . ',
                     p.description AS posDescription,
                     ' . ItemText::longBrandSQL() . ',
@@ -337,8 +343,11 @@ class FannieSignage
                     ' . ItemText::signSizeSQL() . ',
                     v.sku,
                     \'\' AS pricePerUnit,
+                    \'\' AS unitStandard,
                     n.vendorName AS vendor,
                     p.default_vendor_id as vendorID,
+                    l.quantity as quantity,
+                    p.quantity as nonSaleQuantity,
                     p.scale,
                     p.numflag,';
         // 22Jul2015 check table compatibility
@@ -462,6 +471,7 @@ class FannieSignage
                     ' . ItemText::signSizeSQL() . ',
                     v.sku,
                     \'\' AS pricePerUnit,
+                    \'\' AS unitStandard,
                     n.vendorName AS vendor,
                     p.default_vendor_id as vendorID,
                     p.scale,
@@ -515,6 +525,7 @@ class FannieSignage
                     ' . ItemText::signSizeSQL() . ',
                     v.sku,
                     \'\' AS pricePerUnit,
+                    \'\' AS unitStandard,
                     n.vendorName AS vendor,
                     p.default_vendor_id as vendorID,
                     p.scale,
@@ -573,6 +584,7 @@ class FannieSignage
                     ' . ItemText::signSizeSQL() . ',
                     v.sku,
                     \'\' AS pricePerUnit,
+                    \'\' AS unitStandard,
                     n.vendorName AS vendor,
                     p.default_vendor_id as vendorID,
                     p.scale,
@@ -640,6 +652,7 @@ class FannieSignage
                     ' . ItemText::signSizeSQL() . ',
                     v.sku,
                     \'\' AS pricePerUnit,
+                    \'\' AS unitStandard,
                     n.vendorName AS vendor,
                     p.default_vendor_id as vendorID,
                     p.scale,
@@ -732,25 +745,24 @@ class FannieSignage
         $fontsize = isset($args['fontsize']) ? $args['fontsize'] : 9;
         $vertical = isset($args['vertical']) ? $args['vertical'] : false;
         
-
-        if (!BarcodeLib::verifyCheckDigit($upc)) {
-            $upc .= $check = BarcodeLib::getCheckDigit($upc);
-            $upc = str_pad($upc, 13, '0', STR_PAD_LEFT);
-        }
+        //$upc = str_pad(ltrim($upc, '0'), 12, '0', STR_PAD_LEFT);
         $upc = ltrim($upc, '0');
-        $upc = str_pad($upc, 12, '0', STR_PAD_LEFT);
         $len = strlen($upc);
         $is_ean = false;
-
         $barText = $upc;
         
+        if ($len <= 11) {
+            // add check digit to upc-a
+            $upc .= $check = BarcodeLib::getCheckDigit($upc);
+        }
         
-            
-        if ($len == 13) {
+        $upc = str_pad(ltrim($upc, '0'), 12, '0', STR_PAD_LEFT);
+        $len = strlen($upc);
+        if ($len == 12) {
+            $barText = substr($upc,0,1)."-".substr($upc,1,5)."-".substr($upc,6,5)."-".substr($upc,11);
+        } else {
             $barText = substr($upc, 0,1)."-".substr($upc,1,6)."-".substr($upc,7,6);
             $is_ean == true;
-        } else {
-            $barText = substr($upc,0,1)."-".substr($upc,1,5)."-".substr($upc,6,5)."-".substr($upc,11);
         }
 
         //Convert digits to bars

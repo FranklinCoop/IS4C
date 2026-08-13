@@ -1,7 +1,7 @@
 <?php
 
 namespace COREPOS\Fannie\API\item\tagdatasource;
-
+use COREPOS\Fannie\API\lib\PriceLib;
 /**
   @class TagDataSource
   This class exists solely as a parent
@@ -79,16 +79,10 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
 
         //$ret['size'] = $row['units'];
         $ret['size'] = $row['p_size'];
-        $str = $row['unitofmeasure'];
-        $strArray = explode('/', $str);
-        if(sizeof($strArray) > 3) { 
-            $ret['units'] = $strArray[0];
-            $ret['unitStandard'] = $strArray[2];
-        } else {
-            $ret['units'] = 'err';
-            $ret['unitStandard'] = 'err';
-        }
-
+        $unitStd = PriceLib::getUnitStd($row['unitofmeasure'], $row['size']);
+        $ret['unitStandard'] = $unitStd;
+        $unitProd = PriceLib::getUnitProd($row['unitofmeasure'], $row['size']);
+        $ret['units'] = $unitProd;
 
         //            $strRow = $dbc->fetchRow($ret);
         //    $str = $strRow[0];

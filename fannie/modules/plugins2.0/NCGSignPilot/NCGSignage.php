@@ -38,7 +38,7 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
     //Retrive the line data from NCG if avalable.
     protected function getNCGSignData($item) {
         $dbc = $this->getDB();
-        $upc = str_pad(ltrim($item['upc'], '0'), 12, '0', STR_PAD_LEFT);;
+        $upc = str_pad(ltrim($item['upc'], '0'), 12, '0', STR_PAD_LEFT);
 
         if (strlen($upc) == 12) {
             $upc = ltrim($upc, '0');
@@ -63,7 +63,7 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
         $end_date = new DateTime($item['endDate']);
 
         $pricePerUnit = false;
-        $pricePerUnit = $this->getUnitPrice($dbc, $item['nonSalePrice'],$item['unitofmeasure'],$item['size'],$item['unitofmeasure']);
+        $pricePerUnit = $this->getUnitPrice($dbc, $item['nonSalePrice'],$item['unitofmeasure'],$item['size']);
         $pricePerUnit = ($pricePerUnit) ? $pricePerUnit : $item['pricePerUnit'];
 
         $salePricePerUnit = false;
@@ -81,14 +81,14 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 'SignType' => '',
                 'startDate' => $item['startDate'],
                 'endDate' => $item['endDate'],
-                'brand' => $item['brand'],
+                'brand' => $item['signMultiplier'],
                 'description' => $item['description'],
                 'unitSize' => $item['size'],
-                'unitOfMeasure' => $this->getUnit($item['unitofmeasure']),
+                'unitOfMeasure' => $this->getUnit($item['unitofmeasure'], $item['size']),
                 'salePrice' => $item['normal_price'],
                 'normalPrice' => $item['nonSalePrice'],
                 'signPrice' => sprintf('$%.2f', $item['normal_price']),
-                'priceDevider' => $item['signMultiplier'],
+                'priceDevider' => $item['quantity'],
                 'multiPrice' => '',
                 'unitPrice' => $pricePerUnit,
                 'saleUnitPrice' => $salePricePerUnit,
@@ -97,8 +97,15 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 'sku' => $item['sku'],
                 'dept_name' => $item['dept_name'],
                 'superDeptName' => $superName,
-                'signPriceType' => NCGSignage::PRICE_TYPE_NORMAL
+                'signPriceType' => NCGSignage::PRICE_TYPE_NORMAL,
+                'saleGroupPrice' => $item['groupPrice'],
+                'nonSaleQuantity' => $item['nonSaleQuantity'],
+                'groupPrice' => $item['nonSaleGroupPrice']
         );
+
+        if($newItem['priceDevider'] == 2) {
+            $newItem['signPriceType'] = NCGSignage::PRICE_TYPE_BOGO;
+        }
 
         $model = new NCGSignDataModel($dbc);
         $model->start_date($start_date->format('Y-m-d').' 00:00:00');
@@ -160,30 +167,20 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
     }
 
     private function getUnitPrice($dbc, $price, $unitofmaesure, $sizeStr = '', $ncgunit = '') {
-        $unitSize = '';
+        $unitSize = 0;
         $packUnit = '';
         $strUnit = '';
         $rowConversion ='';
+        $pricePerUnit = 'TOPERR';
         $strArray = explode('/', $unitofmaesure);
-        if (sizeof($strArray) < 3) {
-            $inNum = 1;
-            for ($i=0; $i < strlen($sizeStr); $i++) {
-                if ($inNum == 1) {
-                    if (is_numeric($sizeStr[$i]) or $sizeStr[$i] == ".") {
-                        $unitSize .= $sizeStr[$i];
-                    } else if ($sizeStr[$i] == "/" or $sizeStr[$i] == "-") {
-                        $mult = $unitSize;
-                        $unitSize = "";
-                    } else {
-                        $inNum = 0;
-                        $packUnit .= $sizeStr[$i];
-                    }
-                } else {
-                    $packUnit .= $sizeStr[$i];
-                }
+        if (sizeof($strArray) < 3 || $unitofmaesure == '') {
+            $sizeArray = PriceLib::splitSizeStr($sizeStr);
+            $packUnit = $sizeArray['unit'];
+            $unitSize = $sizeArray['number'];
+            $stdUnit = $sizeArray['unit'];
+            if ($ncgunit != 0 && !is_null($ncgunit)) {
+                $stdUnit = $ncgunit;
             }
-            ltrim($packUnit);
-            $stdUnit = $ncgunit;
         } else {
             $unitSize = $strArray[0];
             $packUnit = $strArray[1];
@@ -191,7 +188,7 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
         }
 
         ///look up the unit conversion.
-        $conversion = 0;
+        $conversion = 1;
         if ($packUnit != $stdUnit) {
             $queryConversion = "SELECT c.rate FROM unitConversion c WHERE c.unit_name = ? AND c.unit_std = ?";
             $args = array($packUnit, $stdUnit);
@@ -204,27 +201,40 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 $conversion = $rowConversion['rate'];
             }
         }
-        if ($conversion == 0) return false;
-
-        $pricePerUnit = ($unitSize && $unitSize != 0) ? $price*($conversion/$unitSize)  : false ;
+        //if ($conversion == 0) return 'CONERR';
+        
+        $pricePerUnit = ($unitSize && $unitSize != 0) ? number_format(($price*($conversion/$unitSize)),2) : $pricePerUnit ;
         //if ($pricePerUnit == 0) return false;
-        return number_format($pricePerUnit,2);
+        return $pricePerUnit;
     }
 
-    private function getUnit($fannieUnit, $ncgUnit = false) {
+    private function getUnit($fannieUnit, $ncgUnit = false, $sizeStr ='') {
         $strArray = explode('/', $fannieUnit);
         $ret = $fannieUnit;
         if (sizeof($strArray) < 3) {
-            if ($ncgUnit) $ret = $ncgUnit;    
+            if ($ncgUnit) {
+                $ret = $ncgUnit;
+            } else if($sizeStr != '') {
+                $sizeArray = PriceLib::splitSizeStr($sizeStr);
+                if(sizeof($sizeArray) >1 ) {
+                    $ret = $sizeArray['unit'];
+                }
+            }
         } else {
             $ret = $strArray[2];
         }
         return $ret;
     }
 
-    protected function calculateSaved($normalPrice, $salePrice) {
+    protected function calculateSaved($normalPrice, $salePrice, $bogo = false) {
         $textString = 'You Saved ';
-        $amount = $normalPrice - $salePrice;
+        $amount = 0;
+        if ($bogo) {
+            $amount = $normalPrice;
+        } else {
+            $amount = $normalPrice - $salePrice;
+        }
+        
         $textString .= ($amount< 1) ? ($amount*100).'¢' : sprintf('$%.2f', $amount) ;
         
         return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $textString);

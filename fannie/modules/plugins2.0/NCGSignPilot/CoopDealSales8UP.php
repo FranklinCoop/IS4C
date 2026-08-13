@@ -67,7 +67,8 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
     private function layoutFlags($pdf, $flagX, $flagY, $areaW, $areaH, $flags) {
         global $FANNIE_ROOT;
         if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
-            $flagW = $areaW;    
+            $flagW = $areaW;
+            $flagX += -.02;
             $flagCount = 0;
             foreach ($flags as $flag => $show) {
                 $imagePath = '';
@@ -194,8 +195,8 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $imageHeight = .3475;
             $imageWidth = .3475;
             if (\FannieConfig::factory()->get('FANNIE_COOP_ID') == 'FranklinCoop') {
-                $imageHeight = $imageHeight/5;
-                $imageWidth = $imageWidth/5;
+                $imageHeight = ($imageHeight/5)*2;
+                $imageWidth = ($imageWidth/5)*2;
             }
             $remainingWidth = $this->width - (2*$this->signMarginX) - $orangeBoxW - $imageWidth; 
             $x += $orangeBoxW;
@@ -205,7 +206,7 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             ##### Local & Organic Images #####
             $x += $remainingWidth;
             $imageY = $y;
-            $this->layoutFlags($pdf, $x,$y,$imageWidth*2,$imageHeight, $NCGItem['attribute']);
+            $this->layoutFlags($pdf, $x,$y,$imageWidth,$imageHeight, $NCGItem['attribute']);
 
             // reset the draw colors to black and white mostly for trouble shooting if I need to draw borders.
             if ($showBorders == 1) {
@@ -321,15 +322,15 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             ##### Item Size #####
             $textString = strtoupper('ITEM SIZE: '.$NCGItem['unitSize']); //'ITEM SIZE 20 CHARCT - UNIT QTY 10'
             $barcodeW = 1;
-            $sizeFontSize = 5;
+            $sizeFontSize = 6;
             $sizeFont = 'GillSansNova-Medium';
             $cellW = $this->width - (2*$this->signMarginX) - $barcodeW;
             $x = $this->startX  + $this->signMarginX  + ($this->width  *$column);
             $y += $textHeight +.01;
             $pdf->setXY($x,$y);
-            $textHeight = $pdf->getCellHeight(5,'in');;
-
-            $pdf->SetFont('GillSansNova-Medium', '', 5);
+            $textHeight = $pdf->getCellHeight(5,'in');
+            $pdf->SetFont($sizeFont, '', $sizeFontSize);
+            $textString = $pdf->TruncateToCell($textString, $cellW, '');
             $pdf->Cell($cellW, $textHeight, $textString , $showBorders, 0, 'L');
             ##### Barcode/UPC #####
             $upc = $NCGItem['upc'];
@@ -342,7 +343,7 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
                 'align'=>'C',
                 'textheight'=> $textHeight,
                 'font'=>'GillSansNova-Medium',
-                'fontsize'=> 5);
+                'fontsize'=> 6);
             $this->drawBarcode($upc, $pdf, $x + $cellW, $y, $args);
             
             /*
@@ -367,6 +368,7 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             $textString = strtoupper($NCGItem['vendor'].' - '.$NCGItem['sku']); //'SUPPLIER NAME TWENTY – 0123456789'
             $y += $textHeight;
             $pdf->setXY($x,$y);
+            $textString = $pdf->TruncateToCell($textString, $cellW, '');
             $pdf->Cell($cellW, $textHeight, $textString , $showBorders, 0, 'L');
 
             /*
@@ -450,7 +452,7 @@ class CoopDealSales8UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
                     $youSavedFont = 'GillSansNova-CnSemiBold';
                     $pdf->SetFont($youSavedFont, '', $youSavedFontSize);
                     $textHeight = $pdf->getCellHeight($youSavedFontSize ,'in');
-                    $textString = $this->calculateSaved($NCGItem['normalPrice'],$NCGItem['salePrice']);
+                    $textString = $this->calculateSaved($NCGItem['normalPrice'],$NCGItem['salePrice'], true);
                     $pdf->Cell($yousavedW, $yousavedH, $textString, $showBorders, 1, 'C');
 
                     /*

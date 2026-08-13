@@ -62,8 +62,10 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
         $start_date = new DateTime($item['startDate']);
         $end_date = new DateTime($item['endDate']);
 
+        $price = (array_key_exists('nonSalePrice',$item)) ? $item['nonSalePrice'] : $item['normal_price'];
+
         $pricePerUnit = false;
-        $pricePerUnit = $this->getUnitPrice($dbc, $item['nonSalePrice'],$item['unitofmeasure'],$item['size']);
+        $pricePerUnit = $this->getUnitPrice($dbc, $price,$item['unitofmeasure'],$item['size']);
         $pricePerUnit = ($pricePerUnit) ? $pricePerUnit : $item['pricePerUnit'];
 
         $salePricePerUnit = false;
@@ -86,7 +88,7 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 'unitSize' => $item['size'],
                 'unitOfMeasure' => $this->getUnit($item['unitofmeasure'], $item['size']),
                 'salePrice' => $item['normal_price'],
-                'normalPrice' => $item['nonSalePrice'],
+                'normalPrice' => $price,
                 'signPrice' => sprintf('$%.2f', $item['normal_price']),
                 'priceDevider' => $item['quantity'],
                 'multiPrice' => '',
@@ -98,11 +100,16 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 'dept_name' => $item['dept_name'],
                 'superDeptName' => $superName,
                 'signPriceType' => NCGSignage::PRICE_TYPE_NORMAL,
-                'saleGroupPrice' => $item['groupPrice'],
-                'nonSaleQuantity' => $item['nonSaleQuantity'],
-                'groupPrice' => $item['nonSaleGroupPrice']
+                'saleGroupPrice' => '',
+                'nonSaleQuantity' => '',
+                'groupPrice' => ''
         );
-
+        if (array_key_exists('nonSaleQuantity',$item)) {
+            $newItem['nonSaleQuantity'] = $item['nonSaleQuantity'];
+        }
+        if (array_key_exists('nonSaleGroupPrice',$item)) {
+            $newItem['groupPrice'] = $item['nonSaleGroupPrice'];
+        }
         if($newItem['priceDevider'] == 2) {
             $newItem['signPriceType'] = NCGSignage::PRICE_TYPE_BOGO;
         }

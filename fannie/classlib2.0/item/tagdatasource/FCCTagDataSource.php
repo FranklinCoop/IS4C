@@ -79,10 +79,21 @@ class FCCTagDataSource extends \COREPOS\Fannie\API\item\TagDataSource
 
         //$ret['size'] = $row['units'];
         $ret['size'] = $row['p_size'];
-        $unitStd = PriceLib::getUnitStd($row['unitofmeasure'], $row['size']);
-        $ret['unitStandard'] = $unitStd;
-        $unitProd = PriceLib::getUnitProd($row['unitofmeasure'], $row['size']);
-        $ret['units'] = $unitProd;
+
+        $str = $row['unitofmeasure'];
+        
+        $strArray = explode('/', $str);
+        
+        if(sizeof($strArray) > 3) { 
+            $ret['units'] = $strArray[0];
+            $ret['unitStandard'] = $strArray[2];
+        } else {
+            $sizeArray = PriceLib::splitSizeStr($row['p_size']);
+            $ret['unitStandard'] = $sizeArray['unit'];
+            $ret['units'] = $sizeArray['number'];
+
+        }
+
 
         //            $strRow = $dbc->fetchRow($ret);
         //    $str = $strRow[0];

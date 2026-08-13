@@ -255,12 +255,17 @@ class FannieSignage
                     \'\' AS unitofmeasure,
                     o.originID,
                     o.name AS originName,
+                    CONCAT(d.dept_no, " ", d.dept_name) AS dept_name,
+                    sn.super_name AS superDeptName,
                     o.shortName AS originShortName
                   FROM shelftags AS s
                     ' . DTrans::joinProducts('s', 'p', 'INNER') . '
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
                     LEFT JOIN vendorItems AS v ON v.upc=p.upc AND v.vendorID=p.default_vendor_id
                     LEFT JOIN vendors AS ven ON ven.vendorID=v.vendorID
+                    LEFT JOIN departments AS d ON d.dept_no=p.department
+                    LEFT JOIN superdepts AS z ON z.dept_ID = d.dept_no
+                    LEFT JOIN superDeptNames AS sn ON sn.superID = z.superID 
                   WHERE s.id=?
                   ORDER BY p.department, s.upc';
         $args = array($this->source_id);
@@ -296,12 +301,17 @@ class FannieSignage
                     b.batchName,
                     b.endDate,
                     o.originID,
+                    CONCAT(d.dept_no, " ", d.dept_name) AS dept_name,
+                    sn.super_name AS superDeptName,
                     o.name AS originName,
                     o.shortName AS originShortName
                   FROM batchBarcodes AS s
                     ' . DTrans::joinProducts('s', 'p', 'INNER') . '
                     INNER JOIN batches AS b ON s.batchID=b.batchID
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
+                    LEFT JOIN departments AS d ON d.dept_no=s.department
+                    LEFT JOIN superdepts AS z ON z.dept_ID = d.dept_no
+                    LEFT JOIN superDeptNames AS sn ON sn.superID = z.superID 
                   WHERE s.batchID IN (' . $ids . ')
                   ORDER BY p.department, s.upc';
 
@@ -402,8 +412,8 @@ class FannieSignage
                     LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
                     LEFT JOIN departments AS d ON d.dept_no=p.department
-                    LEFT JOIN superdepts AS s ON s.dept_ID = d.dept_no
-                    LEFT JOIN superDeptNames AS sn ON sn.superID = s.superID 
+                    LEFT JOIN superdepts AS z ON z.dept_ID = d.dept_no
+                    LEFT JOIN superDeptNames AS sn ON sn.superID = z.superID 
                     ';
         if (isset($fs_def['sections'])) {
             $query .= ' LEFT JOIN FloorSectionsListView AS fs ON fs.upc=p.upc AND fs.storeID= ? ';
@@ -474,12 +484,15 @@ class FannieSignage
                     \'\' AS unitStandard,
                     n.vendorName AS vendor,
                     p.default_vendor_id as vendorID,
+                    p.quantity as quantity,
                     p.scale,
                     p.numflag,
                     \'\' AS startDate,
                     \'\' AS endDate,
                     \'\' AS batchName,
                     p.unitofmeasure,
+                    CONCAT(d.dept_no, " ", d.dept_name) AS dept_name,
+                    sn.super_name AS superDeptName,
                     o.originID,
                     o.name AS originName,
                     o.shortName AS originShortName
@@ -487,7 +500,11 @@ class FannieSignage
                     LEFT JOIN productUser AS u ON p.upc=u.upc
                     LEFT JOIN vendors AS n ON p.default_vendor_id=n.vendorID
                     LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
-                    LEFT JOIN origins AS o ON p.current_origin_id=o.originID ';
+                    LEFT JOIN origins AS o ON p.current_origin_id=o.originID
+                    LEFT JOIN departments AS d ON d.dept_no=p.department
+                    LEFT JOIN superdepts AS z ON z.dept_ID = d.dept_no
+                    LEFT JOIN superDeptNames AS sn ON sn.superID = z.superID  ';
+                    
 
         if (isset($s_def['signCount'])) {
             $query .= ' LEFT JOIN SignProperties AS sp ON sp.upc=p.upc AND sp.storeID = ? ';
@@ -534,6 +551,8 @@ class FannieSignage
                     \'\' AS endDate,
                     \'\' AS batchName,
                     p.unitofmeasure,
+                    CONCAT(d.dept_no, " ", d.dept_name) AS dept_name,
+                    sn.super_name AS superDeptName,
                     o.originID,
                     o.name AS originName,
                     o.shortName AS originShortName
@@ -543,7 +562,11 @@ class FannieSignage
                     LEFT JOIN vendorItems AS v ON p.upc=v.upc AND p.default_vendor_id=v.vendorID
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
                     LEFT JOIN batchList AS l ON p.upc=l.upc
-                    LEFT JOIN batches AS b ON l.batchID=b.batchID';
+                    LEFT JOIN batches AS b ON l.batchID=b.batchID
+                    LEFT JOIN departments AS d ON d.dept_no=p.department
+                    LEFT JOIN superdepts AS z ON z.dept_ID = d.dept_no
+                    LEFT JOIN superDeptNames AS sn ON sn.superID = z.superID ';
+                    
 
         if (isset($s_def['signCount'])) {
             $query .= ' LEFT JOIN SignProperties AS sp ON sp.upc=p.upc AND sp.storeID = ? ';
@@ -600,6 +623,8 @@ class FannieSignage
                         ELSE p.end_date 
                     END AS endDate,
                     p.unitofmeasure,
+                    CONCAT(d.dept_no, " ", d.dept_name) AS dept_name,
+                    sn.super_name AS superDeptName,
                     o.originID,
                     b.batchName,
                     o.name AS originName,
@@ -613,7 +638,10 @@ class FannieSignage
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
                     LEFT JOIN batchList AS l ON p.batchID=l.batchID AND p.upc=l.upc
                     LEFT JOIN batches AS b ON l.batchID=b.batchID
-                    LEFT JOIN batchType AS t ON b.batchType=t.batchTypeID';
+                    LEFT JOIN batchType AS t ON b.batchType=t.batchTypeID
+                    LEFT JOIN departments AS d ON d.dept_no=p.department
+                    LEFT JOIN superdepts AS z ON z.dept_ID = d.dept_no
+                    LEFT JOIN superDeptNames AS sn ON sn.superID = z.superID ';
 
         if (isset($s_def['signCount'])) {
             $query .= ' LEFT JOIN SignProperties AS sp ON sp.upc=p.upc AND sp.storeID = ? ';
@@ -668,6 +696,8 @@ class FannieSignage
                         ELSE b.endDate 
                     END AS endDate,
                     p.unitofmeasure,
+                    CONCAT(d.dept_no, " ", d.dept_name) AS dept_name,
+                    sn.super_name AS superDeptName,
                     b.batchName,
                     o.originID,
                     o.name AS originName,
@@ -681,7 +711,10 @@ class FannieSignage
                     LEFT JOIN origins AS o ON p.current_origin_id=o.originID
                     LEFT JOIN batchList AS l ON p.upc=l.upc
                     LEFT JOIN batches AS b ON l.batchID=b.batchID
-                    LEFT JOIN batchType AS t ON b.batchType=t.batchTypeID';
+                    LEFT JOIN batchType AS t ON b.batchType=t.batchTypeID
+                    LEFT JOIN departments AS d ON d.dept_no=p.department
+                    LEFT JOIN superdepts AS z ON z.dept_ID = d.dept_no
+                    LEFT JOIN superDeptNames AS sn ON sn.superID = z.superID ';
 
         if (isset($s_def['signCount'])) {
             $query .= ' LEFT JOIN SignProperties AS sp ON sp.upc=p.upc AND sp.storeID = ? ';

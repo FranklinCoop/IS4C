@@ -294,7 +294,7 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             */
             ##### Description #####
             $itemName = $NCGItem['description'];
-            $descFontSize = 7.5;
+            $descFontSize = 6.5;
             $descFont = 'GillSansNova-SemiBold';
             $x = $this->startX  + $this->signMarginX  + ($this->width  *$column);
             $y += $textHeight;
@@ -310,7 +310,7 @@ class CoopDealSales15UP extends \COREPOS\Fannie\Plugin\NCGSignPilot\NCGSignage
             */
             ##### Item Size #####
             $textString = $NCGItem['unitSize']; //'ITEM SIZE 20 CHARCT - UNIT QTY 10'
-            $sizeFontSize = 6;
+            $sizeFontSize = 5;
             $sizeFont = 'GillSansNova-Medium';
             $x = $this->startX  + $this->signMarginX  + ($this->width  *$column);
             $y += $textHeight;

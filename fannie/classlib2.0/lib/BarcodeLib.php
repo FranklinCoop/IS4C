@@ -176,6 +176,26 @@ class BarcodeLib
         $upc = str_pad($str,11,'0',STR_PAD_LEFT);
         return $upc . self::getCheckDigit($upc);
     }
+    function TestCheckDigit($barcode)
+   {
+        $sum = 0;
+        $len = str_len(ltrim($upc, '0'));
+        if ($len === 13) {
+            for ($i = 0; $i < 12; $i++) {
+                // If index is odd, multiply by 3, otherwise multiply by 1
+                $sum += ($i % 2 === 1) ? 3 * $barcode[$i] : $barcode[$i];
+            }
+            return ($sum + $barcode[12]) % 10 === 0;
+        } else {
+            //upc-a with or without check digit or a ean13 with out a check digit so check if the upc12 is valid.
+            $upc = str_pad($upc, 12, '0', STR_PAD_LEFT);
+            for ($i = 0; $i < 11; $i++) {
+                // If index is odd, multiply by 3, otherwise multiply by 1
+                $sum += ($i % 2 === 1) ? 3 * $barcode[$i] : $barcode[$i];
+            }
+            return ($sum + $barcode[11]) % 10 === 0;
+        }
+   }
 
     public static function normalize13($str)
     {

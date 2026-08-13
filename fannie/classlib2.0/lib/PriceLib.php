@@ -98,22 +98,11 @@ class PriceLib
         $num = "";
         $unit = "";
         $mult = 1;
-        $inNum = 1;
-        for ($i=0; $i < strlen($sizeStr); $i++) {
-            if ($inNum == 1) {
-                if (is_numeric($sizeStr[$i]) or $sizeStr[$i] == ".") {
-                    $num .= $sizeStr[$i];
-                } else if ($sizeStr[$i] == "/" or $sizeStr[$i] == "-") {
-                    $mult = $num;
-                    $num = "";
-                } else {
-                    $inNum = 0;
-                    $unit .= $sizeStr[$i];
-                }
-            } else {
-                $unit .= $sizeStr[$i];
-            }
-        }
+        //$inNum = 1;
+        $sizeSplit = PriceLib::splitSizeStr($sizeStr);
+        $num = $sizeSplit['number'];
+        $unit = $sizeSplit['unit'];
+        $mult = $sizeSplit['mult'];
 
         $unit = ltrim($unit);
         $unit = strtoupper($unit);
@@ -193,6 +182,74 @@ class PriceLib
 
         return "";
     }
+
+    public static function getUnitStd($fannieUnit, $sizeStr ='') {
+        $ret = $fannieUnit;
+        if ($fannieUnit == '' && $sizeStr == '') {
+            $ret = 'UNITMISSING';
+        } else {
+            $strArray = explode('/', $fannieUnit);
+            if (sizeof($strArray) < 3) {
+                if($sizeStr != '') {
+                    $sizeArray = PriceLib::splitSizeStr($sizeStr);
+                    if(sizeof($sizeArray) >1 ) {
+                        $ret = $sizeArray['unit'];
+                    }
+                }
+            } else {
+                $ret = $strArray[2];
+            }
+        }
+        return $ret;
+    }
+
+    public static function getUnitProd($fannieUnit, $sizeStr ='') {
+        $ret = $fannieUnit;
+        if ($fannieUnit == '' && $sizeStr == '') {
+            $ret = 'UNITMISSING';
+        } else {
+            $strArray = explode('/', $fannieUnit);
+            if (sizeof($strArray) < 3) {
+                if($sizeStr != '') {
+                    $sizeArray = PriceLib::splitSizeStr($sizeStr);
+                    if(sizeof($sizeArray) >1 ) {
+                        $ret = $sizeArray['unit'];
+                    }
+                }
+            } else {
+                $ret = $strArray[1];
+            }
+        }
+        return $ret;
+    }
+
+    public static function splitSizeStr($sizeStr) {
+        $num = "";
+        $unit = "";
+        $mult = 1;
+        $inNum = 1;
+        if($sizeStr === 'RW') {
+            return array('number'=> 1, 'unit' => 'lb');
+        }
+
+        for ($i=0; $i < strlen($sizeStr); $i++) {
+            if ($inNum == 1) {
+                if (is_numeric($sizeStr[$i]) or $sizeStr[$i] == ".") {
+                    $num .= $sizeStr[$i];
+                } else if ($sizeStr[$i] == "/" or $sizeStr[$i] == "-") {
+                    $mult = $num;
+                    $num = "";
+                } else {
+                    $inNum = 0;
+                    $unit .= $sizeStr[$i];
+                }
+            } else {
+                $unit .= $sizeStr[$i];
+            }
+        }
+
+        return array('number'=> $num, 'unit' => ltrim($unit),'mult' => $mult);
+    }
     /*
     this is a kludge but I'm on short notice to get this done
     there is a mass of spagghti code for the price per unit
@@ -211,12 +268,11 @@ class PriceLib
         $query = "SELECT DISTINCT(p.unitofmeasure) FROM products p where p.upc = ?";
         $prep = $dbc->prepare($query);
         $ret = $dbc->execute($prep, array($upc));
-
-
-        $unitSize = '';
-        $packUnit = '';
-        $strUnit = '';
+        $unitofmaesure = '';
         if (!$ret || $dbc->numRows($ret) == 0) {
+            $unitofmaesure = 'err';
+            /*
+            * This is some legacy code that I am trying to run without but I want it here incase I need to put it back. ~RO
             //failed to get proper unit info, defualt to old scheme.
             // get the unit info from the FCC Legacy table.
             $queryUnitInfo = "SELECT p.unitStandard, p.size, p.unit FROM prodStandardUnit p WHERE p.upc = ?";
@@ -232,33 +288,44 @@ class PriceLib
             $unitSize = $rowUnitInfo['size'];
             $packUnit = $rowUnitInfo['unit'];
             $stdUnit = $rowUnitInfo['unitStandard'];
+            */
         } else {
-            // break up the string
             $strRow = $dbc->fetchRow($ret);
-            $str = $strRow[0];
-            $strArray = explode('/', $str);
-            if (sizeof($strArray) < 3) {
-                return PriceLib::pricePerUnit($price,$sizeStr,$upc); //defaults to old method if data is missing.
-            } else {
-                $unitSize = $strArray[0];
-                $packUnit = $strArray[1];
-                $stdUnit = $strArray[2]; 
-            }
+            $unitofmaesure = $strRow[0];
         }
 
-
-
+        $unitSize = 0;
+        $packUnit = '';
+        $strUnit = '';
+        $rowConversion ='';
+        $pricePerUnit = 'TOPERR';
+        $strArray = explode('/', $unitofmaesure);
+        if (sizeof($strArray) < 3 || $unitofmaesure == '') {
+            $sizeArray = PriceLib::splitSizeStr($sizeStr);
+            $packUnit = $sizeArray['unit'];
+            $unitSize = $sizeArray['number'];
+            $stdUnit = $sizeArray['unit'];
+        } else {
+            $unitSize = $strArray[0];
+            $packUnit = $strArray[1];
+            $stdUnit = $strArray[2];
+        }
 
         //look up the unit conversion.
-        $queryConversion = "SELECT c.rate FROM unitConversion c WHERE c.unit_name = ? AND c.unit_std = ?";
-        $args = array($packUnit, $stdUnit);
-        $prepConversion = $dbc->prepare($queryConversion);
-        $resConversion = $dbc->execute($prepConversion, $args);
-        if (!$resConversion || $dbc->numRows($resConversion) == 0) {
-            return PriceLib::pricePerUnit($price,$sizeStr,$upc); //defaults to old method if data is missing.
+        $conversion = 1;
+        if ($packUnit != $stdUnit) {
+            $queryConversion = "SELECT c.rate FROM unitConversion c WHERE c.unit_name = ? AND c.unit_std = ?";
+            $args = array($packUnit, $stdUnit);
+            $prepConversion = $dbc->prepare($queryConversion);
+            $resConversion = $dbc->execute($prepConversion, $args);
+            if (!$resConversion || $dbc->numRows($resConversion) == 0) {
+                $conversion = 1;
+            } else {
+                $rowConversion = $dbc->fetchRow($resConversion);
+                $conversion = $rowConversion['rate'];
+            }
         }
-        $rowConversion = $dbc->fetchRow($resConversion);
-
+        
         //get the price.
         if($price == 0 || is_null($price)) {
             $queryPrice = "SELECT p.normal_price FROM products p WHERE p.upc = ?";
@@ -272,9 +339,9 @@ class PriceLib
         }
 
         //return the unit price.
-        $pricePerUnit = ($unitSize && $unitSize != 0) ? $price*($rowConversion['rate']/$unitSize)  : 0 ;
-        if ($pricePerUnit == 0) {return "Size: ".$packUnit."\n Conversion Factor: ". $rowConversion['rate']; }
-        else { return number_format($pricePerUnit,2); }
+        $pricePerUnit = ($unitSize && $unitSize != 0) ? number_format(($price*($conversion/$unitSize)),2) : $pricePerUnit ;
+        //if ($pricePerUnit == 0) return false;
+        return $pricePerUnit;
     }
 }
 

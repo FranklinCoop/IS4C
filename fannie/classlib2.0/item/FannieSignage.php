@@ -705,7 +705,8 @@ class FannieSignage
                     o.name AS originName,
                     o.shortName AS originShortName,
                     b.transLimit, 
-                    CASE WHEN l.signMultiplier IS NULL THEN 1 ELSE l.signMultiplier END AS signMultiplier
+                    CASE WHEN l.signMultiplier IS NULL THEN 1 ELSE l.signMultiplier END AS signMultiplier,
+                    p.quantity AS quantity
                  FROM products AS p
                     LEFT JOIN productUser AS u ON p.upc=u.upc
                     LEFT JOIN vendors AS n ON p.default_vendor_id=n.vendorID
@@ -729,7 +730,7 @@ class FannieSignage
             $query .= ' AND p.store_id=? ';
             $args[] = FannieConfig::config('STORE_ID');
         }
-        $query .= 'ORDER BY p.department, p.upc';
+        $query .= 'GROUP BY p.upc ORDER BY p.department, p.upc';
 
         return array('query' => $query, 'args' => $args);
     }

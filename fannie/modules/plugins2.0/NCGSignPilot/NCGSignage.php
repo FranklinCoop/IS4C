@@ -68,12 +68,12 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
         $groupPrice = '';
         $priceDevider = 1;
 
-        if (array_key_exists('nonSaleGroupPrice',$item)) {
+        //if (array_key_exists('nonSaleGroupPrice',$item)) {
             //$newItem['groupPrice'] = $item['nonSaleGroupPrice'];
-        }
-        if($newItem['priceDevider'] == 2) {
+        //}
+        //if($newItem['priceDevider'] == 2) {
             //$newItem['signPriceType'] = NCGSignage::PRICE_TYPE_BOGO;
-        }
+        //}
 
         $pricePerUnit = false;
         $pricePerUnit = $this->getUnitPrice($dbc, $price,$item['unitofmeasure'],$item['size']);

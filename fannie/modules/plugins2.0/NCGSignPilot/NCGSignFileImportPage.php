@@ -142,7 +142,9 @@ class NCGSignFileImportPage extends \COREPOS\Fannie\API\FannieUploadPage {
         $dbc->startTransaction();
 
         foreach ($linedata as $line) {
-
+            if ($line[$indexes['upc']] == '') {
+                continue; // skip any lines that are for larage signs;
+            }
             $upc = $line[$indexes['upc']];
             if ($upc == 'Catapult UPC') {
                 continue; //skip first line

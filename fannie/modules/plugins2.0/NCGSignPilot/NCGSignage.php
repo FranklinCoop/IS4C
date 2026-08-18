@@ -58,11 +58,22 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
             }
         }*/
 
-
+        // dates for formating
         $start_date = new DateTime($item['startDate']);
         $end_date = new DateTime($item['endDate']);
 
+        //error checking to make sure we don't thow any undefiend index warnings;
         $price = (array_key_exists('nonSalePrice',$item)) ? $item['nonSalePrice'] : $item['normal_price'];
+        $quantity = (array_key_exists('nonSaleQuantity',$item)) ? $item['nonSaleQuantity'] : $item['quantity'];
+        $groupPrice = '';
+        $priceDevider = 1;
+
+        if (array_key_exists('nonSaleGroupPrice',$item)) {
+            //$newItem['groupPrice'] = $item['nonSaleGroupPrice'];
+        }
+        if($newItem['priceDevider'] == 2) {
+            //$newItem['signPriceType'] = NCGSignage::PRICE_TYPE_BOGO;
+        }
 
         $pricePerUnit = false;
         $pricePerUnit = $this->getUnitPrice($dbc, $price,$item['unitofmeasure'],$item['size']);
@@ -83,7 +94,7 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 'SignType' => '',
                 'startDate' => $item['startDate'],
                 'endDate' => $item['endDate'],
-                'brand' => $item['signMultiplier'],
+                'brand' => $item['brand'],
                 'description' => $item['description'],
                 'unitSize' => $item['size'],
                 'unitOfMeasure' => $this->getUnit($item['unitofmeasure'], $item['size']),
@@ -104,15 +115,6 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 'nonSaleQuantity' => '',
                 'groupPrice' => ''
         );
-        if (array_key_exists('nonSaleQuantity',$item)) {
-            $newItem['nonSaleQuantity'] = $item['nonSaleQuantity'];
-        }
-        if (array_key_exists('nonSaleGroupPrice',$item)) {
-            $newItem['groupPrice'] = $item['nonSaleGroupPrice'];
-        }
-        if($newItem['priceDevider'] == 2) {
-            $newItem['signPriceType'] = NCGSignage::PRICE_TYPE_BOGO;
-        }
 
         $model = new NCGSignDataModel($dbc);
         $model->start_date($start_date->format('Y-m-d').' 00:00:00');
@@ -144,31 +146,9 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 } elseif ($model->priceDevider() > 1) {
                     $newItem['signPriceType'] = NCGSignage::PRICE_TYPE_SPLIT;
                 }
-                //$newItem['unitPrice'] = $model->unitPrice();
-            /*$newItem = array(
-                'upc' => $model->upc(),
-                'SignSize' => '',
-                'SignType' => '',
-                'startDate' => $model->start_date(),
-                'endDate' => $model->end_date(),
-                'brand' => $model->brand(),
-                'description' => $model->description(),
-                'unitSize' => $model->unitSize(),
-                'unitOfMesure' => $model->unitOfMesure(),
-                'salePrice' => $model->posPrice(),
-                'normalPrice' => $item['nonSalePrice'],
-                'signPrice' => sprintf('$%.2f', $item['normal_price']),
-                'priceDevider' => $model->priceDevider(),
-                'multiPrice' => $model->multiPrice(),
-                'unitPrice' => $item['pricePerUnit'],
-                'saleUnitPrice' => $model->unitPrice(),
-                'attribute' => $model->attribute(),
-                'vendor' => $item['vendor'],
-                'sku' => $item['sku'],
-                'dept_name' => $item['dept_name']
-            );*/
+
         } else {
-            $newItem['dept_name'] = 'Failed NCG Data';
+            $newItem['unitSize'] .= ' -**';
         }
         return $newItem;
     }

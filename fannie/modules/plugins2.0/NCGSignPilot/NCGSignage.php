@@ -25,7 +25,7 @@ namespace COREPOS\Fannie\Plugin\NCGSignPilot {
 use COREPOS\Fannie\API\lib\PriceLib;
 use \BarcodeLib;
 use \NCGSignDataModel;
-use lib\fpdf_extended;
+use lib\FPDF_Extended;
 use DateTime;
 use \VendorSKUtoPLUModel;
 use \FannieConfig;

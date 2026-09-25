@@ -132,7 +132,8 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 $pricePerUnit = $this->getUnitPrice($dbc, $item['nonSalePrice'],$item['unitofmeasure'], $model->unitSize(), $model->unitOfMesure());
                 // update return array
                 //$newItem['unitOfMesure'] = $model->unitOfMesure();
-                $model->end_date($end_date->format('Y-m-d').' 23:59:59'); 
+                //$model->end_date($end_date->format('Y-m-d').' 23:59:59'); 
+                $newItem['endDate'] = $model->end_date();
                 $newItem['salePrice'] = $model->posPrice();
                 $newItem['signPrice'] = $model->signPrice();
                 $newItem['priceDevider'] = $model->priceDevider();

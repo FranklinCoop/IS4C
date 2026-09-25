@@ -25,7 +25,7 @@ namespace COREPOS\Fannie\Plugin\NCGSignPilot {
 use COREPOS\Fannie\API\lib\PriceLib;
 use \BarcodeLib;
 use \NCGSignDataModel;
-use lib\FPDF_extended;
+use lib\fpdf_extended;
 use DateTime;
 use \VendorSKUtoPLUModel;
 use \FannieConfig;
@@ -134,6 +134,7 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 //$newItem['unitOfMesure'] = $model->unitOfMesure();
                 //$model->end_date($end_date->format('Y-m-d').' 23:59:59'); 
                 $newItem['endDate'] = $model->end_date();
+                $newItem['startDate'] = $model->start_date();
                 $newItem['salePrice'] = $model->posPrice();
                 $newItem['signPrice'] = $model->signPrice();
                 $newItem['priceDevider'] = $model->priceDevider();

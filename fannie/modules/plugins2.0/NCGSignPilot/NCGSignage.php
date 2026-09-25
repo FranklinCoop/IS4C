@@ -1,7 +1,7 @@
 <?php
 /*******************************************************************************
 
-    Copyright 2014 Whole Foods Co-op, Duluth, MN
+    Copyright 2026 Franklin Community Coop
 
     This file is part of CORE-POS.
 
@@ -94,7 +94,7 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
                 'SignType' => '',
                 'startDate' => $item['startDate'],
                 'endDate' => $item['endDate'],
-                'brand' => $item['brand'],
+                'brand' => $lookUpUPC,
                 'description' => $item['description'],
                 'unitSize' => $item['size'],
                 'unitOfMeasure' => $this->getUnit($item['unitofmeasure'], $item['size']),
@@ -117,19 +117,22 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
         );
 
         $model = new NCGSignDataModel($dbc);
-        $model->start_date($start_date->format('Y-m-d').' 00:00:00');
-        //$model->end_date($end_date->format('Y-m-d').' 23:59:59');            
-        $model->upc($lookUpUPC);
+        $model->start_date($start_date->format('Y-m-d').' 00:00:00');           
         $exists = $model->load();
+        if(!$exists) {
+            $model = new NCGSignDataModel($dbc);
+            $model->upc($lookUpUPC);
+            $model->find();
+        };
 
         if ($exists) {
                 $salePricePerUnit = false;
-
                 $salePricePerUnit = $this->getUnitPrice($dbc, $model->posPrice(),$item['unitofmeasure'], $model->unitSize(), $model->unitOfMesure());
                 $pricePerUnit = false;
                 $pricePerUnit = $this->getUnitPrice($dbc, $item['nonSalePrice'],$item['unitofmeasure'], $model->unitSize(), $model->unitOfMesure());
                 // update return array
                 //$newItem['unitOfMesure'] = $model->unitOfMesure();
+                $model->end_date($end_date->format('Y-m-d').' 23:59:59'); 
                 $newItem['salePrice'] = $model->posPrice();
                 $newItem['signPrice'] = $model->signPrice();
                 $newItem['priceDevider'] = $model->priceDevider();
@@ -151,6 +154,72 @@ class NCGSignage extends \COREPOS\Fannie\API\item\FannieSignage
             $newItem['unitSize'] .= ' -**';
         }
         return $newItem;
+    }
+
+    public function getLineSignData($items) {
+        $dbc = $this->getDB();    
+        $newItems = array();
+        foreach ($items as $item) {
+            $start_date = new DateTime($item['startDate']);
+            $end_date = new DateTime($item['endDate']);
+            $upc = str_pad(ltrim($item['upc'], '0'), 12, '0', STR_PAD_LEFT);
+
+            if (strlen($upc) == 12) {
+                $upc = ltrim($upc, '0');
+                $upc .= $check = BarcodeLib::getCheckDigit($upc);
+                $upc = str_pad($upc, 13, '0', STR_PAD_LEFT);
+            }
+            //check if the upc is a plu and needs to be mapped to a upc.
+        
+            $lookUpUPC = str_pad(ltrim($upc, '0'), 12, '0', STR_PAD_LEFT);
+            // find any line drive sign data and send it.
+            $signQ = "SELECT * FROM core_op.NCGSignData d
+                    JOIN (SELECT brand, unitSize, posPrice FROM core_op.NCGSignData WHERE upc = ?) f
+                    WHERE start_date between ? AND ? AND SignSize NOT LIKE '%8_UP%'
+                    AND SignSize NOT LIKE '%15_UP%' AND f.brand = d.brand AND f.posPrice = d.posPrice 
+                    AND SUBSTRING_INDEX(f.unitSize, ' ', 1) BETWEEN SUBSTRING_INDEX(d.unitSize, '-', 1) AND SUBSTRING_INDEX(SUBSTRING_INDEX(d.unitSize, ' ', 1), '-', -1)";
+            $signP = $dbc->prepare($signQ);
+            //$today = date('Y-m-d');
+            $signR = $dbc->execute($signP, $lookUpUPC, $start_date->format('Y-m-d').' 00:00:00',$end_date->format('Y-m-d').' 23:59:59');
+            if ($dbc->num_rows($signR) > 0) {
+                $signW = $dbc->fetch_row($signR);
+                $salePricePerUnit = false;
+                $salePricePerUnit = $this->getUnitPrice($dbc, $signW('posPrice'),$item['unitofmeasure'], $signW('unitSize'), $signW('unitOfMesure'));
+                $pricePerUnit = false;
+                $pricePerUnit = $this->getUnitPrice($dbc, $item['nonSalePrice'],$item['unitofmeasure'], $signW('unitSize'), $signW('unitOfMesure'));
+
+                $newItem = array(
+                    'upc' => $item['upc'],
+                    'SignSize' => $signW['SignSize'],
+                    'SignType' => $signW['SignType'],
+                    'startDate' => $signW['start_date'],
+                    'endDate' => $signW['end_date'],
+                    'brand' => $signW['brand'],
+                    'description' => $signW['description'],
+                    'unitSize' => $signW['unitSize'],
+                    'unitOfMeasure' => $this->getUnit($item['unitofmeasure'], $item['size']),
+                    'salePrice' => $item['normal_price'],
+                    'normalPrice' => $price,
+                    'signPrice' => sprintf('$%.2f', $item['normal_price']),
+                    'priceDevider' => $item['quantity'],
+                    'multiPrice' => '',
+                    'unitPrice' => $pricePerUnit,
+                    'saleUnitPrice' => $salePricePerUnit,
+                    'attribute' => $this->getAttributes($dbc, $item['upc']),
+                    'vendor' => $item['vendor'],
+                    'sku' => $item['sku'],
+                    'dept_name' => $item['dept_name'],
+                    'superDeptName' => $superName,
+                    'signPriceType' => NCGSignage::PRICE_TYPE_NORMAL,
+                    'saleGroupPrice' => '',
+                    'nonSaleQuantity' => '',
+                    'groupPrice' => ''
+                );
+                $newItems[] += $newItem;
+            }
+        }
+
+        return $newItems;
     }
 
     private function getUnitPrice($dbc, $price, $unitofmaesure, $sizeStr = '', $ncgunit = '') {

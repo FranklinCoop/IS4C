@@ -4,7 +4,7 @@ if (class_exists('Mailchimp')) {
 
 class MailChimpEx extends Mailchimp
 {
-    public $export_root = 'https://api.mailchimp.com/export/1.0';
+    public $export_root = 'https://api.mailchimp.com/export/3.0';
     public $export_mode = false;
 
     public function __construct($apikey=null, $opts=array())
